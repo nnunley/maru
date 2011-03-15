@@ -3,7 +3,6 @@
 
 typedef ALIGNED (SIMD_SIZE) struct nile_Node_ {
     struct nile_Node_ *next;
-    const char *type;
 } ALIGNED (SIMD_SIZE) nile_Node_t;
 
 typedef struct {
