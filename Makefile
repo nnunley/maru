@@ -23,7 +23,7 @@ endif
 
 .SUFFIXES :
 
-# all : eval2 eval eval32 system.osdefs.k
+# all : eval2 eval eval32 osdefs.k
 all : eval2 eval osdefs.k
 
 run : all
@@ -36,7 +36,7 @@ eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-eval2 : eval eval2.c gc.c gc.h buffer.c chartab.h wcs.c system.osdefs.k
+eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
@@ -52,8 +52,8 @@ check-marux : eval2
 
 test-maru : eval2
 	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
 	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
 
 test2-maru : eval2
 	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
@@ -101,8 +101,8 @@ profile : .force
 #	shark -q -1 -i ./eval emit.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l > test.s
 	shark -q -1 -i ./eval repl.l test-pepsi.l
 
-osdefs.k : system.osdefs.k
-	cp $< $@
+osdefs.k : mkosdefs
+	./mkosdefs > $@
 
 mkosdefs : mkosdefs.c
 	$(CC) -o $@ $<
