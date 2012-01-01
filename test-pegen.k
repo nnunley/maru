@@ -223,11 +223,8 @@
       (or (at-end? in) (error "error in PE near: "(context in)))
       (resolve (array-flatten-all p)))))
 
-(define-function *main* ()
-  (let ((g (compile-pe "         ( \"hello\" | [abcdefghijklmnopqrstuvwxyz] | \",\" | [ ] | [()] ) * ")))
-    (println)
-    (for (i 0 (array-length g)) (println (format "%04i" i)" "(array-at g i)))
-    (println)
-    (println (parse "hello, (parsing) world." g))))
-
-(*main*)
+(let ((g (compile-pe "         ( \"hello\" | [abcdefghijklmnopqrstuvwxyz] | \",\" | [ ] | [()] ) * ")))
+  (println)
+  (for (i 0 (array-length g)) (println (format "%04i" i)" "(array-at g i)))
+  (println)
+  (println (parse "hello, (parsing) world." g)))

@@ -1,7 +1,6 @@
 #define _WIDEN(x)  L ## x
 #define WIDEN(x)   _WIDEN(x)
 
-#include <wchar.h>
 #include <stdlib.h>
 
 static wchar_t *mbs2wcs(char *mbs)
@@ -20,18 +19,15 @@ static wchar_t *mbs2wcs(char *mbs)
 
 static char *wcs2mbs(wchar_t *wcs)
 {
-    typedef struct { char *mbs;  size_t size; } buf_t;
-    static buf_t bufs[32]= {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
-    static int bufn= 0;
-    buf_t *buf= bufs + bufn++;
-    if (bufn == 32) bufn= 0;
+    static char *mbs= 0;
+    static size_t bufSize= 0;
     size_t len= 6 * wcslen(wcs) + 1;
-    if (buf->size < len) {
-	buf->mbs= buf->mbs ? (char *)realloc(buf->mbs, len) : (char *)malloc(len);
-	buf->size= len;
+    if (bufSize < len) {
+	mbs= mbs ? (char *)realloc(mbs, len) : (char *)malloc(len);
+	bufSize= len;
     }
-    wcstombs(buf->mbs, wcs, buf->size);
-    return buf->mbs;
+    wcstombs(mbs, wcs, bufSize);
+    return mbs;
 }
 
 

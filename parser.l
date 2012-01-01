@@ -135,7 +135,7 @@
 		(let ()
 		  (and (= ?\n c) (set self.srcpos (cons (car self.srcpos) (+ 1 (cdr self.srcpos)))))
 		  (set self.pending c))
-	      ;;(or (= self.source *input*) (close self.source)) ;; the caller should close the stream
+	      (or (= self.source *input*) (close self.source))
 	      (set self.source ())
 	      (set self.pending *end*)))
 	(set self.pending *end*))))
@@ -699,9 +699,6 @@
 
 (define-function parse-all (self source)
   (parse-all-from self source $start))
-
-(define-method parser-context <parser> ()
-  (parser-stream-context self.source))
 
 ;;;----------------------------------------------------------------
 
