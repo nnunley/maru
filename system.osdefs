@@ -1,6 +1,12 @@
+// Minimum header files for os detection.
 header	stdio.h stddef.h stdint.h wchar.h
 
-integer __APPLE__? __ELF__? __LITTLE_ENDIAN__? __MACH__? __WIN32__? __i386__? __i586__? __linux__?
+// Executable representation
+integer __ELF__? __LITTLE_ENDIAN__? __MACH__? 
+// OS constants
+integer __WIN32__? __APPLE__? __linux__?
+// Architecture
+integer __i386__? __i586__?  __aarch64__?
 string	__USER_LABEL_PREFIX__?
 
 type	longlong	long long
@@ -12,6 +18,7 @@ type	wchar		wchar_t
 
 sizes	char short int long longlong int32 int64 wchar float double longdouble pointer
 
+// Discover dynamic loading flags and policies.
 header	dlfcn.h		(!defined __WIN32__)
 header	w32dlfcn.h	( defined __WIN32__)
 

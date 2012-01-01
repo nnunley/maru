@@ -98,7 +98,8 @@
 (define-selector compile-node)
 
 (define-function compile-set (compiler)
-  xxx
+;;;  xxx
+)
 
 (define-method compile-node <operator> (compiler)
   (let ((op (<operator>-operation self)))
