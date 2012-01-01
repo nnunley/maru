@@ -23,8 +23,7 @@ endif
 
 .SUFFIXES :
 
-# all : eval2 eval eval32 osdefs.k
-all : eval2 eval osdefs.k
+all : eval2 eval eval32 osdefs.k
 
 run : all
 	rlwrap ./eval
@@ -59,12 +58,12 @@ test2-maru : eval2
 	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
 
 test3-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -fno-builtin -g -o test3 test.s && ./test3
+	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
 
-# maru-check : eval2 .force
-#	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
-#	cc -m32 -o maru-check maru-check.s
-#	./maru-check
+maru-check : eval2 .force
+	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
+	cc -m32 -o maru-check maru-check.s
+	./maru-check
 
 maru-check-c : eval2 .force
 	./eval2 ir-gen-c.k maru.k maru-check.k > maru-check.c
@@ -82,9 +81,9 @@ maru-bench : eval2 .force
 	time ./maru-nfibs 38
 	time ./maru-nfibs 38
 
-#eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
-#	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
-#	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
+eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c $(LIBS) -lgc
@@ -106,6 +105,12 @@ osdefs.k : mkosdefs
 
 mkosdefs : mkosdefs.c
 	$(CC) -o $@ $<
+
+cg : eval .force
+	./eval codegen5.l | tee test.s
+	as test.s
+	ld  --build-id --eh-frame-hdr -m elf_i386 --hash-style=both -dynamic-linker /lib/ld-linux.so.2 -o test /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crt1.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crti.o /usr/lib/gcc/i486-linux-gnu/4.4.5/crtbegin.o -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../.. a.out -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/i486-linux-gnu/4.4.5/crtend.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crtn.o
+	./test
 
 test : emit.l eval.l eval
 	$(TIME) ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
@@ -147,7 +152,7 @@ test-compile-grammar :
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
-test-compile-irgol : eval2 irgol.g.l .force
+test-compile-irgol : eval32 irgol.g.l .force
 	./eval compile-irgol.l test.irgol > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
@@ -162,7 +167,7 @@ test-irgol : eval .force
 	@echo
 	./test
 
-test-compile-irl : eval2 irl.g.l .force
+test-compile-irl : eval32 irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
@@ -187,44 +192,39 @@ tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
 	diff tpeg.ls tpeg.lls
 	rm tpeg.ls tpeg.ll tpeg.lls
 
+test-mach-o : eval32 .force
+	./eval32 test-mach-o.l
+	@echo
+	size a.out
+	chmod +x a.out
+	@echo
+	./a.out
 
-ifeq (0,1)
-	test-mach-o : eval32 .force
-		./eval32 test-mach-o.l
-		@echo
-		size a.out
-		chmod +x a.out
-		@echo
-		./a.out
+test-elf : eval32 .force
+	./eval32 test-elf.l
+	@echo
+	size a.out
+	chmod +x a.out
+	@echo
+	./a.out
 
-	test-elf : eval32 .force
-		./eval32 test-elf.l
-		@echo
-		size a.out
-		chmod +x a.out
-		@echo
-		./a.out
-endif
-
-test-assembler : eval2 .force
-	./eval2 assembler.k
+test-assembler : eval32 .force
+	./eval32 assembler.k
 
 test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
 	./eval compile-recursion2.l test-recursion2.txt
 
-#Looks I think this is supposed to generate a binary, and execute
-test-main : eval2 .force
-	$(TIME) ./eval2 test-main.k
+test-main : eval32 .force
+	$(TIME) ./eval32 test-main.k
 	chmod +x test-main
 	$(TIME) ./test-main hello world
 
-test-main2 : eval2 .force
-	$(TIME) ./eval2 test-pegen.k save.k test-pegen
+test-main2 : eval32 .force
+	$(TIME) ./eval32 test-pegen.k save.k test-pegen
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
 
-# C preprocessor that wasn't included in the repo.
 cpp.g.l : cpp.g tpeg.l
 	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
@@ -252,6 +252,16 @@ profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
 	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
 
+NILE = ../nile
+GEZIRA = ../gezira
+
+libs : libnile.$(SO) libgezira.$(SO)
+
+libnile.$(SO) : .force
+	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(NILE)/runtimes/c/nile.c
+
+libgezira.$(SO) : .force
+	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(GEZIRA)/c/gezira.c $(GEZIRA)/c/gezira-image.c
 
 stats : .force
 	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l

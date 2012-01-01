@@ -1,4 +1,4 @@
-(buffer-save (or (car *arguments*)
+(save (or (car *arguments*)
 	  (error "save: no filename specified")))
 
 (exit 0)

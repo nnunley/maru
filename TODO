@@ -1,36 +1,3 @@
-========
-Finish prepping to rehome the Maru codebase.
-
-* Fix native compilation.
-- MacOS on ARM processors needs a bit of work. Needs working IR path to not go crazy.
-
-Fix IR2
-
-* LLVM assembly?
-* ARM assembly?
-* 64 bit support
-* IR Gen has information on this bin the todos below.
-
-Documentation
-
-I should write my own walkthrough of my understanding of this code.
-
-* Bootstrap loop
-* IR
-* DIfferences between this grammar engine and Ometa. 
-* Point out cool things that the current evaluator can do.
-
-
----------------------------
-Historical TODOs:
-
-Below was everything that Dan and Ian left as things to work on.
-
--------
-
-
-
-
 * constant folding
 
 * remove frame from <ir> and move it to <ir-gen>
