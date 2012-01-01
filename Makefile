@@ -1,15 +1,8 @@
 NOW = $(shell date '+%Y%m%d.%H%M')
-SYS = $(shell uname -o)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
 CFLAGS = -Wall -g $(OFLAGS)
 CC32 = $(CC) -m32
-
-ifeq "$(SYS)" "Msys"
-LIBS = -lm libw32dl.a
-else
-LIBS = -lm -ldl
-endif
 
 .SUFFIXES :
 
@@ -18,19 +11,16 @@ all : eval eval32 osdefs.k
 run : all
 	rlwrap ./eval
 
-status : .force
-	@echo "SYS is $(SYS)"
-
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
-	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
+	$(CC) -g $(CFLAGS) -o eval eval.c -lm -ldl
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
-	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
+	$(CC32) -g $(CFLAGS) -o eval32 eval.c -lm -ldl
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
-	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c $(LIBS) -lgc
+	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c -lm -ldl -lgc
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 debug : .force

@@ -1,4 +1,4 @@
-// last edited: 2012-08-22 17:08:24 by piumarta on WINXP
+// last edited: 2012-08-20 07:20:08 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -15,12 +15,6 @@
 #include <assert.h>
 
 extern int isatty(int);
-
-#if defined(WIN32)
-# define swnprintf(BUF, SIZE, FMT, ARG) swprintf(BUF, FMT, ARG)
-#else
-# define swnprintf swprintf
-#endif
 
 #define	TAG_INT	1
 //#define	LIB_GC	1
@@ -1700,14 +1694,14 @@ static subr(ne)
     return newBool(!equal(lhs, rhs));
 }
 
-#if !defined(WIN32) && (!LIB_GC)
+#if (!LIB_GC)
 static void profilingDisable(int);
 #endif
 
 static subr(exit)
 {
   oop n= car(args);
-#if !defined(WIN32) && (!LIB_GC)
+#if (!LIB_GC)
   if (opt_p)
   {
       profilingDisable(1);
@@ -1727,7 +1721,7 @@ static subr(open)
   oop arg= car(args);
   if (!is(String, arg)) { fprintf(stderr, "open: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
   char *name= strdup(wcs2mbs(get(arg, String,bits)));
-  char *mode= "r";
+  char *mode= "rb";
   long  wide= 1;
   if (is(String, cadr(args))) mode= wcs2mbs(get(cadr(args), String,bits));
   if (is(Long, caddr(args))) wide= getLong(caddr(args));
@@ -1909,7 +1903,7 @@ static subr(format)
   oop ans= nil;
   if (!(p= malloc(sizeof(wchar_t) * size))) return nil;
   for (;;) {
-    int n= swnprintf(p, size, fmt, arg);
+    int n= swprintf(p, size, fmt, arg);
     if (0 <= n && n < size) {
       ans= newString(p);
       free(p);
@@ -2109,7 +2103,7 @@ static subr(long_string)
 {
   oop arg= car(args);				if (is(String, arg)) return arg;  if (!isLong(arg)) return nil;
   wchar_t buf[32];
-  swnprintf(buf, 32, L"%ld", getLong(arg));
+  swprintf(buf, 32, L"%ld", getLong(arg));
   return newString(buf);
 }
 
@@ -2129,7 +2123,7 @@ static subr(double_string)
 {
     oop arg= car(args);				if (is(String, arg)) return arg;  if (!isDouble(arg)) return nil;
     wchar_t buf[32];
-    swnprintf(buf, 32, L"%f", getDouble(arg));
+    swprintf(buf, 32, L"%f", getDouble(arg));
     return newString(buf);
 }
 
@@ -2253,9 +2247,7 @@ accessor(long,  long)
 
 #undef accessor
 
-#if !defined(WIN32)
-# include <sys/mman.h>
-#endif
+#include <sys/mman.h>
 
 static subr(native_call)
 {
@@ -2289,20 +2281,14 @@ static subr(native_call)
 	default:	fatal("call: cannot call object of type %i", getType(obj));
     }
     if (size) {
-#     if !defined(WIN32)
 	if (mprotect(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
-#     endif
     }
     return newLong(((int (*)())addr)(argv));
 }
 
-#if defined(WIN32)
-# include "w32dlfcn.h"
-#else
-# define __USE_GNU
-# include <dlfcn.h>
-# undef __USE_GNU
-#endif
+#define __USE_GNU
+#include <dlfcn.h>
+#undef __USE_GNU
 
 static subr(subr)
 {
@@ -2425,36 +2411,7 @@ static subr(address_of)
 }
 
 #include <sys/time.h>
-#if defined(WIN32)
-    struct rusage {
-      struct timeval ru_utime;
-      struct timeval ru_stime;
-    };
-
-#   define RUSAGE_SELF 0
-
-#   define timersub(a, b, result)					\
-    do {								\
-      (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;			\
-      (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;			\
-      if ((result)->tv_usec < 0) {					\
-	--(result)->tv_sec;						\
-	(result)->tv_usec += 1000000;					\
-      }									\
-    } while (0)
-
-    static void getrusage(int who, struct rusage *ru)
-    {
-      clock_t cl= clock();
-      long ms= cl * 1000 / CLOCKS_PER_SEC;
-      ru->ru_utime.tv_sec=  (ms / 1000);
-      ru->ru_utime.tv_usec= (ms % 1000) * 1000;
-      ru->ru_stime.tv_sec=  0;
-      ru->ru_stime.tv_usec= 0;
-    }
-#else
-# include <sys/resource.h>
-#endif
+#include <sys/resource.h>
 
 static struct timeval epoch;
 
@@ -2520,7 +2477,7 @@ static void replFile(FILE *stream, wchar_t *path)
     }
   }
   int c= getwc(stream);
-  if (WEOF != c)			fatal("unexpected character 0x%02x '%c'\n", c, c);
+  if (EOF != c)				fatal("unexpected character 0x%02x '%c'\n", c, c);
   endSource();
 }
 
@@ -2545,7 +2502,7 @@ static void sigint(int signo)
   fatal("\nInterrupt");
 }
 
-#if !defined(WIN32) && (!LIB_GC)
+#if (!LIB_GC)
 
 static int profilerCount= 0;
 
@@ -2806,7 +2763,7 @@ int main(int argc, char **argv)
 
   signal(SIGINT, sigint);
 
-#if !defined(WIN32) && (!LIB_GC)
+#if (!LIB_GC)
   {
       struct sigaction sa;
       sa.sa_handler= sigvtalrm;
@@ -2825,7 +2782,7 @@ int main(int argc, char **argv)
     else if (!wcscmp (arg, L"-b"))	{ ++opt_b; }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
     else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
-#  if !defined(WIN32) && (!LIB_GC)
+#  if (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
 	opt_g= 0;
 	opt_p= wcstoul(arg + 2, 0, 0);
@@ -2842,13 +2799,13 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-#          if !defined(WIN32) && (!LIB_GC)
+#          if (!LIB_GC)
 	    if (opt_p) profilingEnable();
 #	   endif
 	    set(arguments, Variable,value, argt);
 	    replPath(arg);
 	    repled= 1;
-#	   if !defined(WIN32) && (!LIB_GC)
+#	   if (!LIB_GC)
 	    if (opt_p) profilingDisable(0);
 #	   endif
 	}
@@ -2874,7 +2831,7 @@ int main(int argc, char **argv)
     printf("\nmorituri te salutant\n");
   }
 
-#if !defined(WIN32) && (!LIB_GC)
+#if (!LIB_GC)
   if (opt_p) profilingDisable(1);
 #endif
 
