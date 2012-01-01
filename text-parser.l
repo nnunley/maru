@@ -1,13 +1,15 @@
 (require "ansiterm.l")
 
-(define-structure <text-parser> (string limit position memos positions result))
+(define-structure <text-parser> (string limit position memos refill result))
+
+(define-function text-parser-refill-default (self len) ())
 
 (define-function text-parser-for-on (class str)
-  (new class str (string-length str) 0 (array)))
+  (new class str (string-length str) 0 (array) text-parser-refill-default))
 
 (define text-parser-match-any
   (define-method parser-match-any <text-parser> ()
-    (when (< self.position self.limit)
+    (when (or (< self.position self.limit) (self.refill self 1))
       (set self.result (string-at self.string self.position))
       (incr self.position))))
 
@@ -38,29 +40,33 @@
 
 (define text-parser-match-class
   (define-method parser-match-class <text-parser> (class)
-    (let ((c (string-at self.string self.position)))
-      (and c
-	   (let ((i (string-search class c)))
-	     (and i
-		  (<= 0 i)
-		  (set self.result c)
-		  (incr self.position)))))))
+    (when (or (< self.position self.limit) (self.refill self 1))
+      (let ((c (string-at self.string self.position)))
+	(and c
+	     (let ((i (string-search class c)))
+	       (and i
+		    (<= 0 i)
+		    (set self.result c)
+		    (incr self.position))))))))
 
 (define text-parser-match-object
   (define-method parser-match-object <text-parser> (obj)
-    (when (= obj (string-at self.string self.position))
+    (when (and (or (< self.position self.limit) (self.refill self 1))
+	       (= obj (string-at self.string self.position)))
       (set self.result obj)
       (incr self.position))))
 
 (define text-parser-match-char
   (define-method parser-match-object <text-parser> (obj)
-    (when (= obj (string-at self.string self.position))
+    (when (and (or (< self.position self.limit) (self.refill self 1))
+	       (= obj (string-at self.string self.position)))
       (set self.result (string-copy self.string self.position 1))
       (incr self.position))))
 
 (define text-parser-match-string
   (define-method parser-match-string <text-parser> (string len)
-    (when (= 0 (string-compare self.string string self.position len))
+    (when (and (or (< (+ self.position len) self.limit) (self.refill self len))
+	       (= 0 (string-compare self.string string self.position len)))
       (set self.result string)
       (incr self.position len))))
 
@@ -149,14 +155,14 @@
   ;;(println "; memoised "name" "self)
   (let* ((here  (<text-parser>-position self))
 	 (memos (<text-parser>-memos self))
-	 (memo  (get (array-at memos here) name)))
+	 (memo  (get (array-at memos here) rule)))
     ;;(println "; memo "memo)
     (cond
       (memo	(and (= *succeeded* (<memo>-state memo))
 		     (let ()
 		       (set (<text-parser>-result self) (<memo>-result memo))
 		       (set (<text-parser>-position self) (<memo>-position memo)))))
-      (else	(put (array-at memos here) name (set memo (new <memo>)))
+      (else	(put (array-at memos here) rule (set memo (new <memo>)))
 		(if (text-parser-invoke-rule-simply-with name rule self args)
 		    (memo-set memo *succeeded* (<text-parser>-result self) (<text-parser>-position self))
 		  (set (<memo>-state memo) *failed*)
@@ -165,7 +171,7 @@
 (define-function text-parser-invoke-rule-with-recursion (name rule self . args)
   (let* ((posn   (<text-parser>-position self))
 	 (memos  (<text-parser>-memos self))
-	 (memo   (get (array-at memos posn) name)))
+	 (memo   (get (array-at memos posn) rule)))
     (if memo
 	;; this rule has already been entered at this position and has either succeeded, failed, or is in left-recursive iteration
 	(let ((state  (<memo>-state  memo))
@@ -177,7 +183,7 @@
 					())
 	    (else			())))
       ;; this rule has not been entered at this position
-      (put (array-at memos posn) name (set memo (new <memo> *active* () posn)))
+      (put (array-at memos posn) rule (set memo (new <memo> *active* () posn)))
       (if (text-parser-invoke-rule-simply-with name rule self args)
 	  ;; rule succeeded without recursion or entered recursion and found a non-recursive initial prefix
 	  (let ((state (<memo>-state memo)))

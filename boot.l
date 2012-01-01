@@ -94,6 +94,13 @@
   (lambda (x y)
     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
 
+(define concat-symbols
+  (lambda args
+    (let ((result (car args)))
+      (while (symbol? (car (set args (cdr args))))
+	(set result (concat-symbol result (car args))))
+      result)))
+
 (define quasiquote
   (form
     (let ((qq-list) (qq-element) (qq-object))
@@ -104,7 +111,9 @@
 			       (if (cdr l)
 				   (list 'concat-list (cadr obj) (qq-list (cdr l)))
 				 (cadr obj))
-			     (list 'cons (qq-object obj) (qq-list (cdr l)))))
+			     (if (and (= 'unquote obj) (pair? (cdr l)) (not (cddr l)))
+				 (cadr l)
+			       (list 'cons (qq-object obj) (qq-list (cdr l))))))
 		       (list 'quote l))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
@@ -125,7 +134,7 @@
   `(define ,name (lambda ,args ,@body)))
 
 (define-form define-macro (name args . body)
-  `(define-form ,name ,args (cons 'let (cons () (macro-expand (list-zip-assocs ',args (list ,@args)) ',body)))))
+  `(define-form ,name ,args (cons 'let (cons () (macro-expand (zip-assocs ',args (list ,@args)) ',body)))))
 
 (define-function macro-expand (bindings exp)
   (if (pair? exp)
@@ -160,13 +169,23 @@
 (define-function array-append (arr val)
   (set-array-at arr (array-length arr) val))
 
-(define-function map (function list)
+(define-function map1 (function list)
   (let ((head (cons)))
     (let ((tail head))
       (while (pair? list)
 	(set tail (set (cdr tail) (cons (function (car list)) ())))
 	(set list (cdr list))))
     (cdr head)))
+
+(define-function mapN (function lists)
+  (and (pair? (car lists))
+       (cons (apply function (map1 car lists))
+	     (mapN function (map1 cdr lists)))))
+
+(define-function map (function . lists)
+  (if (pair? (cdr lists))
+      (mapN function lists)
+    (map1 function (car lists))))
 
 (define-function reverse-map (function list)
   (and list
@@ -405,7 +424,7 @@
 (define-structure <expr>	(name defn ctx profile))		(define-function expr? (obj) (= <expr> (type-of obj)))
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
-(define-structure <subr>	(_imp _name _profile))
+(define-structure <subr>	(_name _imp _sig _profile))
 (define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
@@ -637,6 +656,8 @@
   ;;(println "; backtrace disabled")
   )
 
+(define-function printf (fmt arg) (print (format fmt arg)))
+
 ;;; multimethod
 
 (define-structure <generic> (name methods default))
@@ -712,14 +733,11 @@
       (set curr next))
     prev))
 
-(define-function list-zip (a b)
-  (if (and (pair? a) (pair? b))
-      (cons (car a) (cons (car b) (list-zip (cdr a) (cdr b))))
-    (or a b)))
+(define-function zip lists		(apply map list lists))
 
-(define-function list-zip-assocs (a b)
+(define-function zip-assocs (a b)
   (if (and (pair? a) (pair? b))
-      (cons (cons (car a) (car b)) (list-zip-assocs (cdr a) (cdr b)))
+      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
     (or a b)))
 
 ;;; iteration
@@ -737,13 +755,13 @@
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
-       (let ((,var (car _list_))) ,@body)
+       (let* ((,var (car _list_))) ,@body)	;; let* allows (list-do (vars...) list-of-lists)
        (set _list_ (cdr _list_)))))
 
 (define-form alist-do (var alist . body)
   `(let ((_list_ ,alist))
      (while _list_
-       (let ((,var (cdar _list_))) ,@body)
+       (let*  ((,var (cdar _list_))) ,@body)
        (set _list_ (cdr _list_)))))
 
 (define-function %generic-do (get len var col body)
@@ -751,7 +769,7 @@
 	  (_idx_ 0)
 	  (_end_ (,len _col_)))
      (while (< _idx_ _end_)
-       (let ((,var (,get _col_ _idx_))) ,@body)
+       (let* ((,var (,get _col_ _idx_))) ,@body)
        (set _idx_ (+ _idx_ 1)))))
 
 (define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
@@ -775,8 +793,8 @@
   `(let ((_ ())
 	 (__ ,list))
      (while (and __ (not _))
-       (let ((,name (car __)))
-	 (and ,expr (set _ ,name))
+       (let* ((,name (car __)))
+	 (and ,expr (set _ (car __)))
 	 (set __ (cdr __))))
      _))
 
@@ -922,6 +940,8 @@
 (define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
 (define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
 
 ;;; structural equality
 
