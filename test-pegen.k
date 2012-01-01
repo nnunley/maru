@@ -147,7 +147,7 @@
     (cond
       ((= c ?\[)	(compile-pe-class in))
       ((= c ?\")	(compile-pe-string in))
-      ((= c ?\()	(let ((c ()) (p (array-with (compile-pe-expression in))))
+      ((= c ?\()	(let (c (p (array-with (compile-pe-expression in))))
 			  (while (and (set c (next in)) (!= ?\) c))
 			    (array-append p (compile-pe-expression in)))
 			  (or (= ?\) c) (error "missing ')' near: "(context (rewind in 1))))
@@ -179,7 +179,7 @@
 
 (define-function compile-pe-sequence (in)
   (println "compile-pe-sequence "(peek in))
-  (let ((c ()) (p (array)))
+  (let (c (p (array)))
     (while (and (set c (peek in)) (!= ?\| c) (!= ?\) c))
       (array-append p (compile-pe-prefix in))
       (compile-pe-space in)
@@ -223,11 +223,8 @@
       (or (at-end? in) (error "error in PE near: "(context in)))
       (resolve (array-flatten-all p)))))
 
-(define-function *main* ()
-  (let ((g (compile-pe "         ( \"hello\" | [abcdefghijklmnopqrstuvwxyz] | \",\" | [ ] | [()] ) * ")))
-    (println)
-    (for (i 0 (array-length g)) (println (format "%04i" i)" "(array-at g i)))
-    (println)
-    (println (parse "hello, (parsing) world." g))))
-
-(*main*)
+(let ((g (compile-pe "         ( \"hello\" | [abcdefghijklmnopqrstuvwxyz] | \",\" | [ ] | [()] ) * ")))
+  (println)
+  (for (i 0 (array-length g)) (println (format "%04i" i)" "(array-at g i)))
+  (println)
+  (println (parse "hello, (parsing) world." g)))

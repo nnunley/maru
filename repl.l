@@ -1,6 +1,10 @@
 (define-function array-append-all (arr . vals)
   (list-do val vals (array-append arr val)))
 
+(define-function pval (expr)
+  ;;(println "### expr")
+  (eval expr))
+
 (load "parser.l")
 (load "peg-compile.l")
 (load "peg.l")
@@ -58,12 +62,8 @@
     v))
 
 (define-function repl-stream (stream prompt)	(repl-parser-stream (parser-stream stream) prompt))
-(define-function repl-file   (file prompt path)	(repl-stream (parser-input-stream (input-stream file path)) prompt))
+(define-function repl-file   (file prompt path)	(repl-stream (input-stream file path) prompt))
 (define-function repl-path   (path prompt)	(repl-file (or (open path) (error "cannot open: "path)) prompt path))
-
-;; recursive require/load comes back to here...
-
-(define-function load (name)	(repl-path name ()))
 
 (while *arguments* (repl-path (next-argument) ()))
 

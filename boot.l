@@ -83,23 +83,9 @@
 	  (set j (+ j 1)))
 	s))))
 
-(define concat-strings
-  (lambda args
-    (let ((result (car args)))
-      (while (string? (car (set args (cdr args))))
-	(set result (concat-string result (car args))))
-      result)))
-
 (define concat-symbol
   (lambda (x y)
     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
-
-(define concat-symbols
-  (lambda args
-    (let ((result (car args)))
-      (while (symbol? (car (set args (cdr args))))
-	(set result (concat-symbol result (car args))))
-      result)))
 
 (define quasiquote
   (form
@@ -111,9 +97,7 @@
 			       (if (cdr l)
 				   (list 'concat-list (cadr obj) (qq-list (cdr l)))
 				 (cadr obj))
-			     (if (and (= 'unquote obj) (pair? (cdr l)) (not (cddr l)))
-				 (cadr l)
-			       (list 'cons (qq-object obj) (qq-list (cdr l))))))
+			     (list 'cons (qq-object obj) (qq-list (cdr l)))))
 		       (list 'quote l))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
@@ -134,7 +118,7 @@
   `(define ,name (lambda ,args ,@body)))
 
 (define-form define-macro (name args . body)
-  `(define-form ,name ,args (cons 'let (cons () (macro-expand (zip-assocs ',args (list ,@args)) ',body)))))
+  `(define-form ,name ,args (cons 'let (cons () (macro-expand (list-zip-assocs ',args (list ,@args)) ',body)))))
 
 (define-function macro-expand (bindings exp)
   (if (pair? exp)
@@ -150,9 +134,7 @@
 
 (define-function list-length (list)
   (if (pair? list)
-      (let ((len 1))
-	(while (set list (cdr list)) (set len (+ len 1)))
-	len)
+      (+ 1 (list-length (cdr list)))
     0))
 
 (define %list->array
@@ -169,38 +151,13 @@
 (define-function array-append (arr val)
   (set-array-at arr (array-length arr) val))
 
-(define-function map1 (function list)
+(define-function map (function list)
   (let ((head (cons)))
     (let ((tail head))
       (while (pair? list)
 	(set tail (set (cdr tail) (cons (function (car list)) ())))
 	(set list (cdr list))))
     (cdr head)))
-
-(define-function mapN (function lists)
-  (and (pair? (car lists))
-       (cons (apply function (map1 car lists))
-	     (mapN function (map1 cdr lists)))))
-
-(define-function map (function . lists)
-  (if (pair? (cdr lists))
-      (mapN function lists)
-    (map1 function (car lists))))
-
-(define-function reverse-map (function list)
-  (and list
-       (let ((tail (reverse-map function (cdr list))))
-	 (cons (function (car list)) tail))))
-
-(define-function reverse-with-map (function arg list)
-  (and list
-       (let ((tail (reverse-with-map function arg (cdr list))))
-	 (cons (function arg (car list)) tail))))
-
-(define-function reverse-map-with (function list arg)
-  (and list
-       (let ((tail (reverse-map-with function (cdr list) arg)))
-	 (cons (function (car list) arg) tail))))
 
 (define-function map-with (function list a)
   (if (pair? list)
@@ -249,33 +206,13 @@
 
 ;;; let*
 
-(define-function %let*getters (vars getter rest)
-  (if (pair? vars)
-      (cons (list (car vars) (list 'car getter))
-	    (%let*getters (cdr vars) (list 'cdr getter) rest))
-    (if (symbol? vars)
-	(cons (list vars getter) rest)
-      rest)))
-
-(define-function %let*unpack (vars val rest)
-    (cons (cons '_%let_values_ val)
-	  (%let*getters vars '_%let_values_ rest)))
-
-(define-function %let*bindings (bindings)
-  (if (pair? bindings)
-      (let ((var     (caar bindings))
-	    (val     (cdar bindings)))
-	(if (pair? var)
-	    (%let*unpack var val (%let*bindings (cdr bindings)))
-	  (cons (cons var val) (%let*bindings (cdr bindings)))))))
-
 (define-function %let* (bindings body)
   (if (pair? (cdr bindings))
       `(let (,(car bindings)) ,(%let* (cdr bindings) body))
     `(let ,bindings ,@body)))
 
 (define-form let* bindings-body
-  (%let* (%let*bindings (car bindings-body)) (cdr bindings-body)))
+  (%let* (car bindings-body) (cdr bindings-body)))
 
 ;;; cond
 
@@ -288,10 +225,7 @@
 	     (value  (cdr clause)))
 	(if (= 'else test)
 	    (%progn value)
-	  (if (= '=> (car value))
-	      `(let ((_ ,test))
-		 (if _ (,(%progn (cdr value)) _) ,(%cond (cdr clauses))))
-	    `(if ,test ,(%progn value) ,(%cond (cdr clauses))))))))
+	  `(if ,test ,(%progn value) ,(%cond (cdr clauses)))))))
 
 (define-form cond clauses (%cond clauses))
 
@@ -339,26 +273,21 @@
 
 (define %make-accessor) ;; forward
 
-(define-function %accessor (name)	(if (= ?_ (string-at (symbol->string name) 0)) 'long-at 'oop-at))
-
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-		      (list ',(%accessor (car fields))
+		      (list 'oop-at
 			    (list '%typecheck ',name self)
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define-function %make-unsafe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-		      (list ',(%accessor (car fields))
+		      (list 'oop-at
 			    self
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
-(define %make-accessor
-  (if (> (optimised) 0)
-      %make-unsafe-accessor
-    %make-safe-accessor))
+(define %make-accessor %make-safe-accessor)
 
 (define-function %make-accessors (name fields)
   (%make-accessor name fields 0))
@@ -380,17 +309,6 @@
 	    (_self_ (allocate _type_ (array-at %structure-sizes _type_))))
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
-
-(define-function %make-make-inits (prefix inits)
-  (and inits
-       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-	     (%make-make-inits prefix (cdr inits)))))
-
-(define-form make (type . inits)
-  `(let ((self (new ,type)))
-     (with-instance-accessors ,type
-       ,@(%make-make-inits (concat-symbol type '-) inits)
-       self)))
 
 (define-form define-class (name basis fields)
   (let ((base (eval basis)))
@@ -424,8 +342,8 @@
 (define-structure <expr>	(name defn ctx profile))		(define-function expr? (obj) (= <expr> (type-of obj)))
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
-(define-structure <subr>	(_name _imp _sig _profile))
-(define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
+(define-structure <subr>	(_imp _name _profile))
+(define-structure <variable>	(name value env index))			(define-function variable? (obj) (= <variable> (type-of obj)))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 
@@ -434,13 +352,12 @@
     (set (<fixed>-function self) fun)
     self))
 
-(define-function variable (name value env index . opt-type)
+(define-function variable (name value env index)
   (let ((self (new <variable>)))
     (set (<variable>-name  self) name)
     (set (<variable>-value self) value)
     (set (<variable>-env   self) env)
     (set (<variable>-index self) index)
-    (set (<variable>-type  self) (car opt-type))
     self))
 
 (define-function environment (parent)
@@ -452,24 +369,11 @@
     self))
 
 (define-function environment-define (env name value)
-  (let* ((bindings (<env>-bindings env))
-	 (offset   (<env>-offset   env))
-	 (var      (variable name value env offset)))
+  (let ((bindings (<env>-bindings env))
+	(offset   (<env>-offset   env))
+	(var      (variable name value env offset)))
     (set (<env>-offset env) (+ offset 1))
     (array-append bindings var)))
-
-(define-function environment-find (env name)
-  (let* ((bindings (<env>-bindings env))
-	 (offset   (<env>-offset   env))
-	 (var      ())
-	 (idx      0))
-    (while (and (not var) (< idx offset))
-      (if (= name (<variable>-name (array-at bindings idx)))
-	  (set var (array-at bindings idx))
-	(set idx (+ idx 1))))
-    var))
-
-(define-function global? (var)	(= 0 (<env>-level (<variable>-env var))))
 
 ;;; local syntax
 
@@ -494,7 +398,7 @@
   (and (pair? fields)
        (cons `(,(concat-symbol 'self. (car fields)) () ((name) (list 'oop-at 'self ,i)))
 	     (make-instance-accessors name (cdr fields) (+ i 1)))))
-
+  
 (define-form with-instance-accessors (type . body)
   `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
     (let () ,@body)))
@@ -506,12 +410,10 @@
 (define-function selector? (obj) (= <selector> (type-of obj)))
 
 (define-function <selector>-inherit (methods type)
-  (let ((method ())
-	(probe  type))
-    (while (and (set probe (array-at %structure-bases probe))
-		(not (set method (array-at methods probe)))))
-    ;; (and method (set (array-at methods type) method))	;; copy down the method for performance
-    method))
+  (let ((method ()))
+    (while (and (set type (array-at %structure-bases type))
+		(not (set method (array-at methods type)))))
+    method)) ;; xxx THIS SHOULD COPY DOWN THE METHOD FOR PERFORMANCE xxx
 
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
@@ -656,8 +558,6 @@
   ;;(println "; backtrace disabled")
   )
 
-(define-function printf (fmt arg) (print (format fmt arg)))
-
 ;;; multimethod
 
 (define-structure <generic> (name methods default))
@@ -691,7 +591,6 @@
 (define-form define-multimethod (method typed-args . body)
   (let ((args  (map cadr typed-args))
 	(types (map car  typed-args)))
-    (or (defined? method) (eval (list 'define-generic method)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
 (define-apply <generic> (self . arguments)
@@ -722,22 +621,14 @@
     (set list (cdr list)))
   (car list))
 
-(define-function list-reverse! (head)
-  (let ((curr head)
-	(prev ())
-	(next ()))
-    (while curr
-      (set next (cdr curr))
-      (set-cdr curr prev)
-      (set prev curr)
-      (set curr next))
-    prev))
-
-(define-function zip lists		(apply map list lists))
-
-(define-function zip-assocs (a b)
+(define-function list-zip (a b)
   (if (and (pair? a) (pair? b))
-      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
+      (cons (car a) (cons (car b) (list-zip (cdr a) (cdr b))))
+    (or a b)))
+
+(define-function list-zip-assocs (a b)
+  (if (and (pair? a) (pair? b))
+      (cons (cons (car a) (car b)) (list-zip-assocs (cdr a) (cdr b)))
     (or a b)))
 
 ;;; iteration
@@ -755,13 +646,7 @@
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
-       (let* ((,var (car _list_))) ,@body)	;; let* allows (list-do (vars...) list-of-lists)
-       (set _list_ (cdr _list_)))))
-
-(define-form alist-do (var alist . body)
-  `(let ((_list_ ,alist))
-     (while _list_
-       (let*  ((,var (cdar _list_))) ,@body)
+       (let ((,var (car _list_))) ,@body)
        (set _list_ (cdr _list_)))))
 
 (define-function %generic-do (get len var col body)
@@ -769,7 +654,7 @@
 	  (_idx_ 0)
 	  (_end_ (,len _col_)))
      (while (< _idx_ _end_)
-       (let* ((,var (,get _col_ _idx_))) ,@body)
+       (let ((,var (,get _col_ _idx_))) ,@body)
        (set _idx_ (+ _idx_ 1)))))
 
 (define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
@@ -784,47 +669,6 @@
   (for-each collection (lambda (x) (function x value))))
 
 (define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
-(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
-
-(define-form until (condition . body)
-  `(while (not ,condition) ,@body))
-
-(define-form list-detect (name list expr)
-  `(let ((_ ())
-	 (__ ,list))
-     (while (and __ (not _))
-       (let* ((,name (car __)))
-	 (and ,expr (set _ (car __)))
-	 (set __ (cdr __))))
-     _))
-
-(define-form array-detect (name arr expr)
-  `(let* ((_ ())
-	  (_a ,arr)
-	  (_l (array-length _a)))
-     (for (_i 0 _l)
-       (let ((,name (array-at _a _i)))
-	 (and ,expr (let () (set _ ,name) (set _i _l)))))
-     _))
-
-(define-form when (test . body)		`(and ,test (let () ,@body)))
-(define-form unless (test . body)	`(or  ,test (let () ,@body)))
-
-(define-function %loop-inits (bindings)
-  (and bindings
-       (cons (list (caar bindings) (cadar bindings))
-	     (%loop-inits (cdr bindings)))))
-
-(define-function %loop-steps (bindings)
-  (and bindings
-       (cons (list 'set (caar bindings) (caddar bindings))
-	     (%loop-steps (cdr bindings)))))
-
-(define-form loop (bindings test . body)
-  `(let ,(%loop-inits bindings)
-     (while ,test
-       ,@body
-       ,@(%loop-steps bindings))))
 
 ;;; conversion
 
@@ -879,14 +723,6 @@
       (set list (cdr list)))
     str))
 
-(define-function character->string (c)
-  (let ((s (string 1)))
-    (set-string-at s 0 c) s))
-
-(define-function array-append-all (a s)
-  (string-do e s (array-append a e))
-  s)
-
 ;;; sorting and searching
 
 (define-function %partition (items at set-at compare left pivot right)
@@ -937,11 +773,8 @@
 (define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
 (define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
 
-(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
-(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
-(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
-
-(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
+(define-function max (a b)	(if (> a b) a b))
+(define-function min (a b)	(if (< a b) a b))
 
 ;;; structural equality
 
@@ -1013,29 +846,3 @@
       (let ()
 	(push *loaded* name)
 	(load name))))
-
-(define-method length <string> ()		(string-length self))
-(define-method length <array> ()		(array-length self))
-
-(define-method at <string> (index)		(string-at self index))
-(define-method at <array> (index)		(array-at self index))
-
-(define-method set-at <string> (index value)	(string-at self index))
-(define-method set-at <array> (index value)	(array-at self index))
-
-(define-function contents-to-file-named (string path . options)
-  (let ((f (or (open path "w")
-	       (error "cannot open for writing: "path)))
-	(p (or (car options) putc)))
-    (for (i 0 (length string)) (p (at string i) f))
-    (close f)))
-
-(define-function contents-of-file-named (path)
-  (let ((f (or (open path)
-	       (error "cannot open for reading: "path)))
-	(s (array))
-	(c))
-    (while (set c (getc f))
-      (array-append s c))
-    (close f)
-    (array->string s)))

@@ -1,6 +1,9 @@
-(require "osdefs.k")
+#!./eval
 
-(define __PREFIX__ (if (or (defined? '__MACH__) (defined? '__WIN32__)) "_" ""))
+(define __MACH__	'(t))
+(define __WINDOWS__	'( ))
+
+(define __PREFIX__ (if (or __MACH__ __WINDOWS__) "_" ""))
 
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
@@ -117,16 +120,12 @@
 						  (set-array-at mangled outdex (digit-for (&  c 15)))	(set outdex (+ outdex 1))))))
       (set index (+ 1 index)))
     (array->string mangled)))
-
+      
 ;;; IA32 -- OPERANDS
 
-(define *label-source* ())
-(define *label-counter* 0)
-
-(define-function temp-label-name ()
-  (let ((label (concat-string "_L_" (long->string (set *label-counter* (+ *label-counter* 1))))))
-    (and *label-source* (set label (concat-strings label"_"(car *label-source*)"_"(long->string (cdr *label-source*)))))
-    label))
+(let ((counter 0))
+  (define-function temp-label-name ()
+    (concat-string "_L_" (long->string (set counter (+ counter 1))))))
 
 (define-operand LABEL (name) 	__PREFIX__(mangle-label (<LABEL>-name self)))
 (define-operand GI32 (name)	(<GI32>-name self))
@@ -468,16 +467,15 @@
   (cons  return		gen-return)
   (cons  address-of	gen-address-of)))
 
+(define *prev-source* ())
+
 (define-method gen <pair> (comp)
-  (and (= 0 (optimised))
-       (let ((source (oop-at self 2)))
-	 (and (!= *label-source* source)
-	      (car source)
-	      (let ()
-		(set *label-source* source)
-		;;(gen comp DEFLABEL (LABEL (temp-label-name)))		;; DEBUG ONLY
-		;;(gen comp COMMENT (list (car source) " " (cdr source)))
-		(gen comp DEFLABEL (LABEL (temp-label-name)))))))
+  (let ((source (oop-at self 2)))
+    (and (!= *prev-source* source)
+	 (car source)
+	 (let ()
+	   (gen comp COMMENT (list (car source) " " (cdr source)))
+	   (set *prev-source* source))))
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
 	 (op    (and (variable? head) (cadr (assq (<variable>-value head) (array-at operators arity))))))
@@ -485,10 +483,10 @@
 	((array-at generators arity) op (cdr self) comp)
       (if (set op (cdr (assq head forms)))
 	  (op self comp)
-	(let* ((tmps (map-with gen-tmp (cdr self) comp))
-	       (args (map-with gen-arg (cdr self) comp))
-	       (func (gen (car self) comp))
-	       (narg (list-length args)))
+	(let ((tmps (map-with gen-tmp (cdr self) comp))
+	      (args (map-with gen-arg (cdr self) comp))
+	      (func (gen (car self) comp))
+	      (narg (list-length args)))
 	  (map2-with gen-move tmps args comp)
 	  (free-temps comp tmps)
 	  (free-args  comp args)
@@ -517,7 +515,7 @@
 (define-method gen-definition <extern> (name comp)
   (let ((nlabel (LABEL                self.name        ))
 	(slabel (LABEL (concat-symbol self.name '$stub))))
-    (if (defined? '__MACH__)
+    (if __MACH__
 	(let ()
 	  (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
 	  (gen comp DEFLABEL slabel)
@@ -576,14 +574,11 @@
     (while (<= 0 (set index (- index 1)))
       (let ((name  (<variable>-name  (array-at vars index)))
 	    (value (<variable>-value (array-at vars index))))
-      (println "## defn " name)
-      (warn name "\n")
-      ;;x;(println (<expr>-defn (cdar env)))
-      (gen-definition value name comp)
-      ))
-    (for (i 0 (<compiler>-pc comp))
-                        (apply emit (array-at (<compiler>-asm comp) i)))
-    ))
+	(println "## defn " name)
+	(warn name "\n")
+	;;x;(println (<expr>-defn (cdar env)))
+	(gen-definition value name comp)))
+    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
 (define-form compile-begin ()	`(set *globals* (environment *globals*)))
 

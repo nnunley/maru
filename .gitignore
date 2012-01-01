@@ -1,7 +1,0 @@
-*.dSYM
-.vscode/
-eval
-eval2
-mkosdefs
-osdefs.k
-test.s

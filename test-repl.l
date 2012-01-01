@@ -87,9 +87,7 @@ foo * bar
 
   paramlist	= "(" _ name?:a ("," _ name)*:b ")" _			-> `(,@a ,@b) ;
 
-  fundefn	= name:f paramlist:a "=" _ expression:e			-> (println "FUNCTION DEFINITION FROM "(cadr (<parser>-position self))
-										    " TO "                     (car  (<parser>-position self)))
-									-> (let ()
+  fundefn	= name:f paramlist:a "=" _ expression:e			-> (let ()
 									     (eval (list 'define f))
 									     `(set ,f (lambda ,a ,e))) ;
 

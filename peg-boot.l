@@ -268,7 +268,7 @@
 	 (or (RULE expression) (error "expression expected after ="))
 	 (set exp self.result)
 	 (or (OBJECT ?\;) (error "; expected"))
-	 (set self.result (list id exp ())))))
+	 (set self.result (list id exp)))))
 
 (unit-test "<begpeg>"
   (let ((self (new <begpeg>))
@@ -330,11 +330,11 @@
     (unit-assert (RULE semicolon	))
     (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-all (match-rule and) (match-rule this)) (match-all (match-rule is) (match-rule an)) (match-rule expression))))
     (unit-assert (RULE semicolon	))
-    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-all (match-rule lots) (match-rule of)) (match-all (match-rule rules) (match-rule here) (match-any))) ())))))
+    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-all (match-rule lots) (match-rule of)) (match-all (match-rule rules) (match-rule here) (match-any))))))))
 
 ;;;----------------------------------------------------------------
 
-(define peg-grammar-string (contents-of-file-named "peg.g"))
+(define peg-grammar-string (input-stream-up-to (input-stream (open "peg.g") "peg.g") *end*))
 
 ;;;----------------
 
@@ -362,7 +362,7 @@
 
 ;; (map eval GEN)
 
-(define-class <peg> <parser> (grammar-name))
+(define-class <peg> <parser> ())
 
 (define GEN (peg-compile-rules '<peg> BEG))
 
@@ -370,14 +370,13 @@
 
 (define PEG)
 
-(define-function peg (stream name)
+(define-function peg (stream)
   (let ((self (new <peg>)))
-    (set (<peg>-source       self) stream)
-    (set (<peg>-grammar-name self) stream)
+    (set (<peg>-source self) stream)
     self))
 
 (let* ((s (parser-stream (string-stream peg-grammar-string)))
-       (p (peg s '<peg>)))
+       (p (peg s)))
   (while ($definition p)
     (set PEG (cons (<peg>-result p) PEG)))
   ($space p)
@@ -397,7 +396,7 @@
 
 (progress "dumping generated parser")
 
-(println "(define-class <peg> <parser> (grammar-name))")
+(println "(define-class <peg> <parser> ())")
 (map dumpln GEN)
 
 (progress "parser bootstrap complete")
