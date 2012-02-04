@@ -171,7 +171,7 @@ static int stringLength(oop string)
   return getLong(get(string, String,size));
 }
 
-static oop newSymbol(wchar_t *cstr)	{ oop obj= newBits(Symbol);	set(obj, Symbol,bits, cstr ? wcsdup(cstr) : cstr);			return obj; }
+static oop newSymbol(wchar_t *cstr)	{ oop obj= newBits(Symbol);	set(obj, Symbol,bits, wcsdup(cstr));			return obj; }
 
 static oop newPair(oop head, oop tail)	{ oop obj= newOops(Pair);	set(obj, Pair,head, head);  set(obj, Pair,tail, tail);	return obj; }
 
@@ -392,14 +392,8 @@ static int isGlobal(oop var)
 
 static oop newBool(int b)		{ return b ? s_t : nil; }
 
-static oop gensym()
-{
-  return newSymbol(0);
-}
-
 static oop intern(wchar_t *string)
 {
-  if ( ! string ) return gensym(); else {
   ssize_t lo= 0, hi= arrayLength(symbols) - 1, c= 0;
   oop s= nil;
   while (lo <= hi) {
@@ -415,7 +409,6 @@ static oop intern(wchar_t *string)
   arrayInsert(symbols, lo, s);
   GC_UNPROTECT(s);
   return s;
-  }
 }
 
 #include "chartab.h"
@@ -785,13 +778,7 @@ static void doprint(FILE *stream, oop obj, int storing)
       }
       break;
     }
-    case Symbol: {
-      void *bits = get(obj, Symbol,bits);
-      if ( bits )
- 	fprintf(stream, "%ls", get(obj, Symbol,bits));
-      else
-        fprintf(stream, "#<symbol %p>", (void*) obj);
-    } break;
+    case Symbol:	fprintf(stream, "%ls", get(obj, Symbol,bits));	break;
     case Pair: {
 #if 0
       if (nil != get(obj, Pair,source)) {
@@ -1887,11 +1874,6 @@ static subr(symbolP)
   return newBool(is(Symbol, getHead(args)));
 }
 
-static subr(gensym)
-{
-  return gensym();
-}
-
 static subr(stringP)
 {
   arity1(args, "string?");
@@ -1966,8 +1948,7 @@ static subr(string_symbol)
 static subr(symbol_string)
 {
   oop arg= car(args);				if (is(String, arg)) return arg;  if (!is(Symbol, arg)) return nil;
-  void *bits = get(arg, Symbol,bits);
-  return bits ? newString(bits) : nil;
+  return newString(get(arg, Symbol,bits));
 }
 
 static subr(long_double)
@@ -2476,7 +2457,6 @@ int main(int argc, char **argv)
       { " set-cdr",	   subr_set_cdr },
       { " form?",	   subr_formP },
       { " symbol?",	   subr_symbolP },
-      { " gensym",         subr_gensym },
       { " string?",	   subr_stringP },
       { " string", 	   subr_string },
       { " string-length",  subr_string_length },
