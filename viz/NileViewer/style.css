@@ -33,9 +33,6 @@ body {
     color: #000;
 }
 
-.NVPipelineHighContrast {
-}
-
 .NVSubpipeline {
     position:absolute;
     z-index: 1;
@@ -48,21 +45,7 @@ body {
 .NVProcess {
     position:relative;
     width:100%;
-    height: 180px;
-}
-
-.NVProcessBackground {
-    position: absolute;
-    left:-10px;
-    top:-10px;
-    width: 443px;
-    height: inherit;
-}
-
-.NVProcessExpanded .NVProcessBackground {
-    background-color: rgb(233,240,249);
-    border-bottom: solid 1px rgb(206,210,216);
-    border-top: solid 1px rgb(206,210,216);
+    height: 164px;
 }
 
 .NVProcessHeader {
@@ -79,16 +62,8 @@ body {
     font-size: 13px;
 }
 
-.NVPipelineHighContrast .NVProcessTitle {
-    font-size: 17px;
-}
-
-.NVProcessTitleTriangle {
+.NVProcessTitleHelp {
     font-size: 11px;
-}
-
-.NVPipelineHighContrast .NVProcessTitleTriangle {
-    font-size: 14px;
 }
 
 .NVProcessName {
@@ -129,13 +104,8 @@ body {
     background-color: #dae5ed;
     width: 16px;
     height: 16px;
-    border-right: solid 2px #fff;  /* not margin, so rolling over from one icon to another is continuous */
-    border-bottom: solid 2px #fff;
-}
-
-.NVProcessExpanded .NVProcessIcon {
-    border-right: solid 2px rgb(233,240,249);
-    border-bottom: solid 2px rgb(233,240,249);
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
 }
 
 .NVProcessIconInner {
@@ -173,10 +143,6 @@ body {
     -webkit-box-shadow: 0px 0px 1px rgba(0,0,0,0.15), 0px 1px 4px rgba(0,0,0,0.25);
 }
 
-.NVPipelineHighContrast .NVProcessCanvas {
-    background: #e8e8e8;
-}
-
 .NVProcessCanvasHelp {
     display:none;
     position:absolute;
@@ -187,29 +153,11 @@ body {
     color: #fff;
 }
 
-.NVProcessCanvasCaption {
-    position: absolute;
-    top:152px;
-    left:0px;
-    font-size: 10px;
-    color: #999;
-    margin-top:0px;
-}
-
-.NVProcessCanvasCaptionNumber {
-    width:70px;
-    text-align: center;
-}
-
-.NVProcessCanvasCaption b {
-    color: #f00;
-    font-weight: bold;
-}
-
 .NVProcessCode {
     position:absolute;
-    left:432px;
+    left:440px;
     top:0px;
+    width:300px;
     height: auto;
     font: 12px monospace;
     color: #222;
@@ -217,16 +165,11 @@ body {
 }
 
 .NVProcessCodeLine {
-    padding-left:4px;
-    padding-right: 4px;
 }
 
 .NVProcessCodeLineHot {
-    background-color: #f2f2f2;
-}
-
-.NVPipelineHighContrast .NVProcessCodeLineHot {
-    background: #e8e8e8;
+    font-weight: bold;
+    color: #ff0000;
 }
 
 .NVBracket {
@@ -246,8 +189,8 @@ body {
     width:1px;
     border-width: 19px 0px 19px 29px;
     -webkit-border-image: url(Images/BracketBottom.png) 19 0 19 29 stretch;
-    -moz-border-image: url(Images/BracketBottom.png) 19 0 19 29 stretch;
-    border-image: url(Images/BracketBottom.png) 19 0 19 29 stretch;
+    -moz-border-image: url(Images/BracketTop.png) 19 0 19 29 stretch;
+    border-image: url(Images/BracketTop.png) 19 0 19 29 stretch;
 }
 
 
