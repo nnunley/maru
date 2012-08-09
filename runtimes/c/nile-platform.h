@@ -25,12 +25,13 @@
 
 #ifndef NILE_DISABLE_THREADS
 
-/* CPU pause */
+/* CPU pause and cache prefetch */
 
 #if defined (__i386__) || defined (__x86_64__) || \
     defined (_M_IX86)  || defined (_M_X64)
 #include <xmmintrin.h>
 #define nile_pause _mm_pause
+#define nile_prefetch(a) _mm_prefetch (a, _MM_HINT_T0)
 #else
 #error Unsupported architecture!
 #endif
@@ -113,6 +114,8 @@ static void nile_Sem_wait   (nile_Sem_t *s)        { WaitForSingleObject (*s, IN
 
 #include <pthread.h>
 typedef pthread_t nile_OSThread_t;
+#define NILE_DECLARE_THREAD_START_ROUTINE(name, arg) \
+    static void *name (void *arg)
 
 static void
 nile_OSThread_spawn (nile_OSThread_t *t, void *(*f)(void *), void *arg)
@@ -129,17 +132,20 @@ nile_OSThread_join (nile_OSThread_t *t)
 #elif defined(_WIN32)
 
 typedef HANDLE nile_OSThread_t;
+#define NILE_DECLARE_THREAD_START_ROUTINE(name, arg) \
+    static DWORD __stdcall name (LPVOID arg)
 
 static void
-nile_OSThread_spawn (nile_OSThread_t *t, void *(*f)(void *), void *arg)
+nile_OSThread_spawn (nile_OSThread_t *t, LPTHREAD_START_ROUTINE f, void *arg)
 {
-    *t = CreateThread (NULL, 0, (LPTHREAD_START_ROUTINE) f, arg, 0, NULL);
+    *t = CreateThread (NULL, 0, f, arg, 0, NULL);
 }
 
 static void
 nile_OSThread_join (nile_OSThread_t *t)
 {
-    WaitForSingleObject (*t, INFINITE); CloseHandle (*t);
+    WaitForSingleObject (*t, INFINITE);
+    CloseHandle (*t);
 }
 
 #else
