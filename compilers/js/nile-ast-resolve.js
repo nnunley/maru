@@ -53,11 +53,8 @@ nile.opexpr.resolve = function(env)
 nile.varexpr.resolve = function(env)
 {
   var var_ = env.getVardecl(this.var);
-  if (!var_) {
-    try      { var this_ = this.splitVars(); }
-    catch(e) { throw "Variable: " + this.var + " undeclared"; }
-    return this_.resolve(env);
-  }
+  if (!var_)
+    return this.splitVars().resolve(env);
   return nile.varexpr(var_);
 };
 

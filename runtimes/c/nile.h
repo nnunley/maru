@@ -1,10 +1,6 @@
 #ifndef NILE_H
 #define NILE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Runtime routines */
 
 typedef struct nile_Process_ nile_Process_t;
@@ -176,8 +172,5 @@ nile_DupCat (nile_Process_t *p,  int quantum,
 #undef INLINE
 #undef Real
 
-#endif
-#ifdef __cplusplus
-}
 #endif
 #endif

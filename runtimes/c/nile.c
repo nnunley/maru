@@ -3,11 +3,6 @@
 #include <stdio.h>
 #define NILE_INCLUDE_PROCESS_API
 #include "nile.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "nile-platform.h"
 #include "nile-sleep.h"
 #include "nile-heap.h"
@@ -75,11 +70,10 @@ nile_sync (nile_Process_t *init)
     for (i = 1; i < liaison->nthreads; i++)
         liaison->threads[i].sync = 1;
 
-    if ((p = (nile_Process_t *) nile_Thread_steal_from_q (worker)))
+    if ((p = nile_Thread_steal_from_q (worker)))
         nile_Thread_work (worker, p);
     while (worker->status == NILE_STATUS_OK) {
-        p = (nile_Process_t *) nile_Thread_steal (worker, nile_Thread_steal_from_q);
-        if (p)
+        if ((p = nile_Thread_steal (worker, nile_Thread_steal_from_q)))
             nile_Thread_work (worker, p);
         else if (nile_Sleep_is_quiescent (worker->sleep))
             break;
@@ -167,7 +161,3 @@ nile_print_leaks (nile_Process_t *init)
     }
     nile_Process_activate (init, t);
 }
-
-#ifdef __cplusplus
-}
-#endif

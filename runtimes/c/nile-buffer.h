@@ -1,4 +1,4 @@
-static nile_Node_t *
+static void *
 nile_Process_alloc_node (nile_Process_t *p);
 
 #define BAT(b, i)         ((&b->data)[i])

@@ -103,6 +103,10 @@ nile.defineASTNode("processsig",   ["name", "param", "type"]);
 nile.defineASTNode("processbody",  ["forpat", "block"]);
 nile.defineASTNode("processdef",   ["sig", "prologue", "body", "epilogue"]);
 
+nile.processdef.getName = function() { return this.sig.name; };
+nile.typedef.getName    = function() { return this.name; };
+nile.vardecl.getName    = function() { return this.name; };
+
 nile.opexpr.isInfixRelational = function()
 {
   return this.fixity == "in" && this.op &&
@@ -127,7 +131,12 @@ nile.opexpr.unchainRelational = function()
 
 nile.varexpr.splitVars = function()
 {
-  return NileParser.matchAll(this.var, 'juxedvarsonly');
+  try {
+    var node = NileParser.matchAll(this.var, 'juxedvarsonly');
+    return node;
+  } catch(e) {
+    throw "Variable: " + this.var + " undeclared";
+  }
 };
 
 nile.opdef.matchSig = function(name, fixity, argtype)
