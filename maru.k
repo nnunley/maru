@@ -10,7 +10,7 @@
   `((void    . ,IR-VOID)
     (char    . ,IR-INT8)	    (int8    . ,IR-INT8)
     (short   . ,IR-INT16)	    (int16   . ,IR-INT16)
-    (int     . ,IR-INT)		    (int32   . ,IR-INT32)
+    (int     . ,IR-INT32)	    (int32   . ,IR-INT32)
     (long    . ,IR-LONG)	    (int64   . ,IR-INT64)
     (float   . ,IR-FLOAT)	    (float32 . ,IR-FLOAT32)
     (double  . ,IR-DOUBLE)	    (float64 . ,IR-FLOAT64)
@@ -71,7 +71,7 @@
        (maru->ir-type (cdr decl) ir)))
 
 (define-method maru-compile <undefined> (ir)	(ir-nop))
-(define-method maru-compile <long>   	(ir)	(ir-lit self IR-INT))
+(define-method maru-compile <long>   	(ir)	(ir-lit self IR-LONG))
 (define-method maru-compile <double> 	(ir)	(ir-lit self IR-DOUBLE))
 (define-method maru-compile <string> 	(ir)	(ir-lit self IR-STRING))
 (define-method maru-compile <symbol> 	(ir)	(ir-get-var self))

@@ -1,6 +1,6 @@
-; (require "parser.l")
-;; (require "peg-compile.l")
-;; (require "peg.l")
+ (require "parser.l")
+; (require "peg-compile.l")
+ (require "peg.l")
 
 ;;; message
 
