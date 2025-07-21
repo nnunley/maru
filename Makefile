@@ -176,9 +176,9 @@ test-compile-irl : eval32 irl.g.l .force
 irl.g.l : tpeg.l irl.g
 	./eval compile-tpeg.l irl.g > irl.g.l
 
-test-ir : eval .force
-	./eval test-ir.k > test.c
-	$(CC32) -fno-builtin -g -o test test.c
+test-ir : eval2 .force
+	./eval2 ir-gen-c.k maru.k test-ir2.k > test.c
+	$(CC) -fno-builtin -g -o test test.c -ldl
 	@echo
 	./test
 
