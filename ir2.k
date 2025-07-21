@@ -1,6 +1,7 @@
 (require "osdefs.k")
 (require "trie.k")
 
+
 (define-constant pointer-size 4)	;; sizeof-long
 
 (define-structure <ir> (function scope program functions struct-types error-handler exports))
