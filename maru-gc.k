@@ -1,5 +1,5 @@
 (define-form gcdebug (exp)	exp)
-(define-form debug (exp)	());exp)
+(define-form debug (exp)	exp)
 (define-form safe  (exp)	exp)
 
 (define (printf (int  	char * ...)		*)	(extern printf))
@@ -12,7 +12,11 @@
 (define-constant gc_quantum	59392)	; 50k
 (define-constant gc_frequency	32768)
 
-(define-struct <header> ((size long) (flags long) (next struct <header> *) (type long)))
+(define-struct <header> (
+  (size long) 
+  (flags long) 
+  (next struct <header> *) 
+  (type long)))
 
 (define-constant <header>-flags-used		1)
 (define-constant <header>-flags-atom		2)
@@ -218,10 +222,13 @@
     (return 0)))
 
 (define-function print_list void ((list struct <cell> *))
+  (let ((l list))
+    (while l
+      (printf "%08x.%-5i      " list (. list head))
+      (set l (. l tail))
+    )
+  )
   (if list
-      (let ()
-	(printf "%08x.%-5i      " list (. list head))
-	(print_list (. list tail)))
     (printf "\n")))
 
 (define-function info void ()
@@ -231,15 +238,15 @@
 (define-function main int ((argc int) (argv char * *))
   (gc_initialise)
   (let ((i   0)
-	(obj (cast 0 struct <cell> *)))
-    (gc-protect (obj)
-      (while (< i 10000)
-	(unless (% i 1000) (info))
-	(set obj (make_list 256))
-	;;(print_list obj)
-	(set i (+ i 1)))
-      (gc_gcollect)
-      ))
+    (obj (cast 0 struct <cell> *)))
+      (gc-protect (obj)
+        (while (< i 10000)
+          (unless (% i 10) (info))
+          (set obj (make_list 256))
+          ;(print_list obj)
+          (set i (+ i 1)))
+        (gc_gcollect)
+        ))
   (gc_gcollect)
   (info)
   (return (cast 0 int))
