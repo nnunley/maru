@@ -105,7 +105,7 @@ debuggc : .force
 profile : .force
 	$(MAKE) clean eval CFLAGS="$(CFLAGS) -O3 -fno-inline-functions -DNDEBUG"
 #	shark -q -1 -i ./eval emit.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l > test.s
-	shark -q -1 -i ./eval repl.l test-pepsi.l
+	shark -q -1 -i ./eval lib/repl.l test-pepsi.l
 
 osdefs.k : mkosdefs
 	./mkosdefs > $@
@@ -114,7 +114,7 @@ mkosdefs : mkosdefs.c
 	$(CC) -o $@ $<
 
 cg : eval .force
-	./eval codegen5.l | tee test.s
+	./eval lib/codegen5.l | tee test.s
 	as test.s
 	ld  --build-id --eh-frame-hdr -m elf_i386 --hash-style=both -dynamic-linker /lib/ld-linux.so.2 -o test /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crt1.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crti.o /usr/lib/gcc/i486-linux-gnu/4.4.5/crtbegin.o -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../.. a.out -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/i486-linux-gnu/4.4.5/crtend.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crtn.o
 	./test
@@ -136,7 +136,7 @@ test-eval : test .force
 	$(TIME) ./test test-eval.l
 
 test-boot : test .force
-	$(TIME) ./test boot-emit.l
+	$(TIME) ./test core/boot-emit.l
 
 test-emit : eval .force
 	./core/compiler/emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
@@ -148,7 +148,7 @@ core/peg.l : eval core/parser.l core/peg-compile.l core/peg-boot.l grammars/exam
 	mv core/peg.l.new core/peg.l
 
 test-repl : eval core/peg.l .force
-	./eval core/repl.l test-repl.l
+	./eval lib/repl.l test-repl.l
 
 test-peg : eval core/peg.l .force
 	$(TIME) ./eval core/parser.l core/peg.l test-peg.l > peg.n
@@ -216,35 +216,35 @@ test-elf : eval32 .force
 	./a.out
 
 test-assembler : eval32 .force
-	./eval32 assembler.k
+	./eval32 lib/assembler.k
 
 test-recursion2 :
-	./eval compile-grammar.l grammars/examples/test-recursion2.g > test-recursion2.g.l
-	./eval compile-recursion2.l test-recursion2.txt
+	./eval core/compiler/compile-grammar.l grammars/examples/test-recursion2.g > test-recursion2.g.l
+	./eval core/compiler/compile-recursion2.l test-recursion2.txt
 
 test-main : eval32 .force
-	$(TIME) ./eval32 test-main.k
+	$(TIME) ./eval32 lib/test-main.k
 	chmod +x test-main
 	$(TIME) ./test-main hello world
 
 test-main2 : eval32 .force
-	$(TIME) ./eval32 test-pegen.k save.k test-pegen
+	$(TIME) ./eval32 lib/test-pegen.k core/save.k test-pegen
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
 
 cpp.g.l : grammars/examples/cpp.g tpeg.l
-	./eval compile-tpeg.l $< > $@.new
+	./eval core/compiler/compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
 test-cpp : eval cpp.g.l .force
-	./eval compile-cpp.l cpp-small-test.c
+	./eval core/compiler/compile-cpp.l cpp-small-test.c
 
 osdefs.g.l : grammars/core/osdefs.g tpeg.l
-	./eval compile-tpeg.l $< > $@.new
+	./eval core/compiler/compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
 %.osdefs.k : %.osdefs osdefs.g.l
-	./eval compile-osdefs.l $< > $<.c
+	./eval core/compiler/compile-osdefs.l $< > $<.c
 	cc -o $<.exe $<.c
 	./$<.exe > $@.new
 	mv $@.new $@
@@ -257,7 +257,7 @@ osdefs : osdefs.g.l $(OSKEFS) .force
 
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
-	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
+	shark -q -1 -i ./eval core/parser.l peg.n test-peg.l > peg.m
 
 NILE = ../nile
 GEZIRA = ../gezira
@@ -271,9 +271,9 @@ libgezira.$(SO) : .force
 	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(GEZIRA)/c/gezira.c $(GEZIRA)/c/gezira-image.c
 
 stats : .force
-	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat core/bootstrap/boot.l core/compiler/emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat core/eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat core/bootstrap/boot.l core/compiler/emit.l core/eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
 	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
@@ -286,10 +286,10 @@ clean : .force
 
 FILES = Makefile \
 	wcs.c buffer.c chartab.h eval.c gc.c gc.h \
-	boot.l emit.l eval.l test-emit.l \
-	parser.l peg-compile.l peg-compile-2.l peg-boot.l peg.l test-peg.l test-repl.l \
-	repl.l repl-2.l mpl.l sim.l \
-	peg.g
+	core/bootstrap/boot.l core/compiler/emit.l core/eval.l test-emit.l \
+	core/parser.l core/peg-compile.l core/peg-boot.l core/peg.l test-peg.l test-repl.l \
+	lib/repl.l lib/mpl.l lib/sim.l \
+	grammars/core/peg.g
 
 DIST = maru-$(NOW)
 DEST = ckpt/$(DIST)
