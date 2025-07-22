@@ -1,0 +1,11 @@
+{
+    "editor.formatOnType": true,
+    "[commonlisp]": {
+        "editor.wordSeparators": "`|;:'\",()"
+    },
+    "files.associations": {
+        "*.liquid": "liquid",
+        "wchar.h": "c",
+        "_wchar.h": "c"
+    }
+}

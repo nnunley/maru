@@ -2,7 +2,7 @@
 ;; (require "peg.l")
 ;; (require "peg-compile.l")
 
-(let* ((g (input-stream-up-to (input-stream (open "peg.g") "peg.g") *end*))
+(let* ((g (input-stream-up-to (input-stream (open "grammars/core/peg.g") "grammars/core/peg.g") *end*))
        (s (string-stream g))
        (p (new <peg>))
        (r (array->list (parse-all p s))))
