@@ -72,6 +72,9 @@ strings are arrays of ucs4
 symbols are ucs4
 read converts utf8 to ucs4
 write converts ucs4 to utf8
+	NOTE: Current implementation uses pure UTF-8 internally (more space efficient)
+	- Could switch to UCS-4 if needed for constant-time character access
+	- UTF-8 implementation already handles conversion/decoding
 
 tokens should contain the FILE name and the LINE number and maybe character COLUMNs for debugging
 
@@ -97,6 +100,15 @@ PEG grammar should look like structure:
 	structures inherit dynamically
 
 make eval.c eval.l use WIDE CHARACTERS
+	DONE: Created UTF-8 support implementation
+	- Created utf8.c with maru_ prefixed functions
+	- Created utf8.k with IR2 type definitions
+	- Created maru-utf8.k with pure Maru implementation
+	- Added character counting vs byte counting
+	- Added Unicode script detection (Latin, CJK, Arabic, Hebrew, etc.)
+	- Added bidirectional text support
+	- Added collation support for sorting
+	TODO: Integrate into eval2.c replacing wcs.c
 
 propagate changes eval.c -> eval.l
 
