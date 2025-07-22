@@ -92,7 +92,7 @@ struct Data	{ };
 struct Long	{ long_t    bits; };
 struct Double	{ double    bits; };
 struct String	{ oop	    size;  wchar_t *bits; };	/* bits is in managed memory */
-struct Symbol	{ wchar_t  *bits; int flags};
+struct Symbol	{ wchar_t  *bits; int flags; };
 struct Pair	{ oop	    head, tail, source; };
 struct Array	{ oop	    size, _array; };
 struct Expr	{ oop	    name, definition, environment, profile; };
@@ -2545,13 +2545,13 @@ static subr(long_double)
     return newDouble(getLong(arg));
 }
 
-// static subr(long_string)
-// {
-//   oop arg= car(args);				if (is(String, arg)) return arg;  if (!isLong(arg)) return nil;
-//   wchar_t buf[32];
-//   swnprintf(buf, 32, L"%ld", getLong(arg));
-//   return newString(buf);
-// }
+static subr(long_string)
+{
+  oop arg= car(args);				if (is(String, arg)) return arg;  if (!isLong(arg)) return nil;
+  wchar_t buf[32];
+  swnprintf(buf, 32, L"%ld", getLong(arg));
+  return newString(buf);
+}
 
 // static subr(string_long)
 // {
@@ -3324,7 +3324,7 @@ static subr_ent_t subr_tab[] = {
     { " string->symbol",	subr_string_symbol },
 //     { " symbol-compare",	subr_symbol_compare },
     { " long->double",	subr_long_double },
-//     { " long->string",	subr_long_string },
+    { " long->string",	subr_long_string },
 //     { " string->long",	subr_string_long },
     { " double->long",	subr_double_long },
 //     { " double->string",	subr_double_string },
