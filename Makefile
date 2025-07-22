@@ -23,10 +23,28 @@ endif
 
 .SUFFIXES :
 
-all : eval2 eval eval32 osdefs.k
+all : eval2 eval eval32 osdefs.k evalm evalm-full
 
 run : all
 	rlwrap ./eval
+
+# Multi-Method Evaluator Binary
+evalm : eval evalm.l
+	@echo "Creating evalm binary..."
+	@echo '#!/bin/bash' > evalm
+	@echo 'exec "$(shell pwd)/eval" "$(shell pwd)/evalm.l" "$$@"' >> evalm
+	@chmod +x evalm
+	@echo "evalm binary created successfully!"
+	@echo "Usage: ./evalm"
+
+# Full Multi-Method Evaluator Binary (with complete Maru environment)
+evalm-full : eval evalm-full.l
+	@echo "Creating evalm-full binary (complete environment)..."
+	@echo '#!/bin/bash' > evalm-full
+	@echo 'exec "$(shell pwd)/eval" "$(shell pwd)/evalm-full.l" "$$@"' >> evalm-full
+	@chmod +x evalm-full
+	@echo "evalm-full binary created successfully!"
+	@echo "Usage: ./evalm-full (includes ALL Maru functions)"
 
 status : .force
 	@echo "SYS is $(SYS)"
