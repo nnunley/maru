@@ -334,7 +334,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define peg-grammar-string (contents-of-file-named "peg.g"))
+(define peg-grammar-string (contents-of-file-named "grammars/core/peg.g"))
 
 ;;;----------------
 
