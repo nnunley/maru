@@ -551,7 +551,7 @@
              (name (car func-info))
              (param-names (cadr func-info))
              (main (car (cdr (cdr (cdr func-info))))))
-        (print "static oop " name "(")
+        (print "static oop " (c-mangle-label name) "(")
         (let ((first 't))
           (let ((params param-names))
             (while (pair? params)
