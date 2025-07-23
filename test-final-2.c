@@ -1,0 +1,12 @@
+[?7h[32m[?7lemit-c-threaded-final.l:62[0m (let ((from-func (find-thread-function from-thread))) (if from-func (set-oop-at (%typecheck <thread-function> from-func) 2 (cons to-thread (oop-at (%typecheck <thread-function> from-func) 2))) (set *pending-threads* (cons (cons from-thread to-thread) *pending-threads*))))
+[?7h[32m[?7lemit-c-threaded-final.l:60[0m (lambda (from-thread to-thread) "Record that from-thread references to-thread" (let ((from-func (find-thread-function from-thread))) (if from-func (set-oop-at (%typecheck <thread-function> from-func) 2 (cons to-thread (oop-at (%typecheck <thread-function> from-func) 2))) (set *pending-threads* (cons (cons from-thread to-thread) *pending-threads*)))))
+[?7h[32m[?7lemit-c-threaded-final.l:60[0m (define add-thread-reference (lambda (from-thread to-thread) "Record that from-thread references to-thread" (let ((from-func (find-thread-function from-thread))) (if from-func (set-oop-at (%typecheck <thread-function> from-func) 2 (cons to-thread (oop-at (%typecheck <thread-function> from-func) 2))) (set *pending-threads* (cons (cons from-thread to-thread) *pending-threads*))))))
+[?7h[32m[?7lboot.l:996                [0m (eval expr)
+[?7h[32m[?7lboot.l:996                [0m (Fixed<let> ((result (eval expr))) (Fixed<and> (> (verbose) 1) (println "=> " result)) result)
+[?7h[32m[?7lboot.l:1007               [0m (pval expr)
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<let> ((expr (car _list_))) (pval expr))
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_))))
+[?7h[32m[?7lboot.l:1005               [0m (Fixed<let> ((exps (find-and-read name))) (Fixed<or> exps (error "file not found or empty: " name)) (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))))
+[?7h[32m[?7ltest-emit-c-threaded-final.l:6[0m (load "emit-c-threaded-final.l")
+[?7h

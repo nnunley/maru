@@ -1,7 +1,7 @@
 ;;; test-environment-stack.l - Essential Environment Stack Tests
 
-;; Load the environment stack implementation
-(load "evalm-environment-stack.l")
+;; Load the multi-method evaluator with environment stack
+(load "evalm.l")
 
 (println "=== Environment Stack Essential Tests ===")
 
