@@ -1,0 +1,4 @@
+:introspect
+:types
+:demo
+:quit

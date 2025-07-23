@@ -1,0 +1,5 @@
+(type-of 42)
+(dump (cons 'a 'b))
+(+ 1 2 3)
+:compare
+:quit

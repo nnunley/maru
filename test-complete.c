@@ -1,0 +1,18 @@
+[32m[?7l...         [0m *emit-backend*
+[?7h[32m[?7lcore/compiler/emit.l:501[0m (= *emit-backend* (quote c))
+[?7h[32m[?7lcore/compiler/emit.l:501[0m (and (defined? (quote *emit-backend*)) (= *emit-backend* (quote c)))
+[?7h[32m[?7lcore/compiler/emit.l:501[0m (if (and (defined? (quote *emit-backend*)) (= *emit-backend* (quote c))) (let ((signatures (c-collect-function-signatures env))) (println "// Forward declarations") (let ((_list_ signatures)) (while _list_ (let ((sig (car _list_))) (let ((name (car sig)) (param-count (cdr sig))) (print "static oop " (mangle-label name) "(") (if (= 0 param-count) (print "void") (let ((first 1)) (let ((i 0) (_limit_ param-count)) (while (< i _limit_) (if first (set first ()) (print ", ")) (print "oop") (set i (+ i 1)))))) (println ");"))) (set _list_ (cdr _list_))))))
+[?7h[32m[?7lcore/compiler/emit.l:499[0m (lambda (env) (if (and (defined? (quote *emit-backend*)) (= *emit-backend* (quote c))) (let ((signatures (c-collect-function-signatures env))) (println "// Forward declarations") (let ((_list_ signatures)) (while _list_ (let ((sig (car _list_))) (let ((name (car sig)) (param-count (cdr sig))) (print "static oop " (mangle-label name) "(") (if (= 0 param-count) (print "void") (let ((first 1)) (let ((i 0) (_limit_ param-count)) (while (< i _limit_) (if first (set first ()) (print ", ")) (print "oop") (set i (+ i 1)))))) (println ");"))) (set _list_ (cdr _list_)))))))
+[?7h[32m[?7lcore/compiler/emit.l:499[0m (define gen-env (lambda (env) (if (and (defined? (quote *emit-backend*)) (= *emit-backend* (quote c))) (let ((signatures (c-collect-function-signatures env))) (println "// Forward declarations") (let ((_list_ signatures)) (while _list_ (let ((sig (car _list_))) (let ((name (car sig)) (param-count (cdr sig))) (print "static oop " (mangle-label name) "(") (if (= 0 param-count) (print "void") (let ((first 1)) (let ((i 0) (_limit_ param-count)) (while (< i _limit_) (if first (set first ()) (print ", ")) (print "oop") (set i (+ i 1)))))) (println ");"))) (set _list_ (cdr _list_))))))))
+[?7h[32m[?7lboot.l:996              [0m (eval expr)
+[?7h[32m[?7lboot.l:996              [0m (Fixed<let> ((result (eval expr))) (Fixed<and> (> (verbose) 1) (println "=> " result)) result)
+[?7h[32m[?7lboot.l:1007             [0m (pval expr)
+[?7h[32m[?7lboot.l:1007             [0m (Fixed<let> ((expr (car _list_))) (pval expr))
+[?7h[32m[?7lboot.l:1007             [0m (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))
+[?7h[32m[?7lboot.l:1007             [0m (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_))))
+[?7h[32m[?7lboot.l:1005             [0m (Fixed<let> ((exps (find-and-read name))) (Fixed<or> exps (error "file not found or empty: " name)) (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))))
+[?7h[32m[?7lboot.l:1015             [0m (load name)
+[?7h[32m[?7lboot.l:1013             [0m (Fixed<let> () (Fixed<set> *loaded* (cons name *loaded*)) (load name))
+[?7h[32m[?7lboot.l:1012             [0m (Fixed<or> (member? name *loaded*) (Fixed<let> () (Fixed<set> *loaded* (cons name *loaded*)) (load name)))
+[?7h[32m[?7ltest-complete-c.l:2     [0m (require "core/compiler/emit.l")
+[?7h

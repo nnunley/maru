@@ -1,0 +1,1 @@
+(println "Hello from test-minimal.l")
