@@ -131,132 +131,59 @@
 (define-operand LABEL (name) 	__PREFIX__(mangle-label (<LABEL>-name self)))
 (define-operand GI32 (name)	(<GI32>-name self))
 (define-operand LI32 (value)	(<LI32>-value self))
-(define-operand TI32 (offset)	(<TI32>-offset self)"(%esp)")
+(define-operand TI32 (offset)	(<TI32>-offset self))
 
 (define-function temp? (obj)	(= <TI32> (type-of obj)))
 
-;;; IA32 -- INSTRUCTIONS
+;;; INSTRUCTIONS
 
-(define-emit	(TEXT)			(println "	.text"))
-(define-emit	(DATA)			(println "	.data"))
-(define-emit	(SECTION string)	(println "	.section "$1))
+;;; Define all instructions used by the code generator
+(define-instruction TEXT)
+(define-instruction DATA)
+(define-instruction SECTION)
+(define-instruction GLOBAL)
+(define-instruction ALIGN)
+(define-instruction LONG)
+(define-instruction ASCIZ)
+(define-instruction DEFLABEL)
+(define-instruction COMMENT)
+(define-instruction INDIRECT)
 
-(define-emit	(INDIRECT LABEL)	(println "	.indirect_symbol "$1))
-(define-emit	(GLOBAL LABEL)		(println "	.globl "$1))
+(define-instruction ENTER)
+(define-instruction LEAVE)
 
-(define-emit	(ALIGN long)		(println "	.align " $1))
+(define-instruction NEG)
+(define-instruction ADD)
+(define-instruction SUB)
+(define-instruction MUL)
+(define-instruction DIV)
+(define-instruction AND)
+(define-instruction OR)
+(define-instruction XOR)
+(define-instruction NOT)
+(define-instruction LT)
+(define-instruction LE)
+(define-instruction EQ)
+(define-instruction NE)
+(define-instruction GE)
+(define-instruction GT)
+(define-instruction SLA)
+(define-instruction SRA)
 
-(define-emit	(LONG long)		(println "	.long "$1))
-(define-emit	(LONG LABEL)		(println "	.long "$1))
+(define-instruction BR)
+(define-instruction BF)
+(define-instruction BT)
+(define-instruction CALL)
 
-(define-emit	(ASCIZ string)		(print   "	.asciz ") (dumpln $1))
+(define-instruction LOAD)
+(define-instruction STORE)
+(define-instruction ADDR)
+(define-instruction MOVE)
 
-(define-emit	(DEFLABEL LABEL)	(println $1":"))
-
-(define-emit	(ENTER long)		(println "	pushl %ebp")
-					(println "	movl %esp,%ebp")
-					(println "	subl $"$1",%esp"))
-
-(define-emit	(LEAVE long)		(println "	addl $"$1",%esp")
-					(println "	leave")
-					(println "	ret"))
-
-(define-emit	(NEG)			(println "	negl %eax"))
-
-(define-emit	(ADD TI32)		(println "	addl "$1",%eax"))
-
-(define-emit	(SUB TI32)		(println "	subl "$1",%eax"))
-
-(define-emit	(MUL TI32)		(println "	mull "$1))
-
-(define-emit	(DIV TI32)		(println "	movl $0,%edx")
-					(println "	divl "$1))
-
-(define-emit	(AND TI32)		(println "	andl "$1",%eax"))
-
-(define-emit	(OR TI32)		(println "	orl "$1",%eax"))
-
-(define-emit	(XOR TI32)		(println "	xorl "$1",%eax"))
-
-(define-emit	(NOT)			(println "	cmpl $0,%eax")
-					(println "	sete %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(LT TI32)		(println "	cmpl "$1",%eax")
-					(println "	setl %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(LE TI32)		(println "	cmpl "$1",%eax")
-					(println "	setle %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(EQ TI32)		(println "	cmpl "$1",%eax")
-					(println "	sete %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(NE TI32)		(println "	cmpl "$1",%eax")
-					(println "	setne %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(GE TI32)		(println "	cmpl "$1",%eax")
-					(println "	setge %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(GT TI32)		(println "	cmpl "$1",%eax")
-					(println "	setg %al")
-					(println "	movzbl %al,%eax"))
-
-(define-emit	(SLA TI32)		(println "	movl "$1",%ecx")
-					(println "	shll %cl,%eax"))
-
-(define-emit	(SRA TI32)		(println "	movl "$1",%ecx")
-					(println "	sarl %cl,%eax"))
-
-(define-emit	(BR LABEL)		(println "	jmp "$1))
-
-(define-emit	(BF LABEL)		(println "	cmpl $0,%eax")
-					(println "	je "$1))
-
-(define-emit	(BT LABEL)		(println "	cmpl $0,%eax")
-					(println "	jne "$1))
-
-(define-emit	(CALL LABEL)		(println "	call "$1))
-(define-emit	(CALL long)		(println "	call *%eax"))
-
-(define-emit	(LOAD LI32)		(println "	movl $"$1",%eax"))
-(define-emit	(LOAD LABEL)		(println "	movl $"$1",%eax"))
-(define-emit	(LOAD GI32)		(println "	movl " $1",%eax"))
-(define-emit	(LOAD TI32)		(println "	movl " $1",%eax"))
-
-(define-emit	(STORE TI32)		(println "	movl %eax,"$1))
-(define-emit	(STORE GI32)		(println "	movl %eax,"$1))
-
-(define-emit	(ADDR GI32)		(println "	movl $"$1",%eax"))
-(define-emit	(ADDR TI32)		(println "	leal "$1",%eax"))
-
-(define-emit	(MOVE TI32 TI32)	(println "	movl "$1",%ecx")
-					(println "	movl %ecx,"$2))
-
-(define-emit	(COMMENT pair)		(print "## ") (apply println $1))
-
-(define-emit	(CHR-AT TI32)		(println "	movl "$1",%ecx")
-					(println "	leal (%eax,%ecx),%ecx")
-					(println "	xorl %eax,%eax")
-					(println "	movb (%ecx),%al"))
-
-(define-emit	(SET-CHR-AT TI32 TI32)	(println "	movl "$1",%ecx")
-					(println "	leal (%eax,%ecx),%ecx")
-					(println "	movl "$2",%eax")
-					(println "	movb %al,(%ecx)"))
-
-(define-emit	(OOP-AT TI32)		(println "	movl "$1",%ecx")
-			  		(println "	leal (%eax,%ecx,4),%ecx")
-			  		(println "	movl (%ecx),%eax"))
-
-(define-emit	(SET-OOP-AT TI32 TI32)	(println "	movl "$1",%ecx")
-					(println "	leal (%eax,%ecx,4),%ecx")
-					(println "	movl "$2",%eax")
-					(println "	movl %eax,(%ecx)"))
+(define-instruction CHR-AT)
+(define-instruction SET-CHR-AT)
+(define-instruction OOP-AT)
+(define-instruction SET-OOP-AT)
 
 ;;; 
 
@@ -536,54 +463,583 @@
   ;;(print "gen-param ") (dumpln var)
   (set (<variable>-value var) (new-param comp)))
 
-(define-method gen-definition <expr> (name ocomp)
-  (let* ((main (= 'main name))
-	 (defn (<expr>-defn self))
-	 (body (cddr defn))
-	 (comp (compiler (+ 1 (<compiler>-level ocomp))))
-	 (tnam (if main (LABEL name) (LABEL (temp-label-name))))
-	 (vnam (if main ()           (LABEL name)))
-	 (params (map-with gen-param (cadr defn) comp)))
-    (list-do e body (gen e comp))
-    (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
-	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
-	   (frm-size (align 16 (+ tmp-size 8))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
-      (emit TEXT)
-      (and main (emit GLOBAL tnam))
-      (emit DEFLABEL tnam)
-      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
-      (emit ENTER (- frm-size 8))
-      (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
-      (and (<compiler>-epilogue comp)
-	   (emit DEFLABEL (<compiler>-epilogue comp)))
-      (emit LEAVE (- frm-size 8)))
-    (or main
-      (let ()
-	(gen ocomp DATA)
-	(gen ocomp GLOBAL vnam)
-	(gen ocomp DEFLABEL vnam)
-	(gen ocomp LONG tnam)
-	(gen ocomp TEXT)))))
 
 ;;; 
 
+;; Original gen-env - works for both C and assembly backends
 (define-function gen-env (env)
   (let* ((vars  (<env>-bindings env))
-	 (comp  (compiler 0))
-	 (index (array-length vars)))
+         (comp  (compiler 0))
+         (index (array-length vars)))
     (while (<= 0 (set index (- index 1)))
       (let ((name  (<variable>-name  (array-at vars index)))
-	    (value (<variable>-value (array-at vars index))))
-	(println "## defn " name)
-	(warn name "\n")
-	;;x;(println (<expr>-defn (cdar env)))
-	(gen-definition value name comp)))
-    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
+            (value (<variable>-value (array-at vars index))))
+        ;; (println "## defn " name)  ; commented out for cleaner output
+        (warn name "\n")
+        ;;x;(println (<expr>-defn (cdar env)))
+        (gen-definition value name comp)))
+    (for (i 0 (<compiler>-pc comp))
+                        (apply emit (array-at (<compiler>-asm comp) i)))))
 
 (define-form compile-begin ()	`(set *globals* (environment *globals*)))
 
 (define-form compile-end ()	(let ((env *globals*))
 				  (set *globals* (<env>-parent env))
 				  (gen-env env)))
+
+;;; C BACKEND SUPPORT
+;;; Using object-based approach with function name encapsulation
+
+;; Backend selection variable  
+(define *emit-backend* 'asm)  ; 'asm, 'c, 'arm64, or 'ir
+;; Backend mode indicators for compile-time detection
+(define *c-backend-active* ())
+(define *arm64-backend-active* ())
+(define *ir-backend-active* ())
+
+;; C generator context using define-structure (higher-level approach)
+(define-structure <c-generator> (
+  indent-level        ;; Current indentation level
+  in-data-section     ;; Are we in a data section?
+  functions           ;; List of generated functions
+  globals             ;; List of global variables
+  temp-counter        ;; Counter for unique temp names
+  current-function    ;; Current function being generated
+  forward-decls       ;; List of forward declarations to emit
+  implementations     ;; List of function implementations  
+))
+
+(define-function c-generator ()
+  (let ((self (new <c-generator>)))
+    (set (<c-generator>-indent-level     self) 1)
+    (set (<c-generator>-in-data-section  self) ())
+    (set (<c-generator>-functions        self) (list))
+    (set (<c-generator>-globals          self) (list))
+    (set (<c-generator>-temp-counter     self) 0)
+    (set (<c-generator>-current-function self) ())
+    (set (<c-generator>-forward-decls    self) (list))
+    (set (<c-generator>-implementations  self) (list))
+    self))
+
+;; Global C generator instance
+(define *c-gen* (c-generator))
+
+;; Two-pass C generation system
+;; Pass 1: Collect function signatures for forward declarations
+(define-function c-collect-function-signatures (env)
+  (let* ((vars  (<env>-bindings env))
+         (index (array-length vars))
+         (signatures (list)))
+    (while (<= 0 (set index (- index 1)))
+      (let ((name  (<variable>-name  (array-at vars index)))
+            (value (<variable>-value (array-at vars index))))
+        (if (= <expr> (type-of value))
+            (let* ((defn (<expr>-defn value))
+                   (params (cadr defn)))
+              (set signatures (cons (cons name params) signatures))))))
+    signatures))
+
+;; Generate forward declarations from signatures
+(define-function c-gen-forward-declarations (signatures)
+  (println "// Forward declarations")
+  (list-do sig signatures
+    (let ((name (car sig))
+          (params (cdr sig)))
+      (print "static oop " (mangle-label name) "(")
+      (if (= 0 (list-length params))
+          (print "void")
+        (let ((first 1))
+          (list-do param params
+            (if first
+                (set first ())
+              (print ", "))
+            (print "oop " (mangle-label (<variable>-name param))))))
+      (println ");")))
+  (println))
+
+;; Helper functions that use the object context
+(define-function c-indent ()
+  (for (i 0 (<c-generator>-indent-level *c-gen*))
+    (print "  ")))
+
+(define-function c-param-name (param)
+  (if (variable? param)
+      (mangle-label (<variable>-name param))
+    (concat-string "_param_" (long->string (>> (<TI32>-offset param) 2)))))
+
+(define-function c-temp-name (temp)
+  (concat-string "_temp_" (long->string (>> (<TI32>-offset temp) 2))))
+
+;; High-level C expression generator  
+(define-function c-gen-expr (expr)
+  (cond
+    ;; Literals
+    ((long? expr)
+     (print "LONG(" expr ")"))
+    
+    ;; Variables
+    ((variable? expr)
+     (print (mangle-label (<variable>-name expr))))
+    
+    ;; String literals  
+    ((string? expr)
+     (print "\"" expr "\""))
+    
+    ;; Function calls and operations
+    ((pair? expr)
+     (let ((op (car expr))
+           (args (cdr expr)))
+       (cond
+         ;; Handle if statements - check for 'if symbol directly
+         ((and (symbol? op) (= 'if op))
+          (print "(")
+          (c-gen-expr (car args))  ;; condition
+          (print " ? ")
+          (c-gen-expr (cadr args)) ;; then
+          (print " : ")
+          (if (pair? (cddr args))
+              (c-gen-expr (caddr args)) ;; else
+            (print "nil"))
+          (print ")"))
+         
+         ;; Handle Fixed forms (type 11)
+         ((= 11 (type-of op))
+          (print "(")
+          (c-gen-expr (car args))  ;; condition
+          (print " ? ")
+          (c-gen-expr (cadr args)) ;; then
+          (print " : ")
+          (if (pair? (cddr args))
+              (c-gen-expr (caddr args)) ;; else
+            (print "nil"))
+          (print ")"))
+         
+         ;; Variable-based operations
+         ((variable? op)
+          (let ((op-name (<variable>-name op)))
+            (cond
+              ;; Special forms via variables
+              ((= 'if op-name)
+               (print "(")
+               (c-gen-expr (car args))  ;; condition
+               (print " ? ")
+               (c-gen-expr (cadr args)) ;; then
+               (print " : ")
+               (if (pair? (cddr args))
+                   (c-gen-expr (caddr args)) ;; else
+                 (print "nil"))
+               (print ")"))
+               
+              ;; Type predicates
+              ((= 'long? op-name)
+               (print "((long)(")
+               (c-gen-expr (car args))
+               (print ") & 1)"))
+              
+              ;; Arithmetic operations
+              ((= '+ op-name)
+               (print "LONG(getLong(")
+               (c-gen-expr (car args))
+               (print ") + getLong(")
+               (c-gen-expr (cadr args))
+               (print "))"))
+              
+              ((= '- op-name)
+               (print "LONG(getLong(")
+               (c-gen-expr (car args))
+               (print ") - getLong(")
+               (c-gen-expr (cadr args))
+               (print "))"))
+              
+              ((= '* op-name)
+               (print "LONG(getLong(")
+               (c-gen-expr (car args))
+               (print ") * getLong(")
+               (c-gen-expr (cadr args))
+               (print "))"))
+              
+              ;; Comparison operations
+              ((= '> op-name)
+               (print "(getLong(")
+               (c-gen-expr (car args))
+               (print ") > getLong(")
+               (c-gen-expr (cadr args))
+               (print "))"))
+              
+              (else
+               ;; Function call
+               (print (mangle-label op-name) "(")
+               (let ((first 1))
+                 (list-do arg args
+                   (if first
+                       (set first ())
+                     (print ", "))
+                   (c-gen-expr arg)))
+               (print ")")))))
+         
+         (else
+          ;; Debug: show what we don't recognize
+          (print "/* unknown expression type: ")
+          (print (type-of op))
+          (print " value: ")
+          (dumpln op)
+          (print " */")))))
+    
+    (else
+     (print "nil"))))
+
+;; High-level C code generation that translates Lisp operations directly
+(define-method gen-definition <expr> (name ocomp)
+  (cond
+    ;; C backend: generate high-level C code directly from Lisp expressions
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+      ;; C backend: generate high-level C code directly from Lisp expressions
+      (let* ((main (= 'main name))
+             (defn (<expr>-defn self))
+             (params (cadr defn))
+             (body (cddr defn)))
+        (set (<c-generator>-current-function *c-gen*) name)
+        
+        ;; Generate C function signature (suppress the defn comment)
+        (print "static oop " (mangle-label name) "(")
+        (let ((first 1))
+          (list-do param params
+            (if first
+                (set first ())
+              (print ", "))
+            (print "oop " (mangle-label (<variable>-name param)))))
+        (if (= 0 (list-length params))
+            (print "void"))
+        (println ")")
+        (println "{")
+        (set (<c-generator>-indent-level *c-gen*) 
+             (+ (<c-generator>-indent-level *c-gen*) 1))
+        
+        ;; Generate function body directly from Lisp expressions
+        (c-indent) 
+        (print "return ")
+        (c-gen-expr (car body))  ;; Generate C expression directly
+        (println ";")
+        
+        (set (<c-generator>-indent-level *c-gen*) 
+             (- (<c-generator>-indent-level *c-gen*) 1))
+        (println "}")
+        (println)
+        
+        ;; Track generated functions
+        (set (<c-generator>-functions *c-gen*) 
+             (cons name (<c-generator>-functions *c-gen*)))
+        
+        (or main
+            (let ()
+              (println "static oop v_" (mangle-label name) " = (oop)" (mangle-label name) ";")
+              (set (<c-generator>-globals *c-gen*)
+                   (cons name (<c-generator>-globals *c-gen*))))))
+    
+    ;; ARM64 backend: generate ARM64 assembly code
+    ((and (defined? '*arm64-backend-active*) *arm64-backend-active*)
+      (let* ((main (= 'main name))
+             (defn (<expr>-defn self))
+             (body (cddr defn))
+             (comp (compiler (+ 1 (<compiler>-level ocomp))))
+             (tnam (if main (LABEL name) (LABEL (temp-label-name))))
+             (vnam (if main () (LABEL name)))
+             (params (map-with gen-param (cadr defn) comp)))
+        (list-do e body (gen e comp))
+        (let* ((arg-size (align 16 (<compiler>-arg-limit comp)))
+               (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
+               (frm-size (align 16 (+ tmp-size 16))))  ; ARM64 needs 16-byte alignment
+          (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
+          (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
+          (emit TEXT)
+          (and main (emit GLOBAL tnam))
+          (emit DEFLABEL tnam)
+          (emit COMMENT (list "ARM64 frame " arg-size " " (<compiler>-tmp-limit comp) " " tmp-size " " frm-size))
+          (emit ENTER (- frm-size 16))  ; ARM64 frame setup
+          (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
+          (and (<compiler>-epilogue comp)
+               (emit DEFLABEL (<compiler>-epilogue comp)))
+          (emit LEAVE (- frm-size 16)))  ; ARM64 frame teardown
+        (or main
+          (let ()
+            (gen ocomp DATA)
+            (gen ocomp GLOBAL vnam)
+            (gen ocomp DEFLABEL vnam)
+            (gen ocomp LONG tnam)
+            (gen ocomp TEXT)))))
+      
+    ;; Assembly backend (x86): use original implementation
+    (1
+      (let* ((main (= 'main name))
+             (defn (<expr>-defn self))
+             (body (cddr defn))
+             (comp (compiler (+ 1 (<compiler>-level ocomp))))
+             (tnam (if main (LABEL name) (LABEL (temp-label-name))))
+             (vnam (if main ()           (LABEL name)))
+             (params (map-with gen-param (cadr defn) comp)))
+        (list-do e body (gen e comp))
+        (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
+               (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
+               (frm-size (align 16 (+ tmp-size 8))))
+          (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
+          (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
+          (emit TEXT)
+          (and main (emit GLOBAL tnam))
+          (emit DEFLABEL tnam)
+          (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
+          (emit ENTER (- frm-size 8))
+          (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
+          (and (<compiler>-epilogue comp)
+               (emit DEFLABEL (<compiler>-epilogue comp)))
+          (emit LEAVE (- frm-size 8)))
+        (or main
+            (let ()
+              (gen ocomp DATA)
+              (gen ocomp GLOBAL vnam)
+              (gen ocomp DEFLABEL vnam)
+              (gen ocomp LONG tnam)
+              (gen ocomp TEXT))))))))
+
+;; For the C backend, we don't need low-level emit instructions
+;; since we generate high-level C directly from Lisp expressions
+
+;; Switch backend to C
+(define-function use-c-backend ()
+  (set *emit-backend* 'c)
+  (set *c-backend-active* 1)
+  (set *arm64-backend-active* ()))
+
+
+;;; ASSEMBLY BACKEND EMIT METHODS
+;;; These are needed for the traditional eval2.c generation
+
+(define-emit	(TEXT)			(println "	.text"))
+(define-emit	(DATA)			(println "	.data"))
+(define-emit	(SECTION string)	(println "	.section "$1))
+(define-emit	(INDIRECT LABEL)	(println "	.indirect_symbol "$1))
+(define-emit	(GLOBAL LABEL)		(println "	.globl "$1))
+(define-emit	(ALIGN long)		(println "	.align " $1))
+(define-emit	(LONG long)		(println "	.long "$1))
+(define-emit	(LONG LABEL)		(println "	.long "$1))
+(define-emit	(ASCIZ string)		(print   "	.asciz ") (dumpln $1))
+(define-emit	(DEFLABEL LABEL)	(println $1":"))
+
+(define-emit	(ENTER long)		(println "	pushl %ebp")
+			 		(println "	movl %esp,%ebp")
+			 		(and (!= 0 $1) (println "	subl $"$1",%esp")))
+
+(define-emit	(LEAVE long)		(println "	addl $"$1",%esp")
+			 	(println "	movl %ebp,%esp")
+			 	(println "	popl %ebp")
+			 	(println "	ret"))
+
+(define-emit	(NEG)			(println "	negl %eax"))
+(define-emit	(ADD TI32)		(println "	addl "$1",%eax"))
+(define-emit	(SUB TI32)		(println "	subl "$1",%eax"))
+(define-emit	(MUL TI32)		(println "	mull "$1))
+(define-emit	(DIV TI32)		(println "	movl $0,%edx")
+			 		(println "	divl "$1))
+(define-emit	(AND TI32)		(println "	andl "$1",%eax"))
+(define-emit	(OR TI32)		(println "	orl "$1",%eax"))
+(define-emit	(XOR TI32)		(println "	xorl "$1",%eax"))
+(define-emit	(NOT)			(println "	cmpl $0,%eax")
+			 		(println "	sete %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(LT TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	setl %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(LE TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	setle %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(EQ TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	sete %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(NE TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	setne %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(GE TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	setge %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(GT TI32)		(println "	cmpl "$1",%eax")
+			 		(println "	setg %al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(SLA TI32)		(println "	sall "$1",%eax"))
+(define-emit	(SRA TI32)		(println "	sarl "$1",%eax"))
+
+(define-emit	(BR LABEL)		(println "	jmp "$1))
+(define-emit	(BT LABEL)		(println "	cmpl $0,%eax")
+			 		(println "	jne "$1))
+(define-emit	(BF LABEL)		(println "	cmpl $0,%eax")
+			 		(println "	je "$1))
+
+(define-emit	(CALL long)		(println "	call %eax"))
+
+(define-emit	(LOAD LI32)		(println "	movl $"$1",%eax"))
+(define-emit	(LOAD GI32)		(println "	movl "$1",%eax"))
+(define-emit	(LOAD TI32)		(println "	movl "$1"(%ebp),%eax"))
+(define-emit	(LOAD LABEL)		(println "	movl "$1",%eax"))
+
+(define-emit	(STORE GI32)		(println "	movl %eax,"$1))
+(define-emit	(STORE TI32)		(println "	movl %eax,"$1"(%ebp)"))
+
+(define-emit	(ADDR GI32)		(println "	movl $"$1",%eax"))
+(define-emit	(ADDR TI32)		(println "	leal "$1"(%ebp),%eax"))
+
+(define-emit	(MOVE TI32 TI32)	(println "	movl "$1"(%ebp),%eax")
+			 		(println "	movl %eax,"$2"(%ebp)"))
+
+(define-emit	(CHR-AT)		(println "	movl 4(%esp),%eax")
+			 		(println "	movb (%eax),%al")
+			 		(println "	andl $255,%eax"))
+
+(define-emit	(SET-CHR-AT)		(println "	movl 8(%esp),%eax")
+			 		(println "	movl 4(%esp),%ecx")
+			 		(println "	movb %al,(%ecx)")
+			 		(println "	movl %eax,8(%esp)"))
+
+(define-emit	(OOP-AT TI32)		(println "	movl "$1",%ecx")
+			 		(println "	movl (%eax,%ecx,4),%eax"))
+
+(define-emit	(SET-OOP-AT TI32 TI32)	(println "	movl "$1",%ecx")
+			 		(println "	movl "$2",%edx")
+			 		(println "	movl %ecx,(%eax,%edx,4)"))
+
+(define-emit	(OOP-AT)		(println "	movl 4(%esp),%eax")
+			 		(println "	movl (%eax),%eax"))
+
+(define-emit	(SET-OOP-AT)		(println "	movl 8(%esp),%eax")
+			 		(println "	movl 4(%esp),%ecx")
+			 		(println "	movl %eax,(%ecx)")
+			 		(println "	movl %eax,8(%esp)"))
+
+;;; ARM64 ASSEMBLY BACKEND EMIT METHODS
+;;; These emit ARM64 assembly instructions when ARM64 backend is active
+
+;; ARM64 assembly directives
+(define-emit	(ARM64-TEXT)		(println "	.text"))
+(define-emit	(ARM64-DATA)		(println "	.data"))
+(define-emit	(ARM64-SECTION string)	(println "	.section "$1))
+(define-emit	(ARM64-GLOBAL LABEL)	(println "	.globl "$1))
+(define-emit	(ARM64-ALIGN long)	(println "	.align "$1))
+(define-emit	(ARM64-LONG long)	(println "	.long "$1))
+(define-emit	(ARM64-LONG LABEL)	(println "	.long "$1))
+(define-emit	(ARM64-ASCIZ string)	(print   "	.asciz ") (dumpln $1))
+(define-emit	(ARM64-DEFLABEL LABEL)	(println $1":"))
+
+;; ARM64 function prologue and epilogue
+(define-emit	(ARM64-ENTER long)	(println "	stp	x29, x30, [sp, #-16]!")
+			 		(println "	mov	x29, sp")
+			 		(and (!= 0 $1) (println "	sub	sp, sp, #"$1)))
+
+(define-emit	(ARM64-LEAVE long)	(and (!= 0 $1) (println "	add	sp, sp, #"$1))
+			 		(println "	ldp	x29, x30, [sp], #16")
+			 		(println "	ret"))
+
+;; ARM64 arithmetic operations  
+(define-emit	(ARM64-ADD TI32)	(println "	add	x0, x0, #"$1))
+(define-emit	(ARM64-SUB TI32)	(println "	sub	x0, x0, #"$1))
+(define-emit	(ARM64-MUL TI32)	(println "	mov	x1, #"$1)
+			 		(println "	mul	x0, x0, x1"))
+(define-emit	(ARM64-NEG)		(println "	neg	x0, x0"))
+
+;; ARM64 comparison operations
+(define-emit	(ARM64-LT TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, lt"))
+(define-emit	(ARM64-LE TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, le"))
+(define-emit	(ARM64-EQ TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, eq"))
+(define-emit	(ARM64-NE TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, ne"))
+(define-emit	(ARM64-GE TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, ge"))
+(define-emit	(ARM64-GT TI32)		(println "	cmp	x0, #"$1)
+			 		(println "	cset	x0, gt"))
+
+;; ARM64 branching
+(define-emit	(ARM64-BR LABEL)	(println "	b	"$1))
+(define-emit	(ARM64-BF LABEL)	(println "	cbz	x0, "$1))
+(define-emit	(ARM64-BT LABEL)	(println "	cbnz	x0, "$1))
+(define-emit	(ARM64-CALL LABEL)	(println "	bl	"$1))
+
+;; ARM64 load/store operations
+(define-emit	(ARM64-LOAD LI32)	(println "	mov	x0, #"$1))
+(define-emit	(ARM64-LOAD LABEL)	(println "	adrp	x0, "$1"@PAGE")
+			 		(println "	add	x0, x0, "$1"@PAGEOFF"))
+(define-emit	(ARM64-LOAD TI32)	(println "	ldr	x0, [x29, #"$1"]"))
+(define-emit	(ARM64-STORE TI32)	(println "	str	x0, [x29, #"$1"]"))
+
+;; ARM64 memory operations
+(define-emit	(ARM64-OOP-AT TI32)	(println "	ldr	x1, [x29, #"$1"]")
+			 		(println "	ldr	x0, [x0, x1, lsl #3]"))
+(define-emit	(ARM64-SET-OOP-AT TI32 TI32)	(println "	ldr	x1, [x29, #"$1"]")
+			 			(println "	ldr	x2, [x29, #"$2"]")
+			 			(println "	str	x1, [x0, x2, lsl #3]"))
+
+;; ARM64 comments
+(define-emit	(ARM64-COMMENT pair)	(print "// ") (apply println $1))
+
+(define-emit	(COMMENT pair)		(print   "	# ")
+			 		(map print $1)
+			 		(println))
+
+;;; ARM64 BACKEND SETUP FUNCTIONS
+;;; These must come after all emit methods are defined
+
+;; Dynamically redefine generic emit methods to call ARM64 versions
+(define-function load-arm64-emit-mappings ()
+  ;; Override generic emit methods to call ARM64 versions
+  (define-emit (TEXT)           (emit ARM64-TEXT))
+  (define-emit (DATA)           (emit ARM64-DATA))
+  (define-emit (SECTION string) (emit ARM64-SECTION $1))
+  (define-emit (GLOBAL LABEL)   (emit ARM64-GLOBAL $1))
+  (define-emit (ALIGN long)     (emit ARM64-ALIGN $1))
+  (define-emit (LONG long)      (emit ARM64-LONG $1))
+  (define-emit (LONG LABEL)     (emit ARM64-LONG $1))
+  (define-emit (ASCIZ string)   (emit ARM64-ASCIZ $1))
+  (define-emit (DEFLABEL LABEL) (emit ARM64-DEFLABEL $1))
+  (define-emit (ENTER long)     (emit ARM64-ENTER $1))
+  (define-emit (LEAVE long)     (emit ARM64-LEAVE $1))
+  (define-emit (ADD TI32)       (emit ARM64-ADD $1))
+  (define-emit (SUB TI32)       (emit ARM64-SUB $1))
+  (define-emit (MUL TI32)       (emit ARM64-MUL $1))
+  (define-emit (NEG)            (emit ARM64-NEG))
+  (define-emit (LT TI32)        (emit ARM64-LT $1))
+  (define-emit (LE TI32)        (emit ARM64-LE $1))
+  (define-emit (EQ TI32)        (emit ARM64-EQ $1))
+  (define-emit (NE TI32)        (emit ARM64-NE $1))
+  (define-emit (GE TI32)        (emit ARM64-GE $1))
+  (define-emit (GT TI32)        (emit ARM64-GT $1))
+  (define-emit (BR LABEL)       (emit ARM64-BR $1))
+  (define-emit (BF LABEL)       (emit ARM64-BF $1))
+  (define-emit (BT LABEL)       (emit ARM64-BT $1))
+  (define-emit (CALL LABEL)     (emit ARM64-CALL $1))
+  (define-emit (LOAD LI32)      (emit ARM64-LOAD $1))
+  (define-emit (LOAD LABEL)     (emit ARM64-LOAD $1))
+  (define-emit (LOAD TI32)      (emit ARM64-LOAD $1))
+  (define-emit (STORE TI32)     (emit ARM64-STORE $1))
+  (define-emit (OOP-AT TI32)    (emit ARM64-OOP-AT $1))
+  (define-emit (SET-OOP-AT TI32 TI32) (emit ARM64-SET-OOP-AT $1 $2))
+  (define-emit (COMMENT pair)   (emit ARM64-COMMENT $1)))
+
+;; Switch backend to ARM64
+(define-function use-arm64-backend ()
+  (set *emit-backend* 'arm64)
+  (set *arm64-backend-active* 1)
+  (set *c-backend-active* ())
+  (set *ir-backend-active* ())
+  (load-arm64-emit-mappings))
+
+;; Switch backend to IR
+(define-function use-ir-backend ()
+  (set *emit-backend* 'ir)
+  (set *ir-backend-active* 1)
+  (set *c-backend-active* ())
+  (set *arm64-backend-active* ()))

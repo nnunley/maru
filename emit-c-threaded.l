@@ -48,8 +48,8 @@
 
 (define-function c-fresh-thread ()
   "Generate unique thread name"
-  (let ((name (concat-string "thread_" (long->string (set *c-thread-counter* (+ *c-thread-counter* 1))))))
-    name))
+  (set *c-thread-counter* (+ *c-thread-counter* 1))
+  (concat-string "thread_" (long->string *c-thread-counter*)))
 
 (define-function my-reverse (lst)
   "Simple list reversal function"
@@ -325,4 +325,50 @@
 ;; - Garbage collection integration
 ;; - More sophisticated runtime support
 
-(println "emit-c-threaded.l loaded - Unified Threaded C Backend")
+;;; =============================================================================
+;;; ESSENTIAL EMIT.L INFRASTRUCTURE FOR EVAL.L COMPILATION
+;;; =============================================================================
+
+;; First, we need the essential structures that eval.l expects
+(define-structure <env> (parent level offset bindings))
+(define-structure <variable> (name value env index))
+(define-structure <extern> (name stub))
+(define-structure <header> (size flags next type))
+(define-structure <buffer> (contents size position))
+
+;; Essential functions from emit.l
+(define-function environment (parent)
+  "Create new environment (from emit.l)"
+  (let ((self (new <env>)))
+    (set (<env>-parent   self) parent)
+    (set (<env>-level    self) (if parent (<env>-level  parent) 0))
+    (set (<env>-offset   self) 0)
+    (set (<env>-bindings self) (array))
+    self))
+
+(define-function extern (name)
+  "External declaration (from emit.l)"
+  (let ((self (new <extern>)))
+    (set (<extern>-name self) name)
+    self))
+
+(define-function variable? (obj) (= <variable> (type-of obj)))
+
+;; Define minimal compile-begin/compile-end for eval.l compatibility
+(define-form compile-begin ()
+  "Minimal compile-begin for eval.l compatibility"
+  `(set *globals* (environment *globals*)))
+
+(define-form compile-end ()
+  "Minimal compile-end for eval.l compatibility"
+  *globals*)
+
+;; Additional structure definitions that eval.l might use
+(define-form define-structure (name fields) 
+  "Basic structure definition support"
+  `(define ,name (list ',name ',fields)))
+
+;; Global variables that eval.l expects  
+(define *globals* ())  ;; Will be set by compile-begin
+
+;;(println "emit-c-threaded.l loaded - Unified Threaded C Backend with eval.l compatibility")

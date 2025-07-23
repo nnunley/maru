@@ -23,7 +23,7 @@ endif
 
 .SUFFIXES :
 
-all : eval2 eval eval32 osdefs.k evalm evalm-full
+all : eval2 eval eval32 osdefs.k evalm
 
 run : all
 	rlwrap ./eval

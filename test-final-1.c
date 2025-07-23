@@ -1,0 +1,12 @@
+[?7h[32m[?7lemit-c-threaded-final.l:25[0m (reverse *current-output*)
+[?7h[32m[?7lemit-c-threaded-final.l:23[0m (lambda () "Get buffered output as list" (reverse *current-output*))
+[?7h[32m[?7lemit-c-threaded-final.l:23[0m (define flush-output-buffer (lambda () "Get buffered output as list" (reverse *current-output*)))
+[?7h[32m[?7lboot.l:996                [0m (eval expr)
+[?7h[32m[?7lboot.l:996                [0m (Fixed<let> ((result (eval expr))) (Fixed<and> (> (verbose) 1) (println "=> " result)) result)
+[?7h[32m[?7lboot.l:1007               [0m (pval expr)
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<let> ((expr (car _list_))) (pval expr))
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))
+[?7h[32m[?7lboot.l:1007               [0m (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_))))
+[?7h[32m[?7lboot.l:1005               [0m (Fixed<let> ((exps (find-and-read name))) (Fixed<or> exps (error "file not found or empty: " name)) (Fixed<let> ((_list_ exps)) (Fixed<while> _list_ (Fixed<let> ((expr (car _list_))) (pval expr)) (Fixed<set> _list_ (cdr _list_)))))
+[?7h[32m[?7ltest-emit-c-threaded-final.l:6[0m (load "emit-c-threaded-final.l")
+[?7h
