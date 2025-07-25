@@ -1,1 +1,0 @@
-(println "TTY test:" (isatty 0))

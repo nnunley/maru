@@ -1,4 +1,0 @@
-(type-of 42)
-(type-of "hello")
-(dump (cons 'a 'b))
-:quit

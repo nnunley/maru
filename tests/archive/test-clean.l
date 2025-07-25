@@ -1,5 +1,0 @@
-(require "emit.l")
-(println "emit.l loaded successfully!")
-(println "compile-begin defined: " (if (defined? 'compile-begin) "yes" "no"))
-(println "compile-end defined: " (if (defined? 'compile-end) "yes" "no"))
-(println "*emit-backend*: " *emit-backend*)

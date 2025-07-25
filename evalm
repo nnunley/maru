@@ -1,2 +1,0 @@
-#!/bin/bash
-exec "/Users/ndn/development/maru/eval" "/Users/ndn/development/maru/evalm.l" "$@"
