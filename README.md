@@ -1,8 +1,8 @@
-# Maru: A Metacircular Lisp Compiler
+# Maru: A Metacircular Language Workbench
 
 *"The best way to predict the future is to invent it" — Alan Kay*
 
-Maru is a sophisticated self-hosting Lisp compiler developed as part of Alan Kay's VPRI STEPS project. It demonstrates how a complete, metacircular programming system can be built with radical simplicity while maintaining full expressiveness and multi-target compilation capabilities.
+Maru is a sophisticated self-hosting Lisp compiler and language workbench developed by Ian Piumarta at VPRI as part of Alan Kay's STEPS project. Beyond being a metacircular compiler, Maru serves as a powerful platform for building domain-specific languages, demonstrating how complex language implementations can emerge from simple, elegant foundations.
 
 ## What Makes Maru Special?
 
@@ -19,6 +19,13 @@ One source language, multiple targets:
 ### 📝 **Dual Syntax System**
 - **`.l files`**: Traditional S-expression Lisp syntax for dynamic programming, macros, and exploration
 - **`.k files`**: Typed (but still dynamic) structured syntax with IR compilation support for performance
+
+### 🛠️ **Language Workbench Capabilities**
+Maru includes sophisticated tools for building new languages:
+- **PEG Parser Generator**: Build parsers for any syntax (including Unicode)
+- **Multi-Method System**: Extensible compiler passes
+- **Port Streams**: Clean I/O abstraction for code generation
+- **Example: Nile**: A complete stream processing language built on Maru
 
 ### 🧠 **Educational Excellence**
 At ~1,750 lines for the complete compiler, Maru is small enough to understand completely yet sophisticated enough for real development. Perfect for learning language implementation.
@@ -143,6 +150,10 @@ maru/
 │   └── *.k              # Typed library modules
 ├── arch/                 # Architecture-specific code
 ├── grammars/            # PEG parser grammars
+├── compilers/           # Example language implementations
+│   └── nile/            # Stream processing language
+├── runtimes/            # Runtime libraries
+│   └── nile/            # Nile runtime (C + FFI)
 └── doc/                 # Documentation
 ```
 
@@ -241,6 +252,32 @@ Try adding new language features or compilation targets.
 
 ## Advanced Usage
 
+### Building Domain-Specific Languages
+
+Maru excels as a language workbench. See the Nile language for a complete example:
+
+```bash
+# Explore the Nile stream processing language
+cd compilers/nile
+cat README.md
+
+# Example: Compile a Nile program to C
+./nile-to-c-compiler.sh MyModule examples/transform.nl > transform.c
+
+# Build with the Nile runtime
+gcc -o transform transform.c \
+    ../../runtimes/nile/nile.c \
+    ../../runtimes/nile/nile-process.c \
+    ../../runtimes/nile/nile-builtins.c \
+    -I ../../runtimes/nile/ -lm -pthread
+```
+
+Key features for language building:
+- **PEG Parser Generator**: Define grammars in `grammars/`
+- **Multi-Method Dispatch**: Extensible compiler passes
+- **Code Generation**: Clean separation of AST and output
+- **FFI Support**: Interface with C libraries
+
 ### Cross-Platform Compilation
 ```bash
 # Target ARM64 (Apple Silicon)
@@ -277,6 +314,23 @@ ls lib/*.k lib/*.l
 # lib/maru-test.k    - Testing framework
 ```
 
+## Recent Developments
+
+### 🚀 Active Features (2024)
+
+1. **Port Streams System**: Complete I/O abstraction layer with buffered output
+2. **PEG IR Compiler**: Dynamic parser generation at runtime from intermediate representation
+3. **Environment Access Syntax**: `env.symbol` for isolated grammar environments
+4. **Cross-Architecture Support**: Unified build process for ARM64 and x86-64
+
+### 📚 Included Languages
+
+**Nile** - A complete stream processing language demonstrating Maru's capabilities:
+- Unicode mathematical notation (∀, ≤, ≥, ∧, ∨)
+- Efficient compilation to C
+- High-performance runtime with multi-threading
+- See `compilers/nile/` and `runtimes/nile/`
+
 ## Philosophy and Design
 
 Maru embodies several key principles:
@@ -305,11 +359,14 @@ Maru is designed for experimentation and extension:
 - **Documentation**: See `doc/` directory for detailed technical documentation
 - **Examples**: Study the built-in test files and examples  
 - **Academic Papers**: Search for "VPRI STEPS" and Ian Piumarta's work on metacircular systems
+- **Language Examples**: Nile demonstrates building complete languages on Maru
 - **Historical Context**: Part of Alan Kay's vision for simplified computing systems
 
 ## License and History
 
-Maru was developed by Ian Piumarta at Viewpoints Research Institute (VPRI) as part of the STEPS project (2007-2012). The project demonstrated that sophisticated computing systems could be built with radical simplicity while maintaining full functionality.
+Maru was developed by Ian Piumarta at Viewpoints Research Institute (VPRI) as part of the STEPS project (2007-2012). The project aimed to create a complete personal computing system in under 20,000 lines of code, demonstrating that sophisticated computing systems could be built with radical simplicity while maintaining full functionality.
+
+Key collaborators included Dan Amelang (Nile language), Takashi Yamamiya, and other VPRI researchers who contributed to various aspects of the system.
 
 ---
 
