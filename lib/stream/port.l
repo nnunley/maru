@@ -10,7 +10,10 @@
 (define-function string-port  () (new <port> (array) 0))
 (define-function console-port () (new <port> () 0))
 
-(define-method do-print <port> () (print "<port "(array-length self.buffer)":"self.column">"))
+(define-method do-print <port> () 
+  (print "<port " 
+         (if self.buffer (array-length self.buffer) "console")
+         ":" self.column ">"))
 
 (define-function port-contents (p)
   (let ((buf (<port>-buffer p)))
