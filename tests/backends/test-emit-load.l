@@ -1,5 +1,0 @@
-(require "boot.l")
-(println "Loading emit.l...")
-(require "emit.l")
-(println "emit.l loaded successfully\!")
-(println "compile-begin defined: " (defined? 'compile-begin))

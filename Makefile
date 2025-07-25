@@ -23,28 +23,10 @@ endif
 
 .SUFFIXES :
 
-all : eval2 eval eval32 osdefs.k evalm
+all : eval2 eval eval32 osdefs.k
 
 run : all
 	rlwrap ./eval
-
-# Multi-Method Evaluator Binary
-evalm : eval evalm.l
-	@echo "Creating evalm binary..."
-	@echo '#!/bin/bash' > evalm
-	@echo 'exec "$(shell pwd)/eval" "$(shell pwd)/evalm.l" "$$@"' >> evalm
-	@chmod +x evalm
-	@echo "evalm binary created successfully!"
-	@echo "Usage: ./evalm"
-
-# Full Multi-Method Evaluator Binary (with complete Maru environment)
-evalm-full : eval evalm-full.l
-	@echo "Creating evalm-full binary (complete environment)..."
-	@echo '#!/bin/bash' > evalm-full
-	@echo 'exec "$(shell pwd)/eval" "$(shell pwd)/evalm-full.l" "$$@"' >> evalm-full
-	@chmod +x evalm-full
-	@echo "evalm-full binary created successfully!"
-	@echo "Usage: ./evalm-full (includes ALL Maru functions)"
 
 status : .force
 	@echo "SYS is $(SYS)"
@@ -53,52 +35,45 @@ eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-eval2.c : core/compiler/emit.l core/eval.l eval
-	./eval core/compiler/emit.l core/eval.l > eval2.c
-
 eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-eval2-utf8 : eval2-utf8.c gc.c gc.h buffer.c chartab.h utf8.c osdefs.k
-	$(CC) -g $(CFLAGS) -o eval2-utf8 eval2-utf8.c $(LIBS)
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
-
 check-maru : eval2
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-nfibs.k
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-gc.k
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-test.k
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k
+	./eval2 ir-gen-c.k maru.k maru-gc.k
+	./eval2 ir-gen-c.k maru.k maru-test.k
 
 check-marux : eval2
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-nfibs.k
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-gc.k
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-test.k
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k
+	./eval2 ir-gen-x86.k maru.k maru-gc.k
+	./eval2 ir-gen-x86.k maru.k maru-test.k
 
 test-maru : eval2
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
 
 test2-maru : eval2
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
+	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
 
 test3-maru : eval2
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
+	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
 
 maru-check : eval2 .force
-	./eval2 -g core/compiler/ir-gen-x86.k core/maru.k lib/maru-check.k > maru-check.s
+	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
 	cc -m32 -o maru-check maru-check.s
 	./maru-check
 
 maru-check-c : eval2 .force
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/maru-check.k > maru-check.c
+	./eval2 ir-gen-c.k maru.k maru-check.k > maru-check.c
 	cc -o maru-check maru-check.c -ldl
 	./maru-check
 
 maru-bench : eval2 .force
 ##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
 	cc -O2 -fomit-frame-pointer -o nfibs nfibs.c
-	./eval2 core/compiler/ir-gen-x86.k core/maru.k lib/maru-nfibs.k > maru-nfibs.s
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
 ##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
 	cc -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
 	time ./nfibs 38
@@ -123,7 +98,7 @@ debuggc : .force
 profile : .force
 	$(MAKE) clean eval CFLAGS="$(CFLAGS) -O3 -fno-inline-functions -DNDEBUG"
 #	shark -q -1 -i ./eval emit.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l > test.s
-	shark -q -1 -i ./eval lib/repl.l test-pepsi.l
+	shark -q -1 -i ./eval repl.l test-pepsi.l
 
 osdefs.k : mkosdefs
 	./mkosdefs > $@
@@ -132,86 +107,86 @@ mkosdefs : mkosdefs.c
 	$(CC) -o $@ $<
 
 cg : eval .force
-	./eval lib/codegen5.l | tee test.s
+	./eval codegen5.l | tee test.s
 	as test.s
 	ld  --build-id --eh-frame-hdr -m elf_i386 --hash-style=both -dynamic-linker /lib/ld-linux.so.2 -o test /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crt1.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crti.o /usr/lib/gcc/i486-linux-gnu/4.4.5/crtbegin.o -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../.. a.out -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/i486-linux-gnu/4.4.5/crtend.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crtn.o
 	./test
 
-test : core/compiler/emit.l core/eval.l eval
-	$(TIME) ./eval -O core/compiler/emit.l core/eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
+test : emit.l eval.l eval
+	$(TIME) ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
 
 time : .force
-	$(TIME) ./eval -O core/compiler/emit.l core/eval.l core/eval.l core/eval.l core/eval.l core/eval.l > /dev/null
+	$(TIME) ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test2 : test .force
-	$(TIME) ./test -O core/bootstrap/boot.l core/compiler/emit.l core/eval.l > test2.s
+	$(TIME) ./test -O boot.l emit.l eval.l > test2.s
 	diff test.s test2.s
 
 time2 : .force
-	$(TIME) ./test core/bootstrap/boot.l core/compiler/emit.l core/eval.l core/eval.l core/eval.l core/eval.l core/eval.l > /dev/null
+	$(TIME) ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test-eval : test .force
 	$(TIME) ./test test-eval.l
 
 test-boot : test .force
-	$(TIME) ./test core/boot-emit.l
+	$(TIME) ./test boot-emit.l
 
 test-emit : eval .force
-	./core/compiler/emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
+	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
 
-core/peg.l : eval core/parser.l core/peg-compile.l core/peg-boot.l grammars/examples/peg.g
-	-rm core/peg.l.new
-	./eval core/parser.l core/peg-compile.l core/peg-boot.l > core/peg.l.new
-	-mv core/peg.l core/peg.l.$(shell date '+%Y%m%d.%H%M%S')
-	mv core/peg.l.new core/peg.l
+peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
+	-rm peg.l.new
+	./eval parser.l peg-compile.l peg-boot.l > peg.l.new
+	-mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
+	mv peg.l.new peg.l
 
-test-repl : eval core/peg.l .force
-	./eval lib/repl.l test-repl.l
+test-repl : eval peg.l .force
+	./eval repl.l test-repl.l
 
-test-peg : eval core/peg.l .force
-	$(TIME) ./eval core/parser.l core/peg.l test-peg.l > peg.n
-	$(TIME) ./eval core/parser.l peg.n test-peg.l > peg.m
+test-peg : eval peg.l .force
+	$(TIME) ./eval parser.l peg.l test-peg.l > peg.n
+	$(TIME) ./eval parser.l peg.n test-peg.l > peg.m
 	diff peg.n peg.m
 
 test-compile-grammar :
-	./eval core/compiler/compile-grammar.l grammars/examples/test-dc.g > test-dc.g.l
-	./eval core/compiler/compile-dc.l test.dc
+	./eval compile-grammar.l test-dc.g > test-dc.g.l
+	./eval compile-dc.l test.dc
 
 test-compile-irgol : eval32 irgol.g.l .force
-	./eval core/compiler/compile-irgol.l test.irgol > test.c
+	./eval compile-irgol.l test.irgol > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
-irgol.g.l : tpeg.l grammars/core/irgol.g
-	./eval core/compiler/compile-tpeg.l grammars/core/irgol.g > irgol.g.l
+irgol.g.l : tpeg.l irgol.g
+	./eval compile-tpeg.l irgol.g > irgol.g.l
 
 test-irgol : eval .force
-	./eval lib/irgol.k |tee test.c
+	./eval irgol.k |tee test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
 test-compile-irl : eval32 irl.g.l .force
-	./eval core/compiler/compile-irl.l test.irl > test.c
+	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
-irl.g.l : tpeg.l grammars/core/irl.g
-	./eval core/compiler/compile-tpeg.l grammars/core/irl.g > irl.g.l
+irl.g.l : tpeg.l irl.g
+	./eval compile-tpeg.l irl.g > irl.g.l
 
-test-ir : eval2 .force
-	./eval2 core/compiler/ir-gen-c.k core/maru.k lib/test-ir2.k > test.c
-	$(CC) -fno-builtin -g -o test test.c -ldl
+test-ir : eval .force
+	./eval test-ir.k > test.c
+	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
-tpeg.l : grammars/core/tpeg.g core/compiler/compile-peg.l core/compiler/compile-tpeg.l
-	$(TIME) ./eval core/compiler/compile-peg.l  grammars/core/tpeg.g > tpeg.l.new
+tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
+	$(TIME) ./eval compile-peg.l  tpeg.g > tpeg.l.new
 	-test -f tpeg.l && cp tpeg.l tpeg.l.$(NOW)
 	mv tpeg.l.new tpeg.l
-	$(TIME) ./eval core/compiler/compile-tpeg.l grammars/core/tpeg.g > tpeg.ll
+	$(TIME) ./eval compile-tpeg.l tpeg.g > tpeg.ll
 	sort tpeg.l > tpeg.ls
 	sort tpeg.ll > tpeg.lls
 	diff tpeg.ls tpeg.lls
@@ -234,35 +209,35 @@ test-elf : eval32 .force
 	./a.out
 
 test-assembler : eval32 .force
-	./eval32 lib/assembler.k
+	./eval32 assembler.k
 
 test-recursion2 :
-	./eval core/compiler/compile-grammar.l grammars/examples/test-recursion2.g > test-recursion2.g.l
-	./eval core/compiler/compile-recursion2.l test-recursion2.txt
+	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
+	./eval compile-recursion2.l test-recursion2.txt
 
 test-main : eval32 .force
-	$(TIME) ./eval32 lib/test-main.k
+	$(TIME) ./eval32 test-main.k
 	chmod +x test-main
 	$(TIME) ./test-main hello world
 
 test-main2 : eval32 .force
-	$(TIME) ./eval32 lib/test-pegen.k core/save.k test-pegen
+	$(TIME) ./eval32 test-pegen.k save.k test-pegen
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
 
-cpp.g.l : grammars/examples/cpp.g tpeg.l
-	./eval core/compiler/compile-tpeg.l $< > $@.new
+cpp.g.l : cpp.g tpeg.l
+	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
 test-cpp : eval cpp.g.l .force
-	./eval core/compiler/compile-cpp.l cpp-small-test.c
+	./eval compile-cpp.l cpp-small-test.c
 
-osdefs.g.l : grammars/core/osdefs.g tpeg.l
-	./eval core/compiler/compile-tpeg.l $< > $@.new
+osdefs.g.l : osdefs.g tpeg.l
+	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
 %.osdefs.k : %.osdefs osdefs.g.l
-	./eval core/compiler/compile-osdefs.l $< > $<.c
+	./eval compile-osdefs.l $< > $<.c
 	cc -o $<.exe $<.c
 	./$<.exe > $@.new
 	mv $@.new $@
@@ -275,7 +250,7 @@ osdefs : osdefs.g.l $(OSKEFS) .force
 
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
-	shark -q -1 -i ./eval core/parser.l peg.n test-peg.l > peg.m
+	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
 
 NILE = ../nile
 GEZIRA = ../gezira
@@ -289,9 +264,9 @@ libgezira.$(SO) : .force
 	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(GEZIRA)/c/gezira.c $(GEZIRA)/c/gezira-image.c
 
 stats : .force
-	cat core/bootstrap/boot.l core/compiler/emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat core/eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat core/bootstrap/boot.l core/compiler/emit.l core/eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
 	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
@@ -304,10 +279,10 @@ clean : .force
 
 FILES = Makefile \
 	wcs.c buffer.c chartab.h eval.c gc.c gc.h \
-	core/bootstrap/boot.l core/compiler/emit.l core/eval.l test-emit.l \
-	core/parser.l core/peg-compile.l core/peg-boot.l core/peg.l test-peg.l test-repl.l \
-	lib/repl.l lib/mpl.l lib/sim.l \
-	grammars/core/peg.g
+	boot.l emit.l eval.l test-emit.l \
+	parser.l peg-compile.l peg-compile-2.l peg-boot.l peg.l test-peg.l test-repl.l \
+	repl.l repl-2.l mpl.l sim.l \
+	peg.g
 
 DIST = maru-$(NOW)
 DEST = ckpt/$(DIST)

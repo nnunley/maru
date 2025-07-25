@@ -1,7 +1,0 @@
-(load "boot.l")
-(load "core/compiler/emit.l")
-(println "ARM64 backend test starting...")
-(use-arm64-backend)
-(println "ARM64 backend activated")
-(emit TEXT)
-(println "ARM64 backend test completed")

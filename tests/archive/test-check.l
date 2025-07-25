@@ -1,7 +1,0 @@
-(require "boot.l")
-(println "boot.l loaded")
-(require "emit.l")
-(println "emit.l loaded")
-(println "defined? result: " (defined? 'compile-begin))
-(println "checking in globals...")
-(println "compile-begin in *globals*: " (assq 'compile-begin (<env>-bindings *globals*)))
