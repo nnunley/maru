@@ -57,6 +57,12 @@ int main()
 # ifdef __linux__
     defint(__linux__);
 # endif
+# ifdef __arm64__
+    defint(__arm64__);
+# endif
+# ifdef __aarch64__
+    defint(__aarch64__);
+# endif
     defsao(char);
     defsao(short);
     defsao(int);

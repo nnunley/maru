@@ -1,0 +1,6 @@
+42
+"hello"
+(+ 1 2)
+(quote foo)
+:explore
+:quit

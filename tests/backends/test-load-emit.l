@@ -1,0 +1,6 @@
+(require "boot.l")
+(println "boot.l loaded")
+(require "osdefs.k") 
+(println "osdefs.k loaded")
+(require "emit.l")
+(println "emit.l loaded")
