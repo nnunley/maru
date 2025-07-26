@@ -1,0 +1,23 @@
+# Date mappings for historical accuracy
+# Format: commit_pattern|new_date
+
+# Ian Piumarta's original Maru v1.0 (2007)
+original Maru implementation \(v1\.0\)|2007-01-15 10:00:00 +0000
+
+# Early Maru development (2008-2010)
+Maru v2\.1|2008-03-20 10:00:00 +0000
+Maru v2\.2|2008-09-15 10:00:00 +0000
+Maru v2\.3|2009-06-10 10:00:00 +0000
+Maru v2\.4|2010-04-25 10:00:00 +0000
+
+# VPRI period and v2.5 release (2011-2012)
+Import complete Maru v2\.5|2012-11-30 10:00:00 +0000
+
+# Nile development at VPRI (2012-2013)
+# These should maintain their relative order but with 2012-2013 dates
+Nile.*2012-|KEEP_ORIGINAL
+Initial Nile|2012-01-15 10:00:00 +0000
+
+# Recent development (2024-2025) - keep as is
+.*2024-|KEEP_ORIGINAL
+.*2025-|KEEP_ORIGINAL

@@ -1,0 +1,375 @@
+6cbe91f4cdbc95d0795a7bd4ce787aba075e4518|2025-07-25|Clean up project structure and consolidate documentation| (HEAD -> archaeological-timeline)
+d5dcfddf815458e0c2ff2a45b8f5ceb3487c6cf2|2025-07-25|Integrate Nile language compiler and runtime into Maru project|
+583bc2de020b7f9ab85f124618e2fadceb081466|2025-07-25|Add VPRI Complete Maru System (v2.5)| (tag: v2.5-vpri-complete, v2.5-vpri-complete)
+9af80b67f803b3ecd40b061fa1c20efb371748f8|2025-07-25|Add Ian Piumarta's original Maru implementation (v1.0)| (tag: v1.0-original, v1.0-original)
+081eedb8efba6b37917d663d51631cb3f68e9338|2025-07-25|Complete codebase cleanup and add original Maru files| (feature/analysis-and-documentation)
+41f77dd0abe80507cf77e78df63847117e53d5ca|2025-07-22|Implement comprehensive MARU_TARGET_ARCH cross-compilation system|
+a2f3f63ccde2199c7896ed13a3b76a1787fd1ac1|2025-07-22|Unify threaded C backend implementations into single clean file|
+a7679b12d34ed6ccac8918a7b11f55d61b538788|2025-07-22|Implement multi-method evaluator with Piumarta environment stack|
+f9613e5b69f2c44621213c0679a058e95f981d5c|2025-07-21|Revert emit.l to maru-2.4 version|
+ef60a8a529c98ff855f7ce692e197f4783bd27e6|2025-07-21|Fix remaining path references after reorganization|
+2a7a644ccec6b9333e41ef43574ace5974745c56|2025-07-21|Reorganize codebase with hierarchical directory structure|
+c87b1c0f5a781e3557aecf0ff183be394f3754d7|2025-07-21|Add ARM64 support to osdefs system and clean up boot integration|
+132faf16931b9571acd1a8db2d63d3bd220b80be|2025-07-21|Phase 1 Complete: Grammar-driven assembly framework implemented|
+a339195c35f791db24523bbca19b926c857ac517|2025-07-21|Checkpoint 1.2: Grammar generation framework|
+54f31774a42cf2d35c77f1584fcbdc8ab2e445a0|2025-07-21|Checkpoint 1.1: Architecture specification language parser|
+8f0c8a641eb6e4f2dcfa7fe8866111bde897f0ce|2025-07-20|Code style and minor improvements|
+863f17b6a11fa7293c8dd7ab29419f98cf5241a4|2025-07-20|Fix C IR implementation and test infrastructure|
+d10eb24a9ab967369a9f705f22df827a631a6050|2025-07-20|Add comprehensive documentation and IR system analysis|
+ffa826d44546abed908cd7c91cfbb104dbda6a85|2025-02-27|It appears that compile.l is a template for creating a new code compiler target. Comment out placeholder to allow code to parse correctly.| (main)
+8149785fb0785bab337e784c8646bb7f4f8fdc71|2025-02-27|Shift from using hardcoded mkosdefs to the grammar based bootstrap.|
+d12dbc4435810450d40ee58a8300919c4609d34c|2025-02-18|Rewrite Maru nfibs test code.|
+96b6d6f084ab7733eb72491624903feb2210af33|2025-02-18|cleanup: Tabs to spaces in osdefs.g|
+22dd86e086b704607b2807a3b5cc71588bef7319|2025-02-15|Stash notes for what might next be an idea| (github/main)
+e3bf4212312d66b406e639ec9108e830804279a7|2025-02-13|Make make compile work generically.|
+5dc87316f90ff6790c10adbd5b9aca5d5040c59e|2025-02-12|WIP on main: 96e32aa Last bits of import| (refs/stash)
+30d3be8d2d22b186e0b524a9632e51d3ef72aed1|2025-02-12|index on main: 96e32aa Last bits of import|
+96e32aa3f0d4f66585fe6b7b1259ee741fcfe59c|2025-02-12|Last bits of import|
+9fd3c6d8e2a20c1cd7bb1726f2d99f0b66aaadf8|2025-02-12|Maru @ 2012-10-05, as used by the FONC nile project| (tag: maru-last-vpri)
+ded39dfb0b87b05665dcff308493f38acaef477f|2025-02-12|Maru release 2.4| (tag: maru-2.4, v2.4-darwin-mingw32, maru-2.4, list)
+45cd58f51f068cb25d295c549755180f14184376|2025-02-12|Maru release 2.3| (tag: maru-2.3, v2.3-win32-unicode)
+46a7c6f5adf1605f7ced62d43be25e8e3acf8b0a|2025-02-12|Maru release 2.2| (tag: maru-2.2, v2.2-bootstrap-fix)
+3752f9b9c263b09e87e0c2e8e44b4fdd2fe6a10d|2025-02-12|Maru 2.1| (tag: maru-2.1, v2.1-public)
+b6e1fd5cce3e7054d664dca603f40b1a9845fb44|2025-02-12|Initial commit of Maru code.| (tag: maru-1.0, tag: bootstrap, bootstrap)
+ac7d5418e04a4a61eca35fa29f4515395b463e62|2025-02-10|Include the version of Maru from Dan Amelang's old git repository for Nile/Gezira| (github/master, github/HEAD)
+99fad5167a6e30c195d6131a8ca4f8f95d5562f7|2021-08-11|Merge branch 'master' of github.com:kstephens/maru|
+5d01aa1491d7a1e747c484b9cb72f417a730d203|2021-08-11|Added maru-2.1.|
+c841e59963333a31c21079c67f01fb5759a437ac|2021-08-11|Move top-level files to maru-1.0.|
+518455633f0ab6eeb9d1c3d8e9a3f4942e09bbad|2013-06-20|Moved old maru to maru-1.0.|
+ac07e5e90bb28722435c51c49d9295bd4c5dd1e1|2012-12-24|Update maru|
+8acebdd078c679a4787085d870a5de7631bc3923|2012-12-17|Commit new version of maru.|
+e39576ca200a662a0023c4762aea239011b63d5e|2012-12-17|Clean out old version of maru.|
+f6164c4b3a45e837e49c7790918b0c68228d41ec|2012-12-17|The new maru-based compiler has landed.|
+d9ca525bb8b140639c1846788414cc52f9601e96|2012-12-17|Clean out directory for new maru compiler.|
+082f08b604e52fadd708d1eca415aa41821f50e8|2012-12-18|Update TODO|
+dcb454be7db50a90de386c45c8d0ee914a06cf6a|2012-10-09|Merge branch 'master' of github.com:damelang/nile|
+62aa0b82c99261e369f02a7a102115f1fc4406a7|2012-10-09|[JS] Add beginnings of tracing|
+51f1242c044cc5e4276c2d6a6a1dec9182c8a136|2012-10-09|Add missing return statement|
+1c4dfe394e01730e0d214a85c1e00abb498c56ea|2012-10-08|Attempt for message send expr.| (github/version-2.4)
+03df99dde5fe7fbdc8b3e8a4abd44758684e12f0|2012-10-08|NileViewer: refactoring|
+3a5f17c849d31880a6bb8d6595ca3a2918bfb494|2012-10-08|NileViewer: different HTML files can show different demos|
+0342ad9fe17f875cae90bb9581bb27c0a96590c6|2012-10-07|Update NOTES|
+88085ba2723253116b7221371a1550bf9aa1f456|2012-08-20|Cosmetic (variable rename and method shuffle).|
+60dd511c429ceb42fd2bbc37a2f79ce5d4ba6156|2012-08-20|Add TODO comment.|
+9f06fd5d0df107fcb802d5b04d70bbb37f2ff8e0|2012-08-19|Already moved missing variable check to other file.|
+383a081947cd3d1e1eece9f0a92681d5a62a3b56|2012-08-19|Remove unused methods (getName)|
+57410839086b2c57fbb299fb7c04e0783d01c9e6|2012-08-19|Throw error if variable not found.|
+e569ba910c6cdb5b72ddd134011d0a6a0795cd4e|2012-08-09|Incorporate prefetching for process heaps and queues.|
+1fa67461f520c43538b1ce3ffdc6046b6615ae24|2012-08-09|Add cache prefetch macro.|
+d537e8ae007f52319464e40c1e8fe7036d727139|2012-10-08|Top-level method defs.|
+e6c92716a61d697b985bbbfa275771b06b018172|2012-10-07|Getting closer to a reasonable Protractor implementation|
+54c9836fcbf229f25d1ba24296983c4ec9aa1fb7|2012-10-08|send macro takes unquoted selector symbol.|
+9c2b6989e264375d129da6f9ee672279cd335385|2012-10-07|Basic maruby.|
+fd97c6a236031dfa7a01557c47b0ae3c0019c3c0|2012-10-07|maruby.l based on test-message.l.|
+eb67bc4aee6f24e2bdc5655873cbbbb53bf3183d|2012-09-18|maru-2.4 from http://piumarta.com/software/maru/maru-2.4.tar.gz.|
+229c1243a254ba4f3069eeb3f8d26d41731a7690|2012-09-08|Beginnings of the Protractor gesture recognizer in Nile|
+c1fef4f35e48259e2862b816289578a1cb9197b5|2012-09-04|Remove useless GCC arg|
+be3927eb7619413b9227a7134a52b40617e68c8f|2012-09-03|Add .exe to gitignore|
+e2d181364846d3bed7f4214c1ff141e9bf8454d6|2012-09-03|Fix stack alignment problem in GCC + Windows case|
+c1af776f541d03886ec2bda73ab77b85bd32cea3|2012-09-03|Cosmetic -- don't put two statements on one line|
+d7af7d951e34ba3eb03210b0cc209bdf21b64d0c|2012-09-03|Fix lack of dependency on .c files included in nile.c|
+dc8ae72f015d8e736cd6e45103ff06576be07c6a|2012-09-03|Fix thread start declaration to use __stdcall calling convention on Windows|
+eeba15376b1f336c97febc19ff4880fb591c3507|2012-09-03|Make build depend on makefile|
+b1daa2f9563ba44f69a6e3f9738b52e2e5dfbc81|2012-09-03|Ignore .lib and .obj files, too|
+69e11263de1f3b3fc155fdc7cf142291240ed84d|2012-09-02|Make code compile clean in C++ mode|
+3f06c2eff8e3d444f3a798e9fe12a2862afb2592|2012-09-02|Change compilation language for MSVC to avoid missing modern C language support|
+039d077448778dfabd97648bd4db58aabd081009|2012-08-20|Revert "Add line number tracking to parsing and AST"|
+276bed6d35b11f7133934100cfca83290dbbde70|2012-07-26|New OS thread sleeping approach.|
+5e558e2bbac4198c20eb38b362812e3053bf55e1|2012-06-12|NileViewer:  added headshot for demo|
+03b387c0d515072581d023a78f3298d7f3251452|2012-06-11|NileViewer:  high-contrast tweaks|
+4fe6dfe59f56604964c0648ad44766d0f9b1a0cc|2012-06-04|NileViewer:  more high-contrast adjustments|
+7923291ab4415ed83e3d15ca4edd875f1cc88c04|2012-06-01|Merge branch 'master' of github.com:damelang/nile|
+9c5426407db3453eebad661c7f0b60c796acacdf|2012-06-01|NileViewer: switch to high contrast via the html filename|
+30afdcf292db8a838d5f3d68eb37bca50c06a79d|2012-06-01|Add line number tracking to parsing and AST|
+b21a9b58d278c29d1ef18678809617d706675d18|2012-06-01|Merge branch 'master' of github.com:damelang/nile|
+efc92e05c0f96c06610b6a5cc99fabc124976419|2012-06-01|First version of Javascript-based Nile interpreter -- mostly working|
+6e9b25555c21aad6668f764187ac6d5645bf4eee|2012-06-01|Replace Real/Integer dichotomy with unified Number primitive.|
+7bbb76de0bb58e243bc99d45eb983aedb91ccb69|2012-06-01|Remove incompatible definition of Array.reduce from prototype.js|
+477cfc3d8c932f3784b10d9fcd790596e2e97ef5|2012-06-01|Replace OMeta lib methods with ECMA compliant ones.|
+7832dd49793d310779da481768a54ba944c22cb9|2012-05-31|NileViewer:  adding high-contrast mode for bad projectors|
+0dfb3029cb637eac155029bee3385e66841b87f8|2012-05-31|NileViewer:  nicer rendering of selected pixels in pixel view|
+5cce108b30a49c0166af597adf9927856bf9d427|2012-05-30|NileViewer: highlight expanded process, adjust initial real input|
+0c44683ea478413980422c1689734de0e548e85f|2012-05-29|NileViewer: canvas captions, better Real rendering|
+d6e5edefc1ce0d3c80ec80801c646ebffd53f860|2012-05-29|Merge branch 'master' of github.com:damelang/nile|
+b9be105206ab0c92412de717996e87ed900736fb|2012-05-29|NileViewer:  show values for hot item under canvas|
+1bc1c8b9d6aeaabac83a02ed5b4ac00393ca174e|2012-05-28|Merge pull request #1 from subtleGradient/patch-1|
+3d746a6d66fc5fcf56ce8ce700c7dc0483f7483a|2012-05-28|Nproject name and link to slides for more info|
+5325ebbd3dcaf5ddc2053d76518bc4500e396b6c|2012-05-28|NileViewer:  use open circles instead of x's for zero-area points|
+ea2d03932b8c0481a58697f96ea3fffac8d8349a|2012-05-28|NileViewer:  add disclosey triangle in front of expandable process|
+e66d2631ce3f4e63ce956b4bc8dccb3dd4019bfd|2012-05-27|NileViewer:  expanding subprocesses, visualize most data types, hand-compiled gezira|
+f982eb93fa5bd0c7d4df06911ba95751f4a5f718|2012-05-26|NileViewer: adding support for expanding subpipelines|
+7612c3acd52a6265a57995c6b20692758a78c8b8|2012-05-23|Flesh out primitives|
+c2fc1665215092c657372a12c6fa6c8e005f68a2|2012-05-17|Need to include errno.h for previous commit.|
+6e699a62dbe6de731478cb98f80b4175969f839a|2012-05-17|Add semaphore interruption handling for Linux.|
+e0ddb8ddc4db33e285fe04c0a3f6b3d3d7711fc5|2012-05-16|Fix spelling of "quiescent" (thanks Bert)|
+627b3f9fa37def5404d9a6441a61002afa68deb9|2012-05-14|Modify mach semaphore wait code to ignore unrelated wakeups.|
+b2fe016c219cab932ef639da661f41afa245cdc9|2012-05-02|New grammar. Rest of compiler code is broken at the moment.|
+ba668d2399f46c4c7d293563fb12864a8674a235|2012-04-25|NileViewer:  touch-ups|
+c93e8d76e5ca82d7401b2d717200dd3e48100167|2012-04-25|NileViewer: choose different demos from sidebar|
+d45421737244507b29adbda52996fd5f93cff29b|2012-04-24|NileViewer:  dragging points drags all points at that point, so beziers and closed paths stay connected|
+a643192f468e8cd49ec808d7b91e6cb8f1a60b16|2012-04-22|NileViewer:  update help message for dragging points|
+d304de9cc7d4a66ec2ef37b666db33dc49d9a801|2012-04-22|NileViewer: drag points in initial input stream|
+56da8ee2bd6ede46bf8e4093c2e061d15d664a27|2012-04-21|NileViewer: mouse over points on canvas to highlight stream object|
+8e417e299d28253503b01cff818bead887536128|2012-04-20|NileViewer: zoom and pan canvas|
+e5b1a8c78631b34be136654f5fadeea117eba9f3|2012-04-20|Added viz directory with NileViewer|
+bf96dee3bc01cb5bbbcf35fcd1d247c432e4d4fb|2012-04-19|Remove single letter variable restriction (Thanks Bret :)|
+57aa2e8e7f2b63b996db4213b4c0a12b66fd7836|2012-04-19|Propagate AST changes|
+ed3892e59f57ef4ef8ba186d8d509437a58ef3ff|2012-04-19|Add primtype AST node and rename some fields|
+a3c64f16966d3fa2b01ec229cc6c24667d3aafb0|2012-04-19|Fix problem with in/out statements being parsed as operators|
+0e360ccc82e4f9e6c9a8c857f095a0a0b1e164dd|2012-04-19|Space better|
+af927d6de0add790c39ab4b4bedfba445c1ba785|2012-04-19|Shuffle null rule around|
+14118df0523985eeafe1fd78f6ce302ff4b77ac8|2012-04-19|Shuffle AST def, and don't overuse "name" for nile field.|
+2d82c78eda71f6fe9611b40ba005e73d2f16149c|2012-04-18|Update compiler webpage with (most of) gezira source code.|
+094d03aa9085e86b0410bd0b6b06b8967f7d3342|2012-04-18|Move prelude up a level.|
+27c426613aeef61439c9333a1386341ffd755e32|2012-04-18|The beginnings of a Javascript-based Nile compiler.|
+43a1e8ecc323305b0bfaa861c5c6afd9c2ea8905|2012-02-24|Move prelude file around|
+40a0b7868898c2351b425e7d45e53bfc19fc17a4|2012-02-04|Split C runtime code into files and introduce nile_Status_t.|
+aa9ec922d577c04c307f0fa4f73e311a3d22682b|2012-02-03|Make arch.l and arch.h by default.| (github/version-2.1-kurt)
+3ebfe81602b2a70fa75b75ab70370d8e9074409c|2012-02-03|Merge branch 'version-2.1-arch' into version-2.1-kurt|
+d32c568fc17dc57853ff77a2493b937a37f98f44|2012-02-03|Reorganize compiler|
+68a6da2e5c562f3a65073a71aafd7c2949b61798|2012-02-03|Update maru code|
+d1506cfb1580bcb53742a4cc6460d4de7ec1187b|2012-02-03|Attempt to fix "make test" by loading boot.l => segfault.| (github/fix-make-test)
+1a3812913a5c84f463afedff9ca145e3b48070b3|2012-02-03|Generate and use arch.l.| (github/version-2.1-arch)
+8310e24567a4adbd3a90a084f1eac62e9acb4e74|2012-02-02|Use gensym for anon bindings in expanded forms.| (github/version-2.1-anon-symbol)
+32429656058796c7a64f604e564b27353030573b|2012-02-02|Anon symbols and gensym support.|
+2c1b3fbf9e9437a1336bc94dac95acbccaa560ad|2012-01-29|From http://piumarta.com/software/maru/maru-2.1.tar.gz.| (github/version-2.1)
+cad525b961b976e0b806d152113e83734b0b0c39|2012-01-06|Rewrite nile_Funnel to work with large input streams.|
+13f06e54703663f3b72b265e602bfb2087789f43|2011-12-15|Shuffle, shuffle, shuffle.|
+78449db3dbb1b6481be146dbcdab1fca6d2dfa31|2011-12-15|Parsing and resolution mostly complete.|
+ca7c7cf782c1cfb0eeaa75a058826571486c4ecf|2011-12-15|Update maru|
+951c9434f4ac10941e6a9a0029b3f851e2c76d71|2011-12-06|Update repl.l to match the one built into maru.|
+55df2aa07ffc904b7d34fbc4db94db3c3bfcf4b9|2011-12-06|We'll load port.l ourselves, to avoid path resolution problem.|
+bc5db24ef4a1aa344943cedc985d6ecd4b9cef66|2011-12-06|Update maru.|
+f9b0acdf92ea4b22490162e5f66e60105be7183d|2011-11-22|Add another previously missing OOM check.|
+48d7956afb858340adf92a6f8e19e9a3e62a030a|2011-11-12|Remove complex conditional expr in favor of if/else|
+6a22e10e80d6dc2cc2d3afb5fc92b25b4846e069|2011-11-12|Duplicate -> Repeat|
+bc7c0b8d6fb92ed46b267b82778b1eb0b08592ab|2011-11-12|Rename 'o' argument to 'b' for beginning.|
+8b9fe460f9a6f4e1b8623657404a9c6a41c057f5|2011-11-06|Text layout supports splitting long words.|
+6d30e45f371d5006a95b1f2be882c4e72453c95c|2011-11-06|Text layout now handles newline characters.|
+3947c1a757f7f90beb3b3dbc769ab3c9864e23a9|2011-10-29|Text layout now places individual glyphs.|
+9d0ae97b954b8c5fbe9394462b2e333577f86e8b|2011-10-29|Text layout example now duplicates word placement points.|
+fb80bd037c2ba096d53c03f56f1d3a3082d09e1f|2011-10-29|Don't crash just because the wrong quantum was given.|
+2dfcc2013c24d94fa3241c3992e4a125329a9d06|2011-10-29|Add text layout example.|
+6016cb88b5193f63406fe1a87a4d169cd9befb74|2011-10-27|Fix out-of-control pipeline creation.|
+0d30d83aff45a4b49aff78623eb9a340f565a162|2011-10-27|Fix bug in Dup.|
+3e322c10e8561d14c40c2ff8257b1a38c63dbc47|2011-10-27|Fix Zip bug of disappearing consumer.|
+62dd3b70988ac96602f9dea956acc393c4ba0163|2011-10-26|Move ugly code in SortBy into a function.|
+f733d84571207b9834f2f939a01475b0a6f7fd62|2011-10-26|Must clear QUOTA_HIT tag for processes that use consumer's input queue for working.|
+3575d903dfe010567351e1da94a482fcfea0e54e|2011-10-26|Fix compile error.|
+f48c2935cbbafdb5624e385468fab1efcb741230|2011-10-26|Simplify SortBy.|
+23df53e9901d3d631cdef72a3465f72065f94421|2011-10-26|Simplify Reverse a bit more|
+ef1a1a854c9230843acd6dad523a4776a24e460a|2011-10-26|Cosmetic|
+a906e7d4731bed69587af9409afa3e289e8f37c8|2011-10-26|Revert to simpler Reverse process now that the QUOTA_HIT tag is trusted again.|
+aa3c39e1e60683487a1b9bb4aaeb3ceac5e62d50|2011-10-26|Remove ugly single-line cast and dereference.|
+fa041f2aa78d7fe7314dd6a2c6483f6a6a6bf2e8|2011-10-26|Remove unnecessary casts.|
+faf8e862540d63335fb4718e3ff071db9b8e9f54|2011-10-26|Redo out-of-memory fix.|
+c48da538b64b12c3880e6d46c1fe8b846c5be2c9|2011-10-26|Simplify Zip body.|
+36dbc86b009f89c00abe79ead0738ac39f77bc46|2011-10-26|Modify SortBy to resemble the new Reverse.|
+75002d7c93512a868d7df89549eee019c424f7de|2011-10-25|Fix Reverse process (previous commit broke it).|
+1b1b5dc5cab9c72e58d6e7ce8bf3ca1aac79ef75|2011-10-25|Fix out-of-control memory use caused by trusting the QUOTA_HIT tag too much.|
+35b2db93936cf7241a59041d024d698b09f98cc4|2011-10-25|Cosmetic.|
+2b31a80b072d9576eb95a5198436bc461060ae19|2011-10-19|Enable memoization to speed up parsing.|
+1884c073483bfc9f66ba20a169b61ac7e8442370|2011-10-19|Sync repl.l with maru/repl.l|
+44ea237745f7d9aa73451c504c444262c0ab991a|2011-10-19|Update maru.|
+0868f581555d82ba1a016b3870d570e2742b2335|2011-10-19|Update maru.|
+eb858343a05fd89b6aba04404ce5da9f51cfbbd9|2011-10-17|pop now uses gensym.| (github/anon-symbol)
+710224561ffaaca1fc405b39ac5ec35627b9f00e|2011-10-17|Support for anon symbols.|
+0148f3944c2f9e6b0ac58696637cab3313063da0|2011-10-17|Bring up gdb if ./boot-eval fails.|
+51c0aae6f09c1221d6140b519faa1348812a780f|2011-10-12|Remove whitespace.|
+aa6c708a4c7ad5f3443be24fe02396f8e571ec04|2011-10-12|Nile parser in maru is (pretty much) complete.|
+2db5460cbc0689bf63283f47e88de773a428b76d|2011-10-12|Update maru|
+d1ab70930f43a61fc1a25bb49bd23fe08c932c86|2011-10-04|Make AST printing more readable.|
+6c71b192503d94f9763b3cdd1bc7c751cde00995|2011-10-04|Fix binary operator associativity problem.|
+8384beb7e6d1b95a04ab04664ba171cba20c7cb4|2011-10-04|Beginnings of a test suite.|
+1c9070502b5d6295b5f52809de76446c2ddc7e20|2011-10-04|Big jump, now we can handle most of the new Nile syntax.|
+2cd26f6d4e5077bed657489a915163f14b1db5c8|2011-10-04|Start testing using the gezira code from the gezira repo on the "clean" branch.|
+7a3d176df3cf52f7351c9b33fd0314e69e868ce0|2011-10-04|Fix concat-files to use *end* and also to concat files in the right order.|
+86bd48ff71f5807d0d5a2b80530cc3a365e94b56|2011-10-04|Update maru snapshot.|
+6d840a62a10e8e6751bd628c009b2bf0bf2e598a|2011-09-18|Update maru.|
+ccebb2762b8a2f4f315c8c3ce3d0b578447be31e|2011-09-18|Remove unused files.|
+6e7a44b3901bafbfd5e4d598757389af3a6765be|2011-09-14|Update maru.|
+cb183f1b044ed6b00424b685b2745f7931da56e6|2011-09-09|Add operator defintions to test.|
+500d56146fcea5db1d16622b6cafff18ecac6423|2011-09-09|Add outfix operator definition.|
+82ffecdaf77b90cbec097b170ba7a117c8203a51|2011-09-09|Add beginnings of operator definitions.|
+a4339956b458ce8cc7730228f311bb241b0ef593|2011-09-09|Change 'var' rule to 'ident'(ifier).|
+6149765b6b97f484199208a245b1ee5731388985|2011-09-09|Remove extra parans in output.|
+c0aedf63cb8892adb6ccadea7ddaadf2ade122c7|2011-09-09|Use concat-symbol instead of converting to string and back.|
+ef8a434308d4730b3a571e3532d0cd6f2f5a27ee|2011-09-07|Add comments to test.|
+7fa66f23703a3961a6057cbcd877e812a1a49f29|2011-09-07|Add inline comments.|
+dc061f35f7ad54ecd017c200d9e9eae83c9feb17|2011-09-07|Don't force leading uppercase for typenames.|
+7073a9e471bfaf5d92a45ecd8fac667793b77abc|2011-09-07|Use define-ast-node.|
+7d3d8097743430266d389d9cf7a8e128e2748022|2011-09-07|Add (define-ast-node ...).|
+96f43921bcdd1dcaedec0066a49c46bc3ace518b|2011-09-06|Add process types and tuple types to parser.|
+204a557effd9721156a50a043fa3e3d6554b6231|2011-09-05|Add maru examples for fields and lists.|
+230ab02bc54cbf7158c677d8223d3536c208bb12|2011-09-05|Update maru.|
+615e6e378af687130a9e2ebcaea26c397295fd01|2011-09-05|Remove old unused 'hello world' code.|
+234da529e998f8ca533f1cdb46e44583770e6e1b|2011-09-05|Use quasiquotation for more elegant fielddefs rule.|
+fde38457964e453a470354f6c3410607b650471d|2011-09-05|Fix fielddefs rule.|
+6751e4c8a0d75af24c9cb6021790b79ab1e313d2|2011-09-03|Fix backtrace file/lineno problem.|
+5b393330660c708de94adcc15fd49ed2294f412a|2011-09-03|Add beginning of Nile parser.|
+8c4764efa7612ddd603660858e05b4c5f11e7512|2011-09-02|Read offside parser input from file(s).|
+2bcb3d118be24ef6cec4a2290bcc6b61ac44eba1|2011-09-02|Fix wording of README|
+303341daad64e6b98365e2f0c82fa12f62b4a291|2011-09-02|Add maru snapshot.|
+bb5127d9e8a263cb852e0d45e9874a4ba4e1ce6c|2011-09-01|Add local version of repl.l for maru.|
+d9deb79bac43d65700534a7f57dad2871f6b847a|2011-09-01|Begin maru explorations.|
+af42f7059d1388307fc998843bcdd76e3e168cf4|2011-07-30|Introduce limit on size of gated process chains.|
+7713a2599f548f22b6f5c82886cc9e97d1891749|2011-07-30|Another use of process deactivation.|
+817fc99a20740044613d11c4ae839a16d61ac076|2011-07-30|Introduce new process activate/deactivate scheme.|
+1064ffc1a3d24b9371153c5f67c27b045ec38f75|2011-07-24|More #defines around.|
+10046356fd213a72193d1a572d5f06e3a22e931b|2011-07-21|Remove harpoon symbol|
+ca2b46a7876c3190572c5c3dde25648e9bc544d3|2011-07-01|Update TODO|
+fa625711dac5a6e156a912ee20dcd6b4d34771c6|2011-07-01|Beginnings of compiler rewrite.|
+d8dbe46fadf6b6559493f9cfdec717327059f61a|2011-06-20|Remove include guards.|
+7ad044b081fc4768aa993b3e450c221eab0f6c7c|2011-06-20|Move buffer and thread code to separate files.|
+bb5a9e16da14df608daa6cff3025f4aa18191760|2011-06-20|Remove unhelpful comment.|
+8bda274e96cf55ba4a8f97d4247b02ecde5c6959|2011-06-20|Move thread sleeping functions into a separate file.|
+826148e2f77c28b7a10f79189412296e18dbcacd|2011-05-27|Check for OOM in nile_Funnel_pour.|
+82e3f54da7712ed384cd5fe9ff232790126648a1|2011-05-26|Check for NULL process in nile_Process_feed (caused by OOM)|
+0a9c50bffd2171214376501bb612e6d2c9ad5baa|2011-05-23|Update TODOs|
+2401b7409a4cbf4df5cae77165ef9cb2d37e0972|2011-05-22|Add test for DupCat.|
+531dd729d5b1799798984ff8b4662d80042e5c43|2011-05-22|Fix another bug in nile_Cat.|
+4432b31fe44021d12040f09c11be1c676c3f64bb|2011-05-22|Fix bug in nile_Cat.|
+031b372fa243e4df115e796303bf640629a9e815|2011-05-22|Fix bug in nile_Funnel.|
+c93d22bf0da3568967832992b9c8d9ed73e99013|2011-05-22|No need for 'init' argument now that we have the 'parent' field.|
+7cc0bbb1178857595ba6d28999da3a2576d66300|2011-05-22|Update test to use new 'quantum' arguments.|
+44aceb9c3c852ea71ebb402a698faf95beaf2460|2011-05-21|No need for random seed.|
+3b00d6e31a21ac83d69ee5a3e8612657d68c2f2a|2011-05-21|Add reverse test and fix bug in nile_Reverse.|
+9e58cca9b3050874534958a3e42e73c182749aa6|2011-05-21|Reintroduce 'quantum' parameters and be more careful about using them.|
+7e2b21be3d35075ef115151c59dedccc5190243a|2011-05-21|Additional test suite improvements.|
+e56ca787f19e716d3c239e2209dc9f3ab21d68c4|2011-05-21|[bad commit] Add new Reverse and DupCat processes.|
+a38ce8f3dd3c9c66ffa185e86d0b56f18910cb6d|2011-05-21|Update and clean up test suite a bit.|
+b79027e0eb6c34dff31f35f64962d1b2b3982efc|2011-05-21|Create INPUT_MAX for size at which input q is 'full'.|
+f16dd9335e5e4f0599c5182ca5f2f0186c16dc48|2011-05-20|Update Makefile.gcc to match other Makefile.gcc's|
+636926de68baa7031a7a2061290e34d0f4ca5388|2011-05-17|Remove 'quantum' argument from nile_Identity.|
+28a58ba656dd068293495892d0e8e0ed65c245a9|2011-05-17|DupZip has landed|
+302c1a1a8fb45fdb3e0073fc70d814de40396cfa|2011-05-17|Rename Process_alloc/free functions to alloc/free_node|
+2baf5fedae15ef75ec6cf52ede18956d9a4c782e|2011-05-11|Moved buffer allocation earlier|
+c0adefad9df4ecfbf20f6277bd2ed38989196e49|2011-05-10|Remove Tap|
+403a135942596e426f4d437bb01b8694d29d41ec|2011-05-05|Add conditional GCC -m flags to Makefile|
+df364785dfc0218b32c4647c8920ea968746b3dd|2011-05-04|Add nile_Capture (back)|
+adb633fd763d840030b084aca161c47dc6c53a2b|2011-05-04|Big cleanup of C runtime|
+01d4eceee13a67c0e5986131729bd3d3d7c85e1d|2011-05-04|Add a more proper type field in nile_Node_t|
+a42f3dfefcd9168408c07174f8aafbb16154537a|2011-05-04|Use 'i' instead of 'n' for current block position|
+40892e1e03b2153d898ee37804686471a96a7730|2011-05-04|Update TODO|
+13ac99318302c3c8b478ac09dd9ba56d3096bc06|2011-05-02|Fix Darwin detection|
+c354a72743ba9cb819d979477411f05f96f2ed9f|2011-05-02|Minor spacing change|
+617f803f25ce98609f86e10027c2fe082da6fa70|2011-05-02|Update TODO|
+05795aff5066b84ab4e58779e44e96d87885e041|2011-05-02|Simplify Makefile.gcc and comment-out platform-specific flags|
+ca627b5db74b1f1c4ac32ee5c62a2e985e82795e|2011-05-02|Minor change to floating-point printing|
+53f8c696b8cf24165a1955ab9108f9ede75bfd48|2011-05-02|Add files capturing new ideas for compiler implementation|
+715db3540fd45a87aaf91704e679e32d3d877ece|2011-04-18|Port to OS X using -m32.|
+8083c863dd4ed364e944595ca186b17ad65b61a0|2011-03-25|Merge branch 'master' into debug|
+6afe9b0a4d58da4edabc1468b36a89dc4cf0bd72|2011-03-25|Update TODO|
+dc2c2ed12b43b0fcd0cc46997bb0d2bfd852acd6|2011-03-25|Whitespace|
+2893a8945d3a7ef5b1957578ca5f657847fad412|2011-03-21|Add the Tap process|
+a580cef3f26a3849e9c4aba310dd10bb817f8d8d|2011-03-21|Whimsical reordering of function prototypes|
+be5a5c631af0808f3fb574e804a03a9258229e74|2011-03-21|Forgot to commit nile_Funnel change to nile.h|
+a388e15f7b8dc241936ed782b9a9c3dff5bbc513|2011-03-18|Remove quantum parameter to nile_Funnel.|
+dbda78d137f8822c6f6404752eb3d61415972c38|2011-03-18|Swapped processes hit quota earlier now|
+4630e694bddbd85398a54de94c3bafc438e5325b|2011-03-18|Here comes DupZip!|
+1670a4c6ca8793c209bc2973daa9bf91bb140534|2011-03-18|Make _pour loop more similar to _run loop|
+a2d1476ca7623e4c6987475ffff2f90d7bbc9ceb|2011-03-18|Indentation|
+a4a535fd4bf1b96c4992dfe87c8cd5c62d868b71|2011-03-18|Eliminate the buffer bootstrapping approach|
+8dbbe92d7e258a6a50dcbab9accddb1590e38cb7|2011-03-18|Move conditional around a bit for consistency|
+d90f0b5019ef18e616803827a31a160ab959168c|2011-03-18|Introduce a 'jumpout' function for jumping out of the outer loop|
+6cf69102bbd398a2a626d79c55ffe280d5c968c1|2011-03-18|Clean up some NULL uses|
+44c494299427ca9141cbb2837118f28ad8b782fe|2011-03-15|Change nile_Buffer to take a process as arg instead of an allocated block|
+b8003172ec859e5e1bf9e5f15499527acd3de905|2011-03-15|Clean up SortBy a bit|
+8c46aec038af2c1c1fc274e60a263b71991df094|2011-03-15|Update another TODO|
+c415f104d1270b48f86a0ef86454984b89040897|2011-03-15|Update TODO|
+952a0a7da5e94761de920da497aeaf0f7e0a5c9b|2011-03-15|Remove outdated NOTES|
+de26a8e010037e3e53b963bf287b05ea209da80a|2011-03-15|Just check the tag on the output buffer for quota hit|
+c6ede17e1dbcba9e20fdd209c1130a90735a18a0|2011-03-15|Add missing checks for OOM|
+04c941c1d801a05b31ff54eed12a19e2e530e7b4|2011-03-14|Add interim GC debugging function "nile_print_leaks"|
+9bac8f9bb05bdfd407a1595e7a2626a9083964da|2011-03-14|Fix problem with buffer used for the epilogue|
+e16d37668b82f81a265ffe043d403372b607b235|2011-03-14|Fix bug in nile_Process_pipe_v|
+7fe1b8c32b21ead67c97610d3fd5b2b55d238123|2011-03-09|Add nile_Process_pipe_v (Thanks Bert!)|
+053edfe2f0b58650c02f45d0012e6d690d799673|2011-03-08|Stub out DupZip|
+839b861208aa4a7b922a77b4c0c1e3c2ac0f5cf4|2011-03-08|Use NULL not 0|
+a635d282adacdc7dcdacc0ea6974a6350a298802|2011-03-08|Make it clear that there might not be a producer|
+8ed47f6e0c18a4c060aa6226325a1aff6210f1e3|2011-03-08|Fix another dangling reference bug|
+989ab52bc9d1ebc1b8fc72c7a2bdcb9b73d16699|2011-03-08|Fix bug with stray producer reference|
+d0e26a1c16d2f4229d629bab3013944dd3c3a983|2011-03-08|Fix gating bug|
+21993266be5e9ff929ee90e2b5abc80716b4af71|2011-03-08|Fix aliasing bug|
+cafbbd46056eb7957b32519074e1c6ebfcf347be|2011-03-08|Doze for shorter|
+5a1177dd9ec8867c36729359e4823a5ca36c01c1|2011-03-08|Use newline as delimiter|
+57db9164976104632174194926838fe2251edef2|2011-03-08|Add SIMD alignment|
+46fde532831438fc1fdaac841576f3f1b066785d|2011-03-08|Tweak GCC compiler flags|
+ded0451c80c4a4f60b454e5d32b9e0f947b388f1|2011-02-13|Update prelude.nl|
+af24f1a103c77815b4d51aa042044f567f83f8f1|2011-02-04|Makefile tweaks|
+812136a5fdf8869ea6bcf8e424e06ba84cacaea0|2011-02-03|Total rewrite of the nile C runtime|
+1a29582ea979dc313a5cbfc2821cc41833466fd0|2011-01-02|From http://piumarta.com/tmp/maru/|
+8014138d05ed11d0c09702bd76f71976c3da87fe|2010-11-08|Fix NULL reference bug in nile_Buffer_free|
+6dd2d117c3c8d2ad0b223f8c2b1ffdc4f247b96b|2010-11-08|Update prelude now that GroupBy is gone and kernels are called processes.|
+35340da4d37296c25665beed9288b87dd170de71|2010-11-08|Make nile_Real_t more opaque|
+463c7469725c3a322c07f6690002d0784ee9766a|2010-11-08|Reduce use of explicit nile_t function argument|
+fbfbc4fb1ed06bd4a492d104bb74924ffdde2feb|2010-11-08|Remove nile_Pipeline_v since we never used it|
+62b7eec647dac4f6fcc502501189c5152b9dc01d|2010-11-08|nile_Process_exec -> nile_Process_run|
+af9bba355707f529ff0333f33f8046cd8ecbbea0|2010-11-08|nile_main -> nile_Thread_main|
+e6917fa6a8060218d9637c8f30a462042d2e8f39|2010-11-08|"Kernels" are now "Processes", and their work function is now called "work" instead of "process"|
+b97ed7fe6e01baefeced06322e4a1e3a4c3539f1|2010-11-05|We can append and free NULL buffers now|
+9dab1711e0fef23fd700a1c87e7507f6fa4e0c27|2010-11-05|Eliminate kernel cloning and GroupBy|
+8a02afd53835c42c174a10df2a2a4956f3b42a45|2010-11-04|Get rid of append_repeat|
+8dd68d29f8b048b20e003f2bbdc912ce11ffcf02|2010-11-04|Get rid of "peek"|
+e4e7d3549525244151e65894908dd8a615f13052|2010-11-03|Introduce NILE_INBOX_LIMIT and inbox_n to track inbox size|
+c50d18e1b8d6e23ab5a04dfa2c1053a3d427aa28|2010-11-03|No need to check for NULL downstream now that we have a NULL_KERNEL|
+3340a00395831535938fa577cbea2cf705e1115e|2010-11-03|No need to allocate an out buffer if the kernel is forwarding.|
+b93d670660998f3d20ca798a61314b336c2d38da|2010-11-03|Make nile_Buffer_free recursively free the buffer chain.|
+b9d0d17b9e827499bd7cb82530ea7f700fe492f8|2010-11-03|Add the NULL_KERNEL as a do-nothing, general-purpose sink|
+ee3c897bc1d12a326de9a529aa67d0d19b789f95|2010-10-23|Make the loop condition a little more clear|
+9e429af0531be5362bd5f4f003f9fd0c8e1c959c|2010-10-23|Fix bug in nile_SortBy that made it an "unstable sorting algorithm"|
+a59127c09bb65af46f2ee87903a22778350b686e|2010-10-23|Fix bug that nile_Capture wouldn't advance the input in the case that we ran out of room in the sink|
+a59d37b3ec6633aa5dc45c2ac5c2248905dc3744|2010-10-23|Allow for NULL downstream kernels, even in the cases where the upstream kernel is producing|
+6a321f5506ca09fab21f28387d1d8c19842bbd94|2010-08-30|Add Capture kernel for capturing (part of) a stream|
+e80d6d33225ec9a0bf992ea40fdc9c7ff379f2e6|2010-07-26|Schedule kernels depth-first instead of breadth-first|
+50d64713a4dcb8b397bd82ada880b1ec371b60ba|2010-07-22|Missing semicolon|
+b0645dd8012f96edc86ce4f3385b42e42296625a|2010-07-22|Add nile_Pipeline_v for creating a pipeline from an array of kernels|
+56bf10f251049f39997fc7a4a6f7ee5e8bb10a07|2010-07-22|Move var decl higher (for cranky compilers)|
+533d1ef44fea2701422c807322464930dec88ed3|2010-07-22|Minor clean up|
+e770217c941d1dc9f1a810a40098dff32ee4fca6|2010-05-12|Use triangles for min/max instead|
+fa7742c3567a65a8a31b3b4c400f07688970708e|2010-05-06|Add license|
+f174d46ccce8874605e994eaf4b5931a089e7c47|2010-05-06|Update TODOs|
+b649ca5a8ab76534b7ef50d434e09de2803782fc|2010-05-06|Remove obsolete real number operations|
+110a3ae10d64f9125d413c3a6c9f44c0df3dd60e|2010-05-06|Fix bug with zero length streams coming from "outside"|
+94643f4b781e2fe76a62663f418228725891dbfc|2010-05-06|Move var decls up (for older compilers)|
+2db4c98f251921f4a33c4ae0248d3cf389611dc2|2010-05-06|Fix nile_feed bug|
+2ef9fdc12cca7681dab9dda1da16e3615ac69ec9|2010-04-09|Fix bug in Mix kernel|
+acf8f874f24718db55af38f5443541aacf737076|2010-03-01|Fresh .gitignore|
+a4682654484f697bb3614270f726964f22c1c03e|2010-02-25|New Smalltalk compiler|
+76a6e11f410b5453bc467483d2cda4799f1af0e4|2010-02-25|Update TODO|
+6a562ed882e1f70670f4c0e0aff2de25f171c869|2010-02-25|Add support for single-threaded runtime and make that the default|
+6573247c83145991fa36b1f402799c76d698e48c|2010-02-24|Update TODO|
+2e6ae93cf2e3c46d8074f2aaa68bc2c026cf3433|2010-02-24|Simplify Makefile|
+d1f8b16637a1fa2b14cbfe016ec0c4f4207c161d|2010-02-23|Add nile_Mix kernel implementation|
+98a044c440deabc6ed945549ff652240e084c8cc|2010-02-23|Update TODO|
+04268dfcc1e435b5a32aec6440b9d32450678990|2010-02-23|Update TODO|
+2ced1b7d17819812d6f5fbd327963215dec5f991|2010-02-19|Change locks to use uint32_t for portablilty and add support for x86-64|
+95e5b26725d01b72384ad74860ccbf648cbdee96|2010-02-17|Shuffle include for WIN32, use function instead of intrinsic|
+b00c9a11e11541850f4c469a4f88b3277b6c2507|2010-02-17|Remove nile_Real_mod|
+32a05dc97ce03ac798e973fd8ba668b127c4b93b|2010-02-17|Add numeric conversion functions for nile_Real_t|
+154debe1e8b8577b13c1a7f95ee5849473885913|2010-02-16|Remove 'Reverse' primitive kernel since we don't use it anymore|
+6fa41dc5a04d4e87cbd31bcc5a3e2dc558cb424f|2010-02-10|Add Real negation|
+4995519730d5e87a5bb4fe37020cb2bef3c71092|2010-02-10|Add modulus for Reals|
+0d92e79eecd43c5b1d849f9113747f3fed2523f2|2010-02-10|Move to purely atomic exchange, using inline asm when needed|
+d745153574b5d70f20204d7f7eeb2fce200accec|2010-02-09|Change to new tuple syntax|
+8f241612f08eb18b71946080f0a88b208f5e3629|2010-02-09|Add harpoon to unicode cheat sheet|
+71d6468ecef9d0bcd83d48276f65c318db34910d|2010-02-08|Don't use "attribute sentinel" compiler-specific feature|
+523672067cc97c3bf3eee198d1fc53c25925de7a|2010-02-08|Use "long" instead of "int" for locks|
+8903dbdb8c9359ac23f416d7e034827d6e35a359|2010-02-08|Cast away compiler warnings|
+1c37c42a13b7b772222849370f255fdf01572032|2010-02-08|Make compiler invocation more generic (thanks to Yoshiki)|
+ae713dbfc1ce1075afa12d45d2c62b05ecaa780a|2010-02-05|Fix Win32 atomic functions.|
+4fa5ad4e0efe322d5a37ab5a418ad6eaffe84cc2|2010-02-05|Push out current TODO|
+c5d1848a32fe94dd56b920c825fb8bb85f030145|2010-02-05|nile_Interleave rewrite (again).|
+82a277044772509c1110023abb038e1062b0dd16|2010-02-05|Shuffle some decls|
+f56d2064353a8f40b05f04ea2d8b112ef4f566f2|2010-02-04|Implement nile_Sem for Win32 (patch by Yoshiki)|
+8e3e799d818ca1dcc31f69d4068cdc9b5c2cda53|2010-02-02|Update TODOs|
+08f8cc0e9f6ea3e605f65f66071e84eb22b4dd88|2010-02-02|New nile_Interleave implementation. Fixes all known bugs!|
+87d0a98a72ec5c387ef31ace5e48eb6caaf92753|2010-02-02|Don't flush to downstream if there is no downstream.|
+38a310d34db413cc8bda1793b310729e06ee877d|2010-02-02|Don't require output buffers to have anything in them when we send them along.|
+cbceba8e929b3fa2eb4b0355f39c9b4cea980829|2010-02-02|Rewrite logic to be a bit more clear.|
+050fa25fd6821f8b696b1c45975b8ad9c4c2de1b|2010-02-01|Be more uniform about in/out stream variable naming.|
+eeb2686f9033f0f46ecf4344e7ab1b8a3ae84152|2010-02-01|Initialized must_activate.|
+dedf96cc5c50c1a30c769e4cee309fe94e0eeb3a|2010-02-01|Check for shutdown _after_ we block on the ready queue.|
+434579bcbeb8d5a7ffbc4a13371c5009e55e6ffb|2010-02-01|Fix volatile pointer syntax.|
+84778d35e508a88cf00a4bfaa10a3c68a62de42d|2009-12-17|Add NOTES file about C code generation.|
+c56ae976baa05fcaaf0d8506e2efa8ed8e847d8f|2009-12-17|Initial commit|
