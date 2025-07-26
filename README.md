@@ -11,10 +11,10 @@ Maru compiles itself. The entire compiler is written in the language it compiles
 
 ### 🎯 **Multiple Compilation Targets**  
 One source language, multiple targets:
-- **C code** (primary, portable)
+- **ARM64 assembly** (primary, Apple Silicon support)
 - **x86 assembly** (direct machine code)
-- **ARM64 assembly** (Apple Silicon support)  
-- **LLVM IR** (advanced optimizations)
+- **C code** (legacy backends available)
+- **LLVM IR** (experimental)
 
 ### 📝 **Dual Syntax System**
 - **`.l files`**: Traditional S-expression Lisp syntax for dynamic programming, macros, and exploration
@@ -107,9 +107,9 @@ Maru's self-hosting bootstrap is its most elegant feature:
 ```
 1. eval.c        →  (C compiler)    →  eval         (handwritten C evaluator)
 2. eval + boot.l →  (interpreter)   →  Lisp environment
-3. eval + emit.l →  (interpreter)   →  Lisp-to-C compiler  
-4. eval + eval.l →  (compilation)   →  eval2.c      (generated C)
-5. eval2.c       →  (C compiler)    →  eval2        (self-compiled evaluator)
+3. eval + emit.l →  (interpreter)   →  Lisp-to-assembly compiler  
+4. eval + eval.l →  (compilation)   →  eval2.s      (generated ARM64 assembly)
+5. eval2.s       →  (assembler)     →  eval2        (self-compiled evaluator)
 ```
 
 The magic: `eval2` is functionally identical to `eval`, but was generated from Lisp source code!
@@ -117,10 +117,10 @@ The magic: `eval2` is functionally identical to `eval`, but was generated from L
 Verify the metacircular property:
 ```bash
 # eval2 can compile itself
-./eval2 core/compiler/emit.l core/eval.l > eval3.c
+./eval2 core/compiler/emit.l core/eval.l > eval3.s
 
 # Compare - they should be identical  
-diff eval2.c eval3.c
+diff eval2.s eval3.s
 ```
 
 ## Exploring the Language
@@ -136,9 +136,10 @@ diff eval2.c eval3.c
 maru/
 ├── Makefile              # Build system
 ├── eval.c, eval          # Bootstrap C evaluator  
-├── boot.l, boot2.l       # Language bootstrap definitions
-├── eval.l                # Self-hosting evaluator (the heart of Maru)
-├── eval2.c, eval2        # Generated self-compiled version
+├── boot.l → core/bootstrap/boot.l  # Language bootstrap definitions
+├── boot2.l → core/bootstrap/boot2.l # Extended bootstrap
+├── eval.l → core/eval.l   # Self-hosting evaluator (the heart of Maru)
+├── eval2.s, eval2        # Generated ARM64 assembly
 ├── core/                 # Stable compiler infrastructure
 │   ├── bootstrap/        # Bootstrap system
 │   ├── compiler/         # Code generation backends
@@ -229,8 +230,8 @@ make debug
 # Verbose execution
 ./eval -v boot.l your-program.l
 
-# Trace compilation
-echo '(+ 1 2)' | ./eval core/compiler/emit.l -
+# Compile simple expressions to ARM64 assembly
+./eval core/compiler/emit.l simple-test.l > output.s
 ```
 
 ## Learning Path
