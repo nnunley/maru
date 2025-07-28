@@ -6,7 +6,7 @@
 (define *arm64-backend-active* ())
 (define *ir-backend-active* ())
 
-;; Force C backend for eval2.c generation
+;; Force C backend for testing (TODO: implement environment variable detection)
 (set *emit-backend* 'c)
 (set *c-backend-active* 1)
 
@@ -171,6 +171,19 @@
 (define-operand LI32 (value)	(<LI32>-value self))
 (define-operand TI32 (offset)	(<TI32>-offset self))
 
+;; Define ->string methods for operands so they work with port system
+(define-method ->string <LABEL> ()
+  (concat-string __PREFIX__ (mangle-label (<LABEL>-name self))))
+
+(define-method ->string <GI32> ()
+  (<GI32>-name self))
+
+(define-method ->string <LI32> ()
+  (long->string (<LI32>-value self)))
+
+(define-method ->string <TI32> ()
+  (long->string (<TI32>-offset self)))
+
 (define-function temp? (obj)	(= <TI32> (type-of obj)))
 
 ;;; INSTRUCTIONS
@@ -299,6 +312,7 @@
     (gen comp TEXT)
     (gen comp LOAD label)))
 
+
 (define-function gen-tmp-prog (prog comp)
   (while (pair? prog)
     (gen (car prog) comp)
@@ -423,6 +437,9 @@
 (define return		(fixed (lambda args (error "(return) encountered in interpreted code"))))
 (define address-of	(fixed (lambda args (error "(address-of) encountered in interpreted code"))))
 
+;; <fixed> objects should not be generated directly
+;; They are handled through the forms mechanism in gen <pair>
+
 (define forms (list
   (cons  let		gen-let)
   (cons  and	 	gen-and)
@@ -464,38 +481,82 @@
 (define-selector gen-definition)
 
 (define-method gen-definition <long> (name comp)
-  (gen comp DATA)
-  (gen comp DEFLABEL (LABEL name))
-  (gen comp LONG self)
-  (gen comp TEXT))
+  (cond
+    ;; C backend: generate C global variable
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+     (emit-writeln "static oop v_" (mangle-label name) " = makeLong(" self ");"))
+    ;; Assembly backends: use traditional approach
+    (else
+     (gen comp DATA)
+     (gen comp DEFLABEL (LABEL name))
+     (gen comp LONG self)
+     (gen comp TEXT))))
 
 (define-method gen-definition <string> (name comp)
-  (let ((temp (LABEL (temp-label-name))))
-    (gen comp DATA)
-    (gen comp DEFLABEL temp)
-    (gen comp ASCIZ self)
-    (gen comp ALIGN 4)
-    (gen comp DEFLABEL (LABEL name))
-    (gen comp LONG temp)
-    (gen comp TEXT)))
+  (cond
+    ;; C backend: generate C string literal
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+     (emit-write "static oop v_" (mangle-label name) " = (oop)\"")
+     ;; Escape string contents for C
+     (for-each self (lambda (c)
+       (cond
+         ((= c ?\") (emit-write "\\\""))
+         ((= c ?\\) (emit-write "\\\\"))
+         ((= c ?\n) (emit-write "\\n"))
+         ((= c ?\r) (emit-write "\\r"))
+         ((= c ?\t) (emit-write "\\t"))
+         ((< c 32) 
+          (emit-write "\\")
+          (emit-write (digit-for (>> c 6)))
+          (emit-write (digit-for (& (>> c 3) 7)))
+          (emit-write (digit-for (& c 7))))
+         (else 
+          ;; For regular characters, we need to convert them to strings
+          ;; Since we don't have a char->string function, use array
+          (let ((char-str (array->string (array c))))
+            (emit-write char-str))))))
+     (emit-writeln "\";"))
+    ;; Assembly backends: use traditional approach
+    (else
+     (let ((temp (LABEL (temp-label-name))))
+       (gen comp DATA)
+       (gen comp DEFLABEL temp)
+       (gen comp ASCIZ self)
+       (gen comp ALIGN 4)
+       (gen comp DEFLABEL (LABEL name))
+       (gen comp LONG temp)
+       (gen comp TEXT)))))
 
 (define-method gen-definition <extern> (name comp)
-  (let ((nlabel (LABEL                self.name        ))
-	(slabel (LABEL (concat-symbol self.name '$stub))))
-    (if (defined? '__MACH__)
-	(let ()
-	  (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-	  (gen comp DEFLABEL slabel)
-	  (gen comp INDIRECT nlabel)
-	  (gen comp LONG 0)
-	  (gen comp TEXT))
-      (gen comp DATA)
-      (gen comp DEFLABEL slabel)
-      (gen comp LONG nlabel)
-      (gen comp TEXT))))
+  (cond
+    ;; C backend: generate extern declaration
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+     (emit-writeln "extern oop " (mangle-label self.name) ";")
+     (emit-writeln "static oop v_" (mangle-label name) " = (oop)&" (mangle-label self.name) ";"))
+    ;; Assembly backends: use traditional approach
+    (else
+     (let ((nlabel (LABEL                self.name        ))
+           (slabel (LABEL (concat-symbol self.name '$stub))))
+       (if (defined? '__MACH__)
+           (let ()
+             (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
+             (gen comp DEFLABEL slabel)
+             (gen comp INDIRECT nlabel)
+             (gen comp LONG 0)
+             (gen comp TEXT))
+         (gen comp DATA)
+         (gen comp DEFLABEL slabel)
+         (gen comp LONG nlabel)
+         (gen comp TEXT))))))
 
 (define-method gen-definition <form> (name comp)
-  (gen comp COMMENT (list "form "name)))
+  (cond
+    ;; C backend: generate comment
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+     (emit-writeln "/* form " name " */"))
+    ;; Assembly backends: use traditional approach
+    (else
+     (gen comp COMMENT (list "form "name)))))
 
 (define-function gen-param (var comp)
   ;;(print "gen-param ") (dumpln var)
@@ -504,22 +565,108 @@
 
 ;;; 
 
-;; Original gen-env - works for assembly backends
-;; C backend will override this function completely
+;; Backend-aware gen-env function
 (define-function gen-env (env)
-  (let* ((vars  (<env>-bindings env))
-         (comp  (compiler 0))
-         (index (array-length vars)))
+  (cond
+    ;; C backend: only generate definitions, no assembly emit path
+    ((and (defined? '*c-backend-active*) *c-backend-active*)
+     ;; Generate C header and includes
+     (emit-writeln "// Generated C code from Maru")
+     (emit-writeln "#include <stdint.h>")
+     (emit-writeln "#include <stdlib.h>")
+     (emit-writeln "#include <stdio.h>")
+     (emit-writeln)
+     (emit-writeln "// Basic runtime types")
+     (emit-writeln "typedef intptr_t oop;")
+     (emit-writeln "#define nil ((oop)0)")
+     (emit-writeln "#define makeLong(x) ((oop)(((long)(x) << 1) | 1))")
+     (emit-writeln "#define getLong(x) ((long)(x) >> 1)")
+     (emit-writeln "#define LONG(x) makeLong(x)")
+     (emit-writeln)
+     (emit-writeln "// Runtime function prototypes")
+     (emit-writeln "oop cons(oop car, oop cdr);")
+     (emit-writeln)
+     
+     ;; For now, skip forward declarations to simplify the implementation
+     ;; TODO: Add two-pass compilation later
+     
+     ;; Generate definitions
+     (let* ((vars  (<env>-bindings env))
+            (comp  (compiler 0))
+            (index (array-length vars)))
+       (while (<= 0 (set index (- index 1)))
+         (let ((name  (<variable>-name  (array-at vars index)))
+               (value (<variable>-value (array-at vars index))))
+           (gen-definition value name comp))))
+     
+     ;; Generate main function if there's a main in the code
+     ;; This provides the C entry point that sets up the Maru runtime
+     (let ((has-main ()))
+       ;; Check if any function is named 'main'
+       (let* ((vars  (<env>-bindings env))
+              (index (array-length vars)))
+         (while (<= 0 (set index (- index 1)))
+           (let ((name  (<variable>-name  (array-at vars index)))
+                 (value (<variable>-value (array-at vars index))))
+             (if (and (= 'main name) (= <expr> (type-of value)))
+                 (set has-main 1)))))
+       
+       (if has-main
+           (let ()
+             (emit-writeln)
+             (emit-writeln "// Runtime support functions")
+             (emit-writeln "oop newString(const char *str) {")
+             (emit-writeln "    // TODO: Implement proper string object creation")
+             (emit-writeln "    return (oop)str;  // Simplified for now")
+             (emit-writeln "}")
+             (emit-writeln)
+             (emit-writeln "oop cons(oop car, oop cdr) {")
+             (emit-writeln "    // TODO: Implement proper cons cell creation")
+             (emit-writeln "    return nil;  // Simplified for now")
+             (emit-writeln "}")
+             (emit-writeln)
+             (emit-writeln "// Global variables")
+             (emit-writeln "oop v__58arguments_58 = nil;  // *arguments*")
+             (emit-writeln)
+             (emit-writeln "// C entry point")
+             (emit-writeln "int main(int argc, char **argv)")
+             (emit-writeln "{")
+             (emit-writeln "    // Initialize runtime if needed")
+             (emit-writeln "    // TODO: Initialize GC, symbols, etc.")
+             (emit-writeln "    ")
+             (emit-writeln "    // Build *arguments* list from command line")
+             (emit-writeln "    oop args = nil;")
+             (emit-writeln "    for (int i = argc - 1; i >= 1; i--) {")
+             (emit-writeln "        oop str = newString(argv[i]);")
+             (emit-writeln "        args = cons(str, args);")
+             (emit-writeln "    }")
+             (emit-writeln "    v__58arguments_58 = args;")
+             (emit-writeln "    ")
+             (emit-writeln "    // Call the Maru main function")  
+             (emit-writeln "    oop result = _main();")
+             (emit-writeln "    ")
+             (emit-writeln "    // Extract exit code from result")
+             (emit-writeln "    if ((intptr_t)result & 1) {  // Tagged integer?")
+             (emit-writeln "        return (int)getLong(result);")
+             (emit-writeln "    }")
+             (emit-writeln "    return 0;  // Default exit code")
+             (emit-writeln "}"))))) 
     
-    (while (<= 0 (set index (- index 1)))
-      (let ((name  (<variable>-name  (array-at vars index)))
-            (value (<variable>-value (array-at vars index))))
-        ;; (println "## defn " name)  ; commented out for cleaner output
-        ;; (warn name "\n")  ; commented out - was outputting function names
-        ;;x;(println (<expr>-defn (cdar env)))
-        (gen-definition value name comp)))
-    (for (i 0 (<compiler>-pc comp))
-                        (apply emit (array-at (<compiler>-asm comp) i)))))
+    ;; Assembly backends: use traditional emit path
+    (else
+     (let* ((vars  (<env>-bindings env))
+            (comp  (compiler 0))
+            (index (array-length vars)))
+       
+       (while (<= 0 (set index (- index 1)))
+         (let ((name  (<variable>-name  (array-at vars index)))
+               (value (<variable>-value (array-at vars index))))
+           ;; (println "## defn " name)  ; commented out for cleaner output
+           ;; (warn name "\n")  ; commented out - was outputting function names
+           ;;x;(println (<expr>-defn (cdar env)))
+           (gen-definition value name comp)))
+       (for (i 0 (<compiler>-pc comp))
+                           (apply emit (array-at (<compiler>-asm comp) i)))))))
 
 (define-form compile-begin ()	`(set *globals* (environment *globals*)))
 
@@ -529,10 +676,13 @@
     ;; (C backend is forced for eval2.c generation)
     (set *globals* (<env>-parent env))
     
-    ;; Load appropriate backend BEFORE calling gen-env
+    ;; Backend-specific emit methods are loaded here
+    ;; For C backend, we use the integrated methods in this file
+    ;; For assembly backends, we load the appropriate backend
     (cond
       ((and (defined? '*c-backend-active*) *c-backend-active*)
-       (load "core/compiler/emit-c.l"))
+       ;; C backend methods are already integrated in this file
+       ())
       ((and (defined? '*arm64-backend-active*) *arm64-backend-active*)
        (load "core/compiler/emit-arm64.l"))
       ((or (defined? '__x86_64__) (defined? '__i386__))
@@ -734,17 +884,18 @@
           (emit-write (type-of op))
           (emit-write " value: ")
           (with-emit-port (console-port) (lambda () (dumpln op)))
-          (emit-write " */")))))
+          (emit-write " */"))))
     
     (else
-     (emit-write "nil"))))
+     (emit-write "nil")))))  ;; Close cond and c-gen-expr function
 
 ;; High-level C code generation that translates Lisp operations directly
 (define-method gen-definition <expr> (name ocomp)
   (cond
     ;; C backend: generate high-level C code directly from Lisp expressions
     ((and (defined? '*c-backend-active*) *c-backend-active*)
-      (emit-writeln "; C backend code generation for: " name)
+      ;; Don't emit Lisp comments into C output
+      ;; (emit-writeln "; C backend code generation for: " name)
       ;; C backend: generate high-level C code directly from Lisp expressions
       (let* ((main (= 'main name))
              (defn (<expr>-defn self))

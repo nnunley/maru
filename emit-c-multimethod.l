@@ -139,6 +139,38 @@
         (compile-to-c arg backend)))
     (port-write port ")")))
 
+(define-function compile-lambda (expr backend)
+  (let ((port (<c-backend>-output-port backend))
+        (params (cadr expr))
+        (body (cddr expr)))
+    ;; For now, generate a simple C function pointer
+    ;; In a full implementation, this would need closure support
+    (port-write port "/* lambda ")
+    (port-write port (symbol->string params))
+    (port-write port " */ NULL")))
+
+(define-function compile-define (expr backend)
+  (let ((port (<c-backend>-output-port backend))
+        (name (cadr expr))
+        (value (caddr expr)))
+    ;; Generate global variable definition
+    (port-write port "/* define ")
+    (port-write port (symbol->string name))
+    (port-write port " = ")
+    (compile-to-c value backend)
+    (port-write port " */")))
+
+(define-function compile-let (expr backend)
+  (let ((port (<c-backend>-output-port backend))
+        (bindings (cadr expr))
+        (body (cddr expr)))
+    ;; Generate C block with local variables
+    (port-write port "({ /* let */ ")
+    ;; For now, simplified - in full implementation would handle bindings
+    (when (pair? body)
+      (compile-to-c (car body) backend))
+    (port-write port " })")))
+
 ;;; ================================================================
 ;;; MULTIMETHOD METHODS FOR COMPILE-TO-C
 ;;; ================================================================
@@ -170,9 +202,7 @@
   '((let ((port (<c-backend>-output-port backend)))
       (if (= self 'nil)
           (port-write port "nil")
-          (let ()
-            (port-write port "v_")
-            (port-write port (symbol->string self)))))))
+          (port-write port (symbol->string self))))))
 
 ;; nil/empty lists
 (add-method compile-to-c <undefined>
@@ -198,6 +228,9 @@
         ;; Special forms
         ((= op 'if) (compile-if self backend))
         ((= op 'quote) (compile-to-c (cadr self) backend))
+        ((= op 'lambda) (compile-lambda self backend))
+        ((= op 'define) (compile-define self backend))
+        ((= op 'let) (compile-let self backend))
         
         ;; General function call
         (else (compile-function-call self backend))))))
@@ -217,6 +250,56 @@
     (port-write port "\n")))
 
 ;;; ================================================================
+;;; UTILITY FUNCTIONS
+;;; ================================================================
+
+(define-function c-mangle-identifier (name)
+  "Convert symbol to safe C identifier"
+  ;; For now, just use the original name - would need proper mangling
+  ;; Replace common Lisp symbols with C-safe equivalents
+  (let ((str name))
+    (cond
+      ((= str "+") "plus")
+      ((= str "-") "minus") 
+      ((= str "*") "multiply")
+      ((= str "/") "divide")
+      ((= str "=") "equal")
+      ((= str "<") "less_than")
+      ((= str ">") "greater_than")
+      ((= str "?") "question")
+      (else str))))
+
+;;; ================================================================
+;;; FUNCTION COMPILATION
+;;; ================================================================
+
+(define-function compile-function-definition (name params body backend)
+  "Compile a function definition to C"
+  (let ((port (<c-backend>-output-port backend)))
+    ;; Function signature
+    (port-write port "static oop ")
+    (port-write port (c-mangle-identifier (symbol->string name)))
+    (port-write port "(")
+    
+    ;; Parameters - for now, all are oop
+    (when (pair? params)
+      (port-write port "oop ")
+      (port-write port (symbol->string (car params)))
+      (list-do param (cdr params)
+        (port-write port ", oop ")
+        (port-write port (symbol->string param))))
+    
+    (port-write port ") {\n")
+    
+    ;; Function body
+    (port-write port "  return ")
+    (when (pair? body)
+      (compile-to-c (car body) backend))
+    (port-write port ";\n")
+    
+    (port-write port "}\n\n")))
+
+;;; ================================================================
 ;;; PUBLIC INTERFACE - EXPRESSION COMPILATION
 ;;; ================================================================
 
@@ -227,6 +310,13 @@
     (port-write output-port "oop result = ")
     (compile-to-c expr backend)
     (port-write output-port ";\n")
+    backend))
+
+(define-function compile-maru-function (name params body output-port)
+  "Compile a Maru function definition to C code"
+  (let ((backend (new-c-backend output-port)))
+    (emit-c-headers backend)
+    (compile-function-definition name params body backend)
     backend))
 
 ;;; ================================================================
@@ -244,10 +334,6 @@
   (set (<c-backend>-globals backend)
        (cons (list name type value)
              (<c-backend>-globals backend))))
-
-(define-function c-mangle-identifier (name)
-  "Convert symbol to safe C identifier"
-  (concat-string "v_" (symbol->string name)))
 
 ;;; ================================================================
 ;;; FULL ENVIRONMENT COMPILATION (two-pass for complex cases)
@@ -314,25 +400,9 @@
       (set lst (cdr lst)))
     result))
 
-(define-function concat-string (s1 s2)
-  "Concatenate two strings (simplified)"
-  ;; In real Maru this would be implemented properly
-  (symbol->string (string->symbol (string-append s1 s2))))
 
 ;;; ================================================================
-;;; INITIALIZATION AND STATUS
+;;; INITIALIZATION
 ;;; ================================================================
-
-(println "Comprehensive multimethod C backend loaded!")
-(println "Features:")
-(println "  - Multimethod dispatch using type-of and compile-to-c selector")
-(println "  - Context-aware idiomatic C generation")
-(println "  - Two-pass compilation support for complex environments")
-(println "  - Clean separation of concerns")
-(println)
-(println "Usage:")
-(println "  (compile-maru-expression '(+ 1 2) (console-port))")
-(println "  (compile-maru-expression '(if (< x y) a b) (string-port))")
-(println)
 
 (define *c-backend-available* 1)

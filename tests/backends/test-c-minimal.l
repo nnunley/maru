@@ -3,7 +3,7 @@
 ;; Load the necessary modules
 (require "boot.l")
 (require "emit.l")
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 ;; Override gen-env to use C backend instead of assembly
 (define-function gen-env (env) (gen-env-c env))

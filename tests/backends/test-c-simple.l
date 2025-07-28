@@ -2,7 +2,7 @@
 
 (require "boot.l")
 (require "emit.l")
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 ;; Test C code generation directly
 (println "/* Generated C test */")

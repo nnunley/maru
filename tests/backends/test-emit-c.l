@@ -6,7 +6,7 @@
 (require "emit.l")
 
 ;; Now load the C backend
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 ;; Override gen-env to use C backend
 (define-function gen-env (env) (gen-env-c env))

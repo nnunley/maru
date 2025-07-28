@@ -1,0 +1,1 @@
+(define-function hello () (printf "Hello, World!\n"))

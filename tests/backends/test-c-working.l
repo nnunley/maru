@@ -7,7 +7,7 @@
 (set *emit-backend* 'c)
 
 ;; Load C backend
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 ;; Test compilation
 (compile-begin)

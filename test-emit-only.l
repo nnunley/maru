@@ -1,0 +1,1 @@
+(load "core/compiler/emit.l")

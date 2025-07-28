@@ -129,6 +129,7 @@ diff eval2.s eval3.s
 - **`.l` files**: Traditional untyped Lisp syntax
 - **`.k` files**: Typed Lisp syntax with IR compilation support
 - Both can be evaluated directly: `./eval file.l` or `./eval file.k`
+- .k files use the same S-expression syntax but add type annotations and structures
 - For high-performance compilation, .k files are processed through the IR system
 
 ### Core Files Structure
@@ -178,15 +179,19 @@ maru/
 
 **Typed Maru Features (.k files):**
 ```lisp
-;; Type annotations for performance
+;; Type annotations for performance (still valid S-expressions)
 (define-function add (int a) (int b) -> int
   (+ a b))
 
 ;; Structure definitions
 (define-structure <point> (int x) (int y))
 
-;; C integration
+;; C integration via foreign function interface
 (define-alien-function malloc (long size) -> void*)
+
+;; Example from lib/dlopen.k - real FFI usage
+(require "osdefs.k")  ; platform constants
+(define-alien-function dlopen (string filename) (int flags) -> pointer)
 ```
 
 ### Available Examples
@@ -293,14 +298,9 @@ MARU_TARGET_ARCH=x86_64 make
 # .k files can be run directly (interpreted mode)
 ./eval your-program.k
 
-# OR compiled through IR for high performance
-./eval2 core/compiler/ir-gen-c.k core/maru.k your-program.k > output.c
-cc -fno-builtin -g -o your-program output.c -ldl
-./your-program
-
-# Compile to native assembly
-./eval2 core/compiler/ir-gen-x86.k core/maru.k your-program.k > output.s
-./eval2 core/compiler/ir-gen-arm64.k core/maru.k your-program.k > output.s
+# The IR compilation system is designed for high-performance code generation
+# Note: The IR backends are part of ongoing development
+# For now, .k files run through the standard evaluator with type information
 ```
 
 ### Library Development
@@ -313,6 +313,8 @@ ls lib/*.k lib/*.l
 # lib/stream/        - I/O and port system  
 # lib/maru-gc.k      - Garbage collection
 # lib/maru-test.k    - Testing framework
+# lib/dlopen.k       - FFI/dynamic library loading
+# lib/libgl.k        - OpenGL bindings (97 functions via FFI)
 ```
 
 ## Recent Developments

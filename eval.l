@@ -1022,12 +1022,11 @@
 	      (or (= (get_long (get <env> level venv)) (get_long (get <env> level env)))
 		  (put <env> stable venv s_t)))))
       (let ((fn (k_array_at (get <variable> value encoders) (get-type exp))))
-	(and fn (let () (printf "APPLY GOT ENCODER\n... " (k_println fn) 1)))
 	(and fn
 	     (let ((args (new-<pair> env ())))
 	       (gc-protect (args)
 			   (set args (new-<pair> exp args))
-			   (printf "APPLY ENCODER\n... ") (k_print fn) (printf " ") (k_print args) (printf " ") (k_println env)
+			   (debug (printf "APPLY ENCODER\n... ") (k_print fn) (printf " ") (k_print args) (printf " ") (k_println env))
 			   (set exp (k_apply fn args ()))))))))
   exp)
 

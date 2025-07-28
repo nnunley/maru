@@ -2,7 +2,7 @@
 ;;; test-bootstrap-eval2.l -- Test bootstrapping eval2 with our C emitter
 
 (load "emit.l")
-(load "emit-c.l")  
+(load "core/compiler/emit-c.l")  
 
 ;;; Try to compile eval.l to C using our emitter
 (define-function attempt-eval-bootstrap ()
