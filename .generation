@@ -58,6 +58,8 @@ capabilities:
   - peg_parser_system: true  # Complete PEG infrastructure (1,776 lines)
   - grammar_compilation: true  # Runtime parser generation
   - syntax_extension: true  # New language constructs via grammars
+  - embedded_grammar_syntax: true  # { } block grammar definitions (840 lines core grammars)
+  - meta_grammar_system: true  # peg.g defines grammar syntax itself
   - arm64_backend: false  # removed for VPRI compliance
   - line_count_compliant: true  # <10K target including PEG system
   
@@ -65,7 +67,9 @@ core_features:
   - "Bootstrap evolution system with commit tracking"
   - "Complete PEG extensibility infrastructure (essential for Maru hypothesis)"
   - "Grammar embedding capability for language extension"
-  - "VPRI-compliant with extensibility preserved (8,331 lines)"
+  - "Embedded grammar syntax via { } blocks (from test-repl.l)"
+  - "Essential grammar files preserved (grammars/core/*.g - 840 lines)"
+  - "VPRI-compliant with full grammar extensibility (8,821 lines)"
   
 known_issues:
   - "Complex nested cond in emit.l c-gen-expr function"

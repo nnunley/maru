@@ -42,9 +42,9 @@ TOTAL:           8,331 lines  # ✅ Under 10K, preserves extensibility!
 - ❌ JIT infrastructure (`lib/dlopen.k`, `lib/libgl.k`, etc.)
 - ❌ Networking stack (`net/` directory - 500+ lines)
 - ❌ UTF8 system (`core/utf8-complete-system.l` - 228 lines)
-- ❌ **Advanced PEG features** (keep core PEG system for extensibility)
-  - Archive IR-based compilation experiments (~1,200 lines)
-  - TPEG typed variant system
+- ❌ **Advanced PEG features** (keep core PEG + essential grammars for extensibility)
+  - Archive experimental PEG IR compilation (~1,200 lines)
+  - Archive non-core grammar files (ARM64/x86/Unicode/examples: ~1,571 lines)
   - PEG debugging and profiling tools
 - ❌ Port streams (use simple I/O, can be rebuilt via PEG if needed)
 - **Savings**: ~20,000+ lines
@@ -79,15 +79,21 @@ core/peg.l         159 lines  # PEG classes
 core/peg-boot.l    405 lines  # Bootstrap rules
 core/peg-compile.l 136 lines  # Grammar compilation
 core/peg-compiler.l 210 lines # Rule compiler
-grammars/core/peg.g 50 lines  # Meta-grammar
+
+# Essential Grammar Files (enable embedded { } syntax)
+grammars/core/peg.g   277 lines  # Meta-grammar (CRITICAL for { } blocks)
+grammars/core/tpeg.g  134 lines  # Typed PEG variant
+grammars/core/osdefs.g 41 lines  # OS definitions
+grammars/core/irgol.g 194 lines  # IR grammar  
+grammars/core/irl.g   194 lines  # IR language
 
 # Support Infrastructure
 osdefs.k           200 lines  # OS definitions
 buffer.l           150 lines  # Basic I/O
 gc.l               300 lines  # Garbage collector
-misc support       300 lines  # Remaining essentials
+misc support       200 lines  # Remaining essentials
                 ─────────────
-ESTIMATED:       8,331 lines  # ✅ Under 10K with full extensibility!
+ESTIMATED:       8,821 lines  # ✅ Under 10K with full grammar extensibility!
 ```
 
 ## Implementation Steps
@@ -117,7 +123,7 @@ ESTIMATED:       8,331 lines  # ✅ Under 10K with full extensibility!
   - PEG class system (`core/peg.l`)
   - Bootstrap rules (`core/peg-boot.l`)
   - Grammar compilation (`core/peg-compile.l`, `core/peg-compiler.l`)
-  - Meta-grammar definitions (`grammars/core/peg.g`)
+  - **Essential grammar files** (`grammars/core/*.g` - enables `{ }` embedded syntax)
 - Runtime support (`eval.k`)
 - Memory management (`gc.l`, `buffer.l`)
 
@@ -143,19 +149,27 @@ ESTIMATED:       8,331 lines  # ✅ Under 10K with full extensibility!
 
 ## Extensibility Validation
 
-The system must demonstrate that new syntax can be added without core modifications:
+The system must demonstrate embedded grammar syntax from `test-repl.l`:
 
 ```lisp
-;; Example: Define SQL-like syntax embedded in Maru
-(define-grammar sql-subset
-  ((select-stmt (match-sequence 
-                  (match-string "SELECT") 
-                  (match-rule columns)
-                  (match-string "FROM")
-                  (match-rule table)))))
-                  
+;; Embedded grammar definition in { } blocks
+{
+  digit = [0123456789] ;
+  number = digit+ $#:d _ -> d ;
+  factor = value:a ( "*" _ factor:b -> (* a b)
+                   | "/" _ factor:b -> (/ a b)
+                   | -> a ) ;
+  term = factor:a ( "+" _ term:b _ -> (+ a b)
+                  | "-" _ term:b _ -> (- a b)
+                  | -> a ) ;
+}
+
 ;; Use immediately - no rebuild required
-(parse-with sql-subset "SELECT name FROM users")
+3 +4
+3- 4  
+3*3
 ```
+
+**Critical Test**: Must successfully execute `test-repl.l` embedded grammar examples.
 
 This achieves Alan Kay's vision of a personal computing system that fits in your head **and can grow** through principled extension rather than core modification.
