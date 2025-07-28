@@ -1,0 +1,385 @@
+# Bootstrap Evolution System Design
+
+## Problem Statement
+
+Currently, Maru has **multiple copies** of core files leading to:
+- 3 copies of eval.l (5,093 lines total) 
+- Multiple boot variants (4,861 lines total)
+- Confusion about which version is "canonical"
+- VPRI line budget violations (46K→10K needed)
+
+## Core Principle: **Generation-Based Evolution**
+
+Instead of maintaining multiple versions simultaneously, implement a **formal generation system** where:
+
+1. **One Generation Active**: Only one generation exists in the main branch at any time
+2. **Clean Evolution Path**: `eval₁ → eval₂ → eval₃ → eval₄...`
+3. **Explicit Bumping**: Formal process to advance to next generation
+4. **Bootstrap Verification**: Each generation must be able to compile the next
+
+## Architecture
+
+### Generation Identification
+
+```lisp
+;; In eval.l
+(define *maru-generation* 2)    ; Current generation number
+(define *maru-version* "2.5")   ; Version string
+
+;; Accessible at runtime
+(println "Maru Generation " *maru-generation* " v" *maru-version*)
+```
+
+### File Organization
+
+```
+maru/
+├── eval.l           # Current generation (e.g., generation 2)
+├── boot.l           # Current bootstrap
+├── core/
+│   └── compiler/
+│       └── emit.l   # Current compiler
+└── .generation      # Metadata file
+```
+
+**No duplicate files in main branch** - only current generation exists.
+
+### Generation Metadata (`.generation` file)
+
+```yaml
+current_generation: 2
+current_version: "2.5"
+current_commit: "1a9dd9a"
+current_branch: "main"
+created_timestamp: "2025-01-28T10:30:00Z"
+created_by_generation: 1
+created_by_commit: "a884a32"
+
+# Complete generation lineage
+generation_history:
+  - generation: 1
+    version: "2.4" 
+    commit: "a884a32"
+    parent_commit: null
+    branch: "main"
+    timestamp: "2025-01-27T15:20:00Z"
+    description: "Original VPRI Maru"
+    bootstrap_verified: true
+    bootstrap_target: "generation 2"
+    bootstrap_commit: "1a9dd9a"
+    line_count: 6421
+    
+  - generation: 2
+    version: "2.5"
+    commit: "1a9dd9a" 
+    parent_commit: "a884a32"
+    branch: "main"
+    timestamp: "2025-01-28T10:30:00Z"
+    description: "Fix syntax errors and reorganize project"
+    bootstrap_verified: false  # pending fix
+    bootstrap_target: "generation 3"
+    bootstrap_commit: null
+    line_count: 6500  # estimated after fixes
+
+# Bootstrap verification chain
+bootstrap_chain:
+  - source_generation: 1
+    source_commit: "a884a32"
+    target_generation: 2  
+    target_commit: "1a9dd9a"
+    status: "verified"
+    verification_date: "2025-01-28T10:30:00Z"
+    
+  - source_generation: 2
+    source_commit: "1a9dd9a"
+    target_generation: 3
+    target_commit: null
+    status: "pending"
+    verification_date: null
+
+# Current capabilities and status
+capabilities:
+  - self_hosting: true
+  - c_backend: true
+  - arm64_backend: false  # removed for VPRI compliance
+  - line_count_compliant: true  # <10K target
+  
+known_issues:
+  - "Complex nested cond in emit.l c-gen-expr function"
+  - "Bootstrap verification pending syntax fix"
+```
+
+## Evolution Process
+
+### Phase 1: Clean Current State
+```bash
+# Remove duplicates
+rm -f core/eval.l original/eval.l    # Keep only root eval.l
+rm -f boot2.l core/bootstrap/*       # Keep only root boot.l
+
+# Update generation metadata
+echo "2" > .generation
+```
+
+### Phase 2: Implement Generation System
+```lisp  
+;; In eval.l - add generation tracking
+(define *maru-generation* 2)
+(define *maru-version* "2.5-evolution")
+
+;; Bootstrap verification function
+(define-function verify-bootstrap ()
+  (println "Verifying bootstrap capability...")
+  (let ((result (compile-eval-to-eval2)))
+    (if result
+        (println "✓ Bootstrap verified - can generate eval2")
+        (error "✗ Bootstrap failed - cannot generate next generation"))))
+```
+
+### Phase 3: Generation Bumping Mechanism
+```bash
+#!/bin/bash
+# tools/bump-generation.sh - Complete commit tracking implementation
+
+set -e  # Exit on any error
+
+# Get current state with full commit tracking
+CURRENT_GEN=$(yq '.current_generation' .generation)
+CURRENT_COMMIT=$(git rev-parse HEAD)
+CURRENT_BRANCH=$(git branch --show-current)
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+NEXT_GEN=$((CURRENT_GEN + 1))
+
+echo "🔄 Bumping from generation $CURRENT_GEN to $NEXT_GEN"
+echo "📍 Current commit: $CURRENT_COMMIT"
+echo "🌳 Current branch: $CURRENT_BRANCH"
+
+# Step 1: Verify current generation can bootstrap
+echo "✅ Step 1: Verifying bootstrap capability..."
+./eval boot.l -e "(verify-bootstrap)" || {
+    echo "❌ Bootstrap verification failed - cannot proceed"
+    exit 1
+}
+
+# Step 2: Generate next generation with full provenance
+echo "🏗️  Step 2: Generating next generation..."
+GENERATION_DIR="build/generation-$NEXT_GEN"
+mkdir -p "$GENERATION_DIR"
+
+# Generate with provenance comments
+cat > "$GENERATION_DIR/eval$NEXT_GEN.c" <<EOF
+/*
+ * Maru Generation $NEXT_GEN Evaluator
+ * 
+ * Generated by: Generation $CURRENT_GEN
+ * Source commit: $CURRENT_COMMIT
+ * Generated at: $TIMESTAMP
+ * Generated by: $(whoami)@$(hostname)
+ * 
+ * Bootstrap lineage:
+ * Gen $CURRENT_GEN ($CURRENT_COMMIT) -> Gen $NEXT_GEN (this file)
+ */
+
+EOF
+
+# Generate the actual code
+./eval boot.l emit.l eval.l >> "$GENERATION_DIR/eval$NEXT_GEN.c"
+
+# Compile next generation
+echo "🔨 Step 3: Compiling generation $NEXT_GEN..."
+cc -o "$GENERATION_DIR/eval$NEXT_GEN" "$GENERATION_DIR/eval$NEXT_GEN.c"
+
+# Step 4: Verify new generation works
+echo "🧪 Step 4: Testing generation $NEXT_GEN..."
+"$GENERATION_DIR/eval$NEXT_GEN" boot.l tests/basic-bootstrap-test.l || {
+    echo "❌ Generation $NEXT_GEN failed basic tests"
+    exit 1
+}
+
+# Step 5: Commit current state before replacement
+echo "💾 Step 5: Archiving current generation..."
+git add -A
+git commit -m "Archive generation $CURRENT_GEN before bump
+
+Generation: $CURRENT_GEN
+Commit: $CURRENT_COMMIT  
+Bootstrap target: Generation $NEXT_GEN
+Status: Ready for evolution
+
+Archived files:
+- eval.l (Generation $CURRENT_GEN evaluator)
+- boot.l (Generation $CURRENT_GEN bootstrap)
+- core/compiler/emit.l (Generation $CURRENT_GEN compiler)
+
+Next: Replace with Generation $NEXT_GEN" || {
+    echo "⚠️  Nothing to commit (working directory clean)"
+}
+
+ARCHIVE_COMMIT=$(git rev-parse HEAD)
+
+# Step 6: Replace current generation with full tracking
+echo "🔄 Step 6: Installing generation $NEXT_GEN..."
+
+# Create new version of eval.l with updated generation info
+sed -i.bak "s/(define \*maru-generation\* [0-9]\+)/(define *maru-generation* $NEXT_GEN)/" eval.l
+sed -i.bak "s/(define \*maru-version\* \"[^\"]*\")/(define *maru-version* \"$NEXT_GEN.0\")/" eval.l
+rm eval.l.bak
+
+# Update generation metadata with complete commit tracking
+NEXT_COMMIT_PLACEHOLDER="TO_BE_UPDATED"
+
+cat > .generation <<EOF
+current_generation: $NEXT_GEN
+current_version: "$NEXT_GEN.0"
+current_commit: "$NEXT_COMMIT_PLACEHOLDER"
+current_branch: "$CURRENT_BRANCH"
+created_timestamp: "$TIMESTAMP"
+created_by_generation: $CURRENT_GEN
+created_by_commit: "$CURRENT_COMMIT"
+
+generation_history:
+$(yq '.generation_history[] | "  - generation: " + (.generation | tostring) + "\n    version: \"" + .version + "\"\n    commit: \"" + .commit + "\"\n    parent_commit: " + (.parent_commit | tostring) + "\n    branch: \"" + .branch + "\"\n    timestamp: \"" + .timestamp + "\"\n    description: \"" + .description + "\"\n    bootstrap_verified: " + (.bootstrap_verified | tostring) + "\n    bootstrap_target: \"generation " + (.bootstrap_target | split(" ")[1]) + "\"\n    bootstrap_commit: " + (.bootstrap_commit | tostring) + "\n    line_count: " + (.line_count | tostring)' .generation)
+  - generation: $NEXT_GEN
+    version: "$NEXT_GEN.0"
+    commit: "$NEXT_COMMIT_PLACEHOLDER"
+    parent_commit: "$CURRENT_COMMIT"
+    branch: "$CURRENT_BRANCH"
+    timestamp: "$TIMESTAMP"
+    description: "Generated from generation $CURRENT_GEN"
+    bootstrap_verified: false
+    bootstrap_target: "generation $((NEXT_GEN + 1))"
+    bootstrap_commit: null
+    line_count: $(wc -l < eval.l)
+
+bootstrap_chain:
+$(yq '.bootstrap_chain[]' .generation)
+  - source_generation: $CURRENT_GEN
+    source_commit: "$CURRENT_COMMIT"
+    target_generation: $NEXT_GEN
+    target_commit: "$NEXT_COMMIT_PLACEHOLDER"
+    status: "verified"
+    verification_date: "$TIMESTAMP"
+    archive_commit: "$ARCHIVE_COMMIT"
+
+capabilities:
+$(yq '.capabilities[]' .generation)
+
+known_issues: []
+EOF
+
+# Step 7: Commit new generation with complete metadata
+git add -A
+git commit -m "Bump to generation $NEXT_GEN
+
+🔄 Generation Evolution:
+- Source: Generation $CURRENT_GEN (commit $CURRENT_COMMIT)
+- Target: Generation $NEXT_GEN (this commit)
+- Timestamp: $TIMESTAMP
+- Bootstrap: ✅ Verified
+- Archive: $ARCHIVE_COMMIT
+
+📊 Changes:
+- Updated eval.l to generation $NEXT_GEN
+- Updated .generation metadata with full lineage
+- Bootstrap chain verified and recorded
+
+🧬 Lineage:
+Gen $CURRENT_GEN ($CURRENT_COMMIT) → Gen $NEXT_GEN ($(git rev-parse HEAD))
+
+This commit represents a verified bootstrap evolution where
+generation $CURRENT_GEN successfully generated generation $NEXT_GEN."
+
+# Step 8: Update generation metadata with actual commit hash
+FINAL_COMMIT=$(git rev-parse HEAD)
+sed -i.bak "s/$NEXT_COMMIT_PLACEHOLDER/$FINAL_COMMIT/g" .generation
+rm .generation.bak
+git add .generation
+git commit --amend --no-edit
+
+echo "🎉 Successfully bumped to generation $NEXT_GEN!"
+echo "📍 New commit: $FINAL_COMMIT"
+echo "🔗 Bootstrap chain: Gen $CURRENT_GEN → Gen $NEXT_GEN verified"
+echo "📊 Complete lineage recorded in .generation"
+```
+
+## Bootstrap Evolution Chain
+
+### Current State (Generation 2)
+- **eval**: C-based bootstrap evaluator 
+- **eval.l**: Generation 2 self-hosting evaluator
+- **Status**: Partially working (nested cond issue)
+
+### Target Evolution Path
+```
+Generation 2 (current)
+├── Fix nested cond issue in emit.l
+├── Verify bootstrap: eval.l → eval2.c
+└── Clean up duplicates
+
+Generation 3 (next)  
+├── Generated from clean Generation 2
+├── Simplified architecture (VPRI compliance)
+├── Single C backend only
+└── Verified bootstrap capability
+
+Generation 4 (future)
+├── Further optimizations  
+├── Enhanced error handling
+└── Additional language features
+```
+
+## Implementation Strategy
+
+### Immediately Achievable (Week 1)
+1. **Remove duplicates**: Delete `core/eval.l`, `original/eval.l`, `boot2.l`
+2. **Add generation metadata**: Create `.generation` and update eval.l
+3. **Fix current generation**: Resolve nested cond issue to enable bootstrap
+4. **Verify bootstrap**: Ensure `eval.l` can generate working `eval2.c`
+
+### Medium Term (Week 2-3)  
+1. **Implement bump script**: Automate generation advancement
+2. **Test evolution**: Successfully bump to Generation 3
+3. **VPRI compliance**: Ensure Generation 3 is <10K lines
+4. **Documentation**: Record evolution process
+
+### Long Term Benefits
+1. **Clean development**: No more version confusion
+2. **VPRI compliance**: Natural path to 10K line budget
+3. **Systematic progress**: Each generation builds on previous
+4. **Historical tracking**: Clear record of system evolution
+
+## Comparison with Current State
+
+| Aspect | Current (Multi-Version) | Evolution System |
+|--------|------------------------|------------------|
+| **Line Count** | 46,503 lines | ~8,000 lines per generation |
+| **Files** | 3× eval.l, 2× boot.l | 1× eval.l, 1× boot.l |
+| **Clarity** | Which version to use? | Always use current generation |  
+| **Development** | Confusing, error-prone | Clean, systematic |
+| **VPRI Compliance** | ❌ 4.6x over budget | ✅ Under 10K lines |
+| **Bootstrap** | Unclear capabilities | Verified generation chain |
+
+## Success Criteria
+
+### Generation 2 (Current) - Fix & Verify
+- [ ] Resolve nested cond syntax error 
+- [ ] `eval.l` loads without errors
+- [ ] Bootstrap generates working `eval2`
+- [ ] Remove duplicate files
+- [ ] Add generation metadata
+
+### Generation 3 (Next) - Evolution
+- [ ] Successfully generated from Generation 2
+- [ ] <10K total lines (VPRI compliant)
+- [ ] Single C backend only  
+- [ ] Verified self-hosting capability
+- [ ] Clean architecture without duplicates
+
+### System Benefits - Long Term
+- [ ] Sustainable development process
+- [ ] Clear upgrade path for users
+- [ ] VPRI-compliant system size
+- [ ] Historical tracking of improvements
+- [ ] Elimination of version confusion
+
+This evolution system transforms the current messy multi-version state into a clean, systematic progression that honors both the metacircular nature of Maru and the VPRI constraints for understandable systems.

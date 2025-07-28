@@ -1584,6 +1584,10 @@
   (set evaluators  (k_env_define (get <variable> value globals) (intern "*evaluators*" ) ()))	(gc_push_root (address-of evaluators ))
   (set applicators (k_env_define (get <variable> value globals) (intern "*applicators*") ()))	(gc_push_root (address-of applicators))
 
+  ;; Bootstrap evolution system - generation tracking
+  (k_env_define (get <variable> value globals) (intern "*maru-generation*") 2)
+  (k_env_define (get <variable> value globals) (intern "*maru-version*") "2.5")
+
   (define-fsubr "define"		subr_define)
   (define-fsubr "lambda"		subr_lambda)
   (define-fsubr "let"			subr_let)

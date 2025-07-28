@@ -1,0 +1,62 @@
+current_generation: 2
+current_version: "2.5"
+current_commit: "1a9dd9afc7dcc3c36dea32ae9da23067c4f9437a"
+current_branch: "main"
+created_timestamp: "2025-01-28T18:30:00Z"
+created_by_generation: 1
+created_by_commit: "d5dcfdd"
+
+# Complete generation lineage
+generation_history:
+  - generation: 1
+    version: "2.4" 
+    commit: "d5dcfdd"
+    parent_commit: null
+    branch: "main"
+    timestamp: "2025-01-27T15:20:00Z"
+    description: "Original VPRI Maru with Nile integration"
+    bootstrap_verified: true
+    bootstrap_target: "generation 2"
+    bootstrap_commit: "1a9dd9afc7dcc3c36dea32ae9da23067c4f9437a"
+    line_count: 6421
+    
+  - generation: 2
+    version: "2.5"
+    commit: "1a9dd9afc7dcc3c36dea32ae9da23067c4f9437a" 
+    parent_commit: "d5dcfdd"
+    branch: "main"
+    timestamp: "2025-01-28T18:30:00Z"
+    description: "Fix syntax errors and reorganize project structure"
+    bootstrap_verified: false  # pending fix
+    bootstrap_target: "generation 3"
+    bootstrap_commit: null
+    line_count: 3792  # core files only
+
+# Bootstrap verification chain
+bootstrap_chain:
+  - source_generation: 1
+    source_commit: "d5dcfdd"
+    target_generation: 2  
+    target_commit: "1a9dd9afc7dcc3c36dea32ae9da23067c4f9437a"
+    status: "verified"
+    verification_date: "2025-01-28T18:30:00Z"
+    archive_commit: "d5dcfdd"
+    
+  - source_generation: 2
+    source_commit: "1a9dd9afc7dcc3c36dea32ae9da23067c4f9437a"
+    target_generation: 3
+    target_commit: null
+    status: "pending"
+    verification_date: null
+    archive_commit: null
+
+# Current capabilities and status
+capabilities:
+  - self_hosting: true
+  - c_backend: true
+  - arm64_backend: false  # removed for VPRI compliance
+  - line_count_compliant: true  # <10K target
+  
+known_issues:
+  - "Complex nested cond in emit.l c-gen-expr function"
+  - "Bootstrap verification pending syntax fix"
