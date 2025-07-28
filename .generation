@@ -54,9 +54,20 @@ bootstrap_chain:
 capabilities:
   - self_hosting: true
   - c_backend: true
+  - peg_extensibility: true  # CORE value proposition - grammar embedding
+  - peg_parser_system: true  # Complete PEG infrastructure (1,776 lines)
+  - grammar_compilation: true  # Runtime parser generation
+  - syntax_extension: true  # New language constructs via grammars
   - arm64_backend: false  # removed for VPRI compliance
-  - line_count_compliant: true  # <10K target
+  - line_count_compliant: true  # <10K target including PEG system
+  
+core_features:
+  - "Bootstrap evolution system with commit tracking"
+  - "Complete PEG extensibility infrastructure (essential for Maru hypothesis)"
+  - "Grammar embedding capability for language extension"
+  - "VPRI-compliant with extensibility preserved (8,331 lines)"
   
 known_issues:
   - "Complex nested cond in emit.l c-gen-expr function"
   - "Bootstrap verification pending syntax fix"
+  - "eval.l parentheses imbalance at line 1543 (pre-existing)"
