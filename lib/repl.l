@@ -8,8 +8,8 @@
 (define *parser-stream*)
 
 (define-form grammar-extend (name . rules)
-  (println "GRAMMAR EXTEND" rules)
-  (exit 0))
+  (debug (println "GRAMMAR EXTEND" rules))
+  (error "grammar-extend not yet implemented"))
 
 (define-form grammar-define (name parent fields . rules)
   (eval `(define-class ,name ,parent ,fields))

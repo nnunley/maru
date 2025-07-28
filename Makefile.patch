@@ -1,0 +1,12 @@
+--- Makefile.orig	2025-01-27
++++ Makefile	2025-01-27
+@@ -54,7 +54,8 @@
+ 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
+ 
+ eval2.c : core/compiler/emit.l core/eval.l eval
+-	./eval core/compiler/emit.l core/eval.l > eval2.c
++	@echo "Generating eval2.c with C backend..."
++	MARU_EMIT_BACKEND=c ./eval core/compiler/emit.l core/eval.l > eval2.c
+ 
+ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+ 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)

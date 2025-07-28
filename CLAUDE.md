@@ -99,6 +99,153 @@ A metacircular compiler is a self-hosting compiler written in the language it co
 - **Dotted Access**: `dotted-access-working.l` - Environment access syntax
 - **JIT Infrastructure**: `lib/dlopen.k` FFI system discovered and verified working
 
+## Execution Guide: eval, eval2, and Beyond
+
+### Understanding Maru's Evaluators
+
+Maru has multiple evaluator generations, each built from the previous:
+
+1. **eval** - The bootstrap evaluator (C-based)
+   - Built from eval.c (hand-written C)
+   - Reads and executes Lisp code
+   - Used to bootstrap the next generation
+
+2. **eval2** - The self-hosted evaluator
+   - Generated from eval.l using emit.l
+   - Can be generated as C code or assembly
+   - Maintains identical command-line semantics to eval
+
+3. **Future generations** - Further self-hosting
+   - eval2 can compile the next generation
+   - Each generation proves the metacircular nature
+
+### Basic Execution
+
+```bash
+# Run a Lisp file with eval (bootstrap)
+./eval file.l
+
+# Run with eval2 (self-hosted)
+./eval2 file.l
+
+# Interactive REPL
+./eval boot.l  # Then interact
+
+# With arguments accessible in *arguments*
+./eval script.l arg1 arg2 arg3
+```
+
+### Backend Selection for Code Generation
+
+Maru supports multiple code generation backends:
+
+```bash
+# Force C backend (portable, readable)
+MARU_EMIT_BACKEND=c ./eval emit.l code.l > output.c
+
+# Force ARM64 backend (Apple Silicon optimized)
+MARU_EMIT_BACKEND=arm64 ./eval emit.l code.l > output.s
+
+# Force x86 assembly backend
+MARU_EMIT_BACKEND=x86 ./eval emit.l code.l > output.s
+
+# Use platform default (auto-detected via osdefs.k)
+./eval emit.l code.l > output
+```
+
+### Command Line Options
+
+Both eval and eval2 support these options:
+
+```bash
+# Show version information
+./eval -v
+./eval2 -v
+
+# Enable optimizations
+./eval -O file.l
+./eval2 -O file.l
+
+# Arguments after files are available as *arguments*
+./eval main.l -- --my-app-flag data.txt
+# In main.l: *arguments* contains ("--my-app-flag" "data.txt")
+```
+
+### Generating eval2
+
+```bash
+# Standard generation (uses Makefile)
+make eval2
+
+# Manual generation with C backend
+MARU_EMIT_BACKEND=c ./eval core/compiler/emit.l core/eval.l > eval2.c
+cc -o eval2 eval2.c
+
+# Platform-specific assembly generation
+./eval core/compiler/emit.l core/eval.l > eval2.s  # Uses platform default
+as -o eval2.o eval2.s && ld -o eval2 eval2.o
+```
+
+### Loading Core Libraries
+
+```bash
+# Minimal bootstrap
+./eval boot.l
+
+# Full system with emit capabilities
+./eval boot.l emit.l
+
+# With pretty printing
+./eval boot.l lib/stream/port.l lib/pretty-print.l
+
+# Complete environment
+./eval boot.l emit.l eval.l
+```
+
+### Environment Variables
+
+- **MARU_EMIT_BACKEND**: Controls code generation backend (c, arm64, x86, ir)
+- **MARU_TARGET_ARCH**: Override target architecture for cross-compilation
+
+### Advanced Usage
+
+```bash
+# Compile Lisp to C
+MARU_EMIT_BACKEND=c ./eval emit.l myprogram.l > myprogram.c
+
+# Self-compile eval.l
+MARU_EMIT_BACKEND=c ./eval emit.l eval.l > eval-self.c
+
+# Cross-compile for different architecture
+MARU_TARGET_ARCH=x86 ./eval emit.l program.l > program-x86.s
+
+# Chain evaluators (metacircular demonstration)
+./eval eval.l eval.l test.l  # eval runs eval.l which runs eval.l which runs test.l
+```
+
+### Understanding *arguments*
+
+The global variable `*arguments*` contains command-line arguments after the Lisp files:
+
+```lisp
+;; In your script.l:
+(println "Arguments: " *arguments*)
+
+;; Run: ./eval script.l foo bar baz
+;; Output: Arguments: (foo bar baz)
+```
+
+### Tips for Development
+
+1. **Use eval for development** - It's stable and well-tested
+2. **Test with eval2** - Ensures your code works with self-hosted version
+3. **Choose backends wisely**:
+   - C backend: Best for debugging, portability, understanding
+   - Assembly backends: Best for performance, platform optimization
+   - IR backend: Experimental, for compiler development
+4. **Bootstrap incrementally** - Load only what you need
+5. **Watch for recursion** - Metacircular systems can have deep call stacks
+
 ## Development Guidelines
 
 ### Key Practices
@@ -115,8 +262,8 @@ A metacircular compiler is a self-hosting compiler written in the language it co
 # Standard build
 make clean && make
 
-# Test bootstrap
-./eval boot.l
+# Generate eval2 with C backend
+make eval2  # Now uses MARU_EMIT_BACKEND=c automatically
 
 # Run tests
 make test

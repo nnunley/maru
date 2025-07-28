@@ -121,10 +121,10 @@
 
 ;;; OPERANDS
 
-(define-operand LABEL	(name)		"L"(mangle-label name))
-(define-operand GI32	(LABEL)		(<LABEL>-name LABEL))
-(define-operand LI32	(value)		value)
-(define-operand TI32	(offset)	(- offset)"(%ebp)")
+(define-operand LABEL	(name)		"L"(mangle-label (<LABEL>-name self)))
+(define-operand GI32	(LABEL)		(<LABEL>-name (<GI32>-LABEL self)))
+(define-operand LI32	(value)		(<LI32>-value self))
+(define-operand TI32	(offset)	(- (<TI32>-offset self))"(%ebp)")
 
 (define temp?	 <TI32>)
 (define temp-offset <TI32>-offset)
@@ -211,7 +211,7 @@
 
 (define-method gen <undefined>	(comp)	(gen comp LOAD (LI32 0)))
 (define-method gen <long>	(comp)	(gen comp LOAD (LI32 self)))
-(define-method gen <string>	(comp)	(gen-definition self (temp-label-name) comp) (gen comp LOAD (GI32 (LABEL name))))
+(define-method gen <string>	(comp)	(let ((name (temp-label-name))) (gen-definition self name comp) (gen comp LOAD (GI32 (LABEL name)))))
 (define-method gen <symbol>	(comp)	(gen comp LOAD (LI32 (data self))))
 (define-method gen <extern>	(comp)	(gen comp LOAD (GI32 (LABEL (concat-symbol self.name '$stub)))))
 

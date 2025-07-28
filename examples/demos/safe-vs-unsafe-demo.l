@@ -1,0 +1,40 @@
+;;; safe-vs-unsafe-demo.l - Demonstrate C generation safety issues
+
+(load "boot.l")
+
+(println "=== C GENERATION SAFETY ANALYSIS ===")
+(println)
+
+(println "UNSAFE APPROACH (what we had before):")
+(println "  (> a b)  =>  ((a > b ? s_true : nil) ? a : b)")
+(println)
+(println "Problems:")
+(println "- Assumes 'a' and 'b' are numeric C values")
+(println "- Direct C comparison on oop types is undefined")
+(println "- Could crash with strings, objects, etc.")
+(println)
+
+(println "SAFE APPROACH (what we should use):")
+(println "  (> a b)  =>  greater_than(a, b)")
+(println)
+(println "Benefits:")
+(println "- Runtime type checking")
+(println "- Proper dispatch for different types")
+(println "- Graceful error handling")
+(println)
+
+(println "RUNTIME FUNCTIONS NEEDED:")
+(println "  oop greater_than(oop a, oop b) {")
+(println "    if (long_p(a) && long_p(b))")
+(println "      return getLong(a) > getLong(b) ? s_true : nil;")
+(println "    if (double_p(a) && double_p(b))")
+(println "      return getDouble(a) > getDouble(b) ? s_true : nil;") 
+(println "    error(\"Cannot compare types\");")
+(println "  }")
+(println)
+
+(println "OPTIMIZATION OPPORTUNITY:")
+(println "In contexts where types are KNOWN to be numeric,")
+(println "we could generate the fast direct comparison.")
+(println "This requires type inference or annotations.")
+(println)

@@ -5,7 +5,7 @@
 
 ;; Set backend after emit.l is loaded
 (set *emit-backend* 'c)
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 ;; Now test compilation
 (compile-begin)

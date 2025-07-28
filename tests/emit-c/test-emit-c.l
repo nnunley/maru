@@ -1,6 +1,6 @@
 ;;; test-emit-c.l - Comprehensive test for the unified emit-c.l backend
 
-(require "emit-c.l")
+(require "core/compiler/emit-c.l")
 
 (println "=== Testing Comprehensive Multimethod C Backend ===")
 (println)

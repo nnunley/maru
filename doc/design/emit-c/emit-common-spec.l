@@ -130,7 +130,7 @@
 (define-function create-backend (type output-port)
   "Factory function to create backend instances"
   (case type
-    (c (require "emit-c.l")
+    (c (require "core/compiler/emit-c.l")
        (new-c-backend output-port))
     (x86 (require "emit-x86.l")
          (new-x86-backend output-port))

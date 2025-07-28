@@ -53,7 +53,7 @@ eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-eval2.c : core/compiler/emit.l core/eval.l eval
+eval2.c : core/compiler/emit.l core/eval.l eval osdefs.k
 	./eval core/compiler/emit.l core/eval.l > eval2.c
 
 eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k

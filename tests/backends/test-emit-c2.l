@@ -3,7 +3,7 @@
 
 ;;; Load emit.l and emit-c.l 
 (load "emit.l")
-(load "emit-c.l")
+(load "core/compiler/emit-c.l")
 
 ;;; Override gen-env to use C backend
 (define-function gen-env (env) (gen-env-c env))
