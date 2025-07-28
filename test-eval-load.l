@@ -1,0 +1,6 @@
+(load "boot.l")
+(println "Boot loaded OK")
+(load "eval.l")  
+(println "Eval loaded OK")
+(println "Generation: " *maru-generation*)
+(println "Version: " *maru-version*)

@@ -876,7 +876,7 @@
                        (set first ())
                      (emit-write ", "))
                    (c-gen-expr arg)))
-               (emit-write ")")))))
+               (emit-write ")"))))
          
          (else
           ;; Debug: show what we don't recognize
@@ -887,7 +887,7 @@
           (emit-write " */"))))
     
     (else
-     (emit-write "nil")))))  ;; Close cond and c-gen-expr function
+     (emit-write "nil"))))))  ;; Close cond and c-gen-expr function
 
 ;; High-level C code generation that translates Lisp operations directly
 (define-method gen-definition <expr> (name ocomp)
