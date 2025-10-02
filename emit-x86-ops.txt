@@ -1,0 +1,53 @@
+define-emit	(ADD TI32)		(
+define-emit	(ADDR GI32)		(
+define-emit	(ADDR TI32)		(
+define-emit	(ALIGN long)		(
+define-emit	(AND TI32)		(
+define-emit	(ASCIZ string)		(print   "	.asciz ") (
+define-emit	(BF LABEL)		(
+define-emit	(BR LABEL)		(
+define-emit	(BT LABEL)		(
+define-emit	(CALL LABEL)		(
+define-emit	(CALL long)		(
+define-emit	(CHR-AT TI32)		(
+define-emit	(COMMENT pair)		(print "## ") (
+define-emit	(DATA)			(
+define-emit	(DEFLABEL LABEL)	(
+define-emit	(DIV TI32)		(
+define-emit	(ENTER long)		(
+define-emit	(EQ TI32)		(
+define-emit	(GE TI32)		(
+define-emit	(GLOBAL LABEL)		(
+define-emit	(GT TI32)		(
+define-emit	(INDIRECT LABEL)	(
+define-emit	(LE TI32)		(
+define-emit	(LEAVE long)		(
+define-emit	(LOAD GI32)		(
+define-emit	(LOAD LABEL)		(
+define-emit	(LOAD LI32)		(
+define-emit	(LOAD TI32)		(
+define-emit	(LONG LABEL)		(
+define-emit	(LONG long)		(
+define-emit	(LT TI32)		(
+define-emit	(MOVE TI32 TI32)	(
+define-emit	(MUL TI32)		(
+define-emit	(NE TI32)		(
+define-emit	(NEG)			(
+define-emit	(NOT)			(
+define-emit	(OOP-AT TI32)		(
+define-emit	(OR TI32)		(
+define-emit	(SECTION string)	(
+define-emit	(SET-CHR-AT TI32 TI32)	(
+define-emit	(SET-OOP-AT TI32 TI32)	(
+define-emit	(SLA TI32)		(
+define-emit	(SRA TI32)		(
+define-emit	(STORE GI32)		(
+define-emit	(STORE TI32)		(
+define-emit	(SUB TI32)		(
+define-emit	(TEXT)			(
+define-emit	(XOR TI32)		(
+define-emit (
+define-emit-param-name (
+define-emit-params (
+define-emit-params (+ index 1) (
+define-emit-params 1 (

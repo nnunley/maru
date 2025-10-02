@@ -1,0 +1,46 @@
+;;; generate-arm64-asm.l -- Direct ARM64 assembly file generation
+
+;; Write ARM64 assembly that returns 42
+(let ((port (open "return42.s" "w")))
+  (if port
+      (let ()
+        (display "\t.section\t__TEXT,__text,regular,pure_instructions\n" port)
+        (display "\t.build_version macos, 11, 0\n" port)
+        (display "\t.globl\t_main\n" port)
+        (display "\t.p2align\t2\n" port)
+        (display "_main:\n" port)
+        (display "\tmov\tw0, #42\n" port)
+        (display "\tret\n" port)
+        (close port)
+        (println "Generated return42.s"))
+    (error "Cannot create return42.s")))
+
+;; Write ARM64 assembly that adds two numbers
+(let ((port (open "add.s" "w")))
+  (if port
+      (let ()
+        (display "\t.section\t__TEXT,__text,regular,pure_instructions\n" port)
+        (display "\t.build_version macos, 11, 0\n" port)
+        (display "\t.globl\t_add\n" port)
+        (display "\t.p2align\t2\n" port)
+        (display "_add:\n" port)
+        (display "\tadd\tw0, w0, w1\n" port)
+        (display "\tret\n" port)
+        (display "\n" port)
+        (display "\t.globl\t_main\n" port)
+        (display "\t.p2align\t2\n" port)
+        (display "_main:\n" port)
+        (display "\tmov\tw0, #5\n" port)
+        (display "\tmov\tw1, #7\n" port)
+        (display "\tbl\t_add\n" port)
+        (display "\tret\n" port)
+        (close port)
+        (println "Generated add.s"))
+    (error "Cannot create add.s")))
+
+(println "\nTo compile:")
+(println "  clang -o return42 return42.s")
+(println "  clang -o add add.s")
+(println "\nTo run:")
+(println "  ./return42 ; echo $?   # Should print 42")
+(println "  ./add ; echo $?        # Should print 12")
