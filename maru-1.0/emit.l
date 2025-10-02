@@ -1,12 +1,9 @@
 #!./eval
 
-(define __MACH__  '(x))	; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
-(define __UNIX__  '( ))	; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
-(define __LINUX__ '( ))	; non-nil for Linux, Cygwin, etc. (external symbols have no underscore prefix)
+;(define __MACH__ ())
+(define __MACH__ 't)
 
-;;;----------------------------------------------------------------
-
-(define __PREFIX__ (if __LINUX__ "" "_"))
+(define __PREFIX__ (if __MACH__ "_" ""))
 
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))

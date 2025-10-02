@@ -73,10 +73,8 @@
 		     (if (pair? l)
 			 (let ((obj (car l)))
 			   (if (and (pair? obj) (= (car obj) 'unquote-splicing))
-			       (if (cdr l)
-				   (list 'concat-list (cadr obj) (qq-list (cdr l)))
-				 (cadr obj))
-			     (list 'cons (qq-object obj) (qq-list (cdr l)))))
+			       (list 'concat-list (cadr obj)      (qq-list (cdr l)))
+			     (list   'cons        (qq-object obj) (qq-list (cdr l)))))
 		       (list 'quote l))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
@@ -127,10 +125,10 @@
       (let ((head (function (car alist) (car blist) a)))
 	(cons head (map2-with function (cdr alist) (cdr blist) a)))))
 
-(define-form define-expand (type args . body)	`(set-array-at *expanders*   ,type (lambda ,args ,@body)))
-(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
-(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
-(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
+(set *expanders*   (array))	(define-form define-expand (type args . body)	`(set-array-at *expanders*   ,type (lambda ,args ,@body)))
+(set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
+(set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
+(set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 
 ;;; let*
 
