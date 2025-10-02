@@ -1,0 +1,10 @@
+include ../../gcc-defaults.mk
+
+libnile.a: nile.o
+	$(AR) rcs $@ $^
+
+nile.o: *.h *.c Makefile.gcc ../../gcc-defaults.mk
+	$(CC) $(CFLAGS) -c nile.c
+
+clean:
+	$(RM) *.o *.a
