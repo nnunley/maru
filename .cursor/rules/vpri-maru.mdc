@@ -1,0 +1,11 @@
+---
+description: When examining Maru. code
+globs: *.l, *.k, *.g
+alwaysApply: false
+---
+
+# Your rule content
+
+- Always look at [boot.l](mdc:boot.l), [boot2.l](mdc:boot2.l), [eval.l](mdc:eval.l), [emit.l](mdc:emit.l) for better context on the language
+- This system uses nested grammars. The bottom-most grammar is an object oriented lisp variant, with multi-methods
+- It is intended to be able to generate its own native code by generating code in a target language (c, assembly)
