@@ -1,0 +1,33 @@
+Maru Contributors
+
+Maru is licensed under the MIT License (see LICENSE). Copyright for the
+2008-2012 work is held by Ian Piumarta, Dan Amelang, and Viewpoints Research
+Institute. Copyright for later work is held by the individual contributors
+listed below.
+
+Original authors (Viewpoints Research Institute, STEPS project)
+
+  Ian Piumarta      Creator of Maru: eval, compiler, GC, PEG tooling,
+                    assemblers. Not a git author here; his snapshots were
+                    imported by Dan Amelang.
+  Dan Amelang       2009-2012. Repository maintainer, Nile/Gezira
+                    integration, JavaScript backends, upstream imports.
+
+Contributors (in order of first commit)
+
+  Kurt Stephens     2011-2013, 2021. Imported upstream Maru releases
+                    (maru-2.1, maru-2.4), OS X port, gensym and anonymous
+                    symbol support, arch.l generation, maruby
+                    (Ruby-flavored message sends).
+  Bret Victor       2012. NileViewer: interactive visualizer for Nile
+                    pipelines (viz/), used in VPRI STEPS demos.
+  Norman Nunley, Jr 2025-present. Multi-method evaluator, cross-compilation
+                    (MARU_TARGET_ARCH), threaded C backend, history
+                    reconstruction, documentation.
+
+Adding yourself
+
+If you contribute to Maru, add your name and the year(s) of your
+contributions to the list above in the same commit as your change. By
+contributing you agree that your contribution is licensed under the MIT
+License in LICENSE.
