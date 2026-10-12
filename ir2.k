@@ -679,6 +679,40 @@
 
 ;
 
+;; C-like pointer arithmetic.  pointer +/- integer advances by whole elements
+;; and pointer - pointer counts elements.  Both are rewritten here into byte
+;; arithmetic on longs, so every backend keeps generating unscaled code.
+;; Elements of size 1 (void, char) need no rewrite.
+
+(define-function ir-element-size (ptype)
+  (let ((size (ir-type-size (<ir-pointer-type>-referent ptype))))
+    (if (< size 1) 1 size)))
+
+;; The new nodes wrap operands that are already type-checked, so they get
+;; their type directly; checking them again would re-resolve those operands.
+(define-function ir-long (insn)
+  (set (<ir-insn>-type insn) IR-LONG)
+  insn)
+
+(define-function ir-as-long (insn)
+  (if (= IR-LONG (<ir-insn>-type insn)) insn (ir-long (ir-cast IR-LONG insn))))
+
+;; Replace the integer operand of pointer +/- integer with index * size.
+(define-function ir-scale-pointer-offset (insn ptype)
+  (let ((index (ir-as-long (cadr (<ir-insn>-operands insn))))
+	(size  (ir-element-size ptype)))
+    (set-car (cdr (<ir-insn>-operands insn))
+	     (if (= 1 size) index (ir-long (ir-mul (list index (ir-lit size IR-LONG))))))))
+
+;; Turn pointer - pointer into ((long)lhs - (long)rhs) / size - 0.
+(define-function ir-scale-pointer-difference (insn ptype)
+  (let ((size (ir-element-size ptype))
+	(opds (<ir-insn>-operands insn)))
+    (or (= 1 size)
+	(let ((bytes (ir-long (ir-sub (list (ir-long (ir-cast IR-LONG (car opds))) (ir-long (ir-cast IR-LONG (cadr opds))))))))
+	  (set-car opds (ir-long (ir-div (list bytes (ir-lit size IR-LONG)))))
+	  (set-car (cdr opds) (ir-lit 0 IR-LONG))))))
+
 (define-class <ir-add> <ir-insn> ())			(define-function ir-add (args) (new <ir-add> () args))
 
 (define-method ir-check-type <ir-add> (ir val?)		(or val? (ir-warning-no-effect ir self))
@@ -689,8 +723,7 @@
 								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
-								 ((and (ir-pointer-type? lht) (=             IR-LONG rht))	lht)
-								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
+								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	(ir-scale-pointer-offset self lht) lht)
 								 (else (error "illegal types in: "self))))))
 
 ;
@@ -705,9 +738,8 @@
 								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
-								 ((and (ir-pointer-type? lht) (=                 lht rht))	IR-LONG)
-								 ((and (ir-pointer-type? lht) (=             IR-LONG rht))	lht)
-								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
+								 ((and (ir-pointer-type? lht) (=                 lht rht))	(ir-scale-pointer-difference self lht) IR-LONG)
+								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	(ir-scale-pointer-offset self lht) lht)
 								 (else (error "illegal types in: "self))))))
 
 ;

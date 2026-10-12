@@ -211,6 +211,17 @@ case_maru_test() {
 	}'
 }
 
+# Awk assertion: the input matches the file named by ref, line by line.  The
+# ir2 cases use it to compare a program with the same computation in C.
+same_as_ref='
+	{ got[NR] = $0 }
+	END {
+	    n = 0
+	    while ((getline line < ref) > 0)
+		if (got[++n] != line) { printf "[%s], C says [%s]\n", got[n], line; exit }
+	    if (NR != n) printf "%d lines, C printed %d\n", NR, n
+	}'
+
 # ir2 must agree with the host C compiler on type sizes and long width;
 # check/ir2-sizes.k prints them through the ir2 C backend, and the same
 # values printed by C are the expected output.
@@ -232,34 +243,57 @@ int main(void) {
 EOF
     run sizes_cc cc -o "$T/sizes" "$T/sizes.c" || { fail ir2_sizes "compiling the C reference: $reason"; return; }
     run sizes "$T/sizes" || { fail ir2_sizes "running the C reference: $reason"; return; }
-    assert ir2_sizes "$T/ir2_sizes.out" -v ref="$T/sizes.out" '
-	{ got[NR] = $0 }
-	END {
-	    n = 0
-	    while ((getline line < ref) > 0)
-		if (got[++n] != line) { printf "[%s], C says [%s]\n", got[n], line; exit }
-	    if (NR != n) printf "%d lines, C printed %d\n", NR, n
-	}'
+    assert ir2_sizes "$T/ir2_sizes.out" -v ref="$T/sizes.out" "$same_as_ref"
 }
 
-# The GC written in Maru must compile through the ir2 C backend.  Running it
-# is an expected failure: ir2 pointer arithmetic is unscaled (byte offsets,
-# see ir-gen-x86.k), but maru-gc.k writes (+ chunk 1) expecting C-style
-# scaling, so each object overlaps its header and the allocator loops.  The
-# run gets 10 seconds; only that hang counts as expected.  Once fixed, the
-# run exits 0 and this case reports an unexpected pass.
+# ir2 pointer arithmetic must scale like C: pointer + n advances n elements,
+# void * advances bytes, and pointer - pointer counts elements.
+case_ir2_pointers() {
+    ir2_build ir2_pointers check/ir2-pointers.k || { fail ir2_pointers "$reason"; return; }
+    run ir2_pointers "$T/ir2_pointers" || { fail ir2_pointers "running: $reason"; return; }
+    cat >"$T/pointers.c" <<'EOF'
+#include <stdio.h>
+#include <stdlib.h>
+struct quad { long a, b, c, d; };
+int main(void) {
+    struct quad *p = malloc(1024);
+    long *q = malloc(1024);
+    printf("quad + 1 %ld\n", (long)(p + 1) - (long)p);
+    printf("quad + 3 %ld\n", (long)(p + 3) - (long)p);
+    printf("quad - 1 %ld\n", (long)p - (long)(p - 1));
+    printf("void + 5 %ld\n", (long)((char *)p + 5) - (long)p);
+    printf("quad diff %ld\n", (long)((p + 3) - p));
+    printf("long + 2 %ld\n", (long)(q + 2) - (long)q);
+    return 0;
+}
+EOF
+    run pointers_cc cc -o "$T/pointers" "$T/pointers.c" || { fail ir2_pointers "compiling the C reference: $reason"; return; }
+    run pointers "$T/pointers" || { fail ir2_pointers "running the C reference: $reason"; return; }
+    assert ir2_pointers "$T/ir2_pointers.out" -v ref="$T/pointers.out" "$same_as_ref"
+}
+
+# The GC written in Maru, compiled through the ir2 C backend.  Its main builds
+# a 256-cell list 10000 times, reporting every 1000 iterations and once more
+# after a final collection with no roots.  Each cell is one allocation.
 case_maru_gc() {
     ir2_build maru_gc maru-gc.k || { fail maru_gc "$reason"; return; }
-    saved=$CHECK_TIMEOUT; CHECK_TIMEOUT=10
-    run maru_gc "$T/maru_gc"; st=$?
-    CHECK_TIMEOUT=$saved
-    if [ $st -eq 0 ]; then
-	fail maru_gc "unexpectedly passed: maru-gc now runs; make it a normal case"
-    elif [ $st -eq 142 ]; then
-	xfail maru_gc "hangs as expected (unscaled pointer arithmetic in maru-gc.k)"
-    else
-	fail maru_gc "expected a hang, got: $reason"
-    fi
+    run maru_gc "$T/maru_gc" || { fail maru_gc "running: $reason"; return; }
+    assert maru_gc "$T/maru_gc.out" -v iterations=10000 -v cells=256 -v every=1000 '
+	# GC: <used> used, <free> free, <n> allocations, <n> collections, <n> live
+	/^GC: / { k++; used[k] = $2; free[k] = $4; allocs[k] = $6; colls[k] = $8; live[k] = $10 }
+	END {
+	    reports = iterations / every + 1
+	    if (k != reports) { printf "%d GC reports, expected %d\n", k, reports; exit }
+	    for (i = 1; i < k; i++)
+		if (allocs[i] != (i - 1) * every * cells) { printf "report %d: %d allocations, expected %d\n", i, allocs[i], (i - 1) * every * cells; exit }
+	    if (allocs[k] != iterations * cells) { printf "final: %d allocations, expected %d\n", allocs[k], iterations * cells; exit }
+	    for (i = 2; i <= k; i++) {
+		if (colls[i] < colls[i - 1]) { printf "collections went down at report %d\n", i; exit }
+		if (used[i] + free[i] != used[2] + free[2]) { printf "heap size changed at report %d: %d, was %d\n", i, used[i] + free[i], used[2] + free[2]; exit }
+	    }
+	    if (colls[k] < 1) { print "no collections happened"; exit }
+	    if (used[k] != 0 || live[k] != 0) printf "final: %d bytes used, %d live, expected 0 and 0\n", used[k], live[k]
+	}'
 }
 
 # Harness self-test, run only when named: a hung command must be cut off.
@@ -273,7 +307,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test ir2_sizes maru_gc
+[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_pointers maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"
