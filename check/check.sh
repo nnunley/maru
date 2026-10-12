@@ -211,18 +211,54 @@ case_maru_test() {
 	}'
 }
 
+# ir2 must agree with the host C compiler on type sizes and long width;
+# check/ir2-sizes.k prints them through the ir2 C backend, and the same
+# values printed by C are the expected output.
+case_ir2_sizes() {
+    ir2_build ir2_sizes check/ir2-sizes.k || { fail ir2_sizes "$reason"; return; }
+    run ir2_sizes "$T/ir2_sizes" || { fail ir2_sizes "running: $reason"; return; }
+    cat >"$T/sizes.c" <<'EOF'
+#include <stdio.h>
+struct il { int i; long l; };
+struct id { int i; double d; };
+int main(void) {
+    printf("long %d\n", (int)sizeof(long));
+    printf("pointer %d\n", (int)sizeof(void *));
+    printf("int+long %d\n", (int)sizeof(struct il));
+    printf("int+double %d\n", (int)sizeof(struct id));
+    printf("long 2^40 %ld\n", (long)1048576 * 1048576);
+    return 0;
+}
+EOF
+    run sizes_cc cc -o "$T/sizes" "$T/sizes.c" || { fail ir2_sizes "compiling the C reference: $reason"; return; }
+    run sizes "$T/sizes" || { fail ir2_sizes "running the C reference: $reason"; return; }
+    assert ir2_sizes "$T/ir2_sizes.out" -v ref="$T/sizes.out" '
+	{ got[NR] = $0 }
+	END {
+	    n = 0
+	    while ((getline line < ref) > 0)
+		if (got[++n] != line) { printf "[%s], C says [%s]\n", got[n], line; exit }
+	    if (NR != n) printf "%d lines, C printed %d\n", NR, n
+	}'
+}
+
 # The GC written in Maru must compile through the ir2 C backend.  Running it
-# is an expected failure on 64-bit hosts: ir2.k assumes 4-byte pointers
-# (pointer-size 4), so the generated GC under-allocates and segfaults.  Once
-# that is fixed, the run exits 0 and this case reports an unexpected pass.
+# is an expected failure: ir2 pointer arithmetic is unscaled (byte offsets,
+# see ir-gen-x86.k), but maru-gc.k writes (+ chunk 1) expecting C-style
+# scaling, so each object overlaps its header and the allocator loops.  The
+# run gets 10 seconds; only that hang counts as expected.  Once fixed, the
+# run exits 0 and this case reports an unexpected pass.
 case_maru_gc() {
     ir2_build maru_gc maru-gc.k || { fail maru_gc "$reason"; return; }
-    if run maru_gc "$T/maru_gc"; then
+    saved=$CHECK_TIMEOUT; CHECK_TIMEOUT=10
+    run maru_gc "$T/maru_gc"; st=$?
+    CHECK_TIMEOUT=$saved
+    if [ $st -eq 0 ]; then
 	fail maru_gc "unexpectedly passed: maru-gc now runs; make it a normal case"
-    elif [ "$rc" -eq 139 ]; then
-	xfail maru_gc "segfaults as expected (ir2.k pointer-size 4 on a 64-bit host)"
+    elif [ $st -eq 142 ]; then
+	xfail maru_gc "hangs as expected (unscaled pointer arithmetic in maru-gc.k)"
     else
-	fail maru_gc "expected a segfault, got: $reason"
+	fail maru_gc "expected a hang, got: $reason"
     fi
 }
 
@@ -237,7 +273,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test maru_gc
+[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test ir2_sizes maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"

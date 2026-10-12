@@ -37,14 +37,15 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 - `maruby`: Ruby arithmetic and method calls.
 - `maru_test`: a program compiled through the ir2 C backend computes primes
   and struct arithmetic.
+- `ir2_sizes`: ir2 agrees with the C compiler on type sizes and `long` width.
 - `maru_gc`: expected failure (XFAIL); see below.
 
 ## Known not to work
 
 - `emit.l` emits 32-bit x86 only, so `make test` (self-compile) can't run on
   arm64.
-- `maru-gc.k` through the ir2 C backend segfaults on 64-bit hosts: `ir2.k`
-  has `pointer-size 4`.
+- `maru-gc.k` hangs: ir2 pointer arithmetic is unscaled (byte offsets), but
+  it writes `(+ chunk 1)` expecting C-style scaling.
 - `test-call.k` fails with `mprotect: Permission denied` on macOS.
 - `test-peg.l` and `test-message.l` don't run via `repl.l`; `make test-peg`
   is unverified.
@@ -54,6 +55,5 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
 ## Roadmap
 
-1. 64-bit `ir2.k` and an `ir-gen-arm64.k` backend beside `ir-gen-c.k` and
-   `ir-gen-x86.k`.
+1. An `ir-gen-arm64.k` backend beside `ir-gen-c.k` and `ir-gen-x86.k`.
 2. Carry over refactor work from `refactor-main` case by case, with tests.
