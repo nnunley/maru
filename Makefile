@@ -39,6 +39,9 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
+check : eval eval2 osdefs.k .force
+	sh check/check.sh
+
 check-maru : eval2
 	./eval2 ir-gen-c.k maru.k maru-nfibs.k
 	./eval2 ir-gen-c.k maru.k maru-gc.k

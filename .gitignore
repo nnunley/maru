@@ -1,0 +1,8 @@
+eval
+eval2
+eval32
+mkosdefs
+osdefs.k
+*.dSYM
+*.o
+.DS_Store
