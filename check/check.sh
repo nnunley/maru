@@ -14,6 +14,7 @@ trap 'rm -rf "$T"' EXIT
 
 passed=0
 failed=0
+xfailed=0
 reason=
 
 # run NAME CMD...: stdout to $T/NAME.out, stderr to $T/NAME.err, stdin empty.
@@ -34,12 +35,15 @@ run() {
     case $rc in
 	0)   reason= ;;
 	142) reason="timed out after ${CHECK_TIMEOUT}s" ;;
-	*)   reason="exit $rc: $(tail -n 1 "$T/$name.err")" ;;
+	*)   if [ $rc -gt 128 ]; then reason="killed by signal $((rc - 128))"; else reason="exit $rc"; fi
+	     err=$(tail -n 1 "$T/$name.err")
+	     [ -z "$err" ] || reason="$reason: $err" ;;
     esac
     return $rc
 }
 
 pass() { echo "PASS $1"; passed=$((passed + 1)); }
+xfail() { echo "XFAIL $1: $2"; xfailed=$((xfailed + 1)); }
 fail() { echo "FAIL $1: $2"; failed=$((failed + 1)); }
 
 # Report an awk assertion script's verdict: it prints nothing on success,
@@ -168,6 +172,48 @@ case_earley() {
 	}' "$T/earley.out")"
 }
 
+# ir2_build NAME FILE.k: compile a Maru program to C with the ir2 C backend,
+# then to $T/NAME with cc.  On failure, $reason names the stage.
+ir2_build() {
+    run "$1_gen" ./eval2 ir-gen-c.k maru.k "$2" || { reason="generating C: $reason"; return 1; }
+    cp "$T/$1_gen.out" "$T/$1.c"
+    run "$1_cc" cc -fno-builtin -w -o "$T/$1" "$T/$1.c" -ldl || { reason="compiling C: $reason"; return 1; }
+}
+
+# The ir2 C backend: maru-test.k's sieve prints the primes below its argument,
+# and its struct code sets x = 42 and y = 666, sums them, then doubles both.
+# The two lines after the primes read uninitialized memory, so they are skipped.
+case_maru_test() {
+    ir2_build maru_test maru-test.k || { fail maru_test "$reason"; return; }
+    run maru_test "$T/maru_test" 32 || { fail maru_test "running: $reason"; return; }
+    verdict maru_test "$(awk -v n=32 -v x=42 -v y=666 '
+	BEGIN {
+	    for (i = 2; i < n; i++) if (!composite[i]) { primes = primes " " i; for (k = i * i; k < n; k += i) composite[k] = 1 }
+	    want[1] = "print-foo: " x " " y
+	    want[2] = "sum is " (x + y)
+	    want[3] = "print-foo: " (2 * x) " " (2 * y)
+	}
+	NR == 1 { got = ""; for (i = 1; i <= NF; i++) got = got " " $i
+		  if (got != primes) { printf "primes [%s], expected [%s]\n", got, primes; bad = 1; exit } }
+	$0 == want[m + 1] { m++ }
+	END {
+	    if (!bad && m < 3) printf "missing \"%s\" (in order)\n", want[m + 1]
+	}' "$T/maru_test.out")"
+}
+
+# The GC written in Maru must compile through the ir2 C backend.  Running it
+# is an expected failure on 64-bit hosts: ir2.k assumes 4-byte pointers
+# (pointer-size 4), so the generated GC under-allocates and segfaults.  Once
+# that is fixed, the run exits 0 and this case reports an unexpected pass.
+case_maru_gc() {
+    ir2_build maru_gc maru-gc.k || { fail maru_gc "$reason"; return; }
+    if run maru_gc "$T/maru_gc"; then
+	fail maru_gc "unexpectedly passed: maru-gc now runs; make it a normal case"
+    else
+	xfail maru_gc "runs and $reason (ir2.k pointer-size 4 on a 64-bit host)"
+    fi
+}
+
 # Harness self-test, run only when named: a hung command must be cut off.
 case_selftest_hang() {
     if run selftest_hang sleep 5; then
@@ -179,9 +225,9 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby
+[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test maru_gc
 for c in "$@"; do
     "case_$c"
 done
-echo "$passed passed, $failed failed"
+echo "$passed passed, $failed failed, $xfailed expected failures"
 [ "$failed" -eq 0 ]
