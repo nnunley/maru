@@ -46,6 +46,8 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
 - `emit.l` emits 32-bit x86 only, so `make test` (self-compile) can't run on
   arm64.
+- ir2 takes type sizes from the host (`osdefs.k`), so cross-compiling isn't
+  supported: `ir-gen-x86.k` (32-bit) gets 8-byte pointers on a 64-bit host.
 - `test-call.k` fails with `mprotect: Permission denied` on macOS.
 - `test-peg.l` and `test-message.l` don't run via `repl.l`; `make test-peg`
   is unverified.
