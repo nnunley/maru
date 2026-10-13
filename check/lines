@@ -1,3 +1,4 @@
 33563 source lines at 1c1597b (Dan Amelang 2012-12-24 on Ian Piumarta 2.4, Kurt Stephens merged; check/ in Maru)
 +15 check.l: this budget check, so no line is added without a reason
 -5575 removed old/, unreferenced files (model.l, print-structure.l, peg-compiler.l, test-message.l, main.c, nfibs.c) and Makefile targets for missing inputs
+-8135 C evaluator excluded from the count: eval.l -> emit -> ir -> native is meant to generate it (+1 check.l comment)
