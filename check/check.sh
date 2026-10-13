@@ -313,7 +313,7 @@ case_ir2_offsets() {
 	echo '  (let (((q long *) (cast (malloc 64) long *)))'
 	for t in "$@"; do
 	    for n in 3 -3; do
-		echo "    (let (((n $t) $n)) (printf \"$t %ld\\n\" (- (cast (+ q n) long) (cast q long))))"
+		echo "    (let (((n $t) $n)) (printf \"$t %ld\\n\" (- (+ q n) q)))"
 	    done
 	done
 	echo '  )'

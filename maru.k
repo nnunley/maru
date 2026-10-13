@@ -8,10 +8,10 @@
 
 (define maru->ir-type-map
   `((void    . ,IR-VOID)
-    (char    . ,IR-CHAR)	    (int8    . ,IR-INT8)
-    (short   . ,IR-SHORT)	    (int16   . ,IR-INT16)
+    (char    . ,(ir-integral-of-size sizeof-char))	    (int8    . ,IR-INT8)
+    (short   . ,(ir-integral-of-size sizeof-short))	    (int16   . ,IR-INT16)
     (int     . ,IR-INT)		    (int32   . ,IR-INT32)
-    (long    . ,IR-LONG)	    (int64   . ,IR-INT64)
+    (long    . ,(ir-integral-of-size sizeof-long))	    (int64   . ,IR-INT64)
     (float   . ,IR-FLOAT)	    (float32 . ,IR-FLOAT32)
     (double  . ,IR-DOUBLE)	    (float64 . ,IR-FLOAT64)
     (struct  .  struct)
