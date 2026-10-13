@@ -33,13 +33,14 @@ sizes by definition.
 
     make check
 
-`check/check.sh` runs each demo and asserts what it computes
-(`sh check/check.sh NAME…` runs selected cases):
+`check/check.l` (untyped Maru, built on boot.l's `unit-test`) runs each demo and
+asserts what it computes; `./eval check/check.l NAME…` runs selected cases.
+Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
+`maru-check.k` is.
 
-- `osdefs_bootstrap`: the checked-in `system.osdefs.c` is current with
-  `system.osdefs` and the grammar, and builds this `osdefs.k` with only `cc`.
-- `osdefs`: `osdefs.k` agrees with the compiler's predefined macros,
-  including the host architecture.
+- `osdefs_bootstrap`: the checked-in `system.osdefs.c` is current and builds
+  this `osdefs.k` with only `cc`.
+- `osdefs`: `osdefs.k` agrees with the compiler's predefined macros.
 - `pepsi`: the Smalltalk-like language's FFT peaks at bins 2 and 6.
 - `recursion`: left-recursive PEG grammars match as expected and build a
   left-associative tree.
@@ -50,15 +51,13 @@ sizes by definition.
 - `maruby`: Ruby arithmetic and method calls.
 - `maru_test`: a program compiled through the ir2 C backend computes primes
   and struct arithmetic.
-- `ir2_sizes`: generated from `osdefs.k`; ir2's sizes, alignment and struct
-  padding match what `osdefs.k` measured.
-- `ir2_offsets`: a pointer plus an integer of any width moves that many bytes.
+- `ir2` (`check/ir2.k`): sizes, alignment and struct padding match `osdefs.k`;
+  pointer offsets of any integer width move by bytes at full pointer width.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
-  ir2 pointer arithmetic is unscaled (bytes), as it specifies.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
-- `maru_gc_coalesce`: its allocator merges adjacent free chunks, as `eval.l`'s
-  does.
+- `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
+  and merges adjacent free chunks.
 
 ## Known not to work (verified on arm64 macOS)
 
