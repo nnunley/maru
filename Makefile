@@ -237,12 +237,13 @@ osdefs.g.l : osdefs.g tpeg.l
 	mv $@.new $@
 
 # Each X.osdefs lists what to measure about a platform, and X.osdefs.c is the
-# C program, generated from it, that measures it.  The .c files are checked in
-# so a fresh checkout needs only a C compiler.  They are regenerated whenever
-# their .osdefs, the osdefs grammar or its compiler changes; commit the result.
-# The grammar tools are built only when a .c actually needs regenerating, and
-# .PRECIOUS keeps make from deleting a .c it generated as an intermediate.
-.PRECIOUS : %.osdefs.c
+# C program, generated from it, that measures it.  system.osdefs.c is checked in
+# so a fresh checkout needs only a C compiler.  It is regenerated whenever
+# system.osdefs, the osdefs grammar or its compiler changes; commit the result.
+# The grammar tools are built only when a .c actually needs regenerating.
+# system.osdefs.c is the bootstrap: make must never delete it, even after
+# regenerating it; other generated .c files are intermediates.
+.PRECIOUS : system.osdefs.c
 %.osdefs.c : %.osdefs osdefs.g compile-osdefs.l
 	$(MAKE) eval osdefs.g.l
 	./eval compile-osdefs.l $< > $@.new

@@ -242,6 +242,21 @@ case_osdefs() {
 	}'
 }
 
+# The bootstrap: system.osdefs.c is checked in so a fresh checkout can build
+# osdefs.k with only a C compiler.  It must be current (regenerating it from
+# system.osdefs with the current grammar reproduces it exactly), and compiling
+# and running it alone must produce the osdefs.k everything else uses.
+case_osdefs_bootstrap() {
+    run osdefs_grammar make -s osdefs.g.l || { fail osdefs_bootstrap "building osdefs.g.l: $reason"; return; }
+    run osdefs_regen ./eval compile-osdefs.l system.osdefs || { fail osdefs_bootstrap "regenerating: $reason"; return; }
+    cmp -s "$T/osdefs_regen.out" system.osdefs.c ||
+	{ fail osdefs_bootstrap "system.osdefs.c is stale; run make system.osdefs.c and commit it"; return; }
+    run osdefs_cc cc -o "$T/osdefs-bootstrap" system.osdefs.c || { fail osdefs_bootstrap "compiling system.osdefs.c: $reason"; return; }
+    run osdefs_run "$T/osdefs-bootstrap" || { fail osdefs_bootstrap "running system.osdefs.c: $reason"; return; }
+    if cmp -s "$T/osdefs_run.out" osdefs.k; then pass osdefs_bootstrap
+    else fail osdefs_bootstrap "system.osdefs.c produces a different osdefs.k; rebuild with make osdefs.k"; fi
+}
+
 # ir2 must lay out every C type exactly as osdefs.k measured it.  For each
 # type osdefs.k describes, generate a Maru program printing sizeof T,
 # sizeof struct { char c; T x; } (padding before x exposes T's alignment) and
@@ -357,7 +372,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_offsets maru_check maru_gc
+[ $# -gt 0 ] || set -- osdefs_bootstrap osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_offsets maru_check maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"
