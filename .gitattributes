@@ -1,0 +1,6 @@
+# Derived from other sources in this tree; excluded from the line budget (check/lines).
+[attr]derived linguist-generated
+peg.l            derived
+asm-x86.k        derived
+*.osdefs.k       derived
+system.osdefs.c  derived

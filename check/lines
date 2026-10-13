@@ -2,3 +2,5 @@
 +15 check.l: this budget check, so no line is added without a reason
 -5575 removed old/, unreferenced files (model.l, print-structure.l, peg-compiler.l, test-message.l, main.c, nfibs.c) and Makefile targets for missing inputs
 -8135 C evaluator excluded from the count: eval.l -> emit -> ir -> native is meant to generate it (+1 check.l comment)
+-793 derived code marked derived in .gitattributes and excluded: peg.l, asm-x86.k, net/*.osdefs.k (+1 check.l comment)
++8135 C evaluator counts again until emit generates it (reverses the -8135 entry; -1 check.l comment)
