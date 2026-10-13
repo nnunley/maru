@@ -39,7 +39,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k .force
+check : eval eval2 osdefs.k asm-x86.k .force
 	./eval check/check.l
 
 maru-check : eval2 .force
@@ -155,7 +155,7 @@ tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval
 	diff tpeg.ls tpeg.lls
 	rm tpeg.ls tpeg.ll tpeg.lls
 
-test-mach-o : eval32 .force
+test-mach-o : eval32 asm-x86.k .force
 	./eval32 test-mach-o.l
 	@echo
 	size a.out
@@ -163,7 +163,7 @@ test-mach-o : eval32 .force
 	@echo
 	./a.out
 
-test-elf : eval32 .force
+test-elf : eval32 asm-x86.k .force
 	./eval32 test-elf.l
 	@echo
 	size a.out
@@ -171,7 +171,7 @@ test-elf : eval32 .force
 	@echo
 	./a.out
 
-test-assembler : eval32 .force
+test-assembler : eval32 asm-x86.k .force
 	./eval32 assembler.k
 
 test-recursion2 :
@@ -194,6 +194,10 @@ cpp.g.l : cpp.g tpeg.l
 
 test-cpp : eval cpp.g.l .force
 	./eval compile-cpp.l cpp-small-test.c
+
+asm-x86.k : gen-asm-x86.k asm-common.k | eval
+	./eval repl.l gen-asm-x86.k > $@.new
+	mv $@.new $@
 
 osdefs.g.l : osdefs.g tpeg.l | eval
 	./eval compile-tpeg.l $< > $@.new
@@ -241,7 +245,7 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
+	rm -f irl.g.l irgol.g.l osdefs.k asm-x86.k test.c tpeg.l a.out
 	rm -f *~ *.o eval eval32 eval2 gceval test *.s *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark

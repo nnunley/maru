@@ -51,6 +51,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `maruby`: Ruby arithmetic and method calls.
 - `maru_test`: a program compiled through the ir2 C backend computes primes
   and struct arithmetic.
+- `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
+  `gen-asm-x86.k` (lightning's encoding macros, read by a grammar) encodes as
+  `clang -target i386` does. Change the spec, never `asm-x86.k`.
 - `ir2` (`check/ir2.k`): sizes, alignment and struct padding match `osdefs.k`;
   pointer offsets of any integer width move by bytes at full pointer width.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
