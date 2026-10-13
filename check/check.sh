@@ -284,6 +284,37 @@ case_ir2_sizes() {
 	}'
 }
 
+# ir2 pointer arithmetic is unscaled (maru-check.k): adding an integer of any
+# width to a pointer moves it by that many bytes.  A long * base would show
+# C-style scaling as 8x; each offset is tried as +3 and -3.
+case_ir2_offsets() {
+    set -- char short int long int32 int64
+    {
+	echo '(define (printf (int char * ...) *) (extern printf))'
+	echo '(define (malloc (void * long) *) (extern malloc))'
+	echo '(define-function main int ((argc int) (argv char * *))'
+	echo '  (let (((q long *) (cast (malloc 64) long *)))'
+	for t in "$@"; do
+	    for n in 3 -3; do
+		echo "    (let (((n $t) $n)) (printf \"$t %ld\\n\" (- (cast (+ q n) long) (cast q long))))"
+	    done
+	done
+	echo '  )'
+	echo '  (return 0))'
+    } >"$T/ir2-offsets.k"
+    for t in "$@"; do echo "$t 3"; echo "$t -3"; done >"$T/ir2-offsets.expected"
+    ir2_build ir2_offsets "$T/ir2-offsets.k" || { fail ir2_offsets "$reason"; return; }
+    run ir2_offsets "$T/ir2_offsets" || { fail ir2_offsets "running: $reason"; return; }
+    assert ir2_offsets "$T/ir2_offsets.out" -v expected="$T/ir2-offsets.expected" '
+	{ got[NR] = $0 }
+	END {
+	    n = 0
+	    while ((getline line < expected) > 0)
+		if (got[++n] != line) { printf "[%s], expected [%s] bytes\n", got[n], line; exit }
+	    if (NR != n) printf "%d lines, expected %d\n", NR, n
+	}'
+}
+
 # Upstream's own test of the ir2 language: maru-check.k asserts as it goes
 # (aborting on the first failure) and prints one "... ok" line per section.
 case_maru_check() {
@@ -326,7 +357,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes maru_check maru_gc
+[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_offsets maru_check maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"

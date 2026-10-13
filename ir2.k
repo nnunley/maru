@@ -695,16 +695,8 @@
 ;
 
 ;; ir2 pointer arithmetic is unscaled, as maru-check.k specifies: pointer +/-
-;; integer moves by bytes and pointer - pointer counts bytes.  An integer
-;; offset of any width is widened to a pointer-sized integer.  The cast wraps
-;; an operand that is already type-checked, so it gets its type directly.
-(define-function ir-widen-pointer-offset (insn)
-  (let* ((opds   (<ir-insn>-operands insn))
-	 (offset (cadr opds)))
-    (or (= IR-INTPTR (<ir-insn>-type offset))
-	(let ((cast (ir-cast IR-INTPTR offset)))
-	  (set (<ir-insn>-type cast) IR-INTPTR)
-	  (set-car (cdr opds) cast)))))
+;; integer moves by that many bytes, whatever the integer's width, and
+;; pointer - pointer counts bytes.
 
 (define-class <ir-add> <ir-insn> ())			(define-function ir-add (args) (new <ir-add> () args))
 
@@ -716,7 +708,7 @@
 								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
-								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	(ir-widen-pointer-offset self) lht)
+								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	lht)
 								 (else (error "illegal types in: "self))))))
 
 ;
@@ -732,7 +724,7 @@
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
 								 ((and (ir-pointer-type? lht) (=                 lht rht))	IR-INTPTR)
-								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	(ir-widen-pointer-offset self) lht)
+								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	lht)
 								 (else (error "illegal types in: "self))))))
 
 ;

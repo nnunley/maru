@@ -47,6 +47,7 @@ way. ir2 takes every type size and alignment from `osdefs.k`.
   and struct arithmetic.
 - `ir2_sizes`: generated from `osdefs.k`; ir2's sizes, alignment and struct
   padding match what `osdefs.k` measured.
+- `ir2_offsets`: a pointer plus an integer of any width moves that many bytes.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
   ir2 pointer arithmetic is unscaled (bytes), as it specifies.
 - `maru_gc`: expected failure (XFAIL); see below.
