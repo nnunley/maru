@@ -42,47 +42,10 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 check : eval eval2 osdefs.k .force
 	./eval check/check.l
 
-check-maru : eval2
-	./eval2 ir-gen-c.k maru.k maru-nfibs.k
-	./eval2 ir-gen-c.k maru.k maru-gc.k
-	./eval2 ir-gen-c.k maru.k maru-test.k
-
-check-marux : eval2
-	./eval2 ir-gen-x86.k maru.k maru-nfibs.k
-	./eval2 ir-gen-x86.k maru.k maru-gc.k
-	./eval2 ir-gen-x86.k maru.k maru-test.k
-
-test-maru : eval2
-	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-
-test2-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
-
-test3-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
-
 maru-check : eval2 .force
 	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
 	cc -m32 -o maru-check maru-check.s
 	./maru-check
-
-maru-check-c : eval2 .force
-	./eval2 ir-gen-c.k maru.k maru-check.k > maru-check.c
-	cc -o maru-check maru-check.c -ldl
-	./maru-check
-
-maru-bench : eval2 .force
-##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
-	cc -O2 -fomit-frame-pointer -o nfibs nfibs.c
-	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
-##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
-	cc -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
-	time ./nfibs 38
-	time ./nfibs 38
-	time ./maru-nfibs 38
-	time ./maru-nfibs 38
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
@@ -279,26 +242,11 @@ stats : .force
 
 clean : .force
 	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
-	rm -f *~ *.o main eval eval32 eval2 gceval test *.s *.exe *.$(SO)
+	rm -f *~ *.o eval eval32 eval2 gceval test *.s *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
 	rm -rf osdefs.g.l *.osdefs.k
 
 #----------------------------------------------------------------
-
-FILES = Makefile \
-	wcs.c buffer.c chartab.h eval.c gc.c gc.h \
-	boot.l emit.l eval.l test-emit.l \
-	parser.l peg-compile.l peg-compile-2.l peg-boot.l peg.l test-peg.l test-repl.l \
-	repl.l repl-2.l mpl.l sim.l \
-	peg.g
-
-DIST = maru-$(NOW)
-DEST = ckpt/$(DIST)
-
-dist : .force
-	mkdir -p $(DEST)
-	cp -p $(FILES) $(DEST)/.
-	$(SHELL) -ec "cd ckpt; tar cvfz $(DIST).tar.gz $(DIST)"
 
 .force :

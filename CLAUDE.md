@@ -58,6 +58,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
   and merges adjacent free chunks.
+- `lines`: the source line count equals the sum of `check/lines`. Any change
+  in line count needs an entry there with its delta, and an entry that adds
+  lines must say why. The budget is VPRI's 10k lines; prefer a DSL or grammar
+  (as `gen-asm-x86.k` generates the x86 assembler) over writing code out.
 
 ## Known not to work (verified on arm64 macOS)
 
@@ -72,12 +76,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
   on a 64-bit host, which is wrong for its 32-bit target.
 - `test-peg.l` loops forever on every platform: `peg.l`'s `definitions` rule
-  matches empty input, so the parser never advances. `test-message.l` and
-  `compile-irgol.l` no longer match the current `boot.l` and `ir.k`.
+  matches empty input, so the parser never advances. `compile-irgol.l` no
+  longer matches the current `ir.k`.
 - `make test-emit` runs `emit.l` as a shell script; use
   `./eval emit.l test-emit.l`.
-- `check-maru` and related targets need `maru-nfibs.k`, deleted in the 2.4
-  release (`git show e8c5e69:maru-nfibs.k`).
 - `net/*.osdefs` are Linux-only (`linux/tcp.h`, `linux/if_tun.h`).
 - `maruby.l` is an early start on Ruby: `1 < 2` yields `t`; there's no
   `nil`, `true`, `false`, strings or arrays; variables can't be read in
