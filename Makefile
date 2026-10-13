@@ -182,7 +182,7 @@ test-ir : eval .force
 	@echo
 	./test
 
-tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
+tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval
 	$(TIME) ./eval compile-peg.l  tpeg.g > tpeg.l.new
 	-test -f tpeg.l && cp tpeg.l tpeg.l.$(NOW)
 	mv tpeg.l.new tpeg.l
@@ -232,7 +232,7 @@ cpp.g.l : cpp.g tpeg.l
 test-cpp : eval cpp.g.l .force
 	./eval compile-cpp.l cpp-small-test.c
 
-osdefs.g.l : osdefs.g tpeg.l
+osdefs.g.l : osdefs.g tpeg.l | eval
 	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
@@ -242,7 +242,7 @@ osdefs.g.l : osdefs.g tpeg.l
 # system.osdefs, the osdefs grammar or its compiler changes; commit the result.
 # The grammar tools are built only when a .c actually needs regenerating.
 %.osdefs.c : %.osdefs osdefs.g compile-osdefs.l
-	$(MAKE) eval osdefs.g.l
+	$(MAKE) osdefs.g.l
 	./eval compile-osdefs.l $< > $@.new
 	mv $@.new $@
 
