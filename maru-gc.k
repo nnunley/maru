@@ -81,7 +81,7 @@
     (set (. gc_memory_last next) brk)))
 
 (define-function gc_size long ((obj void *))
-  (return (. (- (cast obj struct <header> *) 1) size)))
+  (return (. (- (cast obj struct <header> *) (sizeof struct <header>)) size)))
 
 (define-function gc_sweep void ()
   (debug (printf "sweep\n"))
@@ -111,7 +111,7 @@
 (define-function gc_mark_and_trace void ((obj void *))
   (and obj
        (not (& 1 (cast obj long)))
-       (let* ((ptr   (- (cast obj struct <header> *) 1))
+       (let* ((ptr   (- (cast obj struct <header> *) (sizeof struct <header>)))
 	      (flags (. ptr flags)))
 	 (debug (printf "mark and trace %p flags %d\n" obj flags))
 	 (safe (or (& <header>-flags-used flags) (fatal "attempt to mark dead object")))
@@ -151,7 +151,7 @@
 	  (if (= 0 (. chunk flags))
 	      (let ((csize (. chunk size)))
 		(while (and (= 0 (. (. chunk next) flags))
-			    (= (. chunk next) (+ chunk 1)))
+			    (= (. chunk next) (+ chunk (sizeof struct <header>))))
 		  (let ((next (. chunk next)))
 		    (set (. chunk next) (. next next))
 		    (set csize (set (. chunk size) (+ csize (+ (sizeof struct <header>) (. next size)))))
@@ -171,7 +171,7 @@
 		      (set (. chunk flags) <header>-flags-used)
 		      (set gc_memory_last chunk)
 		      (debug (printf "alloc chunk %p\n" chunk))
-		      (let ((obj (+ chunk 1)))
+		      (let ((obj (+ chunk (sizeof struct <header>))))
 			(memset obj (cast 0 int) csize)
 			(set gc_alloc_count (+ gc_alloc_count 1))
 			(set gc_allocation_count (+ gc_allocation_count 1))
@@ -182,7 +182,7 @@
 
 (define-function gc_malloc_atomic (void *) ((size long))
   (let ((obj (gc_malloc size)))
-    (set (. (- (cast obj struct <header> *) 1) flags) <header>-flags-used+atom)
+    (set (. (- (cast obj struct <header> *) (sizeof struct <header>)) flags) <header>-flags-used+atom)
     (return obj)))
 
 ;;; ----------------------------------------------------------------

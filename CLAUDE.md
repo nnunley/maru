@@ -53,7 +53,8 @@ ir2 takes every type size and alignment from `osdefs.k`.
 - `ir2_offsets`: a pointer plus an integer of any width moves that many bytes.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
   ir2 pointer arithmetic is unscaled (bytes), as it specifies.
-- `maru_gc`: expected failure (XFAIL); see below.
+- `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
+  frees everything.
 
 ## Known not to work (verified on arm64 macOS)
 
@@ -66,8 +67,6 @@ ir2 takes every type size and alignment from `osdefs.k`.
 - `eval2.c` was hand-edited upstream; nothing here regenerates it.
 - Cross-compiling: ir2 sizes follow the host's `osdefs.k`, so `ir-gen-x86.k`
   gets 8-byte pointers on a 64-bit host.
-- `maru-gc.k` hangs: it writes `(+ chunk 1)` expecting C-style scaled pointer
-  arithmetic, which ir2 doesn't do.
 - `test-peg.l` loops forever on every platform: `peg.l`'s `definitions` rule
   matches empty input, so the parser never advances. `test-message.l` and
   `compile-irgol.l` no longer match the current `boot.l` and `ir.k`.

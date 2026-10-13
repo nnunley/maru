@@ -341,24 +341,28 @@ case_maru_check() {
 	END { if (m < n) printf "missing \"%s ok\" (in order)\n", want[m + 1] }'
 }
 
-# The GC written in Maru must compile through the ir2 C backend.  Running it
-# is an expected failure: ir2 pointer arithmetic is unscaled, as maru-check.k
-# specifies, but maru-gc.k writes (+ chunk 1) expecting C-style scaling, so
-# each object overlaps its header and the allocator loops.  The run gets 10
-# seconds and only that hang counts as expected; an exit 0 is reported as an
-# unexpected pass.
+# The GC written in Maru, compiled through the ir2 C backend.  Its main builds
+# a 256-cell list 10000 times, reporting every 1000 iterations and once more
+# after a final collection with no roots.  Each cell is one allocation.
 case_maru_gc() {
     ir2_build maru_gc maru-gc.k || { fail maru_gc "$reason"; return; }
-    saved=$CHECK_TIMEOUT; CHECK_TIMEOUT=10
-    run maru_gc "$T/maru_gc"; st=$?
-    CHECK_TIMEOUT=$saved
-    if [ $st -eq 0 ]; then
-	fail maru_gc "unexpectedly passed: maru-gc now runs; make it a normal case"
-    elif [ $st -eq 142 ]; then
-	xfail maru_gc "hangs as expected (maru-gc.k assumes scaled pointer arithmetic)"
-    else
-	fail maru_gc "expected a hang, got: $reason"
-    fi
+    run maru_gc "$T/maru_gc" || { fail maru_gc "running: $reason"; return; }
+    assert maru_gc "$T/maru_gc.out" -v iterations=10000 -v cells=256 -v every=1000 '
+	# GC: <used> used, <free> free, <n> allocations, <n> collections, <n> live
+	/^GC: / { k++; used[k] = $2; free[k] = $4; allocs[k] = $6; colls[k] = $8; live[k] = $10 }
+	END {
+	    reports = iterations / every + 1
+	    if (k != reports) { printf "%d GC reports, expected %d\n", k, reports; exit }
+	    for (i = 1; i < k; i++)
+		if (allocs[i] != (i - 1) * every * cells) { printf "report %d: %d allocations, expected %d\n", i, allocs[i], (i - 1) * every * cells; exit }
+	    if (allocs[k] != iterations * cells) { printf "final: %d allocations, expected %d\n", allocs[k], iterations * cells; exit }
+	    for (i = 2; i <= k; i++) {
+		if (colls[i] < colls[i - 1]) { printf "collections went down at report %d\n", i; exit }
+		if (used[i] + free[i] != used[2] + free[2]) { printf "heap size changed at report %d: %d, was %d\n", i, used[i] + free[i], used[2] + free[2]; exit }
+	    }
+	    if (colls[k] < 1) { print "no collections happened"; exit }
+	    if (used[k] != 0 || live[k] != 0) printf "final: %d bytes used, %d live, expected 0 and 0\n", used[k], live[k]
+	}'
 }
 
 # Harness self-test, run only when named: a hung command must be cut off.
