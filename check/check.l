@@ -199,4 +199,19 @@
 			    (concat-strings tmp "/gc.k"))
     (unit-assert (equal (last (run "gc" (ir2-build "gc" (concat-strings tmp "/gc.k")))) "gc ok"))))
 
+;;; ---------------------------------------------------------------- budget
+
+;; Every source line is accounted for: the count must equal the sum of the
+;; entries in check/lines, and each entry that adds lines must say why.
+(check "lines"
+  (let ((n (string->long (car (words (car (run "count" "git ls-files -co --exclude-standard | grep -E \"[.](l|k|g|c|h|osdefs|irl|irgol|dc)$|Makefile$\" | grep -vx system.osdefs.c | xargs cat | wc -l"))))))
+	(sum 0))
+    (list-do entry (lines (contents-of-file-named "check/lines"))
+      (let ((w (words entry)))
+	(when w
+	  (set sum (+ sum (string->long (car w))))
+	  (or (cdr w) (< (string->long (car w)) 0) (error "FAIL lines: no reason given for: " entry)))))
+    (or (= n sum) (error "FAIL lines: " n " source lines, but check/lines accounts for " sum
+			 "; add an entry for " (- n sum) " saying why"))))
+
 (println "all checks passed")
