@@ -303,7 +303,8 @@ case_ir2_sizes() {
 
 # ir2 pointer arithmetic is unscaled (maru-check.k): adding an integer of any
 # width to a pointer moves it by that many bytes.  A long * base would show
-# C-style scaling as 8x; each offset is tried as +3 and -3.
+# C-style scaling as 8x; each offset is tried as +3 and -3.  An offset of 2^33
+# checks that a pointer difference keeps the pointers' full width.
 case_ir2_offsets() {
     set -- char short int long int32 int64
     {
@@ -316,10 +317,11 @@ case_ir2_offsets() {
 		echo "    (let (((n $t) $n)) (printf \"$t %ld\\n\" (- (+ q n) q)))"
 	    done
 	done
+	echo '    (let (((n int64) 8589934592)) (printf "wide %d\n" (= (- (+ q n) q) n)))'
 	echo '  )'
 	echo '  (return 0))'
     } >"$T/ir2-offsets.k"
-    for t in "$@"; do echo "$t 3"; echo "$t -3"; done >"$T/ir2-offsets.expected"
+{     for t in "$@"; do echo "$t 3"; echo "$t -3"; done; echo "wide 1"; } >"$T/ir2-offsets.expected"
     ir2_build ir2_offsets "$T/ir2-offsets.k" || { fail ir2_offsets "$reason"; return; }
     run ir2_offsets "$T/ir2_offsets" || { fail ir2_offsets "running: $reason"; return; }
     assert ir2_offsets "$T/ir2_offsets.out" -v expected="$T/ir2-offsets.expected" '

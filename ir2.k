@@ -59,7 +59,7 @@
     (else	(error "no floating type of size "size))))
 
 (define IR-INT		(ir-integral-of-size sizeof-int))
-(define IR-LONG		(ir-integral-of-size sizeof-pointer))	;; the integer as wide as a pointer (doc/ir.html), not C long
+(define IR-LONG		(ir-integral-of-size sizeof-long))	;; C long; pointer width is the pointer type's own
 (define IR-FLOAT	(ir-floating-of-size sizeof-float))
 (define IR-DOUBLE	(ir-floating-of-size sizeof-double))
 
@@ -720,7 +720,7 @@
 								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
-								 ((and (ir-pointer-type? lht) (=                 lht rht))	IR-LONG)
+								 ((and (ir-pointer-type? lht) (=                 lht rht))	(ir-integral-of-size (<ir-type>-size lht)))
 								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	lht)
 								 (else (error "illegal types in: "self))))))
 
