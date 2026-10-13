@@ -258,8 +258,7 @@ case_osdefs_bootstrap() {
 # ir2 must lay out every C type exactly as osdefs.k measured it.  For each
 # type osdefs.k describes, generate a Maru program printing sizeof T,
 # sizeof struct { char c; T x; } (padding before x exposes T's alignment) and
-# sizeof struct { T x; char c; } (tail padding keeps arrays aligned; read
-# through the sizeof-<name> constant define-struct generates), and
+# sizeof struct { T x; char c; } (tail padding keeps arrays aligned), and
 # derive the expected values from sizeof-T and alignof-T.
 case_ir2_sizes() {
     set -- char:char short:short int:int long:long int32:int32 int64:int64 \
@@ -270,8 +269,8 @@ case_ir2_sizes() {
 	i=0; for t in "$@"; do i=$((i + 1)); echo "(define-struct <tailed-$i> ((x ${t%%:*}) (c char)))"; done
 	echo '(define-function main int ((argc int) (argv char * *))'
 	echo '  (define-struct <in-body> ((c char) (x long)))'
-	echo '  (printf "in-body %d\n" sizeof-<in-body>)'
-	i=0; for t in "$@"; do i=$((i + 1)); echo "  (printf \"${t##*:} %d %d %d\\n\" (sizeof ${t%%:*}) (sizeof struct <padded-$i>) sizeof-<tailed-$i>)"; done
+	echo '  (printf "in-body %d\n" (sizeof struct <in-body>))'
+	i=0; for t in "$@"; do i=$((i + 1)); echo "  (printf \"${t##*:} %d %d %d\\n\" (sizeof ${t%%:*}) (sizeof struct <padded-$i>) (sizeof struct <tailed-$i>))"; done
 	echo '  (return 0))'
     } >"$T/ir2-sizes.k"
     for t in "$@"; do echo "${t##*:}"; done >"$T/ir2-sizes.types"

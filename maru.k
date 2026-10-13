@@ -271,13 +271,8 @@
 
 (define-form extern (name . type)	`(new <extern> ',name ',type))
 
-;; Also defines sizeof-<name>, in the sizeof-X naming osdefs.k and define-data
-;; use.  It expands to (sizeof struct <name>), since ir2 knows a struct's size
-;; only once it has laid the struct out.  It is defined while expanding, so
-;; define-struct still works anywhere a statement does.
 (define-form define-struct (name members)
   (array-append *maru-structs* (cons name members))
-  (eval `(define-constant ,(concat-symbol 'sizeof- name) (sizeof struct ,name)))
   ())
 
 (define-form export names
