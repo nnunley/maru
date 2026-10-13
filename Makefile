@@ -241,9 +241,6 @@ osdefs.g.l : osdefs.g tpeg.l
 # so a fresh checkout needs only a C compiler.  It is regenerated whenever
 # system.osdefs, the osdefs grammar or its compiler changes; commit the result.
 # The grammar tools are built only when a .c actually needs regenerating.
-# system.osdefs.c is the bootstrap: make must never delete it, even after
-# regenerating it; other generated .c files are intermediates.
-.PRECIOUS : system.osdefs.c
 %.osdefs.c : %.osdefs osdefs.g compile-osdefs.l
 	$(MAKE) eval osdefs.g.l
 	./eval compile-osdefs.l $< > $@.new
