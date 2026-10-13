@@ -240,7 +240,11 @@ osdefs.g.l : osdefs.g tpeg.l
 # C program, generated from it, that measures it.  The .c files are checked in
 # so a fresh checkout needs only a C compiler.  They are regenerated whenever
 # their .osdefs, the osdefs grammar or its compiler changes; commit the result.
-%.osdefs.c : %.osdefs osdefs.g compile-osdefs.l | eval osdefs.g.l
+# The grammar tools are built only when a .c actually needs regenerating, and
+# .PRECIOUS keeps make from deleting a .c it generated as an intermediate.
+.PRECIOUS : %.osdefs.c
+%.osdefs.c : %.osdefs osdefs.g compile-osdefs.l
+	$(MAKE) eval osdefs.g.l
 	./eval compile-osdefs.l $< > $@.new
 	mv $@.new $@
 
