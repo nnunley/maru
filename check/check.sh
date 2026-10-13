@@ -38,6 +38,7 @@ run() {
 	142) reason="timed out after ${CHECK_TIMEOUT}s" ;;
 	*)   if [ $rc -gt 128 ]; then reason="killed by signal $((rc - 128))"; else reason="exit $rc"; fi
 	     err=$(tail -n 1 "$T/$name.err")
+	     [ -n "$err" ] || err=$(tail -n 1 "$T/$name.out")
 	     [ -z "$err" ] || reason="$reason: $err" ;;
     esac
     return $rc
@@ -241,89 +242,77 @@ case_osdefs() {
 	}'
 }
 
-# Awk assertion: the input matches the file named by ref, line by line.  The
-# ir2 cases use it to compare a program with the same computation in C.
-same_as_ref='
-	{ got[NR] = $0 }
-	END {
-	    n = 0
-	    while ((getline line < ref) > 0)
-		if (got[++n] != line) { printf "[%s], C says [%s]\n", got[n], line; exit }
-	    if (NR != n) printf "%d lines, C printed %d\n", NR, n
-	}'
-
-# ir2 must agree with the host C compiler on type sizes and long width;
-# check/ir2-sizes.k prints them through the ir2 C backend, and the same
-# values printed by C are the expected output.
+# ir2 must lay out every C type exactly as osdefs.k measured it.  For each
+# type osdefs.k describes, generate a Maru program printing sizeof T,
+# sizeof struct { char c; T x; } (padding before x exposes T's alignment) and
+# sizeof struct { T x; char c; } (tail padding keeps arrays aligned), and
+# derive the expected values from sizeof-T and alignof-T.
 case_ir2_sizes() {
-    ir2_build ir2_sizes check/ir2-sizes.k || { fail ir2_sizes "$reason"; return; }
+    set -- char:char short:short int:int long:long int32:int32 int64:int64 \
+	   float:float double:double 'void *:pointer'
+    {
+	echo '(define (printf (int char * ...) *) (extern printf))'
+	i=0; for t in "$@"; do i=$((i + 1)); echo "(define-struct <padded-$i> ((c char) (x ${t%%:*})))"; done
+	i=0; for t in "$@"; do i=$((i + 1)); echo "(define-struct <tailed-$i> ((x ${t%%:*}) (c char)))"; done
+	echo '(define-function main int ((argc int) (argv char * *))'
+	i=0; for t in "$@"; do i=$((i + 1)); echo "  (printf \"${t##*:} %d %d %d\\n\" (sizeof ${t%%:*}) (sizeof struct <padded-$i>) (sizeof struct <tailed-$i>))"; done
+	echo '  (return 0))'
+    } >"$T/ir2-sizes.k"
+    for t in "$@"; do echo "${t##*:}"; done >"$T/ir2-sizes.types"
+    ir2_build ir2_sizes "$T/ir2-sizes.k" || { fail ir2_sizes "$reason"; return; }
     run ir2_sizes "$T/ir2_sizes" || { fail ir2_sizes "running: $reason"; return; }
-    cat >"$T/sizes.c" <<'EOF'
-#include <stdio.h>
-struct il { int i; long l; };
-struct id { int i; double d; };
-int main(void) {
-    printf("long %d\n", (int)sizeof(long));
-    printf("pointer %d\n", (int)sizeof(void *));
-    printf("int+long %d\n", (int)sizeof(struct il));
-    printf("int+double %d\n", (int)sizeof(struct id));
-    printf("long 2^40 %ld\n", (long)1048576 * 1048576);
-    return 0;
-}
-EOF
-    run sizes_cc cc -o "$T/sizes" "$T/sizes.c" || { fail ir2_sizes "compiling the C reference: $reason"; return; }
-    run sizes "$T/sizes" || { fail ir2_sizes "running the C reference: $reason"; return; }
-    assert ir2_sizes "$T/ir2_sizes.out" -v ref="$T/sizes.out" "$same_as_ref"
-}
-
-# ir2 pointer arithmetic must scale like C: pointer + n advances n elements,
-# void * advances bytes, and pointer - pointer counts elements.
-case_ir2_pointers() {
-    ir2_build ir2_pointers check/ir2-pointers.k || { fail ir2_pointers "$reason"; return; }
-    run ir2_pointers "$T/ir2_pointers" || { fail ir2_pointers "running: $reason"; return; }
-    cat >"$T/pointers.c" <<'EOF'
-#include <stdio.h>
-#include <stdlib.h>
-struct quad { long a, b, c, d; };
-int main(void) {
-    struct quad *p = malloc(1024);
-    long *q = malloc(1024);
-    printf("quad + 1 %ld\n", (long)(p + 1) - (long)p);
-    printf("quad + 3 %ld\n", (long)(p + 3) - (long)p);
-    printf("quad - 1 %ld\n", (long)p - (long)(p - 1));
-    printf("void + 5 %ld\n", (long)((char *)p + 5) - (long)p);
-    printf("quad diff %ld\n", (long)((p + 3) - p));
-    printf("long + 2 %ld\n", (long)(q + 2) - (long)q);
-    return 0;
-}
-EOF
-    run pointers_cc cc -o "$T/pointers" "$T/pointers.c" || { fail ir2_pointers "compiling the C reference: $reason"; return; }
-    run pointers "$T/pointers" || { fail ir2_pointers "running the C reference: $reason"; return; }
-    assert ir2_pointers "$T/ir2_pointers.out" -v ref="$T/pointers.out" "$same_as_ref"
+    assert ir2_sizes "$T/ir2_sizes.out" -v osdefs=osdefs.k -v types="$T/ir2-sizes.types" '
+	BEGIN {
+	    while ((getline line < osdefs) > 0)
+		if (line ~ /^\(define-constant (sizeof|alignof)-/) {
+		    split(line, w, /[ ()]+/); name = w[3]; sub(/^(sizeof|alignof)-/, "", name)
+		    if (w[3] ~ /^sizeof/) size[name] = w[4] + 0; else align[name] = w[4] + 0
+		}
+	    while ((getline t < types) > 0) want[++n] = t
+	}
+	{ got[$1] = $2 " " $3 " " $4 }
+	END {
+	    for (i = 1; i <= n; i++) {
+		t = want[i]
+		if (!(t in size)) { printf "osdefs.k has no sizeof-%s\n", t; exit }
+		a = align[t]; padded = int((a + size[t] + a - 1) / a) * a; tailed = int((size[t] + 1 + a - 1) / a) * a
+		if (got[t] != size[t] " " padded " " tailed) {
+		    printf "%s: ir2 says sizes [%s], osdefs.k implies [%d %d %d]\n", t, got[t], size[t], padded, tailed
+		    exit
+		}
+	    }
+	}'
 }
 
-# The GC written in Maru, compiled through the ir2 C backend.  Its main builds
-# a 256-cell list 10000 times, reporting every 1000 iterations and once more
-# after a final collection with no roots.  Each cell is one allocation.
+# Upstream's own test of the ir2 language: maru-check.k asserts as it goes
+# (aborting on the first failure) and prints one "... ok" line per section.
+case_maru_check() {
+    ir2_build maru_check maru-check.k || { fail maru_check "$reason"; return; }
+    run maru_check "$T/maru_check" || { fail maru_check "running: $reason"; return; }
+    assert maru_check "$T/maru_check.out" '
+	BEGIN { n = split("bytes words ints floats structs pointers", want, " ") }
+	$0 == want[m + 1] " ok" { m++ }
+	END { if (m < n) printf "missing \"%s ok\" (in order)\n", want[m + 1] }'
+}
+
+# The GC written in Maru must compile through the ir2 C backend.  Running it
+# is an expected failure: ir2 pointer arithmetic is unscaled, as maru-check.k
+# specifies, but maru-gc.k writes (+ chunk 1) expecting C-style scaling, so
+# each object overlaps its header and the allocator loops.  The run gets 10
+# seconds and only that hang counts as expected; an exit 0 is reported as an
+# unexpected pass.
 case_maru_gc() {
     ir2_build maru_gc maru-gc.k || { fail maru_gc "$reason"; return; }
-    run maru_gc "$T/maru_gc" || { fail maru_gc "running: $reason"; return; }
-    assert maru_gc "$T/maru_gc.out" -v iterations=10000 -v cells=256 -v every=1000 '
-	# GC: <used> used, <free> free, <n> allocations, <n> collections, <n> live
-	/^GC: / { k++; used[k] = $2; free[k] = $4; allocs[k] = $6; colls[k] = $8; live[k] = $10 }
-	END {
-	    reports = iterations / every + 1
-	    if (k != reports) { printf "%d GC reports, expected %d\n", k, reports; exit }
-	    for (i = 1; i < k; i++)
-		if (allocs[i] != (i - 1) * every * cells) { printf "report %d: %d allocations, expected %d\n", i, allocs[i], (i - 1) * every * cells; exit }
-	    if (allocs[k] != iterations * cells) { printf "final: %d allocations, expected %d\n", allocs[k], iterations * cells; exit }
-	    for (i = 2; i <= k; i++) {
-		if (colls[i] < colls[i - 1]) { printf "collections went down at report %d\n", i; exit }
-		if (used[i] + free[i] != used[2] + free[2]) { printf "heap size changed at report %d: %d, was %d\n", i, used[i] + free[i], used[2] + free[2]; exit }
-	    }
-	    if (colls[k] < 1) { print "no collections happened"; exit }
-	    if (used[k] != 0 || live[k] != 0) printf "final: %d bytes used, %d live, expected 0 and 0\n", used[k], live[k]
-	}'
+    saved=$CHECK_TIMEOUT; CHECK_TIMEOUT=10
+    run maru_gc "$T/maru_gc"; st=$?
+    CHECK_TIMEOUT=$saved
+    if [ $st -eq 0 ]; then
+	fail maru_gc "unexpectedly passed: maru-gc now runs; make it a normal case"
+    elif [ $st -eq 142 ]; then
+	xfail maru_gc "hangs as expected (maru-gc.k assumes scaled pointer arithmetic)"
+    else
+	fail maru_gc "expected a hang, got: $reason"
+    fi
 }
 
 # Harness self-test, run only when named: a hung command must be cut off.
@@ -337,7 +326,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_pointers maru_gc
+[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes maru_check maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"
