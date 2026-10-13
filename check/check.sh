@@ -15,7 +15,6 @@ trap 'rm -rf "$T"' EXIT
 
 passed=0
 failed=0
-xfailed=0
 reason=
 
 # run NAME CMD...: stdout to $T/NAME.out, stderr to $T/NAME.err, stdin empty.
@@ -45,7 +44,6 @@ run() {
 }
 
 pass() { echo "PASS $1"; passed=$((passed + 1)); }
-xfail() { echo "XFAIL $1: $2"; xfailed=$((xfailed + 1)); }
 fail() { echo "FAIL $1: $2"; failed=$((failed + 1)); }
 
 # assert NAME FILE [AWK-OPTIONS] PROGRAM: run an awk assertion script over
@@ -418,5 +416,5 @@ for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"
 done
-echo "$passed passed, $failed failed, $xfailed expected failures"
+echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]

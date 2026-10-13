@@ -25,7 +25,9 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 bootstrapping (a fresh checkout needs only `cc`), and regenerated when
 `system.osdefs`, `osdefs.g` or `compile-osdefs.l` change (commit the result).
 Any other `X.osdefs` builds the same way; its generated `.c` is temporary.
-ir2 takes every type size and alignment from `osdefs.k`.
+ir2 takes the size of each C type (`char` … `long`, pointers) and every
+alignment from `osdefs.k`; fixed-width types (`int8` … `int64`) have their
+sizes by definition.
 
 ## Verify
 
@@ -67,8 +69,9 @@ ir2 takes every type size and alignment from `osdefs.k`.
   `test-mach-o.l`, `assembler.k`. On arm64 they first fail at
   `mprotect: Permission denied` (eval.c:2497).
 - `eval2.c` was hand-edited upstream; nothing here regenerates it.
-- Cross-compiling: ir2 sizes follow the host's `osdefs.k`, so `ir-gen-x86.k`
-  gets 8-byte pointers on a 64-bit host.
+- Cross-compiling: ir2 sizes follow the host's `osdefs.k`. Since that change
+  (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
+  on a 64-bit host, which is wrong for its 32-bit target.
 - `test-peg.l` loops forever on every platform: `peg.l`'s `definitions` rule
   matches empty input, so the parser never advances. `test-message.l` and
   `compile-irgol.l` no longer match the current `boot.l` and `ir.k`.
