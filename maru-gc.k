@@ -155,7 +155,8 @@
 		  (let ((next (. chunk next)))
 		    (set (. chunk next) (. next next))
 		    (set csize (set (. chunk size) (+ csize (+ sizeof-<header> (. next size)))))
-		    (and (= next gc_memory_last) (set gc_memory_last chunk))))
+		    (and (= next gc_memory_last) (set gc_memory_last chunk))
+		    (and (= next first) (set first chunk))))	;; else the ring walk never ends
 		(if (or (< ssize csize) (= size csize))
 		    (let ()
 		      (debug (printf "csize %d\n" csize))

@@ -369,6 +369,7 @@ case_maru_gc() {
 # one that splits the first heap block into 500 small unreachable objects,
 # collects them, then asks for 20000 bytes: more than any one freed chunk but
 # less than the freed run, so it fits in the first block only if merged.
+# First, 200000 bytes, more than the whole heap, must grow it and return.
 case_maru_gc_coalesce() {
     sed '/^(define-function main /,$d' maru-gc.k >"$T/gc-coalesce.k"
     cat >>"$T/gc-coalesce.k" <<'EOF'
@@ -380,16 +381,21 @@ case_maru_gc_coalesce() {
       (gc_malloc 64)
       (set i (+ i 1)))
     (gc_gcollect)
+    (gc_malloc 200000)
+    (printf "grew\n")
     (let ((big (cast (gc_malloc 20000) long)))
       (if (and (>= big base) (< big (+ base gc_quantum)))
 	  (printf "merged\n")
-	(printf "grew\n"))))
+	(printf "not merged\n"))))
   (return (cast 0 int)))
 EOF
     ir2_build maru_gc_coalesce "$T/gc-coalesce.k" || { fail maru_gc_coalesce "$reason"; return; }
     run maru_gc_coalesce "$T/maru_gc_coalesce" || { fail maru_gc_coalesce "running: $reason"; return; }
     assert maru_gc_coalesce "$T/maru_gc_coalesce.out" '
-	END { if ($0 != "merged") printf "20000 bytes did not fit in the freed first block (%s)\n", $0 }'
+	END {
+	    if (NR < 1) print "a request larger than the heap did not return (hung or crashed)"
+	    else if ($0 != "merged") print "20000 bytes did not fit in the freed first block"
+	}'
 }
 
 # Harness self-test, run only when named: a hung command must be cut off.
