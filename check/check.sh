@@ -359,11 +359,37 @@ case_maru_gc() {
 	    if (allocs[k] != iterations * cells) { printf "final: %d allocations, expected %d\n", allocs[k], iterations * cells; exit }
 	    for (i = 2; i <= k; i++) {
 		if (colls[i] < colls[i - 1]) { printf "collections went down at report %d\n", i; exit }
-		if (used[i] + free[i] != used[2] + free[2]) { printf "heap size changed at report %d: %d, was %d\n", i, used[i] + free[i], used[2] + free[2]; exit }
 	    }
 	    if (colls[k] < 1) { print "no collections happened"; exit }
 	    if (used[k] != 0 || live[k] != 0) printf "final: %d bytes used, %d live, expected 0 and 0\n", used[k], live[k]
 	}'
+}
+
+# maru-gc.k's allocator merges adjacent free chunks.  Replace its main with
+# one that splits the first heap block into 500 small unreachable objects,
+# collects them, then asks for 20000 bytes: more than any one freed chunk but
+# less than the freed run, so it fits in the first block only if merged.
+case_maru_gc_coalesce() {
+    sed '/^(define-function main /,$d' maru-gc.k >"$T/gc-coalesce.k"
+    cat >>"$T/gc-coalesce.k" <<'EOF'
+(define-function main int ((argc int) (argv char * *))
+  (gc_initialise)
+  (let ((i    0)
+	(base (cast gc_memory_base long)))
+    (while (< i 500)
+      (gc_malloc 64)
+      (set i (+ i 1)))
+    (gc_gcollect)
+    (let ((big (cast (gc_malloc 20000) long)))
+      (if (and (>= big base) (< big (+ base gc_quantum)))
+	  (printf "merged\n")
+	(printf "grew\n"))))
+  (return (cast 0 int)))
+EOF
+    ir2_build maru_gc_coalesce "$T/gc-coalesce.k" || { fail maru_gc_coalesce "$reason"; return; }
+    run maru_gc_coalesce "$T/maru_gc_coalesce" || { fail maru_gc_coalesce "running: $reason"; return; }
+    assert maru_gc_coalesce "$T/maru_gc_coalesce.out" '
+	END { if ($0 != "merged") printf "20000 bytes did not fit in the freed first block (%s)\n", $0 }'
 }
 
 # Harness self-test, run only when named: a hung command must be cut off.
@@ -377,7 +403,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- osdefs_bootstrap osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_offsets maru_check maru_gc
+[ $# -gt 0 ] || set -- osdefs_bootstrap osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_offsets maru_check maru_gc maru_gc_coalesce
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"

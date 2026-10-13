@@ -55,6 +55,8 @@ ir2 takes every type size and alignment from `osdefs.k`.
   ir2 pointer arithmetic is unscaled (bytes), as it specifies.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
+- `maru_gc_coalesce`: its allocator merges adjacent free chunks, as `eval.l`'s
+  does.
 
 ## Known not to work (verified on arm64 macOS)
 
