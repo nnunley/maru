@@ -103,11 +103,8 @@ profile : .force
 #	shark -q -1 -i ./eval emit.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l > test.s
 	shark -q -1 -i ./eval repl.l test-pepsi.l
 
-osdefs.k : mkosdefs
-	./mkosdefs > $@
-
-mkosdefs : mkosdefs.c
-	$(CC) -o $@ $<
+osdefs.k : system.osdefs.k
+	cp $< $@
 
 cg : eval .force
 	./eval codegen5.l | tee test.s
@@ -239,12 +236,19 @@ osdefs.g.l : osdefs.g tpeg.l
 	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
-%.osdefs.k : %.osdefs osdefs.g.l
-	./eval compile-osdefs.l $< > $<.c
-	cc -o $<.exe $<.c
+# Each X.osdefs lists what to measure about a platform, and X.osdefs.c is the
+# C program, generated from it, that measures it.  The .c files are checked in
+# so a fresh checkout needs only a C compiler.  They are regenerated whenever
+# their .osdefs, the osdefs grammar or its compiler changes; commit the result.
+%.osdefs.c : %.osdefs osdefs.g compile-osdefs.l | eval osdefs.g.l
+	./eval compile-osdefs.l $< > $@.new
+	mv $@.new $@
+
+%.osdefs.k : %.osdefs.c
+	$(CC) -o $<.exe $<
 	./$<.exe > $@.new
 	mv $@.new $@
-	rm -f $<.exe $<.c
+	rm -f $<.exe
 
 OSDEFS = $(wildcard *.osdefs) $(wildcard net/*.osdefs)
 OSKEFS = $(OSDEFS:.osdefs=.osdefs.k)
@@ -273,7 +277,7 @@ stats : .force
 
 clean : .force
 	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
-	rm -f *~ *.o main eval eval32 eval2 gceval test *.s mkosdefs *.exe *.$(SO)
+	rm -f *~ *.o main eval eval32 eval2 gceval test *.s *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
 	rm -rf osdefs.g.l *.osdefs.k

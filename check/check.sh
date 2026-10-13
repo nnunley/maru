@@ -211,6 +211,36 @@ case_maru_test() {
 	}'
 }
 
+# osdefs.k must describe this machine: every "integer X?" probe listed in
+# system.osdefs is defined exactly when the C compiler predefines X, and the
+# host's architecture macro is among them.
+case_osdefs() {
+    run osdefs_macros cc -dM -E -x c /dev/null || { fail osdefs "listing compiler macros: $reason"; return; }
+    case $(uname -m) in
+	arm64|aarch64) arch=__aarch64__ ;;
+	x86_64)        arch=__x86_64__ ;;
+	*)             arch= ;;
+    esac
+    assert osdefs osdefs.k -v specfile=system.osdefs -v macros="$T/osdefs_macros.out" -v arch="$arch" '
+	BEGIN {
+	    while ((getline line < macros) > 0) { split(line, w, " "); predefined[w[2]] = 1 }
+	    while ((getline line < specfile) > 0)
+		if (line ~ /^integer/) {
+		    n = split(line, w, /[ \t]+/)
+		    for (i = 2; i <= n; i++) if (w[i] ~ /\?$/) { sub(/\?$/, "", w[i]); probe[w[i]] = 1 }
+		}
+	}
+	/^\(define(-constant)? __[A-Za-z0-9_]+__ / { name = $2; defined[name] = 1 }
+	END {
+	    if (arch != "" && !(arch in probe)) { printf "system.osdefs does not probe %s\n", arch; exit }
+	    for (p in probe)
+		if ((p in predefined) != (p in defined)) {
+		    printf "%s: compiler %s it, osdefs.k %s it\n", p, (p in predefined) ? "defines" : "does not define", (p in defined) ? "defines" : "does not define"
+		    exit
+		}
+	}'
+}
+
 # Awk assertion: the input matches the file named by ref, line by line.  The
 # ir2 cases use it to compare a program with the same computation in C.
 same_as_ref='
@@ -307,7 +337,7 @@ case_selftest_hang() {
     fi
 }
 
-[ $# -gt 0 ] || set -- pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_pointers maru_gc
+[ $# -gt 0 ] || set -- osdefs pepsi recursion repl pegen earley maruby maru_test ir2_sizes ir2_pointers maru_gc
 for c in "$@"; do
     command -v "case_$c" >/dev/null 2>&1 || { fail "$c" "unknown case"; continue; }
     "case_$c"
