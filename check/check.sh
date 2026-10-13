@@ -271,6 +271,8 @@ case_ir2_sizes() {
 	i=0; for t in "$@"; do i=$((i + 1)); echo "(define-struct <padded-$i> ((c char) (x ${t%%:*})))"; done
 	i=0; for t in "$@"; do i=$((i + 1)); echo "(define-struct <tailed-$i> ((x ${t%%:*}) (c char)))"; done
 	echo '(define-function main int ((argc int) (argv char * *))'
+	echo '  (define-struct <in-body> ((c char) (x long)))'
+	echo '  (printf "in-body %d\n" sizeof-<in-body>)'
 	i=0; for t in "$@"; do i=$((i + 1)); echo "  (printf \"${t##*:} %d %d %d\\n\" (sizeof ${t%%:*}) (sizeof struct <padded-$i>) sizeof-<tailed-$i>)"; done
 	echo '  (return 0))'
     } >"$T/ir2-sizes.k"
@@ -286,8 +288,10 @@ case_ir2_sizes() {
 		}
 	    while ((getline t < types) > 0) want[++n] = t
 	}
+	$1 == "in-body" { in_body = $2; next }
 	{ got[$1] = $2 " " $3 " " $4 }
 	END {
+	    a = align["long"]; if (in_body != int((a + size["long"] + a - 1) / a) * a) { printf "struct defined in a function body: sizeof %s\n", in_body; exit }
 	    for (i = 1; i <= n; i++) {
 		t = want[i]
 		if (!(t in size)) { printf "osdefs.k has no sizeof-%s\n", t; exit }
