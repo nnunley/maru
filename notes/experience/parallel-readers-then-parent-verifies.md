@@ -1,0 +1,7 @@
+# Parallel per-source readers, then the parent verifies load-bearing claims
+
+**Situation.** A syntopical read of 15 sources (about 130k words): seven STEPS reports and Piumarta's design papers. The user asked for the reading-a-book discipline. Reading everything in one context risked compaction losing the early sources before extraction.
+
+**What happened.** I read the five Maru-core sources myself and delegated the other nine to five parallel subagents. Each wrote the A–H per-source note and returned load-bearing findings with page references plus candidate slugs, but no zettels. As each report arrived, I checked its most consequential claims against the primary text with grep or a page render before relying on them. All the claims I checked held: the 20k-vs-10k budget, IS's 1,000 lines, 130 vs 1,110 lines for Nile, 140 lines and five methods for the object kernel, and the 2011 Maru section. One was upgraded from tentative to verified with more detail (the 2012 figures). I then wrote all zettels myself, with the whole slip-box in view, merging slugs that recurred across sources.
+
+**What I noticed.** Delegated readers produced good A–H notes and, usefully, sharp counting critiques. Verifying only the claims I was going to build on kept the cost low while keeping the zettels grounded in the sources, not in summaries. Merging candidate slugs across all readers before writing produced cross-source zettels (counting boundaries, where compiler size goes) that no single reader could have written.
