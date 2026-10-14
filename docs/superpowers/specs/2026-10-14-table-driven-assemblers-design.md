@@ -121,6 +121,39 @@ nothing else.
   (except with EBP as base, which needs disp8), disp8 when it fits, otherwise
   disp32, and SIB only when an index or ESP base requires it.
 
+**x86-64.** The same `x86.spec` covers 64-bit mode, in the SDM's own 64-bit
+notation:
+- **Mode validity.** Each row carries the SDM's two columns: valid in 64-bit
+  mode, and valid in 32-bit (compatibility/legacy) mode, written `V`, `I` or
+  `NE` (not encodable). For example, `40+rd INC r32` is `NE V`, and
+  `REX.W + 01 /r ADD r/m64, r64` is `V NE`. An encoder uses only rows valid
+  in its mode.
+- **New tokens and kinds.**
+  - opcode tokens `REX.W +`, `REX +` and `io` (an 8-byte immediate);
+  - operand kinds `r64`, `r/m64`, `m64`, `imm64`.
+- **The REX prefix** is emitted when the row asks for it (`REX.W`), when a
+  register is R8–R15 (setting REX.R, REX.X or REX.B for the ModRM reg, SIB
+  index, and ModRM rm, SIB base or `+r` register), or when SPL, BPL, SIL or
+  DIL appear. AH, CH, DH and BH can't be encoded with a REX prefix, and
+  matching fails for them.
+- **Registers.** `RAX`…`R15`, `EAX`…`R15D`, `AX`…`R15W`, `AL`…`R15B`, and
+  `SPL` `BPL` `SIL` `DIL`.
+- **Addressing.** 64-bit by default. Memory is `(m64 disp base index scale)`.
+  - A base of `RIP` is RIP-relative: `disp` is the absolute target, encoded
+    relative to the end of the instruction, as a branch is.
+  - In 64-bit mode, a bare 32-bit address takes a SIB byte with no base
+    (`mod 00`, `rm 100`, base `101`), because `rm 101` now means RIP.
+  - 32-bit addressing (prefix `67`) is out of scope.
+- **Immediates.** An `imm32` with a 64-bit operand size is sign-extended;
+  `MOV r64, imm64` (`REX.W + B8+rd io`) carries all 8 bytes.
+- **Default operand size.** Rows the map marks as defaulting to 64 bits
+  (push, pop, near branches: Appendix A's `d64`/`f64`) need no `REX.W`.
+- **Interface.** `(x64 X ...)` and `(x64-decode bytes pc)` encode and decode
+  64-bit mode; `x86` and `x86-decode` stay 32-bit.
+- **Lengths of unknown instructions** come from the same opcode maps. In
+  64-bit mode, `40`–`4F` are REX prefixes, and the maps' `i64` and `o64`
+  marks say which opcodes are invalid or change there.
+
 **A64**
 - Each row is 32 bits, and loading fails on any row that isn't.
 - Fields are the diagram's names: `Rx` is 5 bits, `immN` is N bits, and any
@@ -233,6 +266,13 @@ These replace `asm_x86` and `check/asm-x86.l`.
     decoder never loses its place.
   - Re-encoding must give `__text` back byte for byte.
   - The share of instructions decoded as data is printed, not asserted.
+- **`asm_x64`, `asm_x64_foreign`, `asm_x64_run`**: as the x86 checks, in
+  64-bit mode.
+  - **`asm_x64`:** samples are compared with clang `-target x86_64`, using
+    R8–R15, SPL–DIL, RIP-relative addressing and `imm64`.
+  - **`asm_x64_foreign`:** decodes `eval.c` compiled `-O2` for x86-64 (plain,
+    `-mavx2`, `-mavx512f`).
+  - **`asm_x64_run`:** prints the same transcript as `asm_x86_run`.
 - **`asm_x86_run`**: a program that uses calls, branches in both
   directions, push/pop and memory operands must print `A`…`Z` and exit 0,
   natively or in the VM (see Running generated code).
@@ -321,6 +361,7 @@ same transcript, so the expected values don't depend on the host.
 |---|---|---|
 | i386, Linux ELF or raw buffer | the host runs Linux on x86 or x86-64 (the kernel runs static i386 ELF and serves `int 0x80`) | `qemu-system-i386` with `check/i386.l` |
 | i386 Mach-O (`test-mach-o.l`, `assembler.k`) | never: no current OS loads it | `qemu-system-i386` with `check/i386.l` |
+| x86-64 | the host is x86-64 Linux (`ndn.lan`): Maru writes a static x86-64 ELF and uses `syscall` (`write` 1, `exit` 60) | `qemu-system-x86_64` with `check/i386.l` switched into long mode (identity-mapped page tables, `EFER.LME`, a 64-bit code segment) |
 | A64 | the host is arm64: macOS or Linux | `qemu-system-aarch64 -M virt` with `check/a64.l` |
 
 Native runs use executables that Maru writes itself (`exe.l`, below), with no
@@ -400,10 +441,9 @@ architecture needs fails the check, like any other missing tool.
 
 | Host | Native | VM | Missing (as of 2026-10-14) |
 |---|---|---|---|
-| This Mac (Apple Silicon, macOS) | A64 (signed Mach-O, JIT) | i386 | none |
-| `ndn.lan` (AMD Ryzen 7 7800X3D, Ubuntu, Linux 6.8 x86_64, `CONFIG_IA32_EMULATION=y`) | i386 (static ELF) | A64 | `qemu-system-aarch64` (package `qemu-system-arm`); aarch64 libc headers (`libc6-dev-arm64-cross`) for `asm_a64_eval` |
+| This Mac (Apple Silicon, macOS) | A64 (signed Mach-O, JIT) | i386, x86-64 | none (`qemu-system-x86_64` present; Rosetta is installed but not used: other architectures run in a VM) |
+| `ndn.lan` (AMD Ryzen 7 7800X3D, Ubuntu, Linux 6.8 x86_64, `CONFIG_IA32_EMULATION=y`) | i386 and x86-64 (static ELF), x86-64 JIT | A64 | `qemu-system-aarch64` (package `qemu-system-arm`); aarch64 libc headers (`libc6-dev-arm64-cross`) for `asm_a64_eval` |
 
-`jit_run` on `ndn.lan` also needs x86-64 rows (open question 2).
 
 ## Running generated code in-process (JIT)
 
@@ -443,11 +483,8 @@ host's own architecture is assembled into the code region, run through
 `native-call`, and must produce the same transcript as the executable does.
 In-process code must match the evaluator's own mode:
 - an arm64 `eval` runs A64 code;
-- an x86-64 `eval` can't call the i386 table's 32-bit code. Covering x86-64
-  hosts such as an AMD Linux box needs x86-64 rows (REX prefixes and 64-bit
-  operand size in `x86.spec`), which is open question 2.
-
-Until then, `jit_run` fails on x86-64 hosts, as a missing tool would.
+- an x86-64 `eval` runs `x64` code;
+- an i386 `eval32` would run `x86` code.
 
 The C change counts toward the budget until `emit.l` generates the evaluator
 (about 30 lines).
@@ -475,7 +512,8 @@ Each step gets its own `check/lines` entry.
 | Checks | about 150 |
 | `check/i386.l` (loader, `int 0x80`, `putchar`, `printf`) | about 150 |
 | `check/a64.l` (UART, semihosting exit) | about 50 |
-| `exe.l` (static i386 and aarch64 ELF, signed arm64 Mach-O, SHA-256) | about 150 |
+| `exe.l` (static i386, x86-64 and aarch64 ELF, signed arm64 Mach-O, SHA-256) | about 160 |
+| x86-64: 64-bit rows beside the 32-bit ones, REX and RIP handling, long-mode entry in `check/i386.l` | about 200 |
 | Ported demos | about the same as today |
 
 The x86 table grows to cover the evaluator's 28 mnemonics. The net change is
@@ -483,13 +521,5 @@ clearly negative.
 
 ## Open questions
 
-1. **Where the `[EBP + 0]` regression is pinned.** Today's `asm-x86.k`
-   encodes `[EBP + 0]` as `8b 05` (disp32, address bytes missing); clang gives
-   `8b 45 00`. The new `asm_x86` samples cover it, so the replacement fixes
-   it. Should it also go into today's `check/asm-x86.l` first, as a failing
-   case, before the switch?
-2. **x86-64.** Should `x86.spec` gain 64-bit mode in this spec? That means
-   REX prefixes, `r64`/`r/m64` and RIP-relative addressing, with the same
-   checks. It's needed for `jit_run`, and for native execution of
-   evaluator-mode code, on x86-64 hosts. Otherwise it waits for an x86-64
-   backend.
+None. The `[EBP + 0]` encoding is fixed in today's assembler (`75490d3`), and
+`check/asm-x86.l` covers it.
