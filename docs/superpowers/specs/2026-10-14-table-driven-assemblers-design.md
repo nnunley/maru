@@ -352,16 +352,17 @@ to work" list loses these demos.
 ## Running generated code
 
 Every check that runs generated code (`asm_x86_run`, `asm_a64_run` and the
-demos) does so on every host: natively when the host can execute that code,
-and in a qemu VM otherwise. Each check compares a transcript (the text
-written, then the exit status), and both ways of running must produce the
-same transcript, so the expected values don't depend on the host.
+demos) does so on every host: natively when the host can execute that code
+(on macOS, x86-64 under Rosetta), and in a qemu VM otherwise. Each check
+compares a transcript (the text written, then the exit status), and every way
+of running must produce the same transcript, so the expected values don't
+depend on the host.
 
 | Code | Native when | Otherwise |
 |---|---|---|
 | i386, Linux ELF or raw buffer | the host runs Linux on x86 or x86-64 (the kernel runs static i386 ELF and serves `int 0x80`) | `qemu-system-i386` with `check/i386.l` |
 | i386 Mach-O (`test-mach-o.l`, `assembler.k`) | never: no current OS loads it | `qemu-system-i386` with `check/i386.l` |
-| x86-64 | the host is x86-64 Linux (`ndn.lan`): Maru writes a static x86-64 ELF and uses `syscall` (`write` 1, `exit` 60) | `qemu-system-x86_64` with `check/i386.l` switched into long mode (identity-mapped page tables, `EFER.LME`, a 64-bit code segment) |
+| x86-64 | the host is x86-64 Linux (`ndn.lan`): Maru writes a static x86-64 ELF and uses `syscall` (`write` 1, `exit` 60). On macOS, Rosetta: Maru writes an x86-64 Mach-O and uses `syscall` with `0x2000000` + the BSD number (`write` 4, `exit` 1) | `qemu-system-x86_64` with `check/i386.l` switched into long mode (identity-mapped page tables, `EFER.LME`, a 64-bit code segment) |
 | A64 | the host is arm64: macOS or Linux | `qemu-system-aarch64 -M virt` with `check/a64.l` |
 
 Native runs use executables that Maru writes itself (`exe.l`, below), with no
@@ -404,6 +405,13 @@ roadmap's native backend needs it too.
     self-signed file ran (`hello`, exit 42), and `codesign -dv` reports
     `Signature=adhoc`.
   - This needs SHA-256 written in Maru, about 40 lines.
+- **x86-64 Mach-O for Rosetta:** the same load commands with the x86-64 CPU
+  type. The probe ran under Rosetta both unsigned and ad-hoc signed; `exe.l`
+  signs it anyway, since the signer is already there.
+  - Rosetta is deprecated: Apple has said it stays through macOS 27 and
+    then shrinks to a subset. It is the default only while it exists. When
+    it goes, x86-64 falls back to `qemu-system-x86_64` with no other change,
+    because both produce the same transcript.
 
 **`check/a64.l`, the A64 VM environment.**
 - Maru writes an ELF64 with one segment at `0x40080000`, which `-kernel`
@@ -432,7 +440,8 @@ roadmap's native backend needs it too.
 - Data-in-code ranges are Mach-O only. ELF test input is built with
   `-fno-jump-tables` instead.
 
-**Forcing a runner.** `ASM_RUN=vm make check` puts everything in the VMs, and
+**Forcing a runner.** `ASM_RUN=vm make check` puts everything in the VMs (on
+macOS that includes x86-64, bypassing Rosetta), and
 `ASM_RUN=native` fails where native isn't possible. This way either path can
 be exercised on any host. A missing `qemu-system-*` for the VM an
 architecture needs fails the check, like any other missing tool.
@@ -441,7 +450,7 @@ architecture needs fails the check, like any other missing tool.
 
 | Host | Native | VM | Missing (as of 2026-10-14) |
 |---|---|---|---|
-| This Mac (Apple Silicon, macOS) | A64 (signed Mach-O, JIT) | i386, x86-64 | none (`qemu-system-x86_64` present; Rosetta is installed but not used: other architectures run in a VM) |
+| This Mac (Apple Silicon, macOS 26.6) | A64 (signed Mach-O, JIT); x86-64 under Rosetta (Mach-O) | i386; x86-64 with `ASM_RUN=vm` | none (Rosetta installed; `qemu-system-x86_64` present) |
 | `ndn.lan` (AMD Ryzen 7 7800X3D, Ubuntu, Linux 6.8 x86_64, `CONFIG_IA32_EMULATION=y`) | i386 and x86-64 (static ELF), x86-64 JIT | A64 | `qemu-system-aarch64` (package `qemu-system-arm`); aarch64 libc headers (`libc6-dev-arm64-cross`) for `asm_a64_eval` |
 
 
@@ -512,7 +521,7 @@ Each step gets its own `check/lines` entry.
 | Checks | about 150 |
 | `check/i386.l` (loader, `int 0x80`, `putchar`, `printf`) | about 150 |
 | `check/a64.l` (UART, semihosting exit) | about 50 |
-| `exe.l` (static i386, x86-64 and aarch64 ELF, signed arm64 Mach-O, SHA-256) | about 160 |
+| `exe.l` (static i386, x86-64 and aarch64 ELF, signed arm64 and x86-64 Mach-O, SHA-256) | about 170 |
 | x86-64: 64-bit rows beside the 32-bit ones, REX and RIP handling, long-mode entry in `check/i386.l` | about 200 |
 | Ported demos | about the same as today |
 
