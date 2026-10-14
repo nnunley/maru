@@ -10,4 +10,5 @@
 
 (MOVLir () 42 _EAX)  (ADDLrr () _ECX _EDX)  (PUSHLr () _EBX)  (MOVLmr () 8 _EBP _ESI 4 _EDI)
 (INTi () 0x80)  (ADDLir () 1000 _ESP)  (CALLm () 0 0 0 0)  (RET ())
+(MOVLmr () 0 _EBP 0 0 _EAX)  (MOVLmr () 0 _EBP _ESI 4 _EDI)	;; EBP base needs a disp8 even when 0
 (list-do b (list-reverse! bytes) (print (format "%02x " b)))

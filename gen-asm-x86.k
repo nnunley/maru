@@ -143,8 +143,8 @@
 #define _r_4B(  X,R, D,B    )           (_Mrm(X,_b10,_rN(R),_r4(B))                              ,_L(X,D))
 #define _r_4BIS(X,R, D,B,I,S)           (_Mrm(X,_b10,_rN(R),_b100 ),_SIB(X,_SCL(S),_r4(I),_r4(B)),_L(X,D))
  
-#define _r_DB(  X,R, D,B    )           ((_s0P(D) ? _r_0B  (X,R,  B    ) : (_s1P(D) ? _r_1B(  X,R,D,B    ) : _r_4B(  X,R,D,B    ))))
-#define _r_DBIS(X,R, D,B,I,S)           ((_s0P(D) ? _r_0BIS(X,R,  B,I,S) : (_s1P(D) ? _r_1BIS(X,R,D,B,I,S) : _r_4BIS(X,R,D,B,I,S))))
+#define _r_DB(  X,R, D,B    )           ((_s0P(D) && (B)!=_EBP ? _r_0B  (X,R,  B    ) : (_s1P(D) ? _r_1B(  X,R,D,B    ) : _r_4B(  X,R,D,B    ))))
+#define _r_DBIS(X,R, D,B,I,S)           ((_s0P(D) && (B)!=_EBP ? _r_0BIS(X,R,  B,I,S) : (_s1P(D) ? _r_1BIS(X,R,D,B,I,S) : _r_4BIS(X,R,D,B,I,S))))
  
 #define _r_X( X,R, D,B,I,S)             (_r0P(I)  ? (_r0P(B)   ? _r_D   (X,R,D            )   : \
                                                     (_ESP==(B) ? _r_DBIS(X,R,D,_ESP,_ESP,1)   : \

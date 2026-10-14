@@ -173,7 +173,7 @@
 ;; does: check/asm-x86.l assembles movl, addl, pushl, an SIB load, int, call, ret.
 (check "asm_x86"
   (unit-assert (equal (car (run "asm_x86" "./eval check/asm-x86.l"))
-		      "b8 2a 00 00 00 01 ca 53 8b 7c b5 08 cd 80 81 c4 e8 03 00 00 e8 e7 ff ff ff c3 ")))
+		      "b8 2a 00 00 00 01 ca 53 8b 7c b5 08 cd 80 81 c4 e8 03 00 00 e8 e7 ff ff ff c3 8b 45 00 8b 7c b5 00 ")))
 
 (check "ir2"        (unit-assert (equal (last (run "ir2" (ir2-build "ir2" "check/ir2.k"))) "ir2 ok")))
 
