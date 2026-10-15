@@ -97,3 +97,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 
 1. An `ir-gen-arm64.k` backend beside `ir-gen-c.k` and `ir-gen-x86.k`.
 2. Carry over refactor work from `refactor-main` case by case, with tests.
+   - First: the UTF-8 grammar, `grammars/unicode/utf8.g` on `refactor-main`.
+     It was never run. Its actions read the lead byte as hex text, and it
+     accepts overlong forms, surrogates and values above U+10FFFF. Restore it
+     with RFC 3629's valid ranges and U+FFFD for invalid input, and add a check.
+3. Promote the grammars in `notes/sources/grammars/` (transcribed from the
+   STEPS reports and papers) into the tree as working grammars, each with a
+   check and a `check/lines` entry. TCP first: `net/tcp.k`'s packet handling
+   as the 2007/2008 reports' `svc`/`syn`/`req`/`ack` rules.
+4. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
+   POSIX mutexes, arm64 and x86-64), then Gezira, then the windowed demos.
+   Nile and Gezira come in as submodules of forks, and count toward the 20k.
