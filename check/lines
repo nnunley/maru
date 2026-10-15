@@ -11,3 +11,4 @@
 +1769 nile submodule (nnunley/nile): Nile's compiler on Maru, its prelude and the .nl examples, part of the Frank-level stack the 20k budget covers; its C/JS runtimes, other compilers, viz and 2012 copy of Maru are marked unused
 +593 gezira submodule (nnunley/gezira): Gezira's kernels in Nile (nl/), the graphics the stack renders with; its C, Haskell, JS and Squeak bindings are marked unused
 +1 check.l: the lines check counts nile/ and gezira/ and skips files marked unused
++1395 spike/asm: the table-driven assembler spike (x86 and A64 rows, encoders, decoders, clang cross-checks, JIT probe), committed as-is for review; the assembler plan promotes or removes every file (the .spec rows are not yet counted)

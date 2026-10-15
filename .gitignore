@@ -9,3 +9,7 @@ osdefs.k
 /osdefs.g.l
 /tpeg.l
 /asm-x86.k
+/spike/asm/*.o
+/spike/asm/*.bin
+/spike/asm/*.s
+/spike/asm/*ours.txt

@@ -1,0 +1,5 @@
+(define-function _B (X b) b) (define-function _W (X b) b) (define-function _L (X b) b) (define-function _D1 (X b) b) (define-function _D4 (X b) b)
+(load "asm-x86.k")
+(define-function getB (d) 0) (define-function getL (d) 0) (define-function getD1 (d) 0) (define-function getD4 (d) 0)
+(require "port.l") (define values list) (define-function nth (n l) l) (define NEGATIVE 0) (define FG-RED 0) (define RESET 0) (define-form receive (e . vs) e)
+(load "dsm-x86.k")
