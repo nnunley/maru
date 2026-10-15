@@ -13,6 +13,7 @@
 (require "osdefs.k")
 (require "asm-table.l")
 (require "asm-arm64.l")
+(require "asm-x86.l")
 (require "code-region.l")
 
 (define failures 0)
@@ -101,6 +102,62 @@
 	   25)
 	  75025))
 
+;; The same on x86-64, System V calling convention: EDI, ESI and XMM0, XMM1 in;
+;; EAX or XMM0 out; the stack 16-byte aligned at each call.
+(when (= isa 'x64)
+  (expect ((assemble '((MOV EAX EDI) (ADD EAX ESI) (RET)) "ii>i") 40 2) 42)
+  (expect ((assemble '((MULSS XMM0 XMM1) (RET)) "ff>f") 1.5 2.0) 3.0)
+  (expect ((assemble '((MULSD XMM0 XMM1) (RET)) "dd>d") 1.5 -4.0) -6.0)
+  (expect ((assemble '((MOV RAX RDI) (RET)) "p>p") 0x123456789a) 0x123456789a)
+  (let ((write (dlsym RTLD_DEFAULT "write")))
+    (expect ((assemble
+	      (concat-lists
+	       '((PUSH RBX) (PUSH R12) (PUSH R13)	; return address + 3 pushes: aligned
+		 (SUB RSP 16)
+		 (MOV EBX EDI)
+		 (MOV R12D 65)
+		 (at letter)
+		 (MOV (m8 0 RSP () 1) R12B)		; the letter, then write(1, &letter, 1)
+		 (MOV EDI 1)
+		 (MOV RSI RSP)
+		 (MOV EDX 1))
+	       (list (list 'MOV 'RAX write))
+	       '((CALL RAX)
+		 (ADD R12D 1)
+		 (CMP R12D 91)
+		 (JL (label letter))
+		 (MOV (m8 0 RSP () 1) 10)		; and a newline
+		 (MOV EDI 1)
+		 (MOV RSI RSP)
+		 (MOV EDX 1))
+	       (list (list 'MOV 'RAX write))
+	       '((CALL RAX)
+		 (MOV EDI EBX)
+		 (CALL (label fib))
+		 (ADD RSP 16)
+		 (POP R13) (POP R12) (POP RBX)
+		 (RET)
+		 (at fib)				; fib(n): n < 2 ? n : fib(n-1) + fib(n-2)
+		 (CMP EDI 2)
+		 (JL (label small))
+		 (PUSH RBX) (PUSH R12)
+		 (MOV EBX EDI)
+		 (SUB EDI 1)
+		 (CALL (label fib))
+		 (MOV R12D EAX)
+		 (MOV EDI EBX)
+		 (SUB EDI 2)
+		 (CALL (label fib))
+		 (ADD EAX R12D)
+		 (POP R12) (POP RBX)
+		 (RET)
+		 (at small)
+		 (MOV EAX EDI)
+		 (RET)))
+	      "i>i")
+	     25)
+	    75025)))
+
 ;; Four lanes at once: d[i] += a[i] * b[i] for float arrays.
 (when (= isa 'arm64)
   (let ((fmla (assemble '((LD1 (V 0 4S) (off X0 0))
@@ -117,7 +174,7 @@
 
 ;; A buffer that runs past the region's end does not fit, and nothing is copied.
 (let ((b (asm-buffer (- (+ (car region) (cadr region)) 2))))
-  (asm isa b (if (= isa 'arm64) '(RET) '(RET)))
+  (asm isa b (if (= isa 'arm64) '(RET) '(ADD RAX R12)))	; 4 and 3 bytes: neither fits in 2
   (expect (code-region-fits? region b) ()))
 
 (if (= 0 failures) (println "jit run " isa " ok"))

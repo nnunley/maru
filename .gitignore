@@ -15,3 +15,4 @@ osdefs.k
 /spike/asm/*ours.txt
 /arm64.g.l
 /x86.g.l
+/bin/

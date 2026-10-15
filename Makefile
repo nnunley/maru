@@ -31,6 +31,18 @@ run : all
 status : .force
 	@echo "SYS is $(SYS)"
 
+# On arm64 macOS with Rosetta, x86-64 builds of both evaluators run x86-64 code
+# in-process (jit_run); bin/<arch>/ keeps their names unchanged.
+CROSS = $(shell test "$$(uname -sm)" = "Darwin arm64" && arch -x86_64 /usr/bin/true 2>/dev/null && echo bin/x86_64/eval bin/x86_64/eval2)
+
+bin/x86_64/eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+	@mkdir -p bin/x86_64
+	$(CC) -arch x86_64 -g $(CFLAGS) -o $@ eval.c $(LIBS)
+
+bin/x86_64/eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+	@mkdir -p bin/x86_64
+	$(CC) -arch x86_64 -g $(CFLAGS) -o $@ eval2.c $(LIBS)
+
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
@@ -39,7 +51,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l .force
+check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l $(CROSS) .force
 	./eval check/check.l
 
 maru-check : eval2 .force

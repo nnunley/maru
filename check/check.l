@@ -183,10 +183,20 @@
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
   (unit-assert (equal (last (run "asm-coverage-x64" "./eval check/asm-coverage.l x64")) "asm coverage x64 ok")))
 
+;; Encoded code runs in-process on every evaluator this host has: its own,
+;; and on arm64 macOS bin/x86_64/eval2 under Rosetta.
+(define host-isa (if (= "x86_64" (car (run "uname-m" "uname -m"))) 'x64 'arm64))
 (check "jit_run"
-  (let ((out (run "jit-run-arm64" "./eval2 -b boot2.l check/jit-run.l arm64")))
-    (unit-assert (equal (car out) "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-    (unit-assert (equal (last out) "jit run arm64 ok"))))
+  (list-do e (cons (list "./eval2" host-isa)
+		   (if (= 0 (system "test -x bin/x86_64/eval2")) (list (list "bin/x86_64/eval2" 'x64)) ()))
+    (let* ((name (concat-string "jit-run-" (symbol->string (cadr e))))
+	   (out (run name (concat-strings (car e) " -b boot2.l check/jit-run.l " (symbol->string (cadr e))))))
+      (unit-assert (equal (car out) "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+      (unit-assert (equal (last out) (concat-strings "jit run " (symbol->string (cadr e)) " ok"))))))
+
+(check "cross_eval"
+  (or (!= 'arm64 host-isa) (!= 0 (system "arch -x86_64 /usr/bin/true 2>/dev/null"))
+      (unit-assert (= 0 (system "test -x bin/x86_64/eval2 && test -x bin/x86_64/eval")))))
 
 (check "asm_patch"
   (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok"))
