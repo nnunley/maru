@@ -35,12 +35,33 @@
 
 0 00101 imm26				B pc+simm26*4
 1 00101 imm26				BL pc+simm26*4
-0101010 0 imm19 0 0000			B.EQ pc+simm19*4
-0101010 0 imm19 0 0001			B.NE pc+simm19*4
-0101010 0 imm19 0 1011			B.LT pc+simm19*4
-0101010 0 imm19 0 1010			B.GE pc+simm19*4
 1 011010 0 imm19 Rt			CBZ Xt, pc+simm19*4
 1 011010 1 imm19 Rt			CBNZ Xt, pc+simm19*4
 1101011 0 0 01 11111 0000 0 0 Rn 00000	BLR Xn
 1101011 0 0 10 11111 0000 0 0 11110 00000	RET
 1101010100 0 00 011 0010 0000 000 11111	NOP
+
+# Conditional branches, compare-and-branch, test-and-branch, PC-relative
+# addresses and literal loads: every field a placeholder can stand for.
+0101010 0 imm19 0 0000		B.EQ pc+simm19*4
+0101010 0 imm19 0 0001		B.NE pc+simm19*4
+0101010 0 imm19 0 0010		B.HS pc+simm19*4
+0101010 0 imm19 0 0011		B.LO pc+simm19*4
+0101010 0 imm19 0 0100		B.MI pc+simm19*4
+0101010 0 imm19 0 0101		B.PL pc+simm19*4
+0101010 0 imm19 0 0110		B.VS pc+simm19*4
+0101010 0 imm19 0 0111		B.VC pc+simm19*4
+0101010 0 imm19 0 1000		B.HI pc+simm19*4
+0101010 0 imm19 0 1001		B.LS pc+simm19*4
+0101010 0 imm19 0 1010		B.GE pc+simm19*4
+0101010 0 imm19 0 1011		B.LT pc+simm19*4
+0101010 0 imm19 0 1100		B.GT pc+simm19*4
+0101010 0 imm19 0 1101		B.LE pc+simm19*4
+0 011010 0 imm19 Rt		CBZ Wt, pc+simm19*4
+0 011010 1 imm19 Rt		CBNZ Wt, pc+simm19*4
+b5:1 011011 0 b40:5 imm14 Rt	TBZ Xt, #b5:b40, pc+simm14*4
+b5:1 011011 1 b40:5 imm14 Rt	TBNZ Xt, #b5:b40, pc+simm14*4
+0 immlo:2 10000 immhi:19 Rd	ADR Xd, pc+simmhi:immlo*1
+1 immlo:2 10000 immhi:19 Rd	ADRP Xd, pcpage+simmhi:immlo*4096
+01 011 0 00 imm19 Rt		LDR Xt, pc+simm19*4
+00 011 0 00 imm19 Rt		LDR Wt, pc+simm19*4

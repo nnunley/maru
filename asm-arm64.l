@@ -41,7 +41,32 @@
   (car (list-detect e arm64-registers (and (= width (cadr e)) (= n (caddr e))
 					 (or (< n 31) (= (cadddr e) (if sp? 'sp 'zr)))))))
 
-(define-function arm64-width-of (row name)	(cdr (list-detect f (caddr row) (and (pair? f) (= name (car f))))))
+;; A field name may join several diagram fields (immhi:immlo, b5:b40): one value, high bits first.
+(define-function arm64-parts (name)
+  (let ((s (symbol->string name)) (out ()) (from 0))
+    (for (i 0 (string-length s))
+      (when (= ?: (string-at s i))
+	(set out (cons (string->symbol (string-copy s from (- i from))) out))
+	(set from (+ i 1))))
+    (list-reverse! (cons (string->symbol (string-copy s from (- (string-length s) from))) out))))
+
+(define-function arm64-width-of (row name)
+  (let ((w 0))
+    (list-do part (arm64-parts name)
+      (set w (+ w (cdr (list-detect f (caddr row) (and (pair? f) (= part (car f))))))))
+    w))
+
+;; Bind q, a value of the joined field name, onto env part by part.
+(define-function arm64-bind-field (row name q env)
+  (list-do part (list-reverse! (arm64-parts name))
+    (let ((w (arm64-width-of row part)))
+      (set env (cons (cons part (& q (- (<< 1 w) 1))) env))
+      (set q (>> q w))))
+  env)
+
+(define-function arm64-reloc? (op)	(and (pair? op) (= 'reloc (car op))))
+(define-function arm64-has-reloc? (op)	(and (pair? op) (or (arm64-reloc? op) (arm64-has-reloc? (car op)) (arm64-has-reloc? (cdr op)))))
+(define-function arm64-page (pc)	(& pc -4096))
 
 ;; The field value for v under arm64-operand kind (imm|simm|pcrel f scale), or () if it doesn't fit.
 (define-function arm64-scaled (row k v)
@@ -59,9 +84,15 @@
 			  (and r (= (cadr r) (arm64-reg-width (cadr k)))
 			       (or (< (caddr r) 31) (= (cadddr r) (if (caddr k) 'sp 'zr)))
 			       (cons (cons (arm64-reg-field (cadr k)) (caddr r)) env))))
+            ((and (memq c '(imm simm pcrel pcpage)) (arm64-reloc? op))	; a placeholder: zero for now
+			(and (not (= 'imm0 (cadr k)))
+			     (or (not (cdr op)) (= (cadr op) (arm64-width-of row (cadr k))))
+			     (arm64-bind-field row (cadr k) 0 env)))
       ((memq c '(imm simm))
-			(let ((q (arm64-scaled row k op))) (and q (cons (cons (cadr k) q) env))))
-      ((= c 'pcrel)	(let ((q (and (long? op) (arm64-scaled row k (- op pc))))) (and q (cons (cons (cadr k) q) env))))
+			(let ((q (arm64-scaled row k op))) (and q (arm64-bind-field row (cadr k) q env))))
+      ((= c 'pcrel)	(let ((q (and (long? op) (arm64-scaled row k (- op pc))))) (and q (arm64-bind-field row (cadr k) q env))))
+      ((= c 'pcpage)	(let ((q (and (long? op) (arm64-scaled row (cons 'simm (cdr k)) (- op (arm64-page pc))))))
+			  (and q (arm64-bind-field row (cadr k) q env))))
       ((= c 'lsl)	(and (pair? op) (= 'LSL (car op))
 			     (let ((q (arm64-scaled (list () () (caddr row)) (list 'imm (cadr k) (caddr k)) (cadr op))))
 			       (and q (cons (cons (cadr k) q) env)))))
@@ -91,12 +122,18 @@
 (define-function arm64-sext (v n)		(let ((s (- 64 n))) (>> (<< v s) s)))
 
 ;; The value of field name in word.
-(define-function arm64-field-of (row word name)
+(define-function arm64-part-of (row word name)
   (let ((shift 32) (v ()))
     (list-do f (caddr row)
       (let ((w (if (string? f) (string-length f) (cdr f))))
 	(set shift (- shift w))
 	(and (pair? f) (= name (car f)) (set v (& (>> word shift) (- (<< 1 w) 1))))))
+    v))
+
+(define-function arm64-field-of (row word name)
+  (let ((v 0))
+    (list-do part (arm64-parts name)
+      (set v (| (<< v (arm64-width-of row part)) (arm64-part-of row word part))))
     v))
 
 (define-function arm64-operand (row k word pc)
@@ -106,6 +143,7 @@
       ((= c 'imm)	(if (= 'imm0 (cadr k)) 0 (* (caddr k) (arm64-field-of row word (cadr k)))))
       ((= c 'simm)	(* (caddr k) (arm64-sext (arm64-field-of row word (cadr k)) (arm64-width-of row (cadr k)))))
       ((= c 'pcrel)	(+ pc (* (caddr k) (arm64-sext (arm64-field-of row word (cadr k)) (arm64-width-of row (cadr k))))))
+            ((= c 'pcpage)	(+ (arm64-page pc) (* (caddr k) (arm64-sext (arm64-field-of row word (cadr k)) (arm64-width-of row (cadr k))))))
       ((= c 'lsl)	(list 'LSL (* (caddr k) (arm64-field-of row word (cadr k)))))
       (else		(list c (arm64-operand row (cadr k) word pc) (arm64-operand row (caddr k) word pc))))))
 
@@ -119,8 +157,11 @@
 (define-function arm64-encode (row insn pc)
   (let ((word (arm64-encode-row row (cdr insn) pc)))
     (and word
-	 (let ((positions ()) (i 0))
-	   (list-do k (cadr row) (and (= 'pcrel (car k)) (set positions (cons i positions))) (set i (+ i 1)))
+	 		 (let ((positions ()) (i 0) (ops (cdr insn)))
+		   (list-do k (cadr row)
+		     (and (or (memq (car k) '(pcrel pcpage)) (arm64-has-reloc? (car ops))) (set positions (cons i positions)))
+		     (set ops (cdr ops))
+		     (set i (+ i 1)))
 	   (cons (list (& 255 word) (& 255 (>> word 8)) (& 255 (>> word 16)) (& 255 (>> word 24)))
 		 (list-reverse! positions))))))
 
@@ -131,4 +172,21 @@
 				      pc)))
 	 (and insn (cons insn 4)))))
 
-(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode)
+;; (lo hi step) of the values operand position of row can take at pc, or () if
+;; it has no field a placeholder can stand for.  A memory operand's range is
+;; its offset's.
+(define-function arm64-field-range (row position pc)
+  (let ((k (cadr row)))
+    (while (< 0 position) (set k (cdr k)) (set position (- position 1)))
+    (set k (car k))
+    (and (memq (car k) '(off pre post)) (set k (caddr k)))
+    (let ((c (car k)))
+      (and (memq c '(imm simm pcrel pcpage)) (not (= 'imm0 (cadr k)))
+	   (let* ((w (arm64-width-of row (cadr k))) (s (caddr k))
+		  (half (<< 1 (- w 1)))
+		  (base (cond ((= c 'pcrel) pc) ((= c 'pcpage) (arm64-page pc)) (else 0))))
+	     (if (= c 'imm)
+		 (list 0 (* s (- (<< 1 w) 1)) s)
+	       (list (+ base (* s (- 0 half))) (+ base (* s (- half 1))) s)))))))
+
+(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range)
