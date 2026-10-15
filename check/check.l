@@ -219,6 +219,7 @@
 	  (set sum (+ sum (string->long (car w))))
 	  (or (cdr w) (< (string->long (car w)) 0) (error "FAIL lines: no reason given for: " entry)))))
     (or (= n sum) (error "FAIL lines: " n " source lines, but check/lines accounts for " sum
-			 "; add an entry for " (- n sum) " saying why"))))
+			 "; add an entry for " (- n sum) " saying why"))
+    (println "lines: " n ", tests included; the budget of 20000 is soft")))
 
 (println "all checks passed")
