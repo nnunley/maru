@@ -213,11 +213,12 @@
 
 ;;; ---------------------------------------------------------------- budget
 
-;; Derived code (marked in .gitattributes) doesn't count.
+;; Derived code and code outside the stack (marked derived or unused in
+;; .gitattributes, here or in the nile and gezira submodules) doesn't count.
 ;; Every source line is accounted for: the count must equal the sum of the
 ;; entries in check/lines, and each entry that adds lines must say why.
 (check "lines"
-  (let ((n (string->long (car (words (car (run "count" "git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|osdefs|irl|irgol|dc)$|Makefile$\" | git check-attr --stdin derived | grep unspecified | cut -d: -f1 | xargs cat | wc -l"))))))
+  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|osdefs|irl|irgol|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
 	(sum 0))
     (list-do entry (lines (contents-of-file-named "check/lines"))
       (let ((w (words entry)))

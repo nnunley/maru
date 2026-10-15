@@ -1,0 +1,6 @@
+[submodule "nile"]
+	path = nile
+	url = https://github.com/nnunley/nile.git
+[submodule "gezira"]
+	path = gezira
+	url = https://github.com/nnunley/gezira.git
