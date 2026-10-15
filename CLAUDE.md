@@ -64,10 +64,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `lines`: the source line count equals the sum of `check/lines`. Any change
   in line count needs an entry there with its delta, and an entry that adds
   lines must say why. Derived files are marked `derived` in `.gitattributes`
-  and not counted; the C evaluator counts until `emit.l` generates it. Tests
-  count. The budget is 20k lines, the STEPS target ("a modest 400-page book"
-  one programmer can hold); it is soft, so the check reports the total but
-  doesn't fail over it. Prefer a DSL or grammar (as `gen-asm-x86.k` generates
+  and not counted, nor is `notes/` (reference copies); the C evaluator counts
+  until `emit.l` generates it. Tests count. The budget is 20k lines, the
+  STEPS target ("a modest 400-page book" one programmer can hold); it is
+  soft, so the check reports the total but doesn't fail over it. Prefer a DSL or grammar (as `gen-asm-x86.k` generates
   the x86 assembler) over writing code out, tests included.
 
 ## Known not to work (verified on arm64 macOS)
