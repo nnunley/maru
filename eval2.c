@@ -77,6 +77,8 @@ typedef struct {
     int		 arg_rest;
     ffi_type	*arg_types[32];
     cast_t	 arg_casts[32];
+    ffi_type	*ret_type;	/* 0: an integer or pointer, as when no '>' is given */
+    int		 ret_kind;	/* the signature letter after '>' */
 } proto_t;
 
 #define nil ((oop)0)
@@ -1665,110 +1667,117 @@ static oop apply(oop fun, oop arguments, oop env)
 
 static ffi_type ffi_type_long;
 
-// #define ffcast(NAME, OTYPE)													\
-//     static void ff##NAME(oop arg, void **argp, arg_t *buf)									\
-//     {																\
-//	switch (getType(arg)) {													\
-//	    case OTYPE:	buf->arg_##NAME= get##OTYPE(arg);  *argp= &buf->arg_##NAME;					 break;	\
-//	    default:	fprintf(stderr, "\nnon-"#OTYPE" argument in foreign call: ");  fdumpln(stderr, arg);  fatal(0);	 break;	\
-//	}															\
-//     }
+#define ffcast(NAME, OTYPE)													\
+    static void ff##NAME(oop arg, void **argp, arg_t *buf)									\
+    {																\
+	switch (getType(arg)) {													\
+	    case OTYPE:	buf->arg_##NAME= get##OTYPE(arg);  *argp= &buf->arg_##NAME;					 break;	\
+	    default:	fprintf(stderr, "\nnon-"#OTYPE" argument in foreign call: ");  fdumpln(stderr, arg);  fatal(0);	 break;	\
+	}															\
+    }
 
-// ffcast(int,	Long)
-// ffcast(int32,	Long)
-// ffcast(int64,	Long)
-// ffcast(long,	Long)
-// ffcast(float,	Double)
-// ffcast(double,	Double)
+ffcast(int,	Long)
+ffcast(int32,	Long)
+ffcast(int64,	Long)
+ffcast(long,	Long)
+ffcast(float,	Double)
+ffcast(double,	Double)
 
-// #undef ffcast
+#undef ffcast
 
-// static void ffpointer(oop arg, void **argp, arg_t *buf)
-// {
-//     void *ptr= 0;
-//     switch (getType(arg)) {
-//	case Undefined:	ptr= 0;					break;
-//	case Data:	ptr= (void *)arg;			break;
-//	case Long:	ptr= (void *)getLong(arg);		break;
-//	case Double:	ptr= (void *)arg;			break;
-//	case String:	ptr= get(arg, String,bits);		break;
-//	case Symbol:	ptr= get(arg, Symbol,bits);		break;
-//	case Expr:	ptr= (void *)arg;			break;
-//	case Subr:	ptr= get(arg, Subr,imp);		break;
-//	case Variable:	ptr= &get(arg, Variable,value);		break;
-//	default:
-//	    if (GC_atomic(arg))
-//		ptr= (void *)arg;
-//	    else {
-//		fprintf(stderr, "\ninvalid pointer argument: ");
-//		fdumpln(stderr, arg);
-//		fatal(0);
-//	    }
-//	    break;
-//     }
-//     buf->arg_pointer= ptr;
-//     *argp= &buf->arg_pointer;
-// }
+static void ffpointer(oop arg, void **argp, arg_t *buf)
+{
+    void *ptr= 0;
+    switch (getType(arg)) {
+	case Undefined:	ptr= 0;					break;
+	case Data:	ptr= (void *)arg;			break;
+	case Long:	ptr= (void *)getLong(arg);		break;
+	case Double:	ptr= (void *)arg;			break;
+	case String:	ptr= get(arg, String,bits);		break;
+	case Symbol:	ptr= get(arg, Symbol,bits);		break;
+	case Expr:	ptr= (void *)arg;			break;
+	case Subr:	ptr= get(arg, Subr,imp);		break;
+	default:
+	    if (GC_atomic(arg))
+		ptr= (void *)arg;
+	    else {
+		fprintf(stderr, "\ninvalid pointer argument: ");
+		fdumpln(stderr, arg);
+		fatal(0);
+	    }
+	    break;
+    }
+    buf->arg_pointer= ptr;
+    *argp= &buf->arg_pointer;
+}
 
-// static void ffstring(oop arg, void **argp, arg_t *buf)
-// {
-//     if (!is(String, arg)) {
-//	fprintf(stderr, "\nnon-String argument in foreign call: ");
-//	fdumpln(stderr, arg);
-//	fatal(0);
-//     }
-//     buf->arg_string= wcs2mbs(get(arg, String,bits));
-//     *argp= &buf->arg_string;
-// }
+static void ffstring(oop arg, void **argp, arg_t *buf)
+{
+    if (!is(String, arg)) {
+	fprintf(stderr, "\nnon-String argument in foreign call: ");
+	fdumpln(stderr, arg);
+	fatal(0);
+    }
+    buf->arg_string= wcs2mbs(get(arg, String,bits));
+    *argp= &buf->arg_string;
+}
 
-// static ffi_type *ffdefault(oop arg, void **argp, arg_t *buf)
-// {
-//     switch (getType(arg))
-//     {
-//	case Undefined:	buf->arg_pointer= 0;					*argp= &buf->arg_pointer;	return &ffi_type_pointer;
-//	case Long:	buf->arg_long=	  getLong(arg);				*argp= &buf->arg_long;		return &ffi_type_long;
-//	case Double:	buf->arg_double=  getDouble(arg);			*argp= &buf->arg_double;	return &ffi_type_double;
-//	case String:	buf->arg_string=  wcs2mbs(get(arg, String,bits));	*argp= &buf->arg_string;	return &ffi_type_pointer;
-//	case Subr:	buf->arg_pointer= get(arg, Subr,imp);			*argp= &buf->arg_pointer;	return &ffi_type_pointer;
-//     }
-//     fprintf(stderr, "\ncannot pass object through '...': ");
-//     fdumpln(stderr, arg);
-//     fatal(0);
-//     return 0;
-// }
+static ffi_type *ffdefault(oop arg, void **argp, arg_t *buf)
+{
+    switch (getType(arg))
+    {
+	case Undefined:	buf->arg_pointer= 0;					*argp= &buf->arg_pointer;	return &ffi_type_pointer;
+	case Long:	buf->arg_long=	  getLong(arg);				*argp= &buf->arg_long;		return &ffi_type_long;
+	case Double:	buf->arg_double=  getDouble(arg);			*argp= &buf->arg_double;	return &ffi_type_double;
+	case String:	buf->arg_string=  wcs2mbs(get(arg, String,bits));	*argp= &buf->arg_string;	return &ffi_type_pointer;
+	case Subr:	buf->arg_pointer= get(arg, Subr,imp);			*argp= &buf->arg_pointer;	return &ffi_type_pointer;
+    }
+    fprintf(stderr, "\ncannot pass object through '...': ");
+    fdumpln(stderr, arg);
+    fatal(0);
+    return 0;
+}
 
 static oop ffcall(oop subr, oop arguments)
 {
-    fatal("ffcall");
-//     proto_t	*sig= get(subr, Subr,sig);
-//     imp_t	 imp= get(subr, Subr,imp);
-//     oop	 argp= arguments;
-//     int	 arg_count= 0;
-//     void	*args[32];
-//     arg_t	 bufs[32];
-//     ffi_cif	 cif;
-//     ffi_type	 ret_type= ffi_type_pointer;
-//     ffi_arg	 result;
-//     ffi_type *arg_types[32];
-//     while ((arg_count < sig->arg_count) && (nil != argp)) {
-//	sig->arg_casts[arg_count](car(argp), &args[arg_count], &bufs[arg_count]);
-//	arg_types[arg_count]= sig->arg_types[arg_count];
-//	++arg_count;
-//	argp= getTail(argp);
-//     }
-//     if (arg_count != sig->arg_count) fatal("too few arguments (%i < %i) in call to %S", arg_count, sig->arg_count, get(subr, Subr,name));
-//     if (sig->arg_rest) {
-//	while ((nil != argp) && (arg_count < 32)) {
-//	    arg_types[arg_count]= ffdefault(car(argp), &args[arg_count], &bufs[arg_count]);
-//	    ++arg_count;
-//	    argp= getTail(argp);
-//	}
-//     }
-//     if (nil != argp) fatal("too many arguments in call to %S", get(subr, Subr,name));
-//     if (FFI_OK != ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_count, &ret_type, arg_types)) fatal("FFI call setup failed");
-//     ffi_call(&cif, FFI_FN(imp), &result, args);
-//     return newLong((long)result);
-    return nil;
+    proto_t	*sig= get(subr, Subr,sig);
+    imp_t	 imp= get(subr, Subr,imp);
+    oop	 argp= arguments;
+    int	 arg_count= 0;
+    void	*args[32];
+    arg_t	 bufs[32];
+        ffi_cif	 cif;
+    union { ffi_arg i;  float f;  double d; } result;
+    ffi_type *arg_types[32];
+    while ((arg_count < sig->arg_count) && (nil != argp)) {
+	sig->arg_casts[arg_count](car(argp), &args[arg_count], &bufs[arg_count]);
+	arg_types[arg_count]= sig->arg_types[arg_count];
+	++arg_count;
+	argp= getTail(argp);
+    }
+    if (arg_count != sig->arg_count) fatal("too few arguments (%i < %i) in call to %S", arg_count, sig->arg_count, get(subr, Subr,name));
+    if (sig->arg_rest) {
+	while ((nil != argp) && (arg_count < 32)) {
+	    arg_types[arg_count]= ffdefault(car(argp), &args[arg_count], &bufs[arg_count]);
+	    ++arg_count;
+	    argp= getTail(argp);
+	}
+    }
+    if (nil != argp) fatal("too many arguments in call to %S", get(subr, Subr,name));
+        /* variadic arguments need ffi_prep_cif_var: Apple's arm64 ABI passes them on the stack */
+    ffi_type *ret_type= sig->ret_type ? sig->ret_type : &ffi_type_pointer;
+    if (FFI_OK != (sig->arg_rest
+		   ? ffi_prep_cif_var(&cif, FFI_DEFAULT_ABI, sig->arg_count, arg_count, ret_type, arg_types)
+		   : ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_count, ret_type, arg_types)))
+	fatal("FFI call setup failed");
+    ffi_call(&cif, FFI_FN(imp), &result, args);
+    switch (sig->ret_kind) {
+	case 'f':	return newDouble(result.f);
+	case 'd':	return newDouble(result.d);
+	case 'i':
+	case 'j':	return newLong((long)(int)result.i);
+    }
+    return newLong((long)result.i);
 }
 
 static int length(oop list)
@@ -2717,7 +2726,7 @@ static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned l
 	return val;													\
     }
 
-// accessor(byte,		Long,	 unsigned char)
+accessor(byte,		Long,	 unsigned char)
 // accessor(char,		Long,	 char)
 // accessor(short,		Long,	 short)
 // accessor(wchar,		Long,	 wchar_t)
@@ -2783,65 +2792,86 @@ accessor(float,		Double,	 float)
 //     return newLong(((int (*)())addr)(argv));
 // }
 
-// #if defined(WIN32)
-// # include "w32dlfcn.h"
-// #else
-// # define __USE_GNU
-// # include <dlfcn.h>
-// # undef __USE_GNU
-// #endif
+#if defined(WIN32)
+# include "w32dlfcn.h"
+#else
+# define __USE_GNU
+# include <dlfcn.h>
+# undef __USE_GNU
+#endif
 
-// static subr(subr)
-// {
-//     oop arg= car(args);
-//     wchar_t *name= 0;
-//     switch (getType(arg))
-//     {
-//	case String:	name= get(arg, String,bits);  break;
-//	case Symbol:	name= get(arg, Symbol,bits);  break;
-//	default:	fatal("subr: argument must be string or symbol");
-//     }
-//     char *sym= wcs2mbs(name);
-//     void *addr= dlsym(RTLD_DEFAULT, sym);
-//     if (!addr) fatal("could not find symbol: %s", sym);
-//     proto_t *sig= 0;
-//     arg= cadr(args);
-//     if (nil != arg) {				if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);	 fatal(0); }
-//	wchar_t	 *spec = get(arg, String,bits);
-//	int	  mode = 0;
-//	cast_t	  cast = 0;
-//	ffi_type *type = 0;
-//	sig= calloc(1, sizeof(proto_t));
-//	sig->arg_count= 0;
-//	sig->arg_rest=	0;
-//	while ((mode= *spec++)) {
-//	    switch (mode) {
-//		case 'd':	type= &ffi_type_double;	  cast= ffdouble;	break;
-//		case 'f':	type= &ffi_type_float;	  cast= fffloat;	break;
-//		case 'i':	type= &ffi_type_sint;	  cast= ffint;		break;
-//		case 'j':	type= &ffi_type_sint32;	  cast= ffint32;	break;
-//		case 'k':	type= &ffi_type_sint64;	  cast= ffint64;	break;
-//		case 'l':	type= &ffi_type_slong;	  cast= fflong;		break;
-//		case 'p':	type= &ffi_type_pointer;  cast= ffpointer;	break;
-//		case 's':	type= &ffi_type_pointer;  cast= ffstring;	break;
-//		case 'S':	type= &ffi_type_pointer;  cast= ffpointer;	break;
-//		case '.':	sig->arg_rest++;				break;
-//		default:	fatal("illegal type specification: %s", get(arg, String,bits));
-//	    }
-//	    if (sig->arg_rest) break;
-//	    sig->arg_types[sig->arg_count]= type;
-//	    sig->arg_casts[sig->arg_count]= cast;
-//	    sig->arg_count++;
-//	}
-//     }
-//     return newSubr(name, addr, sig);
-// }
+static subr(subr)
+{
+        oop arg= car(args);
+    wchar_t *name= 0;
+    void *addr= 0;
+    switch (getType(arg))
+    {
+	case String:	name= get(arg, String,bits);  break;
+	case Symbol:	name= get(arg, Symbol,bits);  break;
+	case Long:	name= L"<address>";  addr= (void *)getLong(arg);  break;
+	default:	fatal("subr: argument must be string, symbol or address");
+    }
+    if (!addr) {
+	char *sym= wcs2mbs(name);
+	addr= dlsym(RTLD_DEFAULT, sym);
+	if (!addr) fatal("could not find symbol: %s", sym);
+    }
+    proto_t *sig= 0;
+    arg= cadr(args);
+    if (nil != arg) {				if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);	 fatal(0); }
+	wchar_t	 *spec = get(arg, String,bits);
+	int	  mode = 0;
+	cast_t	  cast = 0;
+	ffi_type *type = 0;
+	sig= calloc(1, sizeof(proto_t));
+	sig->arg_count= 0;
+	sig->arg_rest=	0;
+	while ((mode= *spec++)) {
+	    switch (mode) {
+		case 'd':	type= &ffi_type_double;	  cast= ffdouble;	break;
+		case 'f':	type= &ffi_type_float;	  cast= fffloat;	break;
+		case 'i':	type= &ffi_type_sint;	  cast= ffint;		break;
+		case 'j':	type= &ffi_type_sint32;	  cast= ffint32;	break;
+		case 'k':	type= &ffi_type_sint64;	  cast= ffint64;	break;
+		case 'l':	type= &ffi_type_slong;	  cast= fflong;		break;
+		case 'p':	type= &ffi_type_pointer;  cast= ffpointer;	break;
+		case 's':	type= &ffi_type_pointer;  cast= ffstring;	break;
+		case 'S':	type= &ffi_type_pointer;  cast= ffpointer;	break;
+		case '.':	sig->arg_rest++;				break;
+		case '>':	sig->ret_kind= *spec;
+				switch (*spec) {
+				    case 'd':	sig->ret_type= &ffi_type_double;	break;
+				    case 'f':	sig->ret_type= &ffi_type_float;		break;
+				    case 'i':	sig->ret_type= &ffi_type_sint;		break;
+				    case 'j':	sig->ret_type= &ffi_type_sint32;	break;
+				    case 'k':	sig->ret_type= &ffi_type_sint64;	break;
+				    case 'l':	sig->ret_type= &ffi_type_slong;		break;
+				    case 'p':	sig->ret_type= &ffi_type_pointer;	break;
+				    default:	fatal("illegal return type specification: %s", get(arg, String,bits));
+				}
+				if (spec[1]) fatal("characters after the return type in: %s", get(arg, String,bits));
+				break;
+		default:	fatal("illegal type specification: %s", get(arg, String,bits));
+	    }
+	    	    if ('>' == mode) break;
+	    if (sig->arg_rest) {
+		if ('>' == *spec) continue;	/* "s.>i": variadic, then the return type */
+		break;
+	    }
+	    sig->arg_types[sig->arg_count]= type;
+	    sig->arg_casts[sig->arg_count]= cast;
+	    sig->arg_count++;
+	}
+    }
+    return newSubr(name, addr, sig);
+}
 
-// static subr(subr_name)
-// {
-//     oop arg= car(args);				if (!is(Subr, arg)) { fprintf(stderr, "subr-name: non-Subr argument: ");  fdumpln(stderr, arg);	 fatal(0); }
-//     return newString(get(arg, Subr,name));
-// }
+static subr(subr_name)
+{
+    oop arg= car(args);				if (!is(Subr, arg)) { fprintf(stderr, "subr-name: non-Subr argument: ");  fdumpln(stderr, arg);	 fatal(0); }
+    return newString(get(arg, Subr,name));
+}
 
 static subr(allocate)
 {
@@ -3337,8 +3367,8 @@ static subr_ent_t subr_tab[] = {
 //     { " array-compare",		subr_array_compare },
 //     { " data",			subr_data },
 //     { " data-length",		subr_data_length },
-//     { " byte-at",		subr_byte_at },
-//     { " set-byte-at",		subr_set_byte_at },
+    { " byte-at",		subr_byte_at },
+    { " set-byte-at",		subr_set_byte_at },
 //     { " char-at",		subr_char_at },
 //     { " set-char-at",		subr_set_char_at },
 //     { " short-at",		subr_short_at },
@@ -3364,8 +3394,8 @@ static subr_ent_t subr_tab[] = {
 //     { " longdouble-at",		subr_longdouble_at },
 //     { " set-longdouble-at",	subr_set_longdouble_at },
 //     { " native-call",		subr_native_call },
-//     { " subr",			subr_subr },
-//     { " subr-name",		subr_subr_name },
+    { " subr",			subr_subr },
+    { " subr-name",		subr_subr_name },
     { " allocate",		subr_allocate },
 //     { " allocate-atomic",	subr_allocate_atomic },
     { " oop-at",		subr_oop_at },

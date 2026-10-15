@@ -68,6 +68,8 @@ typedef struct {
     int		 arg_rest;
     ffi_type	*arg_types[32];
     cast_t	 arg_casts[32];
+    ffi_type	*ret_type;	/* 0: an integer or pointer, as when no '>' is given */
+    int		 ret_kind;	/* the signature letter after '>' */
 } proto_t;
 
 #define nil ((oop)0)
@@ -1476,9 +1478,8 @@ static oop ffcall(oop subr, oop arguments)
     int       arg_count= 0;
     void     *args[32];
     arg_t     bufs[32];
-    ffi_cif   cif;
-    ffi_type  ret_type= ffi_type_pointer;
-    ffi_arg   result;
+        ffi_cif   cif;
+    union { ffi_arg i;  float f;  double d; } result;
     ffi_type *arg_types[32];
     while ((arg_count < sig->arg_count) && (nil != argp)) {
 	sig->arg_casts[arg_count](car(argp), &args[arg_count], &bufs[arg_count]);
@@ -1495,9 +1496,20 @@ static oop ffcall(oop subr, oop arguments)
 	}
     }
     if (nil != argp) fatal("too many arguments in call to %S", get(subr, Subr,name));
-    if (FFI_OK != ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_count, &ret_type, arg_types)) fatal("FFI call setup failed");
+            /* variadic arguments need ffi_prep_cif_var: Apple's arm64 ABI passes them on the stack */
+    ffi_type *ret_type= sig->ret_type ? sig->ret_type : &ffi_type_pointer;
+    if (FFI_OK != (sig->arg_rest
+		   ? ffi_prep_cif_var(&cif, FFI_DEFAULT_ABI, sig->arg_count, arg_count, ret_type, arg_types)
+		   : ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_count, ret_type, arg_types)))
+	fatal("FFI call setup failed");
     ffi_call(&cif, FFI_FN(imp), &result, args);
-    return newLong((long)result);
+    switch (sig->ret_kind) {
+	case 'f':	return newDouble(result.f);
+	case 'd':	return newDouble(result.d);
+	case 'i':
+	case 'j':	return newLong((long)(int)result.i);
+    }
+    return newLong((long)result.i);
 }
 
 static int length(oop list)
@@ -2510,17 +2522,21 @@ static subr(native_call)
 
 static subr(subr)
 {
-    oop arg= car(args);
+        oop arg= car(args);
     wchar_t *name= 0;
+    void *addr= 0;
     switch (getType(arg))
     {
 	case String:	name= get(arg, String,bits);  break;
 	case Symbol:	name= get(arg, Symbol,bits);  break;
-	default:	fatal("subr: argument must be string or symbol");
+	case Long:	name= L"<address>";  addr= (void *)getLong(arg);  break;
+	default:	fatal("subr: argument must be string, symbol or address");
     }
-    char *sym= wcs2mbs(name);
-    void *addr= dlsym(RTLD_DEFAULT, sym);
-    if (!addr) fatal("could not find symbol: %s", sym);
+    if (!addr) {
+	char *sym= wcs2mbs(name);
+	addr= dlsym(RTLD_DEFAULT, sym);
+	if (!addr) fatal("could not find symbol: %s", sym);
+    }
     proto_t *sig= 0;
     arg= cadr(args);
     if (nil != arg) {				if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);  fatal(0); }
@@ -2543,9 +2559,26 @@ static subr(subr)
 		case 's':	type= &ffi_type_pointer;  cast= ffstring;	break;
 		case 'S':	type= &ffi_type_pointer;  cast= ffpointer;	break;
 		case '.':	sig->arg_rest++;				break;
+		case '>':	sig->ret_kind= *spec;
+				switch (*spec) {
+				    case 'd':	sig->ret_type= &ffi_type_double;	break;
+				    case 'f':	sig->ret_type= &ffi_type_float;		break;
+				    case 'i':	sig->ret_type= &ffi_type_sint;		break;
+				    case 'j':	sig->ret_type= &ffi_type_sint32;	break;
+				    case 'k':	sig->ret_type= &ffi_type_sint64;	break;
+				    case 'l':	sig->ret_type= &ffi_type_slong;		break;
+				    case 'p':	sig->ret_type= &ffi_type_pointer;	break;
+				    default:	fatal("illegal return type specification: %s", get(arg, String,bits));
+				}
+				if (spec[1]) fatal("characters after the return type in: %s", get(arg, String,bits));
+				break;
 		default:	fatal("illegal type specification: %s", get(arg, String,bits));
 	    }
-	    if (sig->arg_rest) break;
+	    	    	    if ('>' == mode) break;
+	    if (sig->arg_rest) {
+		if ('>' == *spec) continue;	/* "s.>i": variadic, then the return type */
+		break;
+	    }
 	    sig->arg_types[sig->arg_count]= type;
 	    sig->arg_casts[sig->arg_count]= cast;
 	    sig->arg_count++;
