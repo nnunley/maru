@@ -108,3 +108,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 4. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
    POSIX mutexes, arm64 and x86-64), then Gezira, then the windowed demos.
    Nile and Gezira come in as submodules of forks, and count toward the 20k.
+   Spec: `docs/rfc/draft-ndn-nile-runtime-in-maru-00.md`.
+   - Array types in `maru.k`/`ir2`, replacing the runtime's `long` field runs.
+   - Blocks sized to a stream's element size, so kernels over large tensors
+     can run (one 512-byte block size caps an element at about 118 floats).

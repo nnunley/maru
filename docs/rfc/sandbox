@@ -1,0 +1,2 @@
+# Builds and checks write inside the repo, which seatbelt would deny.
+env-scrub
