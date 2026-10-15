@@ -12,6 +12,16 @@
 
 
 
+;; The arrangement vector samples use: set per variant by the row check, else
+;; the row's first allowed arrangement.
+(define arm64-sample-arrangement ())
+(define-function arm64-variants (row)
+  (if (list-detect k (cadr row) (or (and (= 'vreg (car k)) (= 'T (caddr k)))
+				    (and (= 'vbrace (car k)) (= 'T (caddr (cadr k))))))
+      (arm64-allowed row)
+    '(())))
+(define-function arm64-set-variant (arr)	(set arm64-sample-arrangement arr))
+
 ;; Sample operands for kind k of row, using register number pos where a register goes.
 (define-function arm64-samples (row k pos)
   (let ((c (car k)))
@@ -22,6 +32,14 @@
 				(cond ((= class ?X)	(if (caddr k) 'SP 'XZR))
 				      ((= class ?W)	(if (caddr k) 'WSP 'WZR))
 				      (else		(reg-sym letter 31))))))
+            ((= c 'vreg)	(let ((arr (if (= 'T (caddr k)) (or arm64-sample-arrangement (car (arm64-allowed row))) (caddr k))))
+			  			  (list (arm64-arr-data pos arr) (arm64-arr-data 31 arr))))
+      ((= c 'vbrace)	(arm64-samples row (cadr k) pos))
+      ((= c 'vlane)	(let ((w (arm64-width-of row (cadr (cadddr k)))) (t (string->symbol (caddr k))))
+			  (list (list 'V pos t 0) (list 'V 31 t (- (<< 1 w) 1)))))
+      ((memq c '(vshl vshr))
+			(let ((e (arm64-esize (or arm64-sample-arrangement (car (arm64-allowed row))))))
+			  (if (= c 'vshl) (list 0 (- e 1)) (list 1 e))))
       ((= c 'bimm)	(if (= 64 (cadr k)) '(0x5555555555555555 0xff -2 0x0ff00ff00ff00ff0) '(0x55555555 0xff00ff00 0x7ffffffe)))
       ((= c 'lslimm)	(list 1 (- (cadr k) 1)))
       ((= c 'fimm)	'(1.0 -2.5 0.125 31.0))
@@ -40,8 +58,14 @@
 			  out)))))
 
 ;; clang's syntax for one operand; label is this instruction's label number.
-(define-function arm64-text (op label)
+(define-function arm64-text (op label . kind)
   (cond
+    ((and kind (pair? (car kind)) (= 'vbrace (caar kind)))	(concat-strings "{" (arm64-text op label) "}"))
+        ((and (pair? op) (= 'V (car op)) (long? (caddr op)))
+     (concat-strings "V" (long->string (cadr op)) "." (symbol->string (arm64-data-arr op))))
+    ((and (pair? op) (= 'V (car op)))
+     (concat-strings "V" (long->string (cadr op)) "." (symbol->string (caddr op)) "[" (long->string (cadddr op)) "]"))
+    ((and (pair? op) (= 'off (car op)) (= 0 (caddr op)))	(concat-strings "[" (arm64-text (cadr op) label) "]"))
         ((symbol? op)		(symbol->string op))
     ((double? op)		(concat-string "#" (double->string op)))
     ((and (long? op) (or (< op -65536) (< 65536 op)))	(format "#0x%lx" op))

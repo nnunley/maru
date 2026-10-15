@@ -220,3 +220,100 @@ b5:1 011011 1 b40:5 imm14 Rt	TBNZ Xt, #b5:b40, pc+simm14*4
 11 111 1 01 00 imm12 Rn Rt		STR Dt, [Xn|SP, #imm12*8]
 01 101 1 010 0 imm7 Rt2 Rn Rt		STP Dt, Dt2, [Xn|SP, #simm7*8]
 01 101 1 010 1 imm7 Rt2 Rn Rt		LDP Dt, Dt2, [Xn|SP, #simm7*8]
+
+# ---------------------------------------------------------------- Advanced SIMD (NEON)
+# Vd.T is a vector register with arrangement T (8B 16B 4H 8H 2S 4S 1D 2D), the
+# same for every operand that names T; T sets the row's q, size or sz fields
+# (or comes from immh), and T=... lists the arrangements the row allows
+# (default: all but 1D, or 2S 4S 2D where the row has sz).  Vn.S[#index] is a
+# lane.  Data: (V 3 4S) is V3.4S, (V 3 S 1) is V3.S[1].
+
+# Three registers, same arrangement: integer.
+0 q:1 0 01110 size:2 1 Rm 10000 1 Rn Rd		ADD Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 size:2 1 Rm 10000 1 Rn Rd		SUB Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 1 Rm 10011 1 Rn Rd		MUL Vd.T, Vn.T, Vm.T T=8B|16B|4H|8H|2S|4S
+0 q:1 1 01110 size:2 1 Rm 10001 1 Rn Rd		CMEQ Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 1 Rm 00110 1 Rn Rd		CMGT Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 1 Rm 00111 1 Rn Rd		CMGE Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 size:2 1 Rm 00110 1 Rn Rd		CMHI Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 size:2 1 Rm 00111 1 Rn Rd		CMHS Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 1 Rm 01100 1 Rn Rd		SMAX Vd.T, Vn.T, Vm.T T=8B|16B|4H|8H|2S|4S
+0 q:1 0 01110 size:2 1 Rm 01101 1 Rn Rd		SMIN Vd.T, Vn.T, Vm.T T=8B|16B|4H|8H|2S|4S
+0 q:1 1 01110 size:2 1 Rm 01100 1 Rn Rd		UMAX Vd.T, Vn.T, Vm.T T=8B|16B|4H|8H|2S|4S
+0 q:1 1 01110 size:2 1 Rm 01101 1 Rn Rd		UMIN Vd.T, Vn.T, Vm.T T=8B|16B|4H|8H|2S|4S
+0 q:1 0 01110 size:2 1 Rm 01000 1 Rn Rd		SSHL Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 size:2 1 Rm 01000 1 Rn Rd		USHL Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 00 1 Rm 00011 1 Rn Rd		AND Vd.T, Vn.T, Vm.T T=8B|16B
+0 q:1 0 01110 01 1 Rm 00011 1 Rn Rd		BIC Vd.T, Vn.T, Vm.T T=8B|16B
+0 q:1 0 01110 10 1 Rm 00011 1 Rn Rd		ORR Vd.T, Vn.T, Vm.T T=8B|16B
+0 q:1 1 01110 00 1 Rm 00011 1 Rn Rd		EOR Vd.T, Vn.T, Vm.T T=8B|16B
+0 q:1 1 01110 00 10000 00101 10 Rn Rd		NOT Vd.T, Vn.T T=8B|16B
+0 q:1 1 01110 size:2 10000 01011 10 Rn Rd	NEG Vd.T, Vn.T
+
+# Shifts by an immediate: immh:immb is esize + shift (SHL) or 2*esize - shift.
+0 q:1 0 011110 immh:4 immb:3 01010 1 Rn Rd	SHL Vd.T, Vn.T, #vshl
+0 q:1 0 011110 immh:4 immb:3 00000 1 Rn Rd	SSHR Vd.T, Vn.T, #vshr
+0 q:1 1 011110 immh:4 immb:3 00000 1 Rn Rd	USHR Vd.T, Vn.T, #vshr
+
+# Floating point (2S 4S 2D).
+0 q:1 0 01110 0 sz:1 1 Rm 11010 1 Rn Rd		FADD Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 1 sz:1 1 Rm 11010 1 Rn Rd		FSUB Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 0 sz:1 1 Rm 11011 1 Rn Rd		FMUL Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 0 sz:1 1 Rm 11111 1 Rn Rd		FDIV Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 0 sz:1 1 Rm 11001 1 Rn Rd		FMLA Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 0 sz:1 1 Rm 11110 1 Rn Rd		FMAX Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 1 sz:1 1 Rm 11110 1 Rn Rd		FMIN Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 0 sz:1 1 Rm 11100 1 Rn Rd		FCMEQ Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 0 sz:1 1 Rm 11100 1 Rn Rd		FCMGE Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 1 sz:1 1 Rm 11100 1 Rn Rd		FCMGT Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 0 sz:1 1 Rm 11010 1 Rn Rd		FADDP Vd.T, Vn.T, Vm.T
+0 q:1 1 01110 1 sz:1 10000 01111 10 Rn Rd	FNEG Vd.T, Vn.T
+0 q:1 0 01110 1 sz:1 10000 01111 10 Rn Rd	FABS Vd.T, Vn.T
+0 q:1 1 01110 1 sz:1 10000 11111 10 Rn Rd	FSQRT Vd.T, Vn.T
+0 q:1 0 01110 0 sz:1 10000 11101 10 Rn Rd	SCVTF Vd.T, Vn.T
+0 q:1 1 01110 0 sz:1 10000 11101 10 Rn Rd	UCVTF Vd.T, Vn.T
+0 q:1 0 01110 1 sz:1 10000 11011 10 Rn Rd	FCVTZS Vd.T, Vn.T
+0 q:1 1 01110 1 sz:1 10000 11011 10 Rn Rd	FCVTZU Vd.T, Vn.T
+
+# Broadcast, insert, extract: the element size is fixed per row.
+0 q:1 0 01110000 00001 0 0001 1 Rn Rd		DUP Vd.T, Wn T=8B|16B
+0 q:1 0 01110000 00010 0 0001 1 Rn Rd		DUP Vd.T, Wn T=4H|8H
+0 q:1 0 01110000 00100 0 0001 1 Rn Rd		DUP Vd.T, Wn T=2S|4S
+0 q:1 0 01110000 01000 0 0001 1 Rn Rd		DUP Vd.T, Xn T=2D
+0 q:1 0 01110000 index:2 100 0 0000 1 Rn Rd	DUP Vd.T, Vn.S[#index] T=2S|4S
+0 q:1 0 01110000 index:1 1000 0 0000 1 Rn Rd	DUP Vd.T, Vn.D[#index] T=2D
+0 1 0 01110000 index:4 1 0 0011 1 Rn Rd		INS Vd.B[#index], Wn
+0 1 0 01110000 index:3 10 0 0011 1 Rn Rd		INS Vd.H[#index], Wn
+0 1 0 01110000 index:2 100 0 0011 1 Rn Rd	INS Vd.S[#index], Wn
+0 1 0 01110000 index:1 1000 0 0011 1 Rn Rd	INS Vd.D[#index], Xn
+0 0 0 01110000 index:4 1 0 0111 1 Rn Rd		UMOV Wd, Vn.B[#index]
+0 0 0 01110000 index:3 10 0 0111 1 Rn Rd		UMOV Wd, Vn.H[#index]
+0 0 0 01110000 index:2 100 0 0111 1 Rn Rd	UMOV Wd, Vn.S[#index]
+0 1 0 01110000 index:1 1000 0 0111 1 Rn Rd	UMOV Xd, Vn.D[#index]
+0 1 0 01110000 index:4 1 0 0101 1 Rn Rd		SMOV Xd, Vn.B[#index]
+0 1 0 01110000 index:3 10 0 0101 1 Rn Rd		SMOV Xd, Vn.H[#index]
+0 1 0 01110000 index:2 100 0 0101 1 Rn Rd	SMOV Xd, Vn.S[#index]
+
+# Shuffles and permutes.
+0 0 101110 00 0 Rm 0 0 imm4:3 0 Rn Rd		EXT Vd.T, Vn.T, Vm.T, #imm4 T=8B
+0 1 101110 00 0 Rm 0 imm4 0 Rn Rd		EXT Vd.T, Vn.T, Vm.T, #imm4 T=16B
+0 q:1 0 01110 size:2 0 Rm 0 011 10 Rn Rd	ZIP1 Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 0 Rm 0 111 10 Rn Rd	ZIP2 Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 0 Rm 0 001 10 Rn Rd	UZP1 Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 0 Rm 0 101 10 Rn Rd	UZP2 Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 0 Rm 0 010 10 Rn Rd	TRN1 Vd.T, Vn.T, Vm.T
+0 q:1 0 01110 size:2 0 Rm 0 110 10 Rn Rd	TRN2 Vd.T, Vn.T, Vm.T
+0 q:1 001110 000 Rm 0 00 0 00 Rn Rd		TBL Vd.T, {Vn.16B}, Vm.T T=8B|16B
+
+# Reductions.
+0 q:1 0 01110 size:2 11000 11011 10 Rn Rd	ADDV Bd, Vn.T T=8B|16B
+0 q:1 0 01110 size:2 11000 11011 10 Rn Rd	ADDV Hd, Vn.T T=4H|8H
+0 1 0 01110 10 11000 11011 10 Rn Rd		ADDV Sd, Vn.4S
+0 1 1 01110 0 0 11000 01111 10 Rn Rd		FMAXV Sd, Vn.4S
+0 1 1 01110 1 0 11000 01111 10 Rn Rd		FMINV Sd, Vn.4S
+
+# Vector loads and stores.
+0 q:1 0011000 1 000000 0111 size:2 Rn Rt	LD1 {Vt.T}, [Xn|SP] T=8B|16B|4H|8H|2S|4S|1D|2D
+0 q:1 0011000 0 000000 0111 size:2 Rn Rt	ST1 {Vt.T}, [Xn|SP] T=8B|16B|4H|8H|2S|4S|1D|2D
+00 111 1 01 11 imm12 Rn Rt			LDR Qt, [Xn|SP, #imm12*16]
+00 111 1 01 10 imm12 Rn Rt			STR Qt, [Xn|SP, #imm12*16]

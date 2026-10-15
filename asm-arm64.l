@@ -15,7 +15,8 @@
 	  ((= ?R (string-at s 0))		5)
 	  (else					(string->number (array->string (arm64-array-from s 3)))))))
 
-;; A row: (mnemonic operands fields mask value), fields as strings of bits or (name . width).
+;; A row: (mnemonic operands fields mask value allowed), fields as strings of
+;; bits or (name . width); allowed is the row's T=... arrangements, or ().
 (define arm64-rows
   (map (lambda (row)
 	 (let ((fields (map (lambda (f) (if (string? f) f (cons (car f) (arm64-field-width f)))) (caddr row)))
@@ -25,7 +26,7 @@
 		 (string-do c f (set mask (| (<< mask 1) 1)) (set value (| (<< value 1) (- c ?0))) (set n (+ n 1)))
 	       (set mask (<< mask (cdr f))) (set value (<< value (cdr f))) (set n (+ n (cdr f)))))
 	   (or (= n 32) (error (car row)" "(cadr row)": "n" bits, not 32"))
-	   (list (car row) (cadr row) fields mask value)))
+	   	   (list (car row) (cadr row) fields mask value (cadddr row))))
        (parse-string <arm64spec> $file (contents-of-file-named "arm64.spec"))))
 
 ;; Registers: (name class number kind).  The class is the letter of the operand
@@ -123,6 +124,50 @@
   (let ((b (& 1 (>> q 6))) (cd (& 3 (>> q 4))))
     (arm64-fp8-value (& 1 (>> q 7)) (if (= b 1) (- cd 3) (+ cd 1)) (& q 15))))
 
+;;; Vector arrangements: (name size-index q).  A row's arrangement variable T
+;;; sets whichever of its fields q, size (2 bits) or sz (1 bit) it has.
+
+;; Maru reads 4S as 4 and S, so arrangement names are made from strings, and
+;; in data a vector register is (V n count size): (V 3 4 S) is V3.4S, which is
+;; what (V 3 4S) reads as.  A lane is (V n size index): (V 3 S 1) is V3.S[1].
+(define-function arm64-arr (name)	(string->symbol name))
+(define arm64-arrangements
+  (map (lambda (e) (cons (arm64-arr (car e)) (cdr e)))
+       '(("8B" 0 0) ("16B" 0 1) ("4H" 1 0) ("8H" 1 1) ("2S" 2 0) ("4S" 2 1) ("1D" 3 0) ("2D" 3 1))))
+(define arm64-arrangements-fp	(map arm64-arr '("2S" "4S" "2D")))
+(define arm64-arrangements-int	(map arm64-arr '("8B" "16B" "4H" "8H" "2S" "4S" "2D")))
+
+;; Data (V n count size) to its arrangement name, and back.
+(define-function arm64-data-arr (op)
+  (string->symbol (concat-string (long->string (caddr op)) (symbol->string (cadddr op)))))
+(define-function arm64-arr-data (n arr)
+  (let* ((s (symbol->string arr)) (i 0))
+    (while (and (< i (string-length s)) (<= ?0 (string-at s i)) (<= (string-at s i) ?9)) (set i (+ i 1)))
+    (list 'V n (string->number (string-copy s 0 i)) (string->symbol (string-copy s i (- (string-length s) i))))))
+
+(define-function arm64-has-field? (row name)	(list-detect f (caddr row) (and (pair? f) (= name (car f)))))
+
+(define-function arm64-allowed (row)
+  (or (cadr (cddddr row))
+            (if (arm64-has-field? row 'sz) arm64-arrangements-fp arm64-arrangements-int)))
+
+(define-function arm64-esize (arr)	(<< 8 (cadr (assq arr arm64-arrangements))))	; bits per element
+
+;; Bind arrangement arr for row onto env, consistently with any already bound.
+(define-function arm64-bind-arrangement (row arr env)
+  (let ((a (assq arr arm64-arrangements)) (bound (assq 'T env)))
+    (and a (memq arr (arm64-allowed row)) (or (not bound) (= (cdr bound) arr))
+	 (let ((sz (- (cadr a) 2)))
+	   (and (or (not (arm64-has-field? row 'sz)) (<= 0 sz))
+		(let ((e (cons (cons 'T arr) env)))
+		  (and (arm64-has-field? row 'q) (set e (cons (cons 'q (caddr a)) e)))
+		  (and (arm64-has-field? row 'size) (set e (cons (cons 'size (cadr a)) e)))
+		  (and (arm64-has-field? row 'sz) (set e (cons (cons 'sz sz) e)))
+		  e))))))
+
+(define-function arm64-vector? (op)	; (V n count size) or a lane (V n size index)
+  (and (pair? op) (= 'V (car op)) (= 4 (list-length op)) (long? (cadr op)) (<= 0 (cadr op)) (< (cadr op) 32)))
+
 (define-function arm64-cond-code (c)
   (let ((i 0) (found ()))
     (list-do x arm64-conditions (and (= x c) (set found i)) (set i (+ i 1)))
@@ -148,6 +193,19 @@
 			  (and r (= (cadr r) (arm64-reg-class (cadr k)))
 			       (or (not (cadddr r)) (= (cadddr r) (if (caddr k) 'sp 'zr)))
 			       (cons (cons (arm64-reg-field (cadr k)) (caddr r)) env))))
+                  ((= c 'vreg)	(and (arm64-vector? op) (long? (caddr op))
+			     (let* ((arr (arm64-data-arr op))
+				    (e (if (= 'T (caddr k)) (arm64-bind-arrangement row arr env) (and (= (caddr k) arr) env))))
+			       (and e (cons (cons (arm64-reg-field (cadr k)) (cadr op)) e)))))
+      ((= c 'vbrace)	(arm64-bind row (cadr k) op env pc))
+            ((= c 'vlane)	(and (arm64-vector? op) (symbol? (caddr op)) (= (string->symbol (caddr k)) (caddr op))
+			     (let ((q (arm64-scaled row (cadddr k) (cadddr op))))
+			       (and q (arm64-bind-field row (cadr (cadddr k)) q (cons (cons (arm64-reg-field (cadr k)) (cadr op)) env))))))
+      ((memq c '(vshl vshr))
+			(let* ((bound (assq 'T env)) (e (and bound (arm64-esize (cdr bound)))))
+			  (and e (long? op)
+			       (if (= c 'vshl) (and (<= 0 op) (< op e)) (and (< 0 op) (<= op e)))
+			       (arm64-bind-field row 'immh:immb (if (= c 'vshl) (+ e op) (- (* 2 e) op)) env))))
       ((= c 'bimm)	(let ((f (and (long? op) (arm64-bitmask op (cadr k)))))
 			  (and f (cons (cons 'n (car f)) (cons (cons 'immr (cadr f)) (cons (cons 'imms (caddr f)) env))))))
       ((= c 'lslimm)	(let ((w (cadr k)))
@@ -165,6 +223,7 @@
 			(and (not (= 'imm0 (cadr k)))
 			     (or (not (cdr op)) (= (cadr op) (arm64-width-of row (cadr k))))
 			     (arm64-bind-field row (cadr k) 0 env)))
+            ((and (= c 'imm) (= 'imm0 (cadr k)))	(and (= op 0) env))
       ((memq c '(imm simm))
 			(let ((q (arm64-scaled row k op))) (and q (arm64-bind-field row (cadr k) q env))))
       ((= c 'pcrel)	(let ((q (and (long? op) (arm64-scaled row k (- op pc))))) (and q (arm64-bind-field row (cadr k) q env))))
@@ -215,12 +274,39 @@
       (set v (| (<< v (arm64-width-of row part)) (arm64-part-of row word part))))
     v))
 
+;; The arrangement word encodes for row: the one allowed arrangement its q,
+;; size, sz or immh fields agree with, or ().
+(define-function arm64-decode-arrangement (row word)
+  (let ((found ()) (n 0))
+    (list-do arr (arm64-allowed row)
+      (let ((a (assq arr arm64-arrangements)))
+	(when (and (or (not (arm64-has-field? row 'q)) (= (caddr a) (arm64-part-of row word 'q)))
+		   (or (not (arm64-has-field? row 'size)) (= (cadr a) (arm64-part-of row word 'size)))
+		   (or (not (arm64-has-field? row 'sz)) (= (- (cadr a) 2) (arm64-part-of row word 'sz)))
+		   (or (not (arm64-has-field? row 'immh))
+		       (let ((immh (arm64-part-of row word 'immh)) (top 3))
+			 (while (and (<= 0 top) (= 0 (& immh (<< 1 top)))) (set top (- top 1)))
+			 (= top (cadr a)))))
+	  (set found arr)
+	  (set n (+ n 1)))))
+    (and (= n 1) found)))
+
 ;; The operand kind k reads from word, or 'invalid when this row does not
 ;; describe it (a reserved bit pattern, or an alias another row decodes).
 (define-function arm64-operand (row k word pc)
   (let ((c (car k)))
     (cond
       ((= c 'reg)	(arm64-reg-named (arm64-reg-class (cadr k)) (arm64-field-of row word (arm64-reg-field (cadr k))) (caddr k)))
+            ((= c 'vreg)	(let ((arr (if (= 'T (caddr k)) (arm64-decode-arrangement row word) (caddr k))))
+			  			  (if arr (arm64-arr-data (arm64-field-of row word (arm64-reg-field (cadr k))) arr) 'invalid)))
+      ((= c 'vbrace)	(arm64-operand row (cadr k) word pc))
+      ((= c 'vlane)	(list 'V (arm64-field-of row word (arm64-reg-field (cadr k))) (string->symbol (caddr k))
+			      (arm64-field-of row word (cadr (cadddr k)))))
+      ((memq c '(vshl vshr))
+			(let* ((arr (arm64-decode-arrangement row word)) (e (and arr (arm64-esize arr)))
+			       (v (arm64-field-of row word 'immh:immb))
+			       (s (and e (if (= c 'vshl) (- v e) (- (* 2 e) v)))))
+			  (if (and s (if (= c 'vshl) (and (<= 0 s) (< s e)) (and (< 0 s) (<= s e)))) s 'invalid)))
       ((= c 'bimm)	(or (arm64-bitmask-value (or (arm64-part-of row word 'n) 0) (arm64-part-of row word 'immr)
 						 (arm64-part-of row word 'imms) (cadr k))
 			    'invalid))

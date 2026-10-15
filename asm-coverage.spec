@@ -212,3 +212,80 @@ arm64	store.f32	STR St, [Xn|SP, #imm12*4]
 arm64	store.f64	STR Dt, [Xn|SP, #imm12*8]
 arm64	store.pair.f64	STP Dt, Dt2, [Xn|SP, #simm7*8]
 arm64	load.pair.f64	LDP Dt, Dt2, [Xn|SP, #simm7*8]
+
+# ---------------------------------------------------------------- arm64: Advanced SIMD (NEON)
+# Classes vOP.TYPE are the packed counterparts of ir2's operations.
+
+arm64	vadd.int		ADD Vd.T, Vn.T, Vm.T
+arm64	vsub.int		SUB Vd.T, Vn.T, Vm.T
+arm64	vmul.int		MUL Vd.T, Vn.T, Vm.T
+arm64	vneg.int		NEG Vd.T, Vn.T
+arm64	vbitand			AND Vd.T, Vn.T, Vm.T
+arm64	vbitor			ORR Vd.T, Vn.T, Vm.T
+arm64	vbitxor			EOR Vd.T, Vn.T, Vm.T
+arm64	vbitandnot		BIC Vd.T, Vn.T, Vm.T
+arm64	vcom			NOT Vd.T, Vn.T
+arm64	vshl.int		SSHL Vd.T, Vn.T, Vm.T
+arm64	vshl.int		USHL Vd.T, Vn.T, Vm.T
+arm64	vshl.imm		SHL Vd.T, Vn.T, #vshl
+arm64	vshr.imm.s		SSHR Vd.T, Vn.T, #vshr
+arm64	vshr.imm.u		USHR Vd.T, Vn.T, #vshr
+arm64	veq.int			CMEQ Vd.T, Vn.T, Vm.T
+arm64	vgt.s			CMGT Vd.T, Vn.T, Vm.T
+arm64	vge.s			CMGE Vd.T, Vn.T, Vm.T
+arm64	vgt.u			CMHI Vd.T, Vn.T, Vm.T
+arm64	vge.u			CMHS Vd.T, Vn.T, Vm.T
+arm64	vmin.s			SMIN Vd.T, Vn.T, Vm.T
+arm64	vmax.s			SMAX Vd.T, Vn.T, Vm.T
+arm64	vmin.u			UMIN Vd.T, Vn.T, Vm.T
+arm64	vmax.u			UMAX Vd.T, Vn.T, Vm.T
+arm64	vadd.float		FADD Vd.T, Vn.T, Vm.T
+arm64	vsub.float		FSUB Vd.T, Vn.T, Vm.T
+arm64	vmul.float		FMUL Vd.T, Vn.T, Vm.T
+arm64	vdiv.float		FDIV Vd.T, Vn.T, Vm.T
+arm64	vfma.float		FMLA Vd.T, Vn.T, Vm.T
+arm64	vmin.float		FMIN Vd.T, Vn.T, Vm.T
+arm64	vmax.float		FMAX Vd.T, Vn.T, Vm.T
+arm64	vneg.float		FNEG Vd.T, Vn.T
+arm64	vabs.float		FABS Vd.T, Vn.T
+arm64	vsqrt.float		FSQRT Vd.T, Vn.T
+arm64	veq.float		FCMEQ Vd.T, Vn.T, Vm.T
+arm64	vgt.float		FCMGT Vd.T, Vn.T, Vm.T
+arm64	vge.float		FCMGE Vd.T, Vn.T, Vm.T
+arm64	vcast.s.float		SCVTF Vd.T, Vn.T
+arm64	vcast.u.float		UCVTF Vd.T, Vn.T
+arm64	vcast.float.s		FCVTZS Vd.T, Vn.T
+arm64	vcast.float.u		FCVTZU Vd.T, Vn.T
+arm64	vbroadcast		DUP Vd.T, Wn
+arm64	vbroadcast		DUP Vd.T, Xn
+arm64	vbroadcast		DUP Vd.T, Vn.S[#index]
+arm64	vbroadcast		DUP Vd.T, Vn.D[#index]
+arm64	vinsert			INS Vd.B[#index], Wn
+arm64	vinsert			INS Vd.H[#index], Wn
+arm64	vinsert			INS Vd.S[#index], Wn
+arm64	vinsert			INS Vd.D[#index], Xn
+arm64	vextract		UMOV Wd, Vn.B[#index]
+arm64	vextract		UMOV Wd, Vn.H[#index]
+arm64	vextract		UMOV Wd, Vn.S[#index]
+arm64	vextract		UMOV Xd, Vn.D[#index]
+arm64	vextract.s		SMOV Xd, Vn.B[#index]
+arm64	vextract.s		SMOV Xd, Vn.H[#index]
+arm64	vextract.s		SMOV Xd, Vn.S[#index]
+arm64	vshuffle		EXT Vd.T, Vn.T, Vm.T, #imm4
+arm64	vshuffle		ZIP1 Vd.T, Vn.T, Vm.T
+arm64	vshuffle		ZIP2 Vd.T, Vn.T, Vm.T
+arm64	vshuffle		UZP1 Vd.T, Vn.T, Vm.T
+arm64	vshuffle		UZP2 Vd.T, Vn.T, Vm.T
+arm64	vshuffle		TRN1 Vd.T, Vn.T, Vm.T
+arm64	vshuffle		TRN2 Vd.T, Vn.T, Vm.T
+arm64	vpermute		TBL Vd.T, {Vn.16B}, Vm.T
+arm64	vreduce.add		ADDV Bd, Vn.T
+arm64	vreduce.add		ADDV Hd, Vn.T
+arm64	vreduce.add		ADDV Sd, Vn.4S
+arm64	vreduce.add.float	FADDP Vd.T, Vn.T, Vm.T
+arm64	vreduce.max.float	FMAXV Sd, Vn.4S
+arm64	vreduce.min.float	FMINV Sd, Vn.4S
+arm64	vload			LD1 {Vt.T}, [Xn|SP]
+arm64	vstore			ST1 {Vt.T}, [Xn|SP]
+arm64	vload			LDR Qt, [Xn|SP, #imm12*16]
+arm64	vstore			STR Qt, [Xn|SP, #imm12*16]

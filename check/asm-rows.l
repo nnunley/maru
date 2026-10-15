@@ -34,10 +34,17 @@
     (LSL X0 X1 64)		; shift out of range
     (CSET X0 AL)		; AL and NV have no inverse
     (LDR X0 (off X1 4))		; offset not a multiple of 8
-    (FADD S0 S1 D2)))		; mixed precision
+        (FADD S0 S1 D2)		; mixed precision
+    (ADD (V 0 4S) (V 1 2S) (V 2 4S))	; arrangements must agree
+    (MUL (V 0 2D) (V 1 2D) (V 2 2D))	; MUL has no 2D form
+    (FADD (V 0 8B) (V 1 8B) (V 2 8B))	; no byte floating point
+    (SHL (V 0 4S) (V 1 4S) 32)		; shift beyond the element
+    (USHR (V 0 4S) (V 1 4S) 0)))	; right shifts are 1..esize
 
 (define isa-rows		(cadr (asm-isa isa)))
 (define isa-samples		arm64-samples)
+(define isa-variants		arm64-variants)
+(define isa-set-variant		arm64-set-variant)
 (define isa-text		arm64-text)
 (define isa-skip?		arm64-skip?)
 (define isa-refused		arm64-refused)
@@ -59,6 +66,8 @@
   (let ((a (array))) (for (i from to) (array-append a (array-at bytes i))) a))
 
 (list-do row isa-rows
+ (list-do variant (isa-variants row)
+  (isa-set-variant variant)
   (let ((pos 0))
     (list-do sops (product (map (lambda (k) (set pos (+ pos 1)) (isa-samples row k pos)) (cadr row)))
       (unless (isa-skip? row sops)
@@ -69,7 +78,8 @@
 			  sops))
 	       (line (symbol->string (car row)))
 	       (first 1))
-	  (list-do x sops (set line (concat-strings line (if first " " ", ") (isa-text x n))) (set first ()))
+	  	  (let ((ks (cadr row)))
+	    (list-do x sops (set line (concat-strings line (if first " " ", ") (isa-text x n (car ks)))) (set first ()) (set ks (cdr ks))))
 	  (asm isa buffer (cons (car row) ops))
 	  (out s "L" (long->string n) ": " line "\n")
 	  (array-append lines line)
@@ -86,7 +96,8 @@
 		 (set roundtrip (+ roundtrip 1)) (println "ROUNDTRIP " line " -> " (car back)))
 		((not (equal (car back) (cons (car row) ops)))
 		 (set aliased (+ aliased 1))))))
-	  (set n (+ n 1)))))))
+	  	  (set n (+ n 1))))))))
+(isa-set-variant ())
 (close s)
 
 ;; Instructions that must be refused, and must leave the buffer alone.

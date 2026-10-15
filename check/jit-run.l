@@ -101,6 +101,20 @@
 	   25)
 	  75025))
 
+;; Four lanes at once: d[i] += a[i] * b[i] for float arrays.
+(when (= isa 'arm64)
+  (let ((fmla (assemble '((LD1 (V 0 4S) (off X0 0))
+			  (LD1 (V 1 4S) (off X1 0))
+			  (LD1 (V 2 4S) (off X2 0))
+			  (FMLA (V 0 4S) (V 1 4S) (V 2 4S))
+			  (ST1 (V 0 4S) (off X0 0))
+			  (RET))
+			"ppp>p"))
+	(d ((subr "malloc" "l>p") 16)) (a ((subr "malloc" "l>p") 16)) (b ((subr "malloc" "l>p") 16)))
+    (for (i 0 4) (set-float-at d i 1.0) (set-float-at a i (+ i 1.0)) (set-float-at b i 0.5))
+    (fmla d a b)
+    (expect (list (float-at d 0) (float-at d 1) (float-at d 2) (float-at d 3)) '(1.5 2.0 2.5 3.0))))
+
 ;; A buffer that runs past the region's end does not fit, and nothing is copied.
 (let ((b (asm-buffer (- (+ (car region) (cadr region)) 2))))
   (asm isa b (if (= isa 'arm64) '(RET) '(RET)))
