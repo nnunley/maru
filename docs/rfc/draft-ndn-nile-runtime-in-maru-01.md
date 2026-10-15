@@ -1,4 +1,4 @@
-# draft-ndn-nile-runtime-in-maru-00: A Nile Runtime in Typed Maru
+# draft-ndn-nile-runtime-in-maru-01: A Nile Runtime in Typed Maru
 
 **Status:** DRAFT
 **Corpus:** red (spec-first: the checks named below are the acceptance criteria)
@@ -13,7 +13,9 @@ declarations. It keeps the design of Nile's C runtime (a worker pool with
 per-worker queues and chunk heaps) and replaces its spin locks with POSIX
 mutexes and condition variables, so that it runs on arm64 as well as
 x86-64. It also moves Nile's compiler onto Maru's newer dialect and makes
-`nile.k` the single definition of the runtime interface. It is written for
+`nile.k` the single definition of the runtime interface. Nile kernels reach
+machine code only through the Maru stack: typed Maru, Maru's IR and, until
+Maru's own back ends exist, `ir-gen-c.k`. It is written for
 whoever implements the runtime and for whoever plans the Gezira and
 windowed-demo work that follows it.
 
@@ -78,15 +80,16 @@ when, and only when, they appear in all capitals, as shown here.
 - **quantum** — the number of floats in one stream element, which differs
   per kernel input and output.
 - **variable record** — a kernel's state, the struct `<kernel>_vars` that
-  both code generators emit, stored in its process's block after the
+  Nile's Maru code generator emits, stored in its process's block after the
   process record.
 - **worker** — one of the `nthreads` threads `nile_startup` starts.
 - **liaison** — the calling thread, which joins the pool as an extra member
   with its own queue.
 - **quota** — the number of buffers a process's input may hold before its
   producer stops (`INPUT_QUOTA`).
-- **C target**, **Maru target** — the outputs of Nile's two code
-  generators, `nile-gen-code-c.l` and `nile-gen-code-maru.l`.
+- **Maru target** — the typed Maru that Nile's code generator
+  `nile-gen-code-maru.l` emits. Nile's other generator,
+  `nile-gen-code-c.l`, is outside the stack and unused.
 - **reference output** — the 29 lines `text_layout` prints on the C
   runtime.
 
@@ -98,15 +101,20 @@ Gezira enter the `maru` repository, how Nile's compiler runs on Maru's
 `main`, and the checks that hold all of this in place. It does NOT define
 Gezira's kernels, image I/O or window bindings; those belong to the second
 and third steps named in Motivation. It does NOT define native code
-generation; the runtime compiles through `ir-gen-c.k` and `cc`.
+generation; the runtime and the kernels compile through Maru's IR and
+`ir-gen-c.k` until Maru's own back ends replace it.
 
 **Same design as the C runtime.** Every structure, queue discipline,
 critical section and quota in the C runtime has a counterpart in the
 runtime, and only the synchronisation primitives change, so the two can be
 compared piece by piece.
 
-**One definition of the interface.** `nile.k` declares every public call;
-`nile.h` is generated from it and never edited.
+**One definition of the interface.** `nile.k` declares every public call,
+and the runtime, its tests and every kernel compile against it.
+
+**The Maru stack only.** Nile kernels reach machine code only through typed
+Maru and Maru's IR. Nile's C code generator, its C runtime and a C header
+are not part of the build.
 
 **No spinning.** A thread with nothing to do waits on a condition variable.
 
@@ -136,8 +144,10 @@ relies on.
   loads), MUST be restored to `main`.
 - The `nile` fork MUST mark code outside the stack with an `unused`
   attribute in `.gitattributes`: `viz/`, `compilers/js/`, `compilers/st/`,
-  `runtimes/c/`, `runtimes/js/` and `examples/c/`. `runtimes/c/` stays in
-  the tree as the reference implementation.
+  `runtimes/c/`, `runtimes/js/`, `examples/c/`, and the C code generator
+  (`compilers/maru/nile-gen-code-c.l`, `nile-builtins-c.l`,
+  `nile-to-c-compiler.sh`). `runtimes/c/` stays in the tree as the
+  reference implementation.
 
 ### Files
 
@@ -153,7 +163,6 @@ The runtime's files mirror the C runtime's.
 | `nile-kernel.k` | *new* | The kernel interface |
 | `nile-builtins.k` | `nile-builtins.c` | PassThrough, Capture, Reverse, SortBy, DupZip, DupCat and Funnel as kernels against the kernel interface |
 | `nile.k` | already exists | Every public declaration (see "Public interface") |
-| `gen-nile-h.k` | *new* | Generates `nile.h` from `nile.k` |
 | `test/*.k` | `runtimes/c/test/*.c` | The checks' kernels and drivers |
 
 ### Data model
@@ -251,14 +260,13 @@ blocks on separate cache lines. Two limits follow from it:
 
 ### Public interface
 
-`nile.k` MUST declare every call below, and `nile.h` MUST be generated from
-`nile.k` by `gen-nile-h.k` at build time, marked `derived` and never
-committed, as `asm-x86.k` is generated from `gen-asm-x86.k`. The C target
-and the Maru target then compile against one definition, and the C header
-cannot drift from it. [R-one-interface]
+`nile.k` MUST declare every call below, and the runtime MUST define every
+call `nile.k` declares, so that a kernel or test compiled against `nile.k`
+alone links. [R-one-interface] The `nile.h` in Nile's C runtime is half old
+and half new, and nothing in the stack uses it.
 
 ```maru-check @R-one-interface
-nile_header
+nile_interface
 ```
 
 Calls marked "as C" behave as the C runtime's call of that name.
@@ -271,7 +279,7 @@ Calls marked "as C" behave as the C runtime's call of that name.
 | `nile_status (p) → Status`, `nile_error (p) → bool` | As C. |
 | `nile_print_leaks (p)` | As C. |
 | `nile_Process_pipe (p1, p2) → p1` | Connects `p1`'s output to `p2`'s input. Takes two processes: the C runtime's variadic form cannot be declared in typed Maru, and Nile's runtime TODO asks for the two-argument form. |
-| `nile_Process_feed (p, data, n)` | As C. |
+| `nile_Process_feed (p, data, n)` | As C, except that it sets `BAD_ARG` and feeds nothing when `n` is not a whole number of the process's input elements. |
 | `nile_Process_gate (gater, gatee)` | As C. |
 | `nile_Process_pipeline (ps, n) → p` | As C, built from two-argument pipes. |
 | `nile_Process_launch (ps, nps, data, ndata)` | As C. |
@@ -280,8 +288,8 @@ Calls marked "as C" behave as the C runtime's call of that name.
 
 ### The kernel interface
 
-The interface is inferred from what both code generators emit; neither the
-header nor the generators document its semantics.
+The interface is inferred from what Nile's two code generators emit;
+neither the header nor the generators document its semantics.
 
 | Call | Meaning |
 |---|---|
@@ -295,7 +303,8 @@ header nor the generators document its semantics.
 | `nile_Process_reroute (p, i, j, sub) → status` | Saves `i` and `j`, then places the pipeline `sub` between `p` and its consumer. `p` passes its remaining input through and removes itself, as C's `swap` does. |
 
 The prologue runs once before the first input, with an empty `in`. The
-epilogue runs once after the last input. Both use the work-function
+epilogue runs once after the last input. Both run even when the stream is
+empty. Both use the work-function
 signature and the same output calls.
 
 A buffer's capacity MUST be rounded down to a whole number of the
@@ -306,11 +315,11 @@ in the middle of a statement. If no block is free, it marks every worker
 `OUT_OF_MEMORY` and points `out` at a scratch block, so the write completes
 and is discarded; the next `nile_Process_advance_input` stops the kernel.
 
-Both code generators MUST pass `sizeof_vars`: the size of the kernel's
-variable struct, or 0 when the kernel has none. The C runtime's
+Nile's Maru code generator MUST pass `sizeof_vars`: the size of the
+kernel's variable struct, or 0 when the kernel has none. The C runtime's
 `nile_Process` took this argument, and the generators dropped it; restoring
-it is one argument in `nile-gen-code-c.l` and one in
-`nile-gen-code-maru.l`, since both already emit the struct. It lets the
+it is one argument in `nile-gen-code-maru.l`, which already emits the
+struct. It lets the
 runtime check the record against the block, and copy it when a process is
 cloned.
 
@@ -473,18 +482,11 @@ target and run on the runtime, MUST print the reference output.
 nile_text_layout
 ```
 
-The same program compiled to the C target and linked against the runtime
-through the generated `nile.h` MUST print the reference output.
-[R-text-layout-c] The two paths differ only in the code generator. If they
-agree with each other, the generators are consistent; their agreement with
-the reference output then tests the runtime and the compiler together.
-Comparing the Maru target alone with the reference output would change the
-compiler, the generator and the runtime at once, and a mismatch would not
-say which.
-
-```maru-check @R-text-layout-c
-nile_text_layout_c
-```
+The check changes the compiler, the code generator and the runtime at once
+relative to the reference output. A mismatch is traced by comparing the
+generated typed Maru kernels with `examples/c/text_layout.c` (the C runtime's
+kernels for the same program), kernel by kernel, and by the runtime's own
+checks above, which do not involve the compiler.
 
 The reference output is produced once from the C runtime, built for x86-64
 and run under Rosetta, and written into the check, with the command that
@@ -508,12 +510,12 @@ Estimates, descriptive only:
 
 | Part | Lines |
 |---|---|
-| Nile's compiler (`compilers/maru`) and prelude | about 1,680 |
+| Nile's compiler (`compilers/maru`, Maru target only) and prelude | about 1,460 |
 | `print-structure.l`, restored | about 60 |
 | `boot2.l` additions for the port | about 100 |
-| The runtime, including `gen-nile-h.k` | about 2,050 (the C runtime is about 2,000 lines of C) |
+| The runtime | about 2,000 (the C runtime is about 2,000 lines of C) |
 | Checks | about 300 |
-| Total added | about 4,200 |
+| Total added | about 3,900 |
 
 That brings the stack to about 31,000 lines against the soft 20,000-line
 budget.
@@ -552,8 +554,14 @@ No seam exists in the kernel interface.
 `notes/sources/grammars/` but no compiler, and its grammar has no way to
 call C. Extension point: none until a Nothing compiler exists.
 
-**Native code generation.** Extension point: `ir-gen-arm64.k` (the roadmap's
-first item); the runtime is ordinary typed Maru.
+**Native code generation.** Compiling kernels and the runtime to arm64 or
+x86-64 machine code with Maru's own back ends, in-process or to object
+files. Excluded because those back ends do not exist yet: the table-driven
+assembler spec (2026-10-14) covers x86 rows that are checked and A64 rows
+that are not written, and the `ir-gen-arm64.k` drafts on `refactor-main`
+emit code that does not assemble. Extension point: the back-end argument of
+the build (`ir-gen-c.k` today); the runtime and kernels are ordinary typed
+Maru and do not change when it does.
 
 **Performance beyond the C runtime's.** Extension point: the configuration
 table.
@@ -576,11 +584,11 @@ smaller, but it could not be compared with the C runtime piece by piece,
 and the per-worker queues are what keep a producer and its consumer on one
 core.
 
-**Why not edit `nile.h` by hand to match `nile.k`?** Two hand-kept
-declarations of one interface drift; the current `nile.h` already has.
-
-**Why not drop the C header and keep only the Maru target?** The C target
-is what separates generator bugs from runtime bugs in `[R-text-layout-c]`.
+**Why not also build `text-layout.nl` through Nile's C code generator?** A
+second path differing only in the code generator would separate generator
+bugs from runtime bugs, but it brings Nile's C target and a generated C
+header into the stack. The stack is Maru's; comparing generated kernels by
+hand covers the rare mismatch.
 
 **Why not allocate pthread objects separately and store pointers?** It is
 simpler to declare, but adds an allocation per lock and cleanup at
@@ -589,10 +597,6 @@ shutdown, and changes the C runtime's memory layout.
 **Why not keep Nile's compiler on `eval` and `boot.l`?** That ties Nile to
 both dialects, and a dialect merge could break it with only
 `nile_text_layout` to notice after the fact.
-
-**Why not compare the Maru target with the reference output alone?** A
-mismatch would not say whether the compiler, the generator or the runtime
-caused it.
 
 **Why not size each process's block to its variable record?** It needs a
 general allocator or size classes, which the Out of Scope entry on block sizing
@@ -616,16 +620,16 @@ not reach the build unreviewed.
 
 ## Compatibility
 
-- Nile's C runtime is unchanged and stays as the reference. Kernels from
-  the updated generators pass `sizeof_vars` and do not link against it; it
-  never implemented the new interface anyway.
-- The generated `nile.h` replaces the hand-written one in builds that use
-  the runtime. `runtimes/c/` keeps its own header.
+- Nile's C runtime is unchanged and stays as the reference, with its own
+  `nile.h`. Kernels from the updated Maru generator pass `sizeof_vars` and
+  do not link against it; it never implemented the new interface anyway.
+- Nile's C code generator still exists in the fork, marked unused; it is
+  not updated for `sizeof_vars`.
 - Nile's compiler moves from `eval`/`boot.l` to `eval2`/`boot2.l`, and
   from its 2012 copy of Maru to `maru`'s `main`. A standalone `nile`
   checkout now needs a `maru` checkout, named by `MARU`.
-- The `lines` check starts counting the submodules, so its total rises by
-  about 4,200 lines, each accounted for in `check/lines`.
+- The `lines` check counts the submodules, so its total rises by about
+  3,900 lines over this work, each accounted for in `check/lines`.
 
 ## References
 
@@ -638,5 +642,7 @@ not reach the build unreviewed.
   design follows.
 - Nile's runtime TODO, `runtimes/c/TODO`: the two-argument pipe.
 - `CLAUDE.md` roadmap items 1 and 4, and the 20k line budget.
+- Table-driven assemblers and disassemblers (x86, A64):
+  `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
 - STEPS 2011 report, on Nothing running the Nile runtime:
   `notes/sources/`.

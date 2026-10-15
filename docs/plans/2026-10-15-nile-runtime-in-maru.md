@@ -8,7 +8,7 @@
 
 **Tech Stack:** Typed Maru (`maru.k`, `ir2.k`, `ir-gen-c.k`) under `eval2`; untyped Maru under `eval` for `check/check.l`; POSIX threads; clang/cc with ThreadSanitizer; git submodules; `gh`.
 
-**Spec:** `docs/rfc/draft-ndn-nile-runtime-in-maru-00.md`. Read it before any task. Requirement IDs below (`[R-…]`) are its markers.
+**Spec:** `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md`. Read it before any task. Requirement IDs below (`[R-…]`) are its markers.
 
 ## Global Constraints
 
@@ -18,7 +18,7 @@
 - Each commit that changes the source line count adds a `check/lines` entry with its delta and reason, so `./eval check/check.l lines` passes after every commit.
 - Commit messages are Conventional Commits. No `Co-Authored-By` or other Claude attribution (a hook blocks it).
 - Work happens on short-lived branches (`nile-runtime` in `maru`, `maru-runtime` in the forks), merged into `main` and deleted when done; no stale branches. Push `main` and the forks' branches as work lands.
-- A task is done when its `maru-check` cases print `PASS` and `make check` stays green. `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-nile-runtime-in-maru-00.md` keeps reporting "red as declared" until Task 11, after which the RFC's `**Corpus:**` line is removed and it reports green.
+- A task is done when its `maru-check` cases print `PASS` and `make check` stays green. `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-nile-runtime-in-maru-01.md` keeps reporting "red as declared" until Task 11, after which the RFC's `**Corpus:**` line is removed and it reports green.
 - Runs on arm64 macOS by default. Task 12 repeats `make check` on `ndn.lan` (x86-64 Linux, fish shell).
 
 ## Review Focus
@@ -83,37 +83,36 @@ The full set `eval2` dropped and `boot2.l` lacks is: `allocate-atomic array-comp
 
 **Files:**
 - Restore: `print-structure.l` (from `git show f6671da^:print-structure.l`)
-- In `nile`: delete `compilers/maru/maru/` (the 2012 copy); modify `compilers/maru/nile-to-c-compiler.sh`, `compilers/maru/nile-to-maru-compiler.sh`; modify whatever `compilers/maru/*.l` the port needs
+- In `nile`: delete `compilers/maru/maru/` (the 2012 copy) and its `unused` line; mark `compilers/maru/nile-gen-code-c.l`, `nile-builtins-c.l` and `nile-to-c-compiler.sh` `unused`; modify `compilers/maru/nile-to-maru-compiler.sh` and whatever `compilers/maru/*.l` the port needs
 - Modify: `boot2.l` (further dropped operations the port finds), `check/boot2-strings.l` (an assertion per added operation), `check/check.l` (case `nile_compile`), `check/lines`, `CLAUDE.md` (Verify list: `boot2_strings`, `nile_compile`)
 
 **Interfaces:**
 - Consumes: Task 2's `boot2.l` functions.
-- Produces: `nile/compilers/maru/nile-to-maru-compiler.sh FILE.nl` and `nile-to-c-compiler.sh FILE.nl`, which run `$MARU/eval2 -b $MARU/boot2.l -L $MARU/ -L <compiler dir>/ <compiler dir>/nile-compiler.l <compiler dir> maru|c FILE.nl`. `MARU` defaults to `<compiler dir>/../../..` when that directory contains `boot2.l`, else the script exits 2 with `set MARU to a maru checkout`.
+- Produces: `nile/compilers/maru/nile-to-maru-compiler.sh MODULE FILE.nl`, which runs `$MARU/eval2 -b $MARU/boot2.l -L $MARU/ -L <compiler dir>/ <compiler dir>/nile-compiler.l <compiler dir> maru MODULE FILE.nl`. `MARU` defaults to `<compiler dir>/../../..` when that directory contains `boot2.l`, else the script exits 2 with `set MARU to a maru checkout`.
 
-- [ ] **Step 1: Write the failing test.** Case `nile_compile`: compiles `nile/examples/text-layout.nl` twice per target, once with the old path (`./eval -b boot.l -L ./ …` on the same compiler files, kept only inside this check as the oracle) and once with the new script; asserts the outputs are byte-identical for both the Maru target and the C target (`.k`, `.c` and `.h`).
+- [ ] **Step 1: Write the failing test.** Case `nile_compile`: compiles `nile/examples/text-layout.nl` twice per target, once with the old path (`./eval -b boot.l -L ./ …` on the same compiler files, kept only inside this check as the oracle) and once with the new script; asserts the Maru-target outputs are byte-identical.
 - [ ] **Step 2:** Run `./eval check/check.l nile_compile`. Expected: FAIL at `undefined variable: string-copy` (until Task 2 lands) or the next missing definition.
 - [ ] **Step 3:** Port: restore `print-structure.l`; rewrite the two scripts as above; for each failure, add the missing operation to `boot2.l` (with an assertion in `check/boot2-strings.l`) or adapt the compiler file. No compiler file uses `*env*` or `Variable`/`Env` objects (checked 2026-10-15), so expect library gaps, not dialect rewrites.
 - [ ] **Step 4:** Run `./eval check/check.l nile_compile boot2_strings`. Expected: both PASS. `make check` green.
 - [ ] **Step 5:** `check/lines` entries (restored `print-structure.l`; `boot2.l` additions). Commit in `nile`: `refactor(compiler): run on maru main under eval2 and find maru through MARU`; in `maru`: `feat: run Nile's compiler on eval2 and boot2.l`.
 
-### Task 4: One interface definition: `nile.k`, `sizeof_vars`, generated `nile.h`
+### Task 4: One interface definition: `nile.k` and `sizeof_vars`
 
 **Implements:** [R-one-interface]
 
 **Files:**
-- In `nile`: move `runtimes/c/nile.k` to `runtimes/maru/nile.k` and complete it; create `runtimes/maru/gen-nile-h.k`; modify `compilers/maru/nile-gen-code-maru.l:107` and `compilers/maru/nile-gen-code-c.l:114` (constructor emission)
-- Modify: `check/check.l` (case `nile_header`), `.gitignore` (generated `nile/runtimes/maru/nile.h`), `check/lines`
+- In `nile`: move `runtimes/c/nile.k` to `runtimes/maru/nile.k` and complete it; modify `compilers/maru/nile-gen-code-maru.l:107` (constructor emission); create `runtimes/maru/test/interface.k`
+- Modify: `check/check.l` (case `nile_interface`), `check/lines`
 
 **Interfaces:**
 - Produces: `nile.k` declaring every call in the RFC's "Public interface" and "The kernel interface" tables. The constructor is `(nile_Process (nile_Process_t * nile_Process_t * int int int nile_Process_work_function_t nile_Process_work_function_t nile_Process_work_function_t) *)` — parent, in_quantum, out_quantum, sizeof_vars, prologue, body, epilogue. `nile_Process_pipe` takes two processes. Status values `NILE_STATUS_OK` 0, `NILE_STATUS_OUT_OF_MEMORY` 1, `NILE_STATUS_BAD_ARG` 2, `NILE_STATUS_SHUTTING_DOWN` 3 as `define-constant`s.
-- Produces: `./eval2 nile/runtimes/maru/gen-nile-h.k nile/runtimes/maru/nile.k > nile.h`, a C header with one prototype per `extern`, mapping typed-Maru types to C (`T *` → `T *`, `nile_Process_work_function_t` → a `typedef int (*)(nile_Process_t *, float *, int, int, float *, int, int)`), an include guard, and the status `enum`.
-- Produces: both generators emit `sizeof_vars` as the fourth argument: `sizeof (struct <cname>_vars)` (C) and `(sizeof struct <cname>_vars)` (Maru) when the kernel has variables, else `0`. Confirm `maru.k`'s `sizeof` syntax against `maru-compile-sizeof` before writing it.
+- Produces: the Maru generator emits `sizeof_vars` as the fourth argument: `(sizeof struct <cname>_vars)` when the kernel has variables, else `0`. Confirm `maru.k`'s `sizeof` syntax against `maru-compile-sizeof` before writing it.
 
-- [ ] **Step 1: Write the failing test.** Case `nile_header`: generates `nile.h`; asserts that for every `(extern NAME)` in `nile.k` the header contains `NAME (`; asserts `cc -fsyntax-only -x c` on a file that includes `nile.h` and the C-target `text_layout.c` from `nile_compile`'s output succeeds; asserts the generated Maru for `text-layout.nl` contains `(nile_Process parent 2 3 (sizeof struct text_layout_MakeWords_vars)`.
-- [ ] **Step 2:** Run it. Expected: FAIL (no `gen-nile-h.k`).
-- [ ] **Step 3:** Complete `nile.k`, write `gen-nile-h.k`, change the two generators.
-- [ ] **Step 4:** Run `./eval check/check.l nile_header nile_compile`. Expected: both PASS (`nile_compile` still compares old and new dialects, which share the generators).
-- [ ] **Step 5:** `check/lines`; commit in `nile`: `feat(runtime): make nile.k the interface and generate nile.h from it`; in `maru`: `test: check the generated Nile header`.
+- [ ] **Step 1: Write the failing test.** Case `nile_interface`: generates `test/interface.k`'s call list from every `(extern NAME)` in `nile.k` (a program storing each function's address in an array of `void *` and printing the count), builds it with `nile-build` once Task 7 lands (until then, asserts only the generator part below), and asserts it links and prints the number of externs; asserts the generated Maru for `text-layout.nl` contains `(nile_Process parent 2 3 (sizeof struct text_layout_MakeWords_vars)`.
+- [ ] **Step 2:** Run it. Expected: FAIL (the generator emits no `sizeof`).
+- [ ] **Step 3:** Complete `nile.k`; change the Maru generator.
+- [ ] **Step 4:** Run `./eval check/check.l nile_interface nile_compile`. Expected: both PASS (`nile_compile` still compares old and new dialects, which share the generators).
+- [ ] **Step 5:** `check/lines`; commit in `nile`: `feat(runtime): make nile.k the interface and pass sizeof_vars`; in `maru`: `test: check the Nile interface`.
 
 ### Task 5: pthread types from `nile.osdefs`, and the build helper
 
@@ -234,22 +233,22 @@ The full set `eval2` dropped and `boot2.l` lacks is: `allocate-atomic array-comp
 
 ### Task 11: `text-layout.nl` end to end, both targets
 
-**Implements:** [R-text-layout-maru], [R-text-layout-c], [R-compiler-boot2]
+**Implements:** [R-text-layout-maru], [R-compiler-boot2]
 
 **Files:**
 - Create: `check/nile-text-layout.out` (the reference output)
-- In `nile`: create `runtimes/maru/test/print.k` (kernel `test_Print (parent, quantum)` printing each element's floats as `%.4f ` and a newline, as `test/nile-print.h`'s `PrintToFile` does), `runtimes/maru/test/text-layout-main.k`, `runtimes/maru/test/text-layout-main.c`
-- Modify: `check/check.l` (cases `nile_text_layout`, `nile_text_layout_c`), `check/lines`, `docs/rfc/draft-ndn-nile-runtime-in-maru-00.md` (remove the `**Corpus:**` line), `CLAUDE.md` (Verify list entries for every `nile_*` case; remove "Gezira/GL demos need `libnile`…" only if Gezira is not yet affected, otherwise leave it)
+- In `nile`: create `runtimes/maru/test/print.k` (kernel `test_Print (parent, quantum)` printing each element's floats as `%.4f ` and a newline, as `test/nile-print.h`'s `PrintToFile` does), `runtimes/maru/test/text-layout-main.k`
+- Modify: `check/check.l` (case `nile_text_layout`), `check/lines`, `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md` (remove the `**Corpus:**` line), `CLAUDE.md` (Verify list entries for every `nile_*` case; remove "Gezira/GL demos need `libnile`…" only if Gezira is not yet affected, otherwise leave it)
 
 **Interfaces:**
-- Consumes: Task 3's compiler scripts, Task 4's header, every runtime file.
-- `text-layout-main.k` and `.c` port `examples/c/text-layout-test.c`: same `glyph_metrics`, `LINE_ORIGIN_X/Y` 5, `LINE_WIDTH` 100, `LINE_HEIGHT` 10, 1,000,000 bytes, 1 thread, `test_Print` in place of `nile_PrintToFile`. The C driver declares `test_Print` itself and includes the generated `nile.h`.
+- Consumes: Task 3's compiler script, Task 4's interface, every runtime file.
+- `text-layout-main.k` ports `examples/c/text-layout-test.c`: same `glyph_metrics`, `LINE_ORIGIN_X/Y` 5, `LINE_WIDTH` 100, `LINE_HEIGHT` 10, 1,000,000 bytes, 1 thread, `test_Print` in place of `nile_PrintToFile`.
 
 - [ ] **Step 1:** Write `check/nile-text-layout.out` from the C runtime under Rosetta: build `examples/c/text-layout-test.c` against `runtimes/c/` with `cc -arch x86_64 -O2 -I runtimes/c -I examples/c runtimes/c/nile.c runtimes/c/nile-process.c runtimes/c/nile-builtins.c examples/c/text-layout-test.c -lpthread` and run it. Expected: 29 lines, the first `5.0000 5.0000 `. Put the exact command in a comment beside the case in `check/check.l`.
-- [ ] **Step 2: Write the failing tests.** `nile_text_layout`: compile `text-layout.nl` with the Maru-target script, `nile-build` it with `print.k` and `text-layout-main.k`, run; assert output equals `check/nile-text-layout.out`. `nile_text_layout_c`: compile to the C target, build the runtime and `print.k` through `nile-build` as an object (`-c`), compile `text_layout.c` and `text-layout-main.c` against the generated `nile.h`, link, run; assert the same.
+- [ ] **Step 2: Write the failing tests.** `nile_text_layout`: compile `text-layout.nl` with the Maru-target script, `nile-build` it with `print.k` and `text-layout-main.k`, run; assert output equals `check/nile-text-layout.out`.
 - [ ] **Step 3:** Run both. Expected: FAIL on the first missing piece; fix it in the task that owns it (and say so in the commit).
 - [ ] **Step 4:** Run both until PASS, then `make check` and `rfc-run --expect` (now green with the `**Corpus:**` line removed).
-- [ ] **Step 5:** `check/lines`; commit: `test: text-layout.nl end to end on the Maru runtime, through both code generators`.
+- [ ] **Step 5:** `check/lines`; commit: `test: text-layout.nl end to end on the Maru runtime`.
 
 ### Task 12: x86-64 Linux
 
@@ -273,4 +272,4 @@ The full set `eval2` dropped and `boot2.l` lacks is: `allocate-atomic array-comp
 | R-prefix, R-reroute | 8 |
 | R-reverse, R-sort, R-dupcat | 9 |
 | R-threads, R-no-races | 10 |
-| R-text-layout-maru, R-text-layout-c | 11 |
+| R-text-layout-maru | 11 |
