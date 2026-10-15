@@ -9,6 +9,9 @@
 #if defined __WIN32__
 #include <w32dlfcn.h>
 #endif
+#if !defined __WIN32__
+#include <sys/mman.h>
+#endif
 #define STR(X)		#X
 #define defint(X)	printf("(define-constant %s %ld)\n", #X, (long)X)
 #define defflt(X)	printf("(define-constant %s %12e)\n", #X, (double)X)
@@ -24,6 +27,9 @@ typedef int64_t int64;
 typedef wchar_t wchar;
 #ifndef RTLD_DEFAULT
 #define RTLD_DEFAULT 0
+#endif
+#ifndef MAP_JIT
+#define MAP_JIT 0
 #endif
 int main() {
 #ifdef __ELF__
@@ -74,5 +80,11 @@ int main() {
   defint(RTLD_DEFAULT);
   defint(RTLD_NOW);
   defint(RTLD_GLOBAL);
+  defint(PROT_READ);
+  defint(PROT_WRITE);
+  defint(PROT_EXEC);
+  defint(MAP_PRIVATE);
+  defint(MAP_ANON);
+  defint(MAP_JIT);
   return 0;
 }

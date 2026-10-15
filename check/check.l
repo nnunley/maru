@@ -179,6 +179,11 @@
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok")))
 
+(check "jit_run"
+  (let ((out (run "jit-run-arm64" "./eval2 -b boot2.l check/jit-run.l arm64")))
+    (unit-assert (equal (car out) "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    (unit-assert (equal (last out) "jit run arm64 ok"))))
+
 (check "asm_patch"
   (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok")))
 

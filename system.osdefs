@@ -25,3 +25,9 @@ header	w32dlfcn.h	( defined __WIN32__)
 default	RTLD_DEFAULT 0
 
 integer	RTLD_DEFAULT RTLD_NOW RTLD_GLOBAL
+
+// Memory for generated code: an anonymous mapping, writable and executable
+// (MAP_JIT on macOS, 0 where it does not exist).
+header	sys/mman.h	(!defined __WIN32__)
+default	MAP_JIT 0
+integer	PROT_READ PROT_WRITE PROT_EXEC MAP_PRIVATE MAP_ANON MAP_JIT
