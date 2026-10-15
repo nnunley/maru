@@ -28,18 +28,24 @@
 	   (list (car row) (cadr row) fields mask value)))
        (parse-string <arm64spec> $file (contents-of-file-named "arm64.spec"))))
 
-;; Registers: (name width number kind), kind sp or zr for number 31.
+;; Registers: (name class number kind).  The class is the letter of the operand
+;; kinds that accept it (Xd takes X registers, Sd S registers); X and W number
+;; 31 is SP or the zero register, kind sp or zr, as the row says.
 (define-function arm64-reg-sym (p i)		(string->symbol (concat-string p (long->string i))))
 (define arm64-registers ())
-(for (i 0 31)
-  (set arm64-registers (cons (list (arm64-reg-sym "X" i) 64 i ()) (cons (list (arm64-reg-sym "W" i) 32 i ()) arm64-registers))))
-(set arm64-registers (concat-list '((SP 64 31 sp) (XZR 64 31 zr) (WSP 32 31 sp) (WZR 32 31 zr)) arm64-registers))
+(for (i 0 32)
+  (list-do c '("X" "W" "S" "D" "Q" "B" "H")
+    (and (or (< i 31) (not (memq (string-at c 0) '(?X ?W))))
+	 (set arm64-registers (cons (list (arm64-reg-sym c i) (string-at c 0) i ()) arm64-registers)))))
+(set arm64-registers (concat-list '((SP ?X 31 sp) (XZR ?X 31 zr) (WSP ?W 31 sp) (WZR ?W 31 zr)) arm64-registers))
+
+(define arm64-conditions '(EQ NE HS LO MI PL VS VC HI LS GE LT GT LE AL NV))
 
 (define-function arm64-reg-field (r)		(let ((s (symbol->string r))) (string->symbol (concat-string "R" (array->string (arm64-array-from s 1))))))
-(define-function arm64-reg-width (r)		(if (= ?X (string-at (symbol->string r) 0)) 64 32))
-(define-function arm64-reg-named (width n sp?)
-  (car (list-detect e arm64-registers (and (= width (cadr e)) (= n (caddr e))
-					 (or (< n 31) (= (cadddr e) (if sp? 'sp 'zr)))))))
+(define-function arm64-reg-class (r)		(string-at (symbol->string r) 0))
+(define-function arm64-reg-named (class n sp?)
+  (car (list-detect e arm64-registers (and (= class (cadr e)) (= n (caddr e))
+					 (or (< n 31) (not (memq class '(?X ?W))) (= (cadddr e) (if sp? 'sp 'zr)))))))
 
 ;; A field name may join several diagram fields (immhi:immlo, b5:b40): one value, high bits first.
 (define-function arm64-parts (name)
@@ -64,6 +70,64 @@
       (set q (>> q w))))
   env)
 
+;;; Bit patterns: logical immediates (DecodeBitMasks) and FP immediates (VFPExpandImm).
+
+(define-function arm64-ones (n)		(if (< n 64) (- (<< 1 n) 1) -1))
+(define-function arm64-lsr (x r)	(if (= 0 r) x (& (>> x r) (arm64-ones (- 64 r)))))
+(define-function arm64-ror (x r e)	(if (= 0 r) x (& (| (arm64-lsr x r) (<< x (- e r))) (arm64-ones e))))
+
+;; (n immr imms) encoding v as a w-bit logical immediate, smallest element first, or ().
+(define-function arm64-bitmask (v w)
+  (let ((found ()) (e 2))
+    (set v (& v (arm64-ones w)))
+    (while (and (not found) (<= e w))
+      (let ((elt (& v (arm64-ones e))) (rep 0) (i 0) (ones 0))
+	(while (< i w) (set rep (| rep (<< elt i))) (set i (+ i e)))
+	(for (b 0 e) (and (!= 0 (& (arm64-lsr elt b) 1)) (set ones (+ ones 1))))
+	(and (= (& rep (arm64-ones w)) v) (< 0 ones) (< ones e)
+	     (for (r 0 e)
+	       (and (not found) (= elt (arm64-ror (arm64-ones ones) r e))
+		    (set found (list (if (= e 64) 1 0) r (| (& (<< (- 0 e) 1) 63) (- ones 1))))))))
+      (set e (* e 2)))
+    found))
+
+;; The w-bit value of logical-immediate fields n, immr, imms, or () if reserved.
+(define-function arm64-bitmask-value (n immr imms w)
+  (let ((len 6) (key (| (<< n 6) (& (- 63 imms) 63))))
+    (while (and (<= 0 len) (= 0 (& key (<< 1 len)))) (set len (- len 1)))
+    (and (< 0 len)
+	 (let* ((e (<< 1 len)) (ones (+ 1 (& imms (- e 1)))) (elt ()) (v 0) (i 0))
+	   (and (< ones e) (<= e w) (< immr e)
+		(let ()
+		  (set elt (arm64-ror (arm64-ones ones) immr e))
+		  (while (< i w) (set v (| v (<< elt i))) (set i (+ i e)))
+		  (if (= w 64) v (& v (arm64-ones w)))))))))
+
+(define-function arm64-fp8-value (sign n m)
+  (let ((v (/ (+ 16 m) 16.0)))
+    (while (< 0 n) (set v (* v 2)) (set n (- n 1)))
+    (while (< n 0) (set v (/ v 2)) (set n (+ n 1)))
+    (if (= sign 1) (- 0 v) v)))
+
+;; imm8 for x = +/-(16+m)/16 * 2^n, m in 0..15, n in -3..4, or ().
+(define-function arm64-fp8 (x)
+  (and (or (long? x) (double? x))
+       (let ((found ()) (sign (if (< x 0) 1 0)) (a (if (< x 0) (- 0 x) x)))
+	 (for (n -3 5)
+	   (for (m 0 16)
+	     (and (not found) (= a (arm64-fp8-value 0 n m))
+		  (set found (| (<< sign 7) (| (<< (if (<= n 0) 1 0) 6) (| (<< (if (<= n 0) (+ n 3) (- n 1)) 4) m)))))))
+	 found)))
+
+(define-function arm64-fp8-decode (q)
+  (let ((b (& 1 (>> q 6))) (cd (& 3 (>> q 4))))
+    (arm64-fp8-value (& 1 (>> q 7)) (if (= b 1) (- cd 3) (+ cd 1)) (& q 15))))
+
+(define-function arm64-cond-code (c)
+  (let ((i 0) (found ()))
+    (list-do x arm64-conditions (and (= x c) (set found i)) (set i (+ i 1)))
+    found))
+
 (define-function arm64-reloc? (op)	(and (pair? op) (= 'reloc (car op))))
 (define-function arm64-has-reloc? (op)	(and (pair? op) (or (arm64-reloc? op) (arm64-has-reloc? (car op)) (arm64-has-reloc? (cdr op)))))
 (define-function arm64-page (pc)	(& pc -4096))
@@ -80,10 +144,23 @@
 (define-function arm64-bind (row k op env pc)
   (let ((c (car k)))
     (cond
-      ((= c 'reg)	(let ((r (assq op arm64-registers)))
-			  (and r (= (cadr r) (arm64-reg-width (cadr k)))
-			       (or (< (caddr r) 31) (= (cadddr r) (if (caddr k) 'sp 'zr)))
+            ((= c 'reg)	(let ((r (assq op arm64-registers)))
+			  (and r (= (cadr r) (arm64-reg-class (cadr k)))
+			       (or (not (cadddr r)) (= (cadddr r) (if (caddr k) 'sp 'zr)))
 			       (cons (cons (arm64-reg-field (cadr k)) (caddr r)) env))))
+      ((= c 'bimm)	(let ((f (and (long? op) (arm64-bitmask op (cadr k)))))
+			  (and f (cons (cons 'n (car f)) (cons (cons 'immr (cadr f)) (cons (cons 'imms (caddr f)) env))))))
+      ((= c 'lslimm)	(let ((w (cadr k)))
+			  (and (long? op) (<= 0 op) (< op w)
+			       (cons (cons 'immr (& (- w op) (- w 1))) (cons (cons 'imms (- (- w 1) op)) env)))))
+      ((= c 'fimm)	(let ((q (arm64-fp8 op))) (and q (cons (cons 'imm8 q) env))))
+      ((= c 'cond)	(let ((q (arm64-cond-code op))) (and q (cons (cons 'cond q) env))))
+      ((= c 'invcond)	(let ((q (arm64-cond-code op)))	; CSET encodes the inverted condition
+			  (and q (< q 14) (cons (cons 'cond (if (= 0 (& q 1)) (+ q 1) (- q 1))) env))))
+      ((= c 'mreg)	(and (pair? op) (= 'reg (car op)) (= (list-length op) (list-length k))
+			     (equal (cdddr op) (cdddr k))
+			     (let ((e (arm64-bind row (cadr k) (cadr op) env pc)))
+			       (and e (arm64-bind row (caddr k) (caddr op) e pc)))))
             ((and (memq c '(imm simm pcrel pcpage)) (arm64-reloc? op))	; a placeholder: zero for now
 			(and (not (= 'imm0 (cadr k)))
 			     (or (not (cdr op)) (= (cadr op) (arm64-width-of row (cadr k))))
@@ -119,6 +196,8 @@
 
 ;;; ---------------------------------------------------------------- decoding
 
+(define-function arm64-nth (l i)		(while (< 0 i) (set l (cdr l)) (set i (- i 1))) (car l))
+
 (define-function arm64-sext (v n)		(let ((s (- 64 n))) (>> (<< v s) s)))
 
 ;; The value of field name in word.
@@ -136,10 +215,23 @@
       (set v (| (<< v (arm64-width-of row part)) (arm64-part-of row word part))))
     v))
 
+;; The operand kind k reads from word, or 'invalid when this row does not
+;; describe it (a reserved bit pattern, or an alias another row decodes).
 (define-function arm64-operand (row k word pc)
   (let ((c (car k)))
     (cond
-      ((= c 'reg)	(arm64-reg-named (arm64-reg-width (cadr k)) (arm64-field-of row word (arm64-reg-field (cadr k))) (caddr k)))
+      ((= c 'reg)	(arm64-reg-named (arm64-reg-class (cadr k)) (arm64-field-of row word (arm64-reg-field (cadr k))) (caddr k)))
+      ((= c 'bimm)	(or (arm64-bitmask-value (or (arm64-part-of row word 'n) 0) (arm64-part-of row word 'immr)
+						 (arm64-part-of row word 'imms) (cadr k))
+			    'invalid))
+      ((= c 'lslimm)	(let* ((w (cadr k)) (s (- (- w 1) (arm64-part-of row word 'imms))))
+			  (if (and (<= 0 s) (= (arm64-part-of row word 'immr) (& (- w s) (- w 1)))) s 'invalid)))
+      ((= c 'fimm)	(arm64-fp8-decode (arm64-part-of row word 'imm8)))
+      ((= c 'cond)	(arm64-nth arm64-conditions (arm64-part-of row word 'cond)))
+      ((= c 'invcond)	(let ((q (arm64-part-of row word 'cond)))
+			  (if (< q 14) (arm64-nth arm64-conditions (if (= 0 (& q 1)) (+ q 1) (- q 1))) 'invalid)))
+      ((= c 'mreg)	(concat-list (list 'reg (arm64-operand row (cadr k) word pc) (arm64-operand row (caddr k) word pc))
+				     (cdddr k)))
       ((= c 'imm)	(if (= 'imm0 (cadr k)) 0 (* (caddr k) (arm64-field-of row word (cadr k)))))
       ((= c 'simm)	(* (caddr k) (arm64-sext (arm64-field-of row word (cadr k)) (arm64-width-of row (cadr k)))))
       ((= c 'pcrel)	(+ pc (* (caddr k) (arm64-sext (arm64-field-of row word (cadr k)) (arm64-width-of row (cadr k))))))
@@ -147,10 +239,17 @@
       ((= c 'lsl)	(list 'LSL (* (caddr k) (arm64-field-of row word (cadr k)))))
       (else		(list c (arm64-operand row (cadr k) word pc) (arm64-operand row (caddr k) word pc))))))
 
-;; The instruction encoded by word at address pc.
+;; The instruction encoded by word at address pc: the first row whose bits
+;; match and whose operands all decode.
 (define-function arm64-decode-word (word pc)
-  (let ((row (list-detect r arm64-rows (= (cadddr (cdr r)) (& word (cadddr r))))))
-    (and row (cons (car row) (map (lambda (k) (arm64-operand row k word pc)) (cadr row))))))
+  (let ((rows arm64-rows) (insn ()))
+    (while (and rows (not insn))
+      (let ((r (car rows)))
+	(when (= (cadddr (cdr r)) (& word (cadddr r)))
+	  (let ((ops (map (lambda (k) (arm64-operand r k word pc)) (cadr r))))
+	    (or (memq 'invalid ops) (set insn (cons (car r) ops))))))
+      (set rows (cdr rows)))
+    insn))
 
 ;;; ---------------------------------------------------------------- registration
 
@@ -189,4 +288,8 @@
 		 (list 0 (* s (- (<< 1 w) 1)) s)
 	       (list (+ base (* s (- 0 half))) (+ base (* s (- half 1))) s)))))))
 
-(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range)
+(define-function arm64-parse-form (text)
+  (let ((p (text-parser-for-on <arm64spec> text)))
+    (and ($form p) (<text-parser>-result p))))
+
+(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range arm64-parse-form)

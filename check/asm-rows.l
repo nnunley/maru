@@ -26,7 +26,15 @@
   '((ADD X0 X1 4096)		; imm12 out of range
     (ADD X0 X1 -1)		; negative value for an unsigned field
     (ADD XZR X1 1)		; register 31 is SP in this form, not XZR
-    (ADD X0 W1 3)))		; no form mixes X and W this way
+        (ADD X0 W1 3)		; no form mixes X and W this way
+    (AND X0 X1 5)		; 0b101 is not a rotated run of ones: no logical immediate
+    (AND X0 X1 0)		; nor are all zeros
+    (AND W0 W1 -1)		; nor all ones
+    (FMOV S0 0.1)		; not +/-(16+m)/16 * 2^n
+    (LSL X0 X1 64)		; shift out of range
+    (CSET X0 AL)		; AL and NV have no inverse
+    (LDR X0 (off X1 4))		; offset not a multiple of 8
+    (FADD S0 S1 D2)))		; mixed precision
 
 (define isa-rows		(cadr (asm-isa isa)))
 (define isa-samples		arm64-samples)

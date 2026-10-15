@@ -7,6 +7,7 @@
 ;;;   (asm-patch isa buffer report v)  fill in a reported operand with its final value
 ;;;   (asm-patch-attempt ...)          the same, or (error . message) leaving the buffer alone
 ;;;   (asm-field-range isa row p pc)   => (lo hi step), the values operand p of row can take at pc
+;;;   (asm-parse-form isa text)        => (mnemonic kinds) for a form in the ISA's row notation, or ()
 ;;;   (asm-buffer origin)              a buffer whose first byte will be at address origin
 ;;;
 ;;; An instruction is (MNEMONIC operand...).  An operand, or the offset inside
@@ -18,15 +19,16 @@
 ;;;
 ;;; Each instruction set file registers itself with asm-register-isa, giving
 ;;; its rows (each a list whose first two elements are the mnemonic and the
-;;; operand kinds), and three functions:
+;;; operand kinds), and four functions:
 ;;;   (encode row insn pc)          => (bytes . positions) or (); positions are the reported operands
 ;;;   (decode bytes pc)             => (insn . length) or ()
 ;;;   (field-range row position pc) => (lo hi step) or ()
+;;;   (parse-form text)             => (mnemonic kinds) or ()
 
 (define *asm-isas* ())
 
-(define-function asm-register-isa (name rows encode decode field-range)
-  (set *asm-isas* (cons (list name rows encode decode field-range) *asm-isas*)))
+(define-function asm-register-isa (name rows encode decode field-range parse-form)
+  (set *asm-isas* (cons (list name rows encode decode field-range parse-form) *asm-isas*)))
 
 (define-function asm-isa (isa)
   (or (assq isa *asm-isas*) (error "asm: unknown instruction set " isa)))
@@ -116,3 +118,6 @@
 
 (define-function asm-decode (isa bytes pc)
   ((cadddr (asm-isa isa)) bytes pc))
+
+(define-function asm-parse-form (isa text)
+  ((cadr (cddddr (asm-isa isa))) text))
