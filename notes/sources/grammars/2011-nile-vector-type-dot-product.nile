@@ -1,0 +1,14 @@
+// Title: Nile 3D vector type and dot product operator
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'Definition of a 3D vector type and dot product operator'; PDF page 11 (printed page 10).
+// Transcribed from the page images; text-layer differences noted below.
+type Vector = (a:Real, b:Real, c:Real)
+  (v1:Vector) • (v2:Vector) : Real
+  ((a1, a2, a3), (b1, b2, b3)) = (v1, v2)
+   a1b1 + a2b2 + a3b3
+
+// Transcription notes
+// - [?] The bullet between the two Vector arguments is read as "•" (U+2022); it is clearly a dot operator
+//   in the image; the precise Unicode code point is not verifiable from the print.
+// - The last line is indented one space further than the lines above it, as printed.
+// - The text layer and the page image agree on all lines.

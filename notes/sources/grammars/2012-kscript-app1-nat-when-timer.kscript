@@ -1,0 +1,12 @@
+// Previous-value access with when trigger (section 3.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 3.2 Accessing the previous value, PDF page 25 (printed page 24)
+// Transcribed from the page images; text-layer differences noted below.
+
+nat <- 0 fby when timer then nat’ + 1
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - The prime mark is ’ (U+2019), as printed.
+// - Uncertain glyphs: none.

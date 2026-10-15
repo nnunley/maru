@@ -1,0 +1,34 @@
+// Title: PEG-based transformer provides front-, middle- and back-end stages in a simple compiler
+// Authors: Ian Piumarta
+// Source: VPRI Technical Report TR-2010-003 (2010), Figure 6 (text to AST). Appendix B ("Code listings")
+//   states that Figures 6, 7 and 8 contain the complete PEG grammars for the front, middle and back ends.
+//   Printed page 10, PDF page 11 (top half of the page).
+// Transcribed from the page images; text-layer differences noted below.
+
+start   = sexpr
+
+sexpr   = _ (atom | list)
+atom    = symbol | number
+list    = "(" sexpr* :l _ ")" -> :l
+
+symbol  = ( letter (letter | digit)* ) $$
+number  = digit+ $#10
+
+letter  = [-+!\$\%&*./:<=>?@A-Z\\^_a-z|~]
+digit   = [0-9]
+
+_       = (blank | comment)*
+blank   = [ \t\n\r]
+comment = ";" (!eol .)*
+eol     = ("\n" "\r"*) | ("\r" "\n"*)
+
+// Transcription notes
+// - Page image checked at 300 dpi for every line. Glyphs match the text layer exactly.
+// - Caption (not part of listing): "Grammar describing the transformation of text (a sequence of character
+//   objects) into an AST. Note that the output list structures are generated implicitly as a result of the
+//   Kleene star operator."
+// - Column spacing: the text layer and page image differ by a few spaces in places (the text layer puts "="
+//   at column 10 in some lines and column 8 in others). The layout here follows the page image: "=" at
+//   column 8 for every rule name. Interior runs of spaces are not guaranteed to match the page exactly.
+// - Glyph checks: "\\" and "\$" in letter, "\t\n\r" in blank, and "$#10" are printed as shown.
+// - No glyph left uncertain.

@@ -1,0 +1,13 @@
+// Title: OMeta (body figure: the general form of an OMeta rule)
+// Author: Alex Warth ("Principal Researcher" on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), report body section "OMeta", p. 18 (PDF p. 18). A one-line example inside the prose.
+// Listing: the single addExpr rule example, as printed. The curly quotes around + are part of the printed rule.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+addExpr      = addExpr:x “+” mulExpr:y  -> (x, '+', y)
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: compared at about 850 px width only.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

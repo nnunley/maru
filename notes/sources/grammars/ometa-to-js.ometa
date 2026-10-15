@@ -1,0 +1,94 @@
+// Title: Appendix D: An OMeta Translator from OMeta to JavaScript (Extended Example)
+// Author: Alex Warth (credited on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), Appendix D, report pp. 42-43 (PDF pp. 42-43).
+// Listing: the ometa NewOMetaParser grammar (p. 42), then the OMeta/JS code generator (p. 43), in printed order.
+// Explanatory prose omitted: "This is the OMeta translator that defines OMeta..." (p. 42) and "The AST structures produced by the above translator..." (p. 43).
+// The heading "The OMeta/JS Code Generator" is printed in the listing's own typeface and is kept as the first line of the second listing.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+ometa NewOMetaParser : Parser {
+  tsName       = listOf(#letter, #letterOrDigit):xs                -> (xs mash).
+  name         = spaces tsName.
+  tsString     = $' (~$' char)*:xs $'                              -> (xs mash).
+  character    = $$ char:x                                         -> {#App. #exactly. x printString}.
+  characters   = $` $` (~($' $') char)*:xs $' $'                   -> {#App. #seq.     xs mash printString}.
+  sCharacters  = $"    (~$"      char)*:xs $"                      -> {#App. #token.   xs mash printString}.
+  string       = ($# tsName | $# tsString | tsString):s            -> {#App. #exactly. s}.
+  number       = ('-' | -> ''):sign digit+:ds                      -> {#App. #exactly. sign, ds mash}.
+  keyword :xs  = token(xs) ~letterOrDigit                          -> xs.
+  hostExpr     = foreign(self.SqueakParser, #unit):x               -> (x squish mash).
+  args         = "(" listOf(#hostExpr, ','):xs ")"                 -> xs
+               |                                                   -> {}.
+  application  = name:rule args:as                                 -> ({#App. rule}, as).
+  semAction    = ("!" | "->") hostExpr:x                           -> {#Act. x}.
+  semPred      = "?" hostExpr:x                                    -> {#Pred. x}.
+  expr         = listOf(#expr4, '|'):xs                            -> ({#Or}, xs).
+  expr4        = expr3*:xs                                         -> ({#And}, xs).
+  optIter :x   = "*"                                               -> {#Many. x}
+               | "+"                                               -> {#Many1. x}
+               |                                                   -> x.
+  expr3        = expr2:x optIter(x):x (":" name:n                  -> {#Set. n. x}
+                                      |                            -> x
+                                      )
+               | ":" name:n                                        -> {#Set. n. {#App. #anything}}.
+  expr2        = "~" expr2:x                                       -> {#Not. x}
+               | "&" expr1:x                                       -> {#Lookahead. x}
+               | expr1.
+  expr1        = application | semAction | semPred
+                 | ( keyword('undefined') | keyword('nil')
+                   | keyword('true')      | keyword('false') ):x   -> {#App. #exactly. x}
+                 | spaces ( character | characters | sCharacters
+                          | string    | number                   )
+                 | "{" expr:x "}"                                  -> {#Form. x}
+                 | "(" expr:x ")"                                  -> x.
+  rule         = &name:n rulePart(n):x (";" rulePart(n))*:xs "."   -> {#Rule. n. {#Or. x}, xs}.
+  rulePart :rn = name:n ?(n = rn) expr4:b1 ( "=" expr:b2           -> {#And. b1. b2}
+                                           |                       -> b1
+                                           ).
+  grammar      = keyword('ometa') name:n
+                   ( ":" name
+                   | -> 'OMeta' ):sn
+                   "{" rule*:rs "}"                                -> ({#Grammar. n. sn}, rs).
+}.
+
+The OMeta/JS Code Generator
+
+" By dispatching on the head of a list, the following idiom allows
+  translators to avoid checking for different kinds of lists in order. "
+ometa Translator {
+  trans = {:x apply(x):answer}             -> answer.
+}.
+
+ometa NewOMetaCompiler : Translator {
+  App 'super' anything+:args               -> (self.sName, '._superApplyWithArgs($elf,', (args join: ','), ')');
+  App  :rule  anything+:args               -> ('$elf._applyWithArgs("', rule, '", ', (args join: ', '), ')');
+  App  :rule -> ('$elf._apply("', rule, '")').
+  Act  :expr -> expr.
+  Pred :expr -> ('$elf._pred(', expr, ')').
+  Or   transFn*:xs                         -> ('$elf._or(', (xs join: ','), ')').
+  And  notLast(#trans)*:xs trans:y
+       !(xs addLast: 'return ', y)         -> ('(function(){', (xs join: ';'), '})()');
+  And  -> '(function(){})'.
+  Many  trans:x                            -> ('$elf._many(function(){return ', x, '})').
+  Many1 trans:x                            -> ('$elf._many1(function(){return ', x, '})').
+  Set   :n trans:v                         -> (n, '=', v).
+  Not   trans:x                            -> ('$elf._not(function(){return ', x, '})').
+  Lookahead trans:x                        -> ('$elf._lookahead(function(){return ', x, '})').
+  Form  trans:x                            -> ('$elf._form(function(){return ', x, '})').
+  Rule  :name locals:ls trans:body         -> (self.gName, '[''', name, ''']=function() {', ls, 'return ',
+                                                     body, '};').
+  Grammar :n :s !(self at: #gName put: n;
+                       at: #sName put: s)
+          trans*:rules                     -> (self.gName, '=', self.sName, '.delegated();', (rules join: ''),
+                                             self.gName, '.prototype=', self.gName, ';').
+
+  locals  = {anything*:vs}                 -> ('var ', (vs join: ','), ';')
+          | {}                             -> ''.
+  transFn = trans:x                        -> ('(function(){return ', x, '})').
+}.
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: both halves of p. 42 were checked at 250 dpi. p. 43 was compared at about 850 px width only.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

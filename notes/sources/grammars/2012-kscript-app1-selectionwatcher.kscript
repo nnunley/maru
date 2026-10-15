@@ -1,0 +1,15 @@
+// Text field selectionWatcher stream (section 7)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 7 (Putting All Together), lead-in 'Then we add the following stream', PDF page 30 (printed page 29)
+// Transcribed from the page images; text-layer differences noted below.
+
+selectionWatcher <-
+  when
+    __docEditor__.selectedDocBox :b
+  then
+    this.textContents(if b then b.printString() else "")
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

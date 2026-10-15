@@ -1,0 +1,11 @@
+// Title: Nile absolute value operator definition (piecewise)
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'Definition of the absolute value operator, which makes use of the conditional expression syntax modeled after piecewise function notation'; PDF page 11 (printed page 10).
+// Transcribed from the page images; text-layer differences noted below.
+| (a:Real) | : Real
+  { -a, if a < 0
+     a, otherwise }
+
+// Transcription notes
+// - The text layer and the page image agree on all three lines.
+// - Indentation as printed; exact space counts may differ slightly.

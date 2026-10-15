@@ -1,0 +1,27 @@
+// Title: "programming with grammar" glimpse: TCP packet rejection and acknowledgement rules
+// Author: not credited on the listing page
+// Source: VPRI TR-2008-004 (STEPS 2008 progress report), Section "TCP/IP" (no figure number),
+//         listing on PDF page 5 (printed page 4).
+// Transcribed from the page images; text-layer differences noted below.
+['{ svc    = &->(svc? [self peek])
+    syn    = &->(syn? [self peek]) .   ->(out ack-syn    -1 (+ sequenceNumber 1) (+ TCP_ACK TCP_SYN) 0)
+    req    = &->(req? [self peek]) .   ->(out ack-psh-fin 0 (+ sequenceNumber datalen (fin-len tcp))
+                                                            (+ TCP_ACK TCP_PSH TCP_FIN)
+                                                            (up destinationPort dev ip tcp
+                                                                (tcp-payload tcp) datalen))
+    ack    = &->(ack? [self peek]) .   ->(out ack           acknowledgementNumber
+                                                            (+ sequenceNumber datalen (fin-len tcp))
+                                                            TCP_ACK 0)
+            ;
+    ( svc (syn | req | ack | .) | .    ->(out ack-rst       acknowledgementNumber
+                                                            (+ sequenceNumber 1)
+                                                            (+ TCP_ACK TCP_RST) 0)
+    ) *
+  } < [NetworkPseudoInterface tunnel: '"/dev/tun0" from: '"10.0.0.1" to: '"10.0.0.2"]]
+
+// Transcription notes
+// - Text layer matches the page image on every line; no glyph differences found.
+// - Column spacing reproduced from the page image (monospace), counted at 300 dpi.
+//   Internal runs of spaces may differ by a column or two from the printed original.
+// - Quotes are straight ASCII ' and " as printed.
+// - The text layer's "opitimizations" typo is in the prose, not this listing.

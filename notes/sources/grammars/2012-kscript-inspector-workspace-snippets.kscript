@@ -1,0 +1,30 @@
+// Title: KScript statements shown in workspace/inspector screenshots (bubble construction)
+// Author: not credited on the figure pages
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), three screenshot figures:
+//         (a) "Rounding the corners, etc." (boxBubble inspector), PDF page 9 (printed page 8);
+//         (b) "Customizing a part within the bubble to be a text editor" (KSBox(nameWatcher, 7@7)), PDF page 9;
+//         (c) "Setting up one of the bubble's command buttons" (pickupButton), PDF page 10 (printed page 9).
+// Transcribed from the page images; these are workspace text shown in screenshots, not program listings in the
+// text layer; text-layer differences noted below.
+
+// (a) boxBubble workspace, figure "Rounding the corners, etc."
+this.cornerRadius(8)
+this.borderFill(this.factory.theme.edgeColor)
+this.borderWidth(1)
+
+// (b) KSBox(nameWatcher, 7@7) workspace, figure "Customizing a part within the bubble to be a text editor"
+this.beLineEditor()
+this.fill(Color.transparent())
+this.borderWidth(1)
+
+// (c) pickupButton workspace, figure "Setting up one of the bubble's command buttons"
+this.enteredFill = this.factory().buttonGradient()
+this.textContents("pick up")
+this.actionID = "box pick up"
+
+// Transcription notes
+// - [?] Figure (a) and (b) lines are partly covered by the inspector's scroll area and the mouse cursor;
+//   the trailing ")" of "this.borderWidth(1)" is partly obscured by the text cursor in both figures.
+//   Kept as the visible text.
+// - Figure (c) is legible; the text cursor marks the end of its last line.
+// - Pixel-level screenshots: spacing and capitalisation as seen; the figures are low resolution.

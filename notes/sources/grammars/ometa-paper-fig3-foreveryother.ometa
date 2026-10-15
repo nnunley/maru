@@ -1,0 +1,15 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 3 ("Extending Java with foreveryother loops").
+//   PDF page 6 (of 10), top. Section 3.1 ("Quick and Easy Language Extensions").
+// Transcribed from the page images; text-layer differences noted below.
+
+meta Java++ <: Java {
+  stmt ::= <space>* ’foreveryother’ <space>* ’(’ <expr>:x <space>* ’)’ <stmt>:s => ...
+        | <super stmt>;
+}
+
+// Transcription notes
+// - Checked at 300 dpi. The "..." after "=>" is three periods, printed as an unfinished semantic action.
+// - Literal quotes are the right single quote U+2019 at both ends of each literal, matching the text layer.
+// - Caption (not part of listing): "Extending Java with foreveryother loops."

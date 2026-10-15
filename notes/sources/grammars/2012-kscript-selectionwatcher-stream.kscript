@@ -1,0 +1,17 @@
+// Title: selectionWatcher stream definition (KScript), text box follows the selected Box's name
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Section 1 (KSWorld bubble example), code listing
+//         after "Then we add the following stream to make the text field update according to the selected Box's name";
+//         PDF page 9 (printed page 8).
+// Transcribed from the page images; text-layer differences noted below.
+selectionWatcher <-
+  when
+    DocEditor.selectedDocBox :b
+  then
+    this.textContents(if b then b.printString() else "")
+
+// Transcription notes
+// - The text layer and the page image agree on every line.
+// - Indentation (2-space steps) reproduced from the page image; exact space counts may differ.
+// - The listing sits in a monospace block; the prose after it ("where the virtual field DocEditor ...")
+//   is not part of the listing.

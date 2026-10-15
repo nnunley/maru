@@ -1,0 +1,12 @@
+// Dataflow field form (section 2.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 2.2, syntax form 'fieldName <- expression', PDF page 23 (printed page 22)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 2.2 FRP-style dataflow extension, boxed syntax form, PDF page 39 (printed page 38)
+// Transcribed from the page images; text-layer differences noted below.
+
+fieldName <- expression
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

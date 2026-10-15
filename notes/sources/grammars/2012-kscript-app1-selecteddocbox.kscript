@@ -1,0 +1,18 @@
+// selectedDocBox filter stream (section 7.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 7.2 Bubble selection, lead-in 'a stream that checks whether the halo target is within the document or not', PDF page 31 (printed page 30)
+// Transcribed from the page images; text-layer differences noted below.
+
+selectedDocBox <-
+  when
+    __topContainer__.haloTarget :box
+  then
+    if ((box && this.boxBelongsToDoc(box)) || box == nil)
+      box
+    else
+      undefined
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

@@ -1,0 +1,33 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 5 ("A desk calculator"). PDF page 7 (of 10), middle.
+//   Section 3.3 ("Stateful Pattern Matching").
+// Transcribed from the page images; text-layer differences noted below.
+
+meta Calc (vars) {
+  __init__ ::= <empty>                                 => [self vars: [IdentityDictionary new]];
+  space    ::= ’ ’;
+  var      ::= <letter>:x <space>*                     => x;
+  num      ::= <num>:n <digit>:d                       => [[n * ’10] + [d - ’$0]]
+            | <digit>:d <space>*                       => [d - ’$0];
+  priExpr  ::= <var>:x                                 => [[self vars] at: x]
+            | <num>:n                                  => n
+            | ’(’ <space>* <expr>:r ’)’ <space>*       => r;
+  mulExpr  ::= <mulExpr>:x ’*’ <space>* <priExpr>:y    => [x * y]
+            | <mulExpr>:x ’/’ <space>* <priExpr>:y     => [x / y]
+            | <priExpr>;
+  addExpr  ::= <addExpr>:x ’+’ <space>* <mulExpr>:y    => [x + y]
+            | <addExpr>:x ’-’ <space>* <mulExpr>:y     => [x - y]
+            | <mulExpr>;
+  expr     ::= <var>:x     ’=’ <space>* <expr>:r       => [[self vars] at: x put: r]
+            | <addExpr>;
+  rep      ::= <space>* <expr>:r ’\n’                  => (println r);
+}
+
+// Transcription notes
+// - Checked at 300 dpi. Literal quotes are the right single quote U+2019 at both ends, as printed, e.g. ’ ’,
+//   ’*’, ’\n’, ’10 and ’$0.
+// - The ’10 and ’$0 forms are written as printed.
+// - Column spacing follows the page image to the nearest column; the "=>" column is aligned as printed.
+//   Interior space runs may differ slightly.
+// - Caption (not part of listing): "A desk calculator."

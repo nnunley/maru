@@ -1,0 +1,30 @@
+// Title: Excerpt of translating Nile ASTs to a lower level language, expressed in OMeta
+// Author: not credited on the listing page
+// Source: VPRI TR-2009-016 (STEPS 2009 progress report), Section 2 (Nile code generator);
+//         boxed excerpt captioned "Excerpt of translating Nile ASTs to a lower level language, expressed in OMeta";
+//         PDF page 7 (printed page 6), lower box.
+// Transcribed from the page images; text-layer differences noted below.
+binOp :op trans:x trans:y =
+          // op is a typed macro
+          ?[typedMacros includesKey: op]
+          [typedMacros at: op]:macroType
+          [self coerce: x to: macroType top1]:cx
+          [self coerce: y to: macroType top2]:cy
+          trans(macroType macro value: {#var. cx} value: {#var. cy}):ans
+          -> [self coerce: ans to: macroType tans]
+|
+          // op is not a typed macro
+          [currentKernelVarTypes at: x]:tx
+          [currentKernelVarTypes at: y]:ty
+          [tx max: ty]:tans
+          [self coerce: x to: tans]:cx
+          [self coerce: y to: tans]:cy
+          [self newTmpName]:ans
+          [self declVar: ans as: tans]
+          [self emitPairwiseOp: (self nileToTargetLangOperator: op) on: cx and: cy type: tans into: ans]
+          -> [ans],
+
+// Transcription notes
+// - The text layer and the page image agree on every line.
+// - The lone "|" between the two alternatives sits at the left margin as printed.
+// - Column spacing reproduced from the page image; exact space counts may differ.

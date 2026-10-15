@@ -1,0 +1,13 @@
+// Title: Nile process transforming a stream of Beziers by a matrix
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'Definition of a Nile process for transforming a stream of beziers by a matrix'; PDF page 12 (printed page 11).
+// Transcribed from the page images; text-layer differences noted below.
+type Bezier = (A:Point, B:Point, C:Point)
+TransformBeziers (M:Matrix) : Bezier >> Bezier
+    ∀ (A, B, C)
+        >> (MA, MB, MC)
+
+// Transcription notes
+// - [?] The quantifier is read as "∀" (U+2200) from the image; the text layer agrees.
+// - The text layer and the page image agree on all other lines.
+// - Indentation as printed; exact space counts may differ slightly.

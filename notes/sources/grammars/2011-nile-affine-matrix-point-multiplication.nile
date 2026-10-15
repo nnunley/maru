@@ -1,0 +1,15 @@
+// Title: Nile affine transformation matrix, point type and multiplication operator
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'Affine transformation matrix type, point type, and multiplication operator'; PDF page 12 (printed page 11).
+// Transcribed from the page images; text-layer differences noted below.
+type Point  = (x:Real, y:Real)
+type Matrix = (a:Real, b:Real, c:Real, d:Real, e:Real, f:Real)
+(M:Matrix) (P:Point) : Point
+    (a, b, c, d, e, f) = M
+    (x, y) = P
+    (ax + cy + e, bx + dy + f)
+
+// Transcription notes
+// - 'type Point' has two spaces before '=' as printed.
+// - The text layer and the page image agree on all lines.
+// - Indentation as printed; exact space counts may differ slightly.

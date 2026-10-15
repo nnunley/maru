@@ -1,0 +1,19 @@
+// selectedDocBox filter stream (section 7.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 7.2 Bubble selection, boxed snippet, PDF page 46 (printed page 45)
+// Transcribed from the page images; text-layer differences noted below.
+
+selectedDocBox <-
+  when
+    TopContainer.haloTarget :box
+  then
+    if box && this.boxBelongsToDoc(box) || box == nil
+      box
+    else
+      undefined
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - The condition reads 'box && this.boxBelongsToDoc(box) || box == nil' with no parentheses, as printed (Appendix I has parentheses).
+// - Uncertain glyphs: none.

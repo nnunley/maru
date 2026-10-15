@@ -1,0 +1,46 @@
+// Title: PEG-based transformer provides front-, middle- and back-end stages in a simple compiler
+// Authors: Ian Piumarta
+// Source: VPRI Technical Report TR-2010-003 (2010), Figure 7 (ASTs to stack-oriented abstract machine
+//   instructions). Appendix B ("Code listings") refers to this as the middle-end grammar.
+//   Printed page 10, PDF page 11 (bottom half of the page).
+// Transcribed from the page images; text-layer differences noted below.
+
+long    = &‘long?   .
+name    = &‘symbol? .
+arity   = .*:x                                     ->‘(list-length x)
+
+args    = expr:e args:a                            -> (::a ::e save)
+        | expr:e                                   -> (::e save)
+        |                                          -> ()
+
+params  = ( name:h params:t | name:h )             ->‘(arg-name h)
+        |
+
+expr    = long:x                                   -> (load-long :x)
+        |     name:x &‘(is-arg? x):n               -> (load-arg  :n)
+        |     name:x                               -> (load-var  :x)
+        | ’( ’< expr:x expr:y )                    -> (::y save ::x less)
+        | ’( ’+ expr:x expr:y )                    -> (::y save ::x add)
+        | ’( ’- expr:x expr:y )                    -> (::y save ::x sub)
+        | ’( ’define name:n expr:e )               -> (long :n ::e store-var :n)
+        | ’( ’lambda ’(params) expr*:b )           -> (enter :::b leave):l
+                                                   ->‘(save-lambda l):n
+                                                   -> (load-label :n)
+        | ’( ’if expr:t expr:x expr:y )            ->‘(new-label):a ->‘(new-label):b
+                                                   -> (          ::t branch-false :a
+                                                                 ::x branch :b
+                                                        label :a ::y
+                                                        label :b )
+        | ’( expr:f &arity:n args:a )              -> (::a ::f call :n)
+        | .:x                                      ->‘(error "unrecognised expression: " x)
+
+start   = expr
+
+// Transcription notes
+// - Page image checked at 300 dpi for every line. Glyphs match the text layer, including the left single
+//   quote ‘ (U+2018) in &‘, ->‘ and ‘(, and the right single quote ’ (U+2019) in ’( and ’lambda, ’define etc.
+// - Column spacing: the text layer and page image differ in run-length of spaces. The layout here follows
+//   the page image to the nearest column; interior space runs may differ by a few characters.
+// - Caption (not part of listing): "Grammar describing the transformation of ASTs into stack-oriented
+//   abstract machine instructions."
+// - No glyph left uncertain.

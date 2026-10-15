@@ -1,0 +1,44 @@
+// File List layout, KSSimpleLayout (Appendix A)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), Appendix A 'The layout of the FileList', lead-in 'This is the layout of the File List.', PDF page 35 (printed page 34)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), Appendix A 'The layout of the FileList', lead-in 'This is the layout of the File List.', PDF page 51 (printed page 50)
+// Transcribed from the page images; text-layer differences noted below.
+
+layout
+  ^ KSSimpleLayout new
+    keep: #topLeft  of: ’titleBar’ to: 0@0;
+    keep: #right    of: ’titleBar’ to: #right offset: 0;
+    keep: #height   of: ’titleBar’ to: 25;
+
+    keep: #topLeft  of: ’directoryField’ to: #bottomLeft of: ’titleBar’ offset: 10@5;
+    keep: #right    of: ’directoryField’ to: #right offset: -10;
+    keep: #height   of: ’directoryField’ to: 20;
+
+    keep: #topLeft  of: ’shortcutListScroller’ to: #bottomLeft of: ’directoryField’ offset: 0@5;
+    keep: #width    of: ’shortcutListScroller’ to: 80;
+    keep: #bottom   of: ’shortcutListScroller’ to: #bottom offset: -35;
+
+    keep: #topLeft  of: ’fileListScroller’ to: #topRight of: ’shortcutListScroller’ offset: 5@0;
+    keep: #right    of: ’fileListScroller’ to: #right offset: -10;
+    keep: #bottom   of: ’fileListScroller’ to: #bottom offset: -35;
+
+    keep: #bottomLeft  of: ’nameField’ to: #bottomLeft offset: 10@ -10;
+    keep: #height      of: ’nameField’ to: 20;
+    keep: #right       of: ’nameField’ to: #left of: ’accept’ offset: -5;
+
+    keep: #bottomRight of: ’cancel’ to: #bottomRight offset: -10@ -10;
+    keep: #extent      of: ’cancel’ to: 60@20;
+
+    keep: #bottomRight of: ’accept’ to: #bottomLeft of: ’cancel’ offset: -5@0;
+    keep: #extent      of: ’accept’ to: 60@20;
+    yourself
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Smalltalk-style KSWorld messages, not KScript, so this file is .txt.
+// - Full-width listing: the text layer stores some lines as fragments split at the column edge (for example 'offset:' and '0;'). Fragments are joined here by page position, so each printed line is one line.
+// - Blank lines are inferred from line gaps and match the page image.
+// - Text-layer glyph check: no differences. Quotes are ’ (U+2019), as printed.
+// - '10@ -10' and '-10@ -10' have a space before the minus sign, as printed.
+// - Uncertain glyphs: none.

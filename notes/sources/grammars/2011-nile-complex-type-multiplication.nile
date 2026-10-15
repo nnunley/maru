@@ -1,0 +1,13 @@
+// Title: Nile complex number type and multiplication operator
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'Complex number type and multiplication operator'; PDF pages 11-12 (printed pages 10-11; the listing breaks across the page).
+// Transcribed from the page images; text-layer differences noted below.
+type Complex = (a:Real, b:Real)
+  (z1:Complex) (z2:Complex) : Complex
+      ((a, b), (c, d)) = (z1, z2)
+      (ac - bd, bc + ad)
+
+// Transcription notes
+// - Joined across the page break (PDF p. 11 bottom, PDF p. 12 top) as one listing.
+// - Indentation as printed; exact space counts may differ slightly.
+// - The text layer and the page image agree on all lines.

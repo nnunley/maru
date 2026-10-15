@@ -1,0 +1,23 @@
+// File List setup method (section 6.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 6.1 File list, lead-in 'There is a small piece of code to set up the File List', PDF page 29 (printed page 28)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 3 Example: The File List, lead-in 'There is a small piece of code to set up the File List', PDF page 43 (printed page 42)
+// Transcribed from the page images; text-layer differences noted below.
+
+setup := (title, acceptLabel, fileName, patterns,
+         extent, theShortcuts) ->
+  acceptButton.textContents(acceptLabel)
+
+  this.layout(this.fileListLayout())
+
+  patterns <- streamOf(patterns.findTokens(","))
+  shortcuts <- streamOf(theShortcuts)
+  this.behavior(fileName)
+
+  return this
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Blank lines inside the listing are printed, so they are kept.
+// - Uncertain glyphs: none.

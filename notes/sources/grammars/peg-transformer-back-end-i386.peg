@@ -1,0 +1,73 @@
+// Title: PEG-based transformer provides front-, middle- and back-end stages in a simple compiler
+// Authors: Ian Piumarta
+// Source: VPRI Technical Report TR-2010-003 (2010), Figure 8 (abstract code to Intel 386 assembly).
+//   Appendix B ("Code listings") refers to this as the back-end grammar. Printed page 11, PDF page 12.
+// Transcribed from the page images; text-layer differences noted below.
+
+start   = insn*
+
+insn    = ’label .:l                               ‘"L\#l:"
+        | ’long .:n                                ‘"          .data"
+                                                   ‘"_V_\$n:   .long 0"
+                                                   ‘"          .text"
+        | ’load-long  .:l                          ‘"          movl    $\#l, %eax"
+        | ’load-label .:n                          ‘"          movl    $L\#n, %eax"
+        | ’load-arg   .:n ->‘(* 4 n):n             ‘"          movl    (\#n)(%esi), %eax"
+        | ’load-var   .:n                          ‘"          movl    _V_\$n, %eax"
+        | ’store-var  .:n                          ‘"          movl    %eax, _V_\$n"
+        | ’save                                    ‘"          subl    $4, %ebx"
+                                                   ‘"          movl    %eax, (%ebx)"
+        | ’add                                     ‘"          addl    (%ebx), %eax"
+                                                   ‘"          addl    $4, %ebx"
+        | ’sub                                     ‘"          subl    (%ebx), %eax"
+                                                   ‘"          addl    $4, %ebx"
+        | ’less                                    ‘"          cmpl    (%ebx), %eax"
+                                                   ‘"          setl    %al"
+                                                   ‘"          movzbl  %al, %eax"
+                                                   ‘"          addl    $4, %ebx"
+        | ’branch .:l                              ‘"          jmp     L\#l"
+        | ’branch-false .:l                        ‘"          cmpl    $0, %eax"
+                                                   ‘"          je      L\#l"
+        | ’call   .:n ->‘(* 4 n):n                 ‘"          call    *%eax"
+                                                   ‘"          addl    $\#n, %ebx"
+        | ’enter                                   ‘"          popl    %ecx"
+                                                   ‘"          movl    %ecx, -4(%ebx)"
+                                                   ‘"          movl    %esi, -8(%ebx)"
+                                                   ‘"          movl    %ebx, %esi"
+                                                   ‘"          subl    $8, %ebx"
+        | ’leave                                   ‘"          movl    %esi, %ebx"
+                                                   ‘"          movl    -8(%ebx), %esi"
+                                                   ‘"          pushl   -4(%ebx)"
+                                                   ‘"          ret"
+        | ’main                                    ‘"          .globl  \${_PREFIX}main"
+                                                   ‘"\${_PREFIX}main:"
+                                                   ‘"          leal    4(%esp), %ecx"
+                                                   ‘"          andl    $-16, %esp"
+                                                   ‘"          pushl   -4(%ecx)"
+                                                   ‘"          pushl   %ebp"
+                                                   ‘"          movl    %esp, %ebp"
+                                                   ‘"          pushl   %ecx"
+                                                   ‘"          subl    $20, %esp"
+                                                   ‘"          movl    $1024, (%esp)"
+                                                   ‘"          call    \${_PREFIX}malloc"
+                                                   ‘"          leal    1024(%eax), %esi"
+                                                   ‘"          leal    -8(%esi), %ebx"
+        | ’exit                                    ‘"          addl    $20, %esp"
+                                                   ‘"          popl    %ecx"
+                                                   ‘"          popl    %ebp"
+                                                   ‘"          leal    -4(%ecx), %esp"
+                                                   ‘"          movl    $0, %eax"
+                                                   ‘"          ret"
+        | .:x                                      ‘(error "unrecognised instruction: " x)
+
+// Transcription notes
+// - Page image checked at 300 dpi for every line (two crops). Glyphs match the text layer.
+// - Label line is ‘"L\#l:" with lowercase l (checked at 300 dpi; the 150 dpi render is ambiguous between 1 and l).
+// - Column spacing: the text layer and page image differ in run-length of spaces, and the text layer
+//   stops "pushl" and "movzbl" at different widths. The layout here follows the page image to the nearest
+//   column; interior space runs may differ by a few characters.
+// - The last alternative is printed as ‘(error ...) with no quote before the opening parenthesis as the
+//   first character; this matches the page image.
+// - Caption (not part of listing): "Grammar describing the transformation of stack-oriented abstract code
+//   into concrete assembly language for the Intel 386."
+// - No glyph left uncertain.

@@ -1,0 +1,16 @@
+// Title: Nile MyComp compositor, two live-editing examples
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics'; two figures captioned 'Example of live editing of deep graphics code.' and 'Here we are removing the subtraction of the translucency (alpha) component from the compositing rule.'; PDF page 11 (printed page 10). Raster figures, read from a 300-dpi crop.
+// Transcribed from the page images; text-layer differences noted below.
+MyComp : Compositor
+  ∀ (a, b)
+    >> a + b × (1 - a.a)
+
+MyComp : Compositor
+  ∀ (a, b)
+    >> a + b × (1)
+
+// Transcription notes
+// - Both fragments are read from the figure; the button labels (fire, reset, close) are not part of the code.
+// - The quantifier is read as "∀" (U+2200); the multiplication sign as "×".
+// - Indentation as in the figure; exact space counts may differ.

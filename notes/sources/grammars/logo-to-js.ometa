@@ -1,0 +1,54 @@
+// Title: Appendix A: An OMeta Translator from Logo to JavaScript (Extended Example)
+// Author: Alex Warth (credited on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), Appendix A, report p. 38 (PDF p. 38).
+// Listing: the Logo Turtle definitions and the ometa LogoTranslator grammar, in printed order.
+// Explanatory prose: none on the page; the appendix title and author credit are omitted.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+Turtle rt: n [self turnBy: n].
+Turtle lt: n [self turnBy: n negated].
+Turtle fd: n [self forwardBy: n].
+Turtle bk: n [self forwardBy: n negated].
+Turtle pu    [self setPenDown: false].
+Turtle pd    [self setPenDown: true].
+
+ometa LogoTranslator : Parser {
+  name         = spaces firstAndRest(#letter, #letterOrDigit):xs -> (xs squish mash).
+  cmdName      = name:n
+                   ?(n ~= 'to') ?(n ~= 'end') ?(n ~= 'output')   -> n.
+  number       = spaces digit+:ds                                -> (ds mash).
+  arg          = ":" name.
+  cmds         = cmd*:xs                                         -> (xs join: ';').
+  block        = "[" cmds:xs "]"                                 -> ('(function() {', xs, '})').
+  primExpr     = arg | number | block
+               | "(" (expr | cmd):x ")"                          -> x.
+  mulExpr      = mulExpr:x "*" primExpr:y                        -> (x, '*', y)
+               | mulExpr:x "/" primExpr:y                        -> (x, '/', y)
+               | primExpr.
+  addExpr      = addExpr:x "+" mulExpr:y                         -> (x, '+', y)
+               | addExpr:x "-" mulExpr:y                         -> (x, '-', y)
+               | mulExpr.
+  relExpr      = addExpr:x "<"  addExpr:y                        -> (x, '<', y)
+               | addExpr:x "<=" addExpr:y                        -> (x, '<=', y)
+               | addExpr:x ">"  addExpr:y                        -> (x, '>', y)
+               | addExpr:x ">=" addExpr:y                        -> (x, '>=', y)
+               | addExpr.
+  expr         = relExpr.
+  cmd          = "output" expr:x                                 -> ('return ', x)
+               | cmdName:n expr*:args                            -> ('$elf.performwithArguments("', n, '", [',
+                                                                       (args join: ','),
+                                                                      '])').
+  decl         = "to" cmdName:n arg*:args cmds:body  "end"       -> ('$elf.', n, ' = ',
+                                                                      'function(', (args join: ','), ') {',
+                                                                        body,
+                                                                      '}').
+  topLevelCmd  = decl | cmd.
+  topLevelCmds = topLevelCmd*:xs spaces end                      -> ('(function() { var $elf = this;
+                                                                             ', (xs join: ';'), '})').
+                                                                     }.
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: not checked line by line at 250 dpi; compared at about 850 px width.
+// Text-layer differences: none found in the comparison. Spacing was rebuilt from glyph positions (7 pt Courier, 4.2 pt advance).
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

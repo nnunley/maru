@@ -1,0 +1,49 @@
+// Title: Transforming postfix expressions into machine code
+// Author: not credited on the listing page
+// Source: VPRI TR-2009-016 (STEPS 2009 progress report), Section 3 "The transformation of intermediate forms
+//         into machine code, bypassing C or other compilers"; boxed figure captioned
+//         "Transforming postfix expressions into machine code"; PDF page 10 (printed page 9).
+// Transcribed from the page images; text-layer differences noted below.
+// The printed figure is two columns: the grammar (left) and the x86 output templates (right).
+// Each printed row is kept as printed; the templates continue down the right column.
+insn  = 'label .:l                                   `"L\#1:"
+      | 'long .:n                                    `"        .data"
+                                                     `"_V_\$n:    .long 0"
+                                                     `"        .text"
+      | 'load-long  .:l                              `"        movl    $\#1, %eax"
+      | 'load-label .:n                              `"        movl    $L\#n, %eax"
+      | 'load-arg   .:n ->`(* 4 n):n                 `"        movl    (\#n)(%esi), %eax"
+      | 'load-var   .:n                              `"        movl    _V_\$n, %eax"
+      | 'store-var  .:n                              `"        movl    %eax, _V_\$n"
+      | 'save                                        `"        subl    $4, %ebx"
+                                                     `"        movl    %eax, (%ebx)"
+      | 'add                                         `"        addl    (%ebx), %eax"
+                                                     `"        addl    $4, %ebx"
+      | 'sub                                         `"        subl    (%ebx), %eax"
+                                                     `"        addl    $4, %ebx"
+      | 'less                                        `"        cmpl    (%ebx), %eax"
+                                                     `"        setl    %al"
+                                                     `"        movzbl  %al, %eax"
+                                                     `"        addl    $4, %ebx"
+      | 'branch .:l                                  `"        jmp     L\#1"
+      | 'branch-false .:l                            `"        cmpl    $0, %eax"
+                                                     `"        je      L\#1"
+      | 'call   .:n ->`(* 4 n):n                     `"        call    *%eax"
+                                                     `"        addl    $\#n, %ebx"
+      | 'enter                                       `"        popl    %ecx"
+                                                     `"        movl    %ecx, -4(%ebx)"
+                                                     `"        movl    %esi, -8(%ebx)"
+                                                     `"        movl    %ebx, %esi"
+                                                     `"        subl    $8, %ebx"
+      | 'leave                                       `"        movl    %esi, %ebx"
+                                                     `"        movl    -8(%ebx), %esi"
+                                                     `"        pushl   -4(%ebx)"
+                                                     `"        ret"
+
+// Transcription notes
+// - [?] Pairing of left-column grammar rows with right-column template rows follows the printed
+//   row positions as read from the image; the right column is one continuous block in print,
+//   so the row-by-row pairing shown here is an approximation of the layout.
+// - Backquote-quote sequences (`") and the escapes \# \$ are as printed in the image.
+// - Text layer agrees with the page image on every template line.
+// - Column spacing reproduced from the page image; exact space counts may differ.

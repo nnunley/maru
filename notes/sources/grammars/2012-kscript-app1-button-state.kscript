@@ -1,0 +1,20 @@
+// Button state streams pressed, entered, actsWhen, selected (section 5.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 5.1 Buttons, lead-in 'Further streams are defined to represent the button's state:', PDF page 28 (printed page 27)
+// Transcribed from the page images; text-layer differences noted below.
+
+pressed <- false fby
+             mergeE(buttonDown.asBoolean(),
+                    not buttonUp.asBoolean(),
+                    not pointerLeave.asBoolean())
+entered <- false fby
+             mergeE(pointerEnter.asBoolean(),
+                    not pointerLeave.asBoolean())
+actsWhen <- streamOf("buttonUp")
+selected <- streamof(false)
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - 'streamof' is printed with a lowercase 'of' here; the other occurrence in this listing is 'streamOf'.
+// - Uncertain glyphs: none.

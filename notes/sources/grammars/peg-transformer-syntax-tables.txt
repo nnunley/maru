@@ -1,0 +1,75 @@
+# Title: PEG-based transformer provides front-, middle- and back-end stages in a simple compiler
+# Authors: Ian Piumarta
+# Source: VPRI Technical Report TR-2010-003 (2010), Appendix A, Table 2 (parsing expressions) and Table 3
+#   (output expressions). Table 2: printed page 9, PDF page 10 (top). Table 3: printed page 9, PDF page 10 (bottom).
+# Transcribed from the page images; text-layer differences noted below.
+#
+# Table 2. Parsing expressions for recognising patterns in the data structures on the input stream.
+#
+# expression                     matches                                                          semantic value (result of expression)
+#
+# primitive values
+.                                nothing (always succeeds)                                        undefined
+                                 any object (fails at the end of the stream)                      the object matched
+[A-Za-z]                         any letter (integer)                                             the letter matched
+"abc"                            a sequence of letters (integers)                                 the sequence matched
+( e )                            the expression e                                                 the value of e
+' symbol                         a literal symbol object                                          the object matched
+' ( e )                          a structure whose contents match e                               e
+‘ "output string"                always                                                           a sequence containing the generated output
+#
+# prefix operators
+& e                              e, without discarding the related input                          e
+! e                              not e, without discarding the related input                      undefined
+-> e                             interpret e as an output expression (see Table 3)                the value of e (see Table 3)
+&‘predicate                      the current input object, iff host langauge predicate is true,   the input object matched
+                                 without discarding the related input
+#
+# postfix operators
+e ?                              zero or one occurrences of e                                     a sequence of the value of any e matched
+e *                              zero or more occurrences of e                                    a sequence of the values of each e matched
+e +                              one or more occurrences of e                                     a sequence of the values of each e matched
+e $$                             the symbol interned from the value of e
+e $#base                         the value of e converted to a number in the given base
+#
+# binary operators
+e1 e2                            e1 and then e2                                                   e2
+e1 | e2                          e1 otherwise e2                                                  the first e matched
+e1 : name                        e1                                                               e1 after storing it in the named variable
+#
+#
+# Table 3. Expressions for generating new data structures on the output stream. (Output expressions always "succeed.")
+#
+# expression                     value written to output stream
+#
+# output expressions following a ->
+symbol                           the indicated literal symbol object
+( expression... )                a sequence (structure) containing zero or more output expressions
+:name                            the object stored in the named variable
+::name                           the objects in the sequence stored in the named variable, spliced in-line into the enclosing output sequence
+:::name                          the objects in the sequences in the sequence stored in the named variable,
+                                 spliced in-line into the enclosing output sequence
+‘(host-expression)               the result of evaluating the host-expression (in the STEPS system this is a "kernel" s-expression)
+#
+# character sequence (string) output expressions
+‘"characters..."                 a string containing each of the individual characters with substitutions as follows
+#
+# output character substitutions
+\n \r \t                         a newline, tab or carriage-return character (respectively)
+\"                               a double quote character
+\\                               a backslash character
+\${name}                         the characters formed by converting the object stored in the named variable to a string
+\#{name}                         the characters formed by converting the object stored in the named variable to an integer
+character                        any other character is copied verbatim to the output
+#
+# Transcription notes
+# - Table 2 and Table 3 checked against the page images at 150 dpi (the rendered page; full-page view).
+# - Italic words in the printed table (e, name, base, expression, host-expression, characters, predicate,
+#   named, character, and the "e" in "e1 : name") are printed in plain text here; italics are not preserved in plain text.
+# - Table 2 row ".": the word "nothing (always succeeds)" is on the same line as "." and the row beneath it
+#   reads "any object (fails at the end of the stream)" with no expression; this matches the page.
+# - "host langauge" is printed as "langauge" in the source (sic); kept as printed.
+# - Column spacing is reconstructed to the nearest column from the page image; interior space runs may differ.
+# - The left quote ‘ (U+2018) is used in "‘ \"output string\"", "&‘predicate", and "‘(host-expression)",
+#   as on the page. Not uncertain.
+# - The backslash row is printed as \\ (two backslashes) in the expression column, as on the page.

@@ -1,0 +1,42 @@
+// Title: Excerpt from s-expressions to postfix expressions
+// Author: not credited on the listing page
+// Source: VPRI TR-2009-016 (STEPS 2009 progress report), Section 2 (B5000-style postfix example);
+//         boxed excerpt captioned "Excerpt from s-expressions to postfix expressions";
+//         PDF page 9 (printed page 8), upper right.
+// Transcribed from the page images; text-layer differences noted below.
+long     = &`long?   .
+name     = &`symbol? .
+arity    = .*:x                       ->`(list-length x)
+
+args     = expr:e args:a              -> (::a ::e save)
+         | expr:e                     -> (::e save)
+         |                            -> ()
+
+params   = ( name:h params:t | name:h )     ->`(arg-name h)
+
+expr     =    long:x                  -> (load-long :x)
+         |    name:x &`(is-arg x):n   -> (load-arg  :n)
+         |    name:x                  -> (load-var  :x)
+         | '( '< expr:x expr:y )      -> (::y save ::x less)
+         | '( '+ expr:x expr:y )      -> (::y save ::x add)
+         | '( '- expr:x expr:y )      -> (::y save ::x sub)
+         | '( 'define name:n expr:e ) -> (long :n ::e store-var :n)
+         | '( 'lambda '(params) expr*:b )  -> (enter :::b leave):l
+                                      ->`(save-lambda l):n
+                                      -> (load-label :n)
+         | '( 'if expr:t expr:x expr:y )   ->`(new-label):a ->`(new-label):b
+                                      -> (        ::t branch-false :a
+                                                  ::x branch :b
+                                            label :a ::y
+                                            label :b )
+         | '( expr:f &arity:n args:a )     -> (::a ::f call :n)
+         | .:x                        ->`(error "unrecognised expression: " x)
+
+start = expr
+
+// Transcription notes
+// - The text layer and the page image agree on every token.
+// - The right-hand action column is aligned as printed; the multi-line 'if' action is
+//   indented as in the image, exact space counts may differ.
+// - The excerpt is clipped at the right margin of the box in the printed page; the last
+//   action line ends with "x" and the printed text is cut off there, as in the original.

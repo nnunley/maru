@@ -1,0 +1,25 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 7 ("Hunting for bad printf calls."). PDF page 9 (of 10),
+//   top. Section 4.2 ("Checking printf Calls").
+// Transcribed from the page images; text-layer differences noted below.
+
+meta P {
+  rep n p ::= ?[n = ’0]
+            | <apply p> <rep [n - ’1] p>;
+  fmt     ::= ’%’    ’%’    <fmt>
+            | ’%’    <char> <fmt>:n        => [n + ’1]
+            | <char>        <fmt>
+            | <empty>                      => ’0;
+  expr    ::= (printf (<fmt>:n) <rep n ’_>)
+            | (printf <_>*)                => ’BAD_PRINTF
+            | (<expr>*:xs)                 => ‘(,xs)
+            | <_>;
+}
+
+// Transcription notes
+// - Checked at 300 dpi. Literal quotes are the right single quote U+2019 at both ends (e.g. ’0, ’1, ’%’,
+//   ’_>, ’BAD_PRINTF). The only left single quote is in ‘(,xs), as printed.
+// - The atom BAD_PRINTF is written as printed (underscore, no space).
+// - Column spacing follows the page image to the nearest column. Interior space runs may differ slightly.
+// - Caption (not part of listing): "Hunting for bad printf calls."

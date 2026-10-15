@@ -1,0 +1,32 @@
+// Title: Prolog and Toylog in OMeta (body figure: Prolog translator and Prolog example)
+// Author: Alex Warth ("Principal Researcher" on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), report body section "Prolog and Toylog in OMeta", p. 20 (PDF p. 20). A body figure, not an appendix. It is a second, shorter version of the Appendix B grammar.
+// Listing: the ometa PrologTranslator grammar and the example Prolog program printed below it.
+// Explanatory prose omitted: the paragraphs before and after the listings, and the Toylog English example that sits in the body's right column.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+Ometa PrologTranslator : Parser {
+variable   =  spaces firstAndRest(#upper, #letterOrDigit):name      -> (Var new: name mash).
+symbol     =  spaces firstAndRest(#lower, #letterOrDigit):name      -> (Sym new: name mash).
+clause     =  symbol:sym "(" listOf(#expr, ','):args ")"            -> (Clause new: sym : args).
+expr       =  clause | variable | symbol.
+clauses    =  listOf(#clause, ',').
+rule       =  clause:head ":-" clauses:body "."                     -> (Rule new: head : body)
+           |  clause:head                   "."                     -> (Rule new: head : {}).
+rules      =  rule*:rs spaces end                                   -> rs.
+query      =  clause:c spaces end                                   -> c.
+}.
+
+
+
+  father(abe, homer).
+  father(homer, lisa).
+  father(homer, bart).
+  grandfather(X, Y) :- father(X, Z), father(Z, Y).
+? grandfather(abe, X)
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: the whole listing was checked at 250 dpi.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

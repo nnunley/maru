@@ -1,0 +1,41 @@
+// Title: Code blocks in the automatically produced visualizer for Nile programs (right column)
+// Author: not credited on the figure page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Section 3 "Inventing methods that create automatic visualizers
+//         for languages created from metalanguages"; figure captioned "Automatically produced visualizer for the Nile
+//         programs that convert a Bezier curve (at top left) to shaded pixels (bottom columns). The right column is an
+//         expansion of the 'Texture' code block."; PDF page 13 (printed page 12). Five code blocks, top to bottom.
+// Transcribed from the page images (raster figure, no text layer); text-layer differences noted below.
+ExpandSpans () : SpanCoverage >> PointCoverage
+    ∀ (x, y, c, l)
+        if c > 0 ∧ l > 0
+            >> (x, y, c)
+            << (x + 1, y, c, l - 1)
+
+ProjectLinearGradient (A:Point, B:Point) : PointCoverage >> Real
+    v   = B - A
+    Δs  = v / (v · v)
+    s00 = A · Δs
+    ∀ (P,_)
+        >> P · Δs - s00
+
+PadGradient () : Point >> Point
+    ∀ s
+        >> 0 ▷ s ◁ 1
+
+GradientSpan (A:Color, B:Color) : Real >> Color
+    ∀ s
+        >> sA + (1 - s)B
+
+ZipPixels () : (PointCoverage, Color) >> Pixel
+    ∀ ((x, y, coverage), (r, g, b, a))
+        >> ((x, y), (r, g, b, a * coverage))
+
+// Transcription notes
+// - [?] Glyph shapes at the figure's resolution: "∀" (for all), "∧" (and), "◁" and "▷" (triangle operators),
+//   "·" (dot product), "Δ" (delta) and "≪"/"<<" were read from the image; the arrow operators in the
+//   ExpandSpans and ProjectLinearGradient blocks are read as printed.
+// - [?] In ProjectLinearGradient the second-to-last line reads "V (P,_)" in the image; the glyph is read as "∀"
+//   by parallel with the other blocks (the same symbol appears as "V" at the figure's resolution).
+// - Indentation reproduced from the image; exact space counts may differ.
+// - The figure's right column is the expanded code the caption refers to; it is not the "Texture" block
+//   itself, which lies in the left panel of the figure and is not transcribed here.

@@ -1,0 +1,52 @@
+// Title: Appendix C: Toylog, An English Language Prolog (Extended Example)
+// Author: Alex Warth (credited on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), Appendix C, report p. 41 (PDF p. 41).
+// Listing: the ometa ToylogTranslator grammar, followed by the two example Toylog texts printed on the page (the facts and the query).
+// Explanatory prose omitted: "This example uses a different OMeta front-end syntax translation." and the two small headings "Typical Toylog facts and definitions" and "Typical Toylog query".
+// The query line uses a curly apostrophe in "y’s" while the facts use straight apostrophes; both are kept as printed.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+ometa ToylogTranslator : Parser {
+  rule                    = clause:head "if" conj:body "."               -> (Rule new: head : body)
+                          | clause:head                "."               -> (Rule new: head : {}).
+  clause                  = iClause('', {}, false).
+  iClause :rel :args :not = ( "not"  !(not := not not)
+                            | var:x  !(args add: x)
+                            | word:x !(rel := rel,
+                                        (rel size > 0
+                                          ifTrue:  [x capitalized]
+                                          ifFalse: [x]))
+                            | thing:x !(args add: x)
+                            )+
+                            !(rel := Clause new: (Sym new: rel) : args)  -> (not
+                                                                              ifTrue:
+                                                                                           [Clause new:
+                                                                                             (Sym new: 'not') :
+                                                                                                {rel}]
+                                                                              ifFalse: [rel]).
+  var                     = ( ("who" | "what" | "when"):ans
+                            | spaces lower+:xs !(xs join: ''):ans
+                                ?(ans size = 1 and: [(ans at: 0) ~= $a])
+                            )                                            -> (Var new: ans).
+  wordPart                = spaces lower+:xs                             -> (xs join: '').
+  word                    = wordPart:xs $' wordPart:ys                   -> (xs, ys capitalized)
+                          | ~("if" | "not" | "and") wordPart
+                          | $' wordPart:xs                               -> (xs capitalized).
+  thing                   = spaces firstAndRest(#upper, #lower):xs       -> (Sym new: (xs join: '')).
+  conj                    = listOf(#clause, 'and').
+  rules                   = rule*:rs spaces end                          -> rs.
+  query                   = clause:c spaces end                          -> c.
+}.
+
+  Abe is Homer's father.
+  Homer is Lisa's father.
+  Homer is Bart's father.
+  x is y's grandfather if x is z's father and z is y's father.
+
+  Abe is y’s grandfather?
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: the query line and most of the facts were checked at 250 dpi. The grammar was compared at about 850 px width only.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

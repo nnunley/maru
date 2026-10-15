@@ -1,0 +1,29 @@
+// Smalltalk title-bar example (LWorld, Smalltalk)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 1 Introduction, lead-in 'The following is an example (in Smalltalk, for the old LWorld)', PDF page 38 (printed page 37)
+// Transcribed from the page images; text-layer differences noted below.
+
+newTitleRow: ext named: titleString for: owner
+  | titleRow title nameWrap dismissButton |
+  titleRow := LBox extent: ext color: LBox themeColor.
+
+  title := LBox newLabel: titleString.
+  nameWrap := LBox extent: (ext x //2 @ ext y)
+                   color: Color transparent.
+  nameWrap name: ’nameWrap’.
+  nameWrap clipping: true.
+  nameWrap add: title.
+  title translation: 2@4.
+  titleRow add: nameWrap.
+
+  dismissButton := LBox withShape: LBox dismissIcon.
+  dismissButton name: ’dismiss’.
+  titleRow add: dismissButton.
+  ^ titleRow.
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Smalltalk code from the old LWorld, not KScript, so this file is .txt. It is an in-text listing before Figure 2; the Figure 2 image is not code and is excluded.
+// - Quotes are ’ (U+2019), as printed, around nameWrap and dismiss.
+// - Uncertain glyphs: none.

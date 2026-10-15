@@ -1,0 +1,16 @@
+// File List fire stream (section 6.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 6.1 File list, lead-in 'One highlight is this stream definition', PDF page 29 (printed page 28)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 3 Example: The File List, lead-in 'One highlight is this stream definition', PDF page 43 (printed page 42)
+// Transcribed from the page images; text-layer differences noted below.
+
+fire <- when
+          acceptButton.fire
+        then
+          { dir: selectedShortcut,
+           file: nameField.textContents()}
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

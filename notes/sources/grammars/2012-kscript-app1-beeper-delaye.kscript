@@ -1,0 +1,13 @@
+// buttonDown with and without delayE (section 2.4.5)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 2.4.5 delayE, after the Figure 2 caption, PDF page 25 (printed page 24)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 2.4.5 delayE, boxed snippet, PDF page 41 (printed page 40)
+// Transcribed from the page images; text-layer differences noted below.
+
+beeper <- buttonDown.doE(() -> this.beep())
+beeper <- buttonDown.delayE(500).doE(() -> this.beep())
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

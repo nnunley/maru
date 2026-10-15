@@ -1,0 +1,13 @@
+// Title: fire stream definition (KScript), consolidating the fire streams of a bubble's buttons
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Section 1 (KSWorld bubble example), code listing
+//         after "Each of the buttons has a stream called fire"; PDF page 10 (printed page 9).
+// Transcribed from the page images; text-layer differences noted below.
+fire <- anyE(contents,
+"fire")
+
+// Transcription notes
+// - The printed listing is wrapped onto two lines in a narrow column: "fire <- anyE(contents," then
+//   "\"fire\")". The line break is from the printed column width; kept as printed.
+// - The text layer and the page image agree on both lines.
+// - Indentation: the second line starts at column 0 as printed in the narrow block.

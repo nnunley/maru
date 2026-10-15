@@ -1,0 +1,15 @@
+// Streams using % and FMSound (section 2.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 2.2, 'The stream can be used by other streams', PDF page 23 (printed page 22)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 2.2, boxed snippet 'The stream can be used by other streams', PDF page 39 (printed page 38)
+// Transcribed from the page images; text-layer differences noted below.
+
+fractionalPart <- myTimer % 1000
+sound <- FMSound.pitch_dur_loudness(fractionalPart,
+                                      0.2, 100)
+player <- sound.play()
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

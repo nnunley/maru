@@ -1,0 +1,24 @@
+// Top-level loop pseudo-code, Figure 3 (KSWorld)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), Figure 3 caption 'The top-level loop of KSWorld in pseudo-code', PDF page 27 (printed page 26)
+// Transcribed from the page images; text-layer differences noted below.
+
+while true
+    var currentTime := getMilliseconds()
+    registerEvents()
+    var evaluator := Evaluator.new()
+    window.withAllBoxesDo((box) ->
+        evaluator.addStreamsFrom(box))
+    evaluator.sortAndEvaluateAt(
+                window.mapTime(currentTime))
+    // layout phase
+    window.withAllBoxesDo((box) ->
+        box.layOut())
+    window.draw()
+    sleepUntilNextFrame()
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Pseudo-code, not KScript, so this file is .txt.
+// - Uncertain glyphs: none.

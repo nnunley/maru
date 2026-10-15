@@ -1,0 +1,26 @@
+// Title: Excerpt from text to s-expressions
+// Author: not credited on the listing page
+// Source: VPRI TR-2009-016 (STEPS 2009 progress report), Section 2 (Nile code generator / meaning chain),
+//         boxed excerpt captioned "Excerpt from text to s-expressions"; PDF page 9 (printed page 8), upper left.
+// Transcribed from the page images; text-layer differences noted below.
+start    = sexpr
+
+sexpr    = _ (atom | list)
+atom     = symbol | number
+list     = "(" sexpr* :l _ ")" -> :l
+
+symbol   = ( letter (letter | digit)* ) $$
+number   = digit+ $#10
+
+letter   = [-+!\$\%&*./:<=>?@A-Z\\^_a-z|~]
+digit    = [0-9]
+
+_        = (blank | comment)*
+blank    = [ \t\n\r]
+comment  = ";" (!eol .)*
+eol      = ("\n" "\r"*) | ("\r" "\n"*)
+
+// Transcription notes
+// - The text layer has the same content; the page image was used for the exact glyphs.
+// - Backslash escapes (\$ \% \\ \^) and the "[ \t\n\r]" class are as printed.
+// - Column spacing reproduced from the page image; exact space counts may differ.

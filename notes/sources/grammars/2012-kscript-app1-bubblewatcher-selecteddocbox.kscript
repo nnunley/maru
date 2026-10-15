@@ -1,0 +1,17 @@
+// bubbleWatcher on selectedDocBox (section 7.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 7.2 Bubble selection, lead-in 'it will only respond to halo placement within the document', PDF page 31 (printed page 30)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 7.2 Bubble selection, boxed snippet, PDF page 47 (printed page 46)
+// Transcribed from the page images; text-layer differences noted below.
+
+bubbleWatcher <-
+  when
+    mergeE(selectedDocBox,
+           textSelection, whole.extent)
+  then
+    this.checkBubbleVisibility()
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

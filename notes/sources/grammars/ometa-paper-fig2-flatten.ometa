@@ -1,0 +1,17 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 2 ("Flattening lists."). PDF page 5 (of 10), top.
+// Transcribed from the page images; text-layer differences noted below.
+
+meta F {
+  flatten ::= (<inside>:xs)                 => xs;
+  inside  ::= (<inside>:xs) <inside>:ys     => (append xs ys)
+            | <_>:x         <inside>:xs     => (cons   x  xs)
+            | <empty>                       => nil;
+}
+
+// Transcription notes
+// - Checked at 300 dpi. Glyphs match the text layer.
+// - Column spacing follows the page image to the nearest column; the second column of "=>" and the
+//   right-hand alternatives are aligned as printed. Interior space runs may differ slightly.
+// - Caption (not part of listing): "Flattening lists."

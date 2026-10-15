@@ -1,0 +1,12 @@
+// Menu items and fire streams (section 5.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 5.2 Menus, PDF page 28 (printed page 27)
+// Transcribed from the page images; text-layer differences noted below.
+
+items <- ...        // the ordered collection of buttons
+fire <- anyE(items, "fire")
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

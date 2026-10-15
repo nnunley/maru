@@ -1,0 +1,60 @@
+// File List behavior method (Appendix B)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), Appendix B 'File List Actions', lead-in 'The code to attach expected behavior to the File List.', PDF page 36 (printed page 35)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), Appendix B 'File List Actions', lead-in 'The code to attach expected behavior to the File List.', PDF pages 51-52 (printed pages 50-51)
+// Transcribed from the page images; text-layer differences noted below.
+
+behavior := (initialFileName) ->
+  // shortcuts holds the list of default directories.
+  // We don’t have a way to add or remove them right now.
+  // So it is computed at the start up time.
+  shortcutList.setItems(([x.value(), x.key()] for x in shortcuts))
+  // When an item in shortcutList is selected, selectedShortcut will be updated.
+  selectedShortcut <- shortcuts.first() fby
+                        when
+                          shortcutList.itemSelected :ev
+                        then
+                          (e in shortcuts when ev.handler.textContents() == e.key())
+  // The following programatically triggers the list
+  // selection action for the first item in shortcutList.
+  shortcutList.first().fireRequest.set(true)
+
+  // fileName is a field that contains the selected file name.  It uses "startsWith" construct
+  // so it is a stream with an initial value.  When itemSelected happens, the string representation
+  // of the box (in handler) will become the new value for fileName.
+  fileName <- when fileList.itemSelected :ev
+              then ev.handler.textContents()
+              startsWith initialFileName
+
+  // When the current selection in shortcutList is updated,
+  // the fileList gets the new items based on the entries in the directory.
+  fileUpdater <- when selectedShortcut :s
+                 then
+    var dir := s.value()
+    var entries := ([{directory: dir, entry: entry}, entry.name()]
+      for entry in dir.entries() when patterns.findFirst((p) ->
+        p.match(entry.name())) > 0)
+      entries := entries.sort((a,b) ->
+        a.first().entry.modificationTime() > b.first().entry.modificationTime())
+    // update the list in fileList
+    fileList.setItems(entries)
+
+  // nameField gets a new string when fileName is changed.
+  updateNameField <- when fileName :name
+                     then nameField.textContents(name)
+
+  // The contents of the directoryField is connected to shortcut
+  updateDirectoryField <- directoryField.textContents(selectedShortcut.value().asString())
+
+  // fire on this handler and the Box are bound to the fire of the accept button.
+  fire <- when acceptButton.fire then {dir: selectedShortcut, file: nameField.textContents()}
+
+  // Allows the File List to be dragged by the title bar.
+  label.beDraggerFor(this)
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Full-width listing: the text layer stores some lines as fragments split at the column edge (for example 'value' starts a right-column fragment). Fragments are joined here by page position.
+// - Blank lines are inferred from line gaps and match the page image.
+// - Uncertain glyphs: none.

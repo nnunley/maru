@@ -1,0 +1,16 @@
+// bubbleWatcher on haloTarget (section 7.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 7.2 Bubble selection, boxed snippet, PDF page 46 (printed page 45)
+// Transcribed from the page images; text-layer differences noted below.
+
+bubbleWatcher <-
+  when
+    mergeE(TopContainer.haloTarget,
+           textSelection, whole.extent)
+  then
+    this.checkBubbleVisibility()
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

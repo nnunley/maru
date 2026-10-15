@@ -1,0 +1,22 @@
+// Button fire stream with actsWhen (section 5.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 5.1 Buttons, lead-in 'the fire stream definition looks like this', PDF page 28 (printed page 27)
+// Transcribed from the page images; text-layer differences noted below.
+
+fire <- when (if (actsWhen == "buttonUp" && clicked ||
+                  actsWhen == "buttonDown" &&
+                  buttonDown.asBoolean()) == true
+                true
+              else
+                undefined)
+        then
+          var ev := if actsWhen == "buttonUp"
+                      buttonUp
+                    else
+                      buttonDown
+          {item: this, event: ev}
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

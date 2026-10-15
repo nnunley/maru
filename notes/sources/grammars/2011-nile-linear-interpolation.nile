@@ -1,0 +1,10 @@
+// Title: Nile linear interpolation expression (Unicode operator and variable)
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics' / Nile syntax; listing after 'An expression for linear interpolation using a Unicode character for a variable and juxtaposition for multiplication'; PDF page 11 (printed page 10).
+// Transcribed from the page images; text-layer differences noted below.
+αx - (1 - α)y
+
+// Transcription notes
+// - The text layer and the page image agree.
+// - Glyph alpha (α) is the Unicode Greek small letter alpha as printed.
+// - Layout is a single indented line as printed.

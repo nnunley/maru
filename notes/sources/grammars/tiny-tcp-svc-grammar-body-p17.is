@@ -1,0 +1,28 @@
+// Title: A Tiny TCP/IP Using Non-deterministic Parsing (body figure: the service-port grammar)
+// Author: Ian Piumarta ("Principal Researcher" on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), report body section "A Tiny TCP/IP Using Non-deterministic Parsing", p. 17 (PDF p. 17). A body figure, not Appendix E.
+// Listing: the anonymous IS grammar object for the svc/syn/req/ack rules, as printed. It is the same grammar as the last block of Appendix E, with different line breaks.
+// Explanatory prose omitted (the paragraphs before and after the listing).
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+['{ svc     = &->(svc? [self peek])
+    syn     = &->(syn? [self peek]) .   ->(out ack-syn    -1 (+ sequenceNumber 1) (+ TCP_ACK TCP_SYN) 0)
+    req     = &->(req? [self peek]) .   ->(out ack-psh-fin 0 (+ sequenceNumber datalen (fin-len tcp))
+                                                             (+ TCP_ACK TCP_PSH TCP_FIN)
+                                                             (up destinationPort dev ip tcp
+                                                                 (tcp-payload tcp) datalen))
+    ack     = &->(ack? [self peek]) .   ->(out ack           acknowledgementNumber
+                                                             (+ sequenceNumber datalen (fin-len tcp))
+                                                             TCP_ACK 0)
+            ;
+    ( svc (syn | req | ack | .) | .     ->(out ack-rst       acknowledgementNumber
+                                                             (+ sequenceNumber 1)
+                                                             (+ TCP_ACK TCP_RST) 0)
+    ) *
+  } < [NetworkPseudoInterface tunnel: '"/dev/tun0" from: '"10.0.0.1" to: '"10.0.0.2"]]
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: compared at about 850 px width only.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

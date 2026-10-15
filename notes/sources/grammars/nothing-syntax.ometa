@@ -1,0 +1,166 @@
+// Title: Appendix 1: Nothing Syntax in OMeta
+// Source: STEPS 2010 4th-year progress report, VPRI Technical Report TR-2010-004 (2010), Appendix 1, report pp. 28-29 (PDF pages 29-30).
+// Transcribed from the page images; text-layer differences noted below.
+
+addExpr = addExpr:x "+" mulExpr:y -> [{#binOp. '+'. x. y}]
+        | addExpr:x "-" mulExpr:y -> [{#binOp. '-'. x. y}]
+        | mulExpr
+
+andExpr = andExpr:x "&&" bitOrExpr:y -> [{#binOp. '&&'. x. y}]
+        | bitOrExpr
+
+bitAndExpr = bitAndExpr:x "&" eqExpr:y -> [{#binOp. '&'. x. y}]
+           | eqExpr
+
+bitOrExpr = bitOrExpr:x "|" bitXorExpr:y -> [{#binOp. '|'. x. y}]
+          | bitXorExpr
+
+bitXorExpr = bitXorExpr:x "^" bitAndExpr:y -> [{#binOp. '^'. x. y}]
+           | bitAndExpr
+
+charLit = $' char:c $' -> [#charLit -> c asciiValue]
+
+decl = "name":n "=" expr:v -> [{#decl. n. v}]
+     | "name":n -> [{#decl. n. {#number. 0}}]
+
+eqExpr = relExpr:x "==" relExpr:y -> [{#binOp. '=='.  x. y}]
+       | relExpr:x "!=" relExpr:y -> [{#binOp. '!='. x. y}]
+       | relExpr
+
+expr = orExpr
+
+field :s :offset = "name":n (":" "number" | [32]):l
+   [structs at: s]:d
+   [(d includesKey: n) ifTrue: [self error: 'duplicate field ', n, ' in struct ', s]]
+   [d at: n put: offset -> l] -> [offset + l]
+
+hexDigit = char:d ( ?[d >= $0] ?[d <= $9]
+                  | ?[d >= $a] ?[d <= $f]
+                  | ?[d >= $A] ?[d <= $F] ) -> [d]
+
+ident = "name"
+
+mulExpr = mulExpr:x "*" primExpr:y -> [{#binOp. '*'. x. y}]
+        | mulExpr:x "/" primExpr:y -> [{#binOp. '/'. x. y}]
+        | mulExpr:x "%" primExpr:y -> [{#binOp. '%'. x. y}]
+        | selExpr
+
+name = <letter letterOrDigit*>:n
+         -> [((Keywords includes: n)
+               ifTrue: [n asSymbol]
+               ifFalse: [n first isUppercase ifTrue: [#structName] ifFalse: [#name]]) -> n]
+
+number = ``0b'' <($0 | $1) ($_ | $0 | $1 )*>:n -> [#number -> (self numberFrom: n base:  2)]
+       | $0     <octDigit ($_ | octDigit)*>:n -> [#number -> (self numberFrom: n base:  8)]
+       | ``0x'' <hexDigit ($_ | hexDigit)*>:n -> [#number -> (self numberFrom: n base: 16)]
+       |        <digit     ($_ | digit   )*>:n -> [#number -> (self numberFrom: n base: 10)]
+
+octDigit = digit:d ?[d >= $0] ?[d < $8] -> [d]
+
+orExpr = orExpr:x "||" andExpr:y -> [{#binOp. '||'. x. y}]
+       | andExpr
+
+primExpr = primExpr:arr "[" expr:idx "]" -> [{#wordAt. arr.     idx}]
+         | "args"       "[" expr:idx "]" -> [{#wordAt. {#args}. idx}]
+         | primExpr:arr "@" expr:idx     -> [{#byteAt. arr.     idx}]
+         | primExpr:f "(" listOf(#expr. ','):args ")" -> [{#call. f}, args]
+         | "memory" "." "name":n ?[n = 'wordSize'] -> [{#memoryWordSize}]
+         | "memory" -> [{#memory}]
+         | "numArgs" -> [{#numArgs}]
+         | "name":n -> [{#name. n}]
+         | "number":n -> [{#number. n}]
+         | "charLit":c -> [{#number. c}]
+         | "!" primExpr:e -> [{#unOp. '!'. e}]
+         | "~" primExpr:e -> [{#unOp. '~'. e}]
+         | "string":s "->" primExpr:e -> [{#string. s. e}]
+         | "(" expr:e ")" -> [e]
+         | "structName":s "." "name":n ?[n = 'wordSize'] -> [{#structSize. s}]
+         | "structName":s "(" expr:e ")" "." "name":n -> [{#structAt. s. e. n}]
+
+
+prog = topLevelStmts:ss spaces end -> [{#prog. {#compound. {#label. '$$'}. ss}}]
+
+relExpr = shiftExpr:x "<"  shiftExpr:y -> [{#binOp. '<'.  x. y}]
+        | shiftExpr:x "<=" shiftExpr:y -> [{#binOp. '<='. x. y}]
+        | shiftExpr:x ">"  shiftExpr:y -> [{#binOp. '>' . x. y}]
+        | shiftExpr:x ">=" shiftExpr:y -> [{#binOp. '>='. x. y}]
+        | shiftExpr
+
+sc = spacesNoNl (exactly(Character cr) | &$} | end)
+   | ";"
+
+selExpr = primExpr:addr ":" expr:offset "#" expr:length -> [{#select. addr. offset. length}]
+        | primExpr
+
+shiftExpr = addExpr:x "<<" addExpr:y -> [{#binOp. '<<'. x. y}]
+          | addExpr:x ">>" addExpr:y -> [{#binOp. '>>'. x. y}]
+          | addExpr
+
+space = ^space | fromTo('//'. String cr) empty(Character cr) | fromTo('/*'. '*/')
+
+spacesNoNl = (~exactly(Character cr) space)*
+
+special = <
+   $( | $) | $[ | $] | $@ | $, | $; | $+ | ``->'' | $- | $* | $/ | $% | ${ | $} |
+   ``=='' | $= | ``!='' | $! | ``<<'' | ``<='' | $< | ``>>'' | ``>='' | $> |
+   $~ | ``&&'' | $& | ``||'' | $| | ``:='' | $: | $# | ``...'' | $.
+>:s -> [s -> s]
+
+stmt = "name":n ":" -> [{#label. n}]
+     | stmtNoLabel
+
+
+stmtNoLabel = "{" stmts:ss "}" -> [{#scope. ss}]
+            | "if" expr:c "goto" "name":n -> [{#jnz. c. {#name. n}}]
+            | "unless" expr:c "goto" "name":n -> [{#jz. c. {#name. n}}]
+            | "goto" "name":n -> [{#jmp. {#name. n}}]
+            | "if" expr:c stmtNoLabel:t ("else" stmtNoLabel | [{#skip}]):e -> [{#if. c. t. e}]
+            | "while" expr:c stmtNoLabel:s -> [{#while. c. s}]
+            | "break" -> [{#break}]
+            | expr:l ":=" expr:r sc -> [{#assign. l. r}]
+            | "var" listOf(#decl. ','):ds sc -> [{#compound}, ds]
+            | "print"  expr:e sc -> [{#print.  e}]
+            | "printb" expr:e sc -> [{#printb. e}]
+            | "printc" expr:e sc -> [{#printc. e}]
+            | "printo" expr:e sc -> [{#printo. e}]
+            | "printh" expr:e sc -> [{#printh. e}]
+            | "prints" expr:e sc -> [{#prints. e}]
+            | "newline" sc -> [{#newline}]
+            | "halt" sc -> [{#halt}]
+            | "clear" sc -> [{#clear}]
+            | structDecl
+            | "return" expr:x sc -> [{#return. x}]
+            | "return" sc -> [{#return. {#number. 0}}]
+            | "eval" expr:e sc -> [{#eval. e}]
+            | expr:e sc -> [{#compound. e. {#pop}}]
+            | ";" -> [{#skip}]
+
+stmts = stmt*:ss -> [{#compound}, ss]
+
+string = $" <(~$" anything)*:s> $" -> [#string -> s]
+
+structDecl = "struct" "structName":s
+   [(structs includesKey: s) ifTrue: [self error: 'duplicate decl for struct ', s]]
+   [structs at: s put: Dictionary new]:d
+   [0]:offset
+   "{" field(s. offset):offset ("," field(s. offset):offset)* "}"
+   [d at: '$bitSize' put: offset]
+   -> [{#structDecl. s. d}]
+
+tok = spaces (name | number | special | string | charLit)
+
+token :tt = tok:t ?[tt = t key] -> [t value]
+
+topLevelStmt = "func" "name":n "(" listOf(#ident. ','):formals (","? "...")? ")" stmtNoLabel:body
+                 -> [{#func. n. formals. body}]
+             | stmt
+
+topLevelStmts = topLevelStmt*:ss -> [{#compound}, ss]
+
+// Transcription notes
+// - Read from the page images (PDF pp. 29-30), not the text layer. Every token and line break matches the text layer except the differences below.
+// - Spacing differs from the text layer in these lines (image shows the spacing; text layer collapsed it): eqExpr "==" line ('=='.  x. y); "print" line ("print"  expr:e ... [{#print.  e}]); relExpr "<" line ("<"  shiftExpr:y ... '<'.  x. y); the "number" rule's base values are right-aligned in the image (base:  2, base:  8, base: 16, base: 10).
+// - The number of spaces in some runs of blanks (column padding inside lines such as primExpr, relExpr and special) was read from the image and is not verified to the exact count.
+// - No glyph was unreadable; no [?] marks were needed.
+// - Page headers, footers and page numbers (28, 29, "VPRI Technical Report TR-2010-004") are dropped.
+// - The page break between report pp. 28 and 29 falls after the relExpr line "relExpr = shiftExpr:x "<"  shiftExpr:y ..."; the listing continues with the next "| shiftExpr:x "<=" ..." line and is joined seamlessly.

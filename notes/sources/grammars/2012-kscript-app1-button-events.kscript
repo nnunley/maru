@@ -1,0 +1,16 @@
+// Button event streams (section 5.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 5.1 Buttons, after 'the code shown below may be written in a text editor', PDF pages 27-28 (printed pages 26-27)
+// Transcribed from the page images; text-layer differences noted below.
+
+buttonDown   <- eventStream()
+buttonUp     <- eventStream()
+pointerLeave <- eventStream()
+pointerEnter <- eventStream()
+motionQuery  <- eventStream()
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - One listing continued across the PDF 27/28 page break; the footnote 2 ('listen()') sits between the parts and is excluded.
+// - Uncertain glyphs: none.

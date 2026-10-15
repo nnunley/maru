@@ -1,0 +1,12 @@
+// Dependency on a source stream (section 2.4.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 2.4.1 Expressions and 'when' constructs, PDF page 24 (printed page 23)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 2.4.1, boxed snippet, PDF page 40 (printed page 39)
+// Transcribed from the page images; text-layer differences noted below.
+
+fillUpdater <- this.fill(color)
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

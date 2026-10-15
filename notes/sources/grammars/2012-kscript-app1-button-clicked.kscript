@@ -1,0 +1,12 @@
+// Button clicked stream (section 5.1)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 5.1 Buttons, lead-in 'the definition of the clicked stream', PDF page 28 (printed page 27)
+// Transcribed from the page images; text-layer differences noted below.
+
+clicked <- buttonUp.asBoolean() && pressed’
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - The prime mark after pressed is ’ (U+2019), as printed.
+// - Uncertain glyphs: none.

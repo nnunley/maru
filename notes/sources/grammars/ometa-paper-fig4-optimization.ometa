@@ -1,0 +1,32 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 4 ("Extensible pattern matching in OMeta").
+//   PDF page 7 (of 10), top. Section 3.2 ("Extensible Pattern Matching"): NullOptimization and OROptimization.
+// Transcribed from the page images; text-layer differences noted below.
+
+meta NullOptimization {
+  opt    ::= (OR     <opt>*:xs)           => ‘(OR     ,@xs)
+            | (NOT    <opt>:x)            => ‘(NOT    ,x)
+            | (MANY   <opt>:x)            => ‘(MANY   ,x)
+            | (MANY1  <opt>:x)            => ‘(MANY1  ,x)
+            | (define <_>:n <opt>:v)      => ‘(define ,n ,v)
+            | (AND    <opt>*:xs)          => ‘(AND    ,@xs)
+            | (FORM   <opt>*:xs)          => ‘(FORM   ,@xs)
+            | <_>;
+}
+
+meta OROptimization <: NullOptimization {
+  opt    ::= (OR <opt>:x)                 => x
+            | (OR <inside>:xs)            => ‘(OR ,@xs)
+            | <super opt>;
+  inside ::= (OR <inside>:xs) <inside>:ys => (append xs ys)
+            | <super opt>:x    <inside>:xs => (cons   x  xs)
+            | <empty>                     => nil;
+}
+
+// Transcription notes
+// - Checked at 300 dpi. The left single quote ‘ (U+2018) precedes (OR, (NOT, (MANY, (MANY1, (define, (AND, (FORM
+//   and (OR ,@xs) in the output expressions, as on the page. Glyphs otherwise match the text layer.
+// - Column spacing follows the page image to the nearest column; interior space runs may differ slightly.
+// - The ",@" and ",n" output forms are printed exactly; the comma and at-sign are as printed.
+// - Caption (not part of listing): "Extensible pattern matching in OMeta."

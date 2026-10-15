@@ -1,0 +1,110 @@
+// Title: Appendix 2: A Copying Garbage Collector written in Nothing
+// Source: STEPS 2010 4th-year progress report, VPRI Technical Report TR-2010-004 (2010), Appendix 2, report pp. 30-31 (PDF pages 31-32).
+// Transcribed from the page images; text-layer differences noted below.
+
+struct OTE { ptr, numSlots }                                 // struct for Object Table (OT) Entries
+
+var ot       = memory,                                       // OT starts @ lowest valid address
+    otSize   = 32 * OTE.wordSize,                            // max. number of objects
+    heap1    = ot + otSize,                                  // base addr. of 1st heap
+    heapSize = (memory.wordSize - heap1) / 2,                // num. words in each heap
+    heap2    = heap1 + heapSize,                             // base addr. of 2nd heap (also addr of 1st word after 2nd heap)
+    heap2Lim = heap2 + heapSize                              // addr of 1st word after 2nd heap
+
+func withOtDo(f) {                                           // This function maps f over all OT entries.
+   var ptr = ot
+   while ptr < heap1 {
+      f(ptr)
+      ptr := ptr + OTE.wordSize
+   }
+}
+
+func initOTE(ote) {                                             // initialize OT
+   OTE(ote).ptr := 0
+   OTE(ote).numSlots := 0
+}
+withOtDo(initOTE)
+
+func oop2ote(oop) { return (oop >> 1) * OTE.wordSize + ot   }     // These functions translate between oops (indices into
+func ote2oop(ote) { return ((ote - ot) / OTE.wordSize) << 1 }     // the OT) and ptrs to their OTEs.
+
+func mkInt(x)  { return x << 1 | 1 }                              // Ints are tagged. These functions create an int object
+func intVal(i) { return i >> 1     }                              // and extract value of an int object, respectively.
+
+var freeList, heap = heap2, heapLim, heapPtr, otherHeapPtr = heap1
+func fixFreeListHelper(ote) {
+   if OTE(ote).ptr < heap || OTE(ote).ptr >= heapLim {
+      OTE(ote).ptr := freeList
+      OTE(ote).numSlots := 0
+      freeList := ote
+   }
+}
+func fixFreeList() {                                           // Organize the free OTEs into a linked list so that alloc
+   freeList := 0                                               // doesn't have to scan the OT for free OTEs.
+   withOtDo(fixFreeListHelper)
+}
+
+func switchActiveHeap() {
+   heapPtr := otherHeapPtr
+   if heap == heap1 { heap := heap2; heapLim := heap2Lim; otherHeapPtr := heap1 }
+   else             { heap := heap1; heapLim := heap2;    otherHeapPtr := heap2 }
+   fixFreeList()
+}
+switchActiveHeap()
+
+func moveToOtherHeap(oop) {                                 // This function recursively moves an object to the other heap
+   if oop & 1                                               // and updates its OTE to point to the new body.
+      return                                                // (No need to do anything for ints.)
+   var ote = oop2ote(oop)
+   if OTE(ote).ptr < heap || OTE(ote).ptr >= heapLim        // If this object's body is not in this heap, it's already been
+      return                                                // moved, so we're done.
+   var ptr = otherHeapPtr                                   // The new address of the object's body.
+   otherHeapPtr := otherHeapPtr + OTE(ote).numSlots
+   var idx = 0                                              // Copy the object's slots to the new body.
+   while idx < OTE(ote).numSlots {
+      ptr[idx] := OTE(ote).ptr[idx]
+      idx := idx + 1
+   }
+   OTE(ote).ptr := ptr                                   // Update the object's OTE to point to the new body.
+   idx := idx - 1                                        // Recursively move this object's slots to the other heap. We start
+   while idx >= 0 {                                      // at the bottom b/c "next" ptrs are usually the last inst var, and
+      moveToOtherHeap(OTE(ote).ptr[idx])                 // we want locality of reference.
+      idx := idx - 1
+   }
+}
+
+var root = mkInt(0)                                         // An object is live iff it is reachable from this variable.
+
+func alloc(n) {                                             // This function allocates a new object with n slots and returns
+   var triedBothHeaps = 0                                   // its oop.
+l1:
+   if freeList == 0 || heapPtr + n > heapLim {              // If the object doesn't fit, either b/c there are no free OTEs or
+      if triedBothHeaps                                     // not enough memory for the object in this heap, GC and try again.
+         halt                                               // (If we've already tried this, then the object doesn't fit -- ERROR!)
+      triedBothHeaps := 1
+      moveToOtherHeap(root)
+      switchActiveHeap()
+      goto l1
+   }
+   var ans = freeList                                       // Take the new object's OTE from the free list.
+   freeList := OTE(freeList).ptr
+   OTE(ans).numSlots := n
+   OTE(ans).ptr := heapPtr                                  // Make room for the object's body in the heap.
+   heapPtr := heapPtr + n
+   var idx = 0                                              // Initialize all of its slots to zero.
+   while idx < n {
+      OTE(ans).ptr[idx] := mkInt(0)
+      idx := idx + 1
+   }
+   return ote2oop(ans)                                      // Return the oop of the new object.
+}
+
+// Transcription notes
+// - Read from the page images (PDF pp. 31-32), not the text layer. Tokens and line breaks match the text layer.
+// - The text layer shows the body of alloc() indented 4 spaces; the image shows 3-space indentation throughout the function body. This file follows the image.
+// - Comment columns: the image places the trailing // comments in columns that the text layer does not preserve exactly. The comment start columns here are approximate; the comment text itself matches.
+// - Spacing inside the mkInt/intVal lines was read from the image ("func mkInt(x)  { ... }", "return i >> 1     }") and the exact run lengths are not verified.
+// - The line "func oop2ote(oop) ... ot   }" and the line "return ((ote - ot) / OTE.wordSize) << 1 }" are as printed; trailing padding before "}" is not verified to the column.
+// - The "halt" line is the first line of page 31 (report p. 31); the listing continues across the page break from alloc()'s "if triedBothHeaps" line and is joined seamlessly.
+// - No glyph was unreadable; no [?] marks were needed.
+// - Page headers, footers and page numbers (30, 31, "VPRI Technical Report TR-2010-004") are dropped.

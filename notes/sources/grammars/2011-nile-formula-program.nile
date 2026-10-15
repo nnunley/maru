@@ -1,0 +1,65 @@
+// Title: Gezira rendering formula written in Nile (the 'The Formula' program, about 45 lines)
+// Author: not credited on the listing page
+// Source: VPRI TR-2011-004 (STEPS 2011 progress report), Section 'Graphics'; figure captioned '"The Formula" in Nile (~ 45 LOC)' with the Nile program panel; PDF page 9 (printed page 8). The text is a raster figure (no text layer) read from two 400-dpi crops of the panel.
+// Transcribed from the page images; text-layer differences noted below.
+type Point = (x, y   [?]
+type Bezier = (A, B, C : Point)   [?]
+type EdgeSpan = (x, y, c, l : Real)
+type EdgeSample = (x, y, a, h : Real)
+
+| (a : Real) | : Real
+   { -a if a < 0, a }
+
+(a : Real) ◁ (b : Real) : Real
+   { a if a < b, b }
+
+(a : Real) ~ (b : Real) : Real
+   (a + b) / 2
+
+DecomposeBeziers : Bezier >> EdgeSample
+    ∀ (A, B, C)
+        inside = (⌊ A ⌋ = ⌊ C ⌋ ∨ ⌈ A ⌉ = ⌈ C ⌉)
+        if inside.x ∧ inside.y
+            P = ⌊ A ⌋ ◁ ⌊ C ⌋
+            w = P.x + 1 - (C.x ~ A.x)
+            h = C.y - A.y
+            >> (P.x + 1/2, P.y + 1/2, w × h, h)
+        else
+            ABBC    = (A ~ B) ~ (B ~ C)
+            min     = ⌊ ABBC ⌋
+            max     = ⌈ ABBC ⌉
+            nearmin = | ABBC - min | < 0.1
+            nearmax = | ABBC - max | < 0.1
+            M       = {min if nearmin, max if nearmax, ABBC}
+            << (M, B ~ C, C) << (A, A ~ B, M)
+
+CombineEdgeSamples : EdgeSample >> EdgeSpan
+    (x, y, A, H) = 0
+    ∀ (x', y', a, h)
+        if y' = y
+            if x' = x
+                A' = A + a
+                H' = H + h
+            else
+                l = {x' - x - 1 if |H| > 0.5, 0}
+                >> (x, y, |A| ◁ 1, l)
+                A' = H + a
+                H' = H + h
+        else
+            >> (x, y, |A| ◁ 1, 0)
+            A' = a
+            H' = h
+    >> (x, y, |A| ◁ 1, 0)
+
+Rasterize : Bezier >> EdgeSpan
+    ⇒ DecomposeBeziers → SortBy (@x)
+       → SortBy (@y) → CombineEdgeSamples
+
+// Transcription notes
+// - [?] 'type Point = (x, y': the 'Do It' button covers the rest of this line; the remainder is not visible
+//   in the figure and is not transcribed (no guess is made).
+// - [?] 'type Bezier = (A, B, C : Point)' is partly overlapped by the button's lower edge; the closing
+//   parenthesis is read as printed in the image.
+// - The 'Do It' and 'Reset' buttons overlay the figure and are not part of the program.
+// - Glyphs read from the 400-dpi crop: ◁ ~ ∧ ∨ ⌊ ⌋ ⌈ ⌉ ⇒ → × ∀ | (absolute value). The text layer has no copy.
+// - Indentation and alignment reproduced from the crop; exact space counts may differ.

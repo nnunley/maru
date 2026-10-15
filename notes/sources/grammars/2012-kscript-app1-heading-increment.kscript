@@ -1,0 +1,11 @@
+// Naive heading update (section 3)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 3 opening, 'If the program is naively written as', PDF page 25 (printed page 24)
+// Transcribed from the page images; text-layer differences noted below.
+
+heading <- heading + 2
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

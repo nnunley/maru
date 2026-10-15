@@ -1,0 +1,19 @@
+// Evaluator pseudo-code, Figure 2 (KSObject evaluation)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), Figure 2 caption 'The evaluation method of KSObject in pseudo-code', PDF page 25 (printed page 24)
+// Transcribed from the page images; text-layer differences noted below.
+
+Evaluator.addStreamsFrom = (anObject) ->
+   for stream in anObject
+      // add stream to the list of streams called streams
+
+Evaluator.sortAndEvaluateAt = (logicalTime) ->
+    var sorted = this.topologicallySortedStreams()
+    for stream in sorted
+        stream.updateIfNecessary(logicalTime)
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Pseudo-code, not KScript, so this file is .txt. The blank line between the two definitions is printed.
+// - Uncertain glyphs: none.

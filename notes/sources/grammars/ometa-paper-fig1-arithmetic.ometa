@@ -1,0 +1,22 @@
+// Title: OMeta: an object-oriented language for pattern matching
+// Authors: Alessandro Warth, Ian Piumarta
+// Source: VPRI Technical Report TR-2007-003 (2007), Figure 1 ("A PEG, written in OMeta, that recognizes simple
+//   arithmetic expressions"). PDF page 3 (of 10), right column, top. The PDF has no printed page number.
+// Transcribed from the page images; text-layer differences noted below.
+
+meta E {
+  dig ::= ’0’ | ... | ’9’;
+  num ::= <dig>+;
+  fac ::= <fac> ’*’ <num>
+        | <fac> ’/’ <num>
+        | <num>;
+  exp ::= <exp> ’+’ <fac>
+        | <exp> ’-’ <fac>
+        | <fac>;
+}
+
+// Transcription notes
+// - Checked at 300 dpi. Literal quotes are the right single quote U+2019 at both ends, e.g. ’0’ and ’9’,
+//   as printed. The text layer shows the same glyph. No glyph left uncertain.
+// - The "..." in dig is three periods, as printed.
+// - Caption (not part of listing): "A PEG, written in OMeta, that recognizes simple arithmetic expressions."

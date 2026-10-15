@@ -1,0 +1,124 @@
+// Title: Appendix B: An OMeta Translator from Prolog to JavaScript (Extended Example)
+// Author: Alex Warth (credited on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), Appendix B, report pp. 39-40 (PDF pp. 39-40).
+// Listing: the ometa PrologTranslator grammar, followed by the JavaScript that gives Prolog its matching semantics, in printed order. The JavaScript is code on the same pages and is kept.
+// Explanatory prose omitted: the lead-in sentence on p. 39 ("Prolog has a very simple syntax..."), and the paragraph "However, Prolog is rather different...". Both are prose.
+// The grammar's name is printed as "Ometa" (capital O), as in the page image, while Appendices A and D print "ometa".
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+Ometa PrologTranslator : Parser {
+variable   =  spaces firstAndRest(#upper, #letterOrDigit):name      -> (Var new: name mash).
+symbol     =  spaces firstAndRest(#lower, #letterOrDigit):name      -> (Sym new: name mash).
+clause     =  symbol:sym "(" listOf(#expr, ','):args ")"            -> (Clause new: sym : args).
+expr       =  clause | variable | symbol.
+clauses    =  listOf(#clause, ',').
+rule       =  clause:head ":-" clauses:body "."                     -> (Rule new: head : body)
+               | clause:head                   "."                 -> (Rule new: head : {}).
+rules      =  rule*:rs spaces end                                   -> rs.
+query      =  clause:c spaces end                                   -> c.
+}.
+
+function Sym(name) { this.name = name }
+Sym.prototype.rename  = function(nm)  { return this }
+Sym.prototype.rewrite = function(env) { return this }
+Sym.prototype.toAnswerString = function() { return this.name }
+
+function Var(name) { this.name = name }
+Var.prototype.rename  = function(nm)  { return new Var(this.name + nm) }
+Var.prototype.rewrite = function(env) { return env[this.name] ? env[this.name] : this }
+Var.prototype.toAnswerString = function() { return this.name }
+
+function Clause(sym, args) { this.sym  = sym; this.args = args }
+Clause.prototype.rename   =  function(nm)   {  return  new  Clause(this.sym,  this.args.map(function(x)
+{ return x.rename(nm) })) }
+Clause.prototype.rewrite  =  function(env)  {  return  new  Clause(this.sym,  this.args.map(function(x)
+{ return x.rewrite(env) })) }
+Clause.prototype.toAnswerString = function() {
+  return     this.sym.toAnswerString()     +     "("     +     this.args.map(function(x)     {     return
+x.toAnswerString() }).join(", ") + ")"
+}
+
+Array.prototype.rename  = function(n)   { return this.map(function(x) { return x.rename(n) }) }
+Array.prototype.rewrite = function(env) { return this.map(function(x) { return x.rewrite(env) }) }
+Array.prototype.toAnswerString    =    function()    {    return    this.map(function(x)    {    return
+x.toAnswerString() }).join(", ") }
+
+function Rule(head, clauses) { this.head = head; this.clauses = clauses }
+Rule.prototype.rename        =    function(n)            {    return    new    Rule(this.head.rename(n),
+this.clauses.rename(n)) }
+
+function addBinding(env, name, value) {
+  var subst = {}
+  subst[name] = value
+  for (var n in env)
+    if (env.hasOwnProperty(n))
+      env[n] = env[n].rewrite(subst)
+  env[name] = value
+}
+function assert(cond) { if (!cond) throw "unification failed" }
+
+Sym.prototype.unify = function(that, env) {
+  if (that instanceof Sym)
+    assert(this.name == that.name)
+  else {
+    assert(that instanceof Var)
+    if (env[that.name])
+      this.unify(env[that.name], env)
+    else
+      addBinding(env, that.name, this.rewrite(env))
+  }
+}
+Var.prototype.unify = function(that, env) {
+  if (env[this.name])
+    env[this.name].unify(that, env)
+  else
+    addBinding(env, this.name, that.rewrite(env))
+}
+Clause.prototype.unify = function(that, env) {
+  if (that instanceof Clause) {
+    assert(that.args.length == this.args.length)
+    this.sym.unify(that.sym, env)
+    for (var idx = 0; idx < this.args.length; idx++)
+      this.args[idx].unify(that.args[idx], env)
+  }
+  else
+    that.unify(this, env)
+}
+
+function State(query, goals) { this.query = query; this.goals = goals }
+
+function nextSolution(nameMangler, rules, stateStack) {
+  while (true) {
+    if (stateStack.length == 0)
+      return false
+    var state = stateStack.pop(),
+        query = state.query,
+        goals = state.goals
+    if (goals.length == 0)
+      return !window.confirm(query.toAnswerString())
+    var goal = goals.pop()
+    for (var idx = rules.length - 1; idx >= 0; idx--) {
+      var rule = rules[idx].rename(nameMangler), env
+      try { rule.head.unify(goal, env = {}) }
+      catch (e) { continue }
+      var newQuery = query.rewrite(env),
+          newGoals = goals.rewrite(env),
+          newBody  = rule.clauses.rewrite(env)
+      for (var idx2 = newBody.length - 1; idx2 >= 0; idx2--)
+        newGoals.push(newBody[idx2])
+      stateStack.push(new State(newQuery, newGoals))
+    }
+  }
+}
+
+function solve(query, rules) {
+  var stateStack = [new State(query, [query])], n = 0
+  while (nextSolution(n++, rules, stateStack)) {}
+  alert("no more solutions")
+}
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: the grammar block at the top of p. 39 was checked at 250 dpi. The JavaScript on pp. 39-40 was compared at about 850 px width only.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.

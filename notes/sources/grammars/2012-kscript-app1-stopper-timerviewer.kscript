@@ -1,0 +1,13 @@
+// Stopper stream with undefined as filter (section 2.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 2.2, lead-in 'the stream stopper below does not update beyond 1,000', PDF page 23 (printed page 22)
+// Also printed in: VPRI TR-2012-001 (STEPS 2012 final report), Appendix II (Making Applications in KSWorld), section 2.2, boxed snippet 'the stream stopper below', PDF page 40 (printed page 39)
+// Transcribed from the page images; text-layer differences noted below.
+
+stopper <- if myTimer > 1000 then undefined else myTimer
+timerViewer <- stopper / 100
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - Uncertain glyphs: none.

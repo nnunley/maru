@@ -1,0 +1,40 @@
+// Title: Example of part of the Nile language, expressed in the prototype OMeta meta translator
+// Author: not credited on the listing page
+// Source: VPRI TR-2009-016 (STEPS 2009 progress report), Section 2 "The Nile Parser";
+//         figure caption "Example of part of the Nile language, expressed in the prototype OMeta meta translator";
+//         PDF page 7 (printed page 6).
+// Transcribed from the page images; text-layer differences noted below.
+OffsideRuleParser.level = 0
+
+ometa NileParser <: OffsideRuleParser {
+  space    = ^space
+           | ``/*'' (~``*/'' :_)* ``*/''
+           | ``//'' (~nl :_)* nl,
+  ns_ident = letter:x letterOrDigit*:xs exactly("'")*:ps          -> [x].concat(xs).concat(ps).join(''),
+  ident    = spaces ns_ident,
+  scalar   = spaces digit+:is '.' digit+:fs                        -> parseFloat(is.join('') + '.' + fs.join(''))
+           | spaces digit+:is                                      -> parseInt(is.join('')),
+
+  aType    = "[" listOf(#vTypeP, ','):ps "]"                       -> {['vType'].concat(
+               ps.reduce(function (xs, x) { return xs.concat(x) }, [])
+             )
+           }
+           | (ident | "â š"):t
+             -> ['nType', t],
+  vTypeP   = listOf(#ident, ','):ns ":" ident:t                    -> ns.map(function(n) { return [n, t] }),
+
+  akType   = "(" listOf(#vTypeP, ','):as ")" ":" kType:kt          -> ['akType',
+               as.reduce(function(xs, x) { return xs.concat(x) }, []),
+               kt
+             ],
+  kType    = aType:t1 ">>" (aType | "â š"):t2                       -> ['kType', t1, t2]
+           | ident:t                                               -> ['nType', t],
+
+  typeDef  = ident:n "<:" (akType | kType | aType):t               -> ['typeDef', n, t],
+
+// Transcription notes
+// - [?] "â š" appears twice: in aType's ident alternative and in kType's aType alternative.
+//   The page image shows the same two-glyph sequence both times; the intended character is
+//   not recoverable from the print. Kept as printed.
+// - Action columns and line breaks follow the page image; exact space counts may differ.
+// - The listing ends after typeDef; the printed excerpt has no closing brace.

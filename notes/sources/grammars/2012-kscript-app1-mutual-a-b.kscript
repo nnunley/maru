@@ -1,0 +1,13 @@
+// Mutually dependent streams via previous value (section 3.2)
+// Author: not credited on the listing page
+// Source: VPRI TR-2012-001 (STEPS 2012 final report), Appendix I (KScript and KSWorld), section 3.2, lead-in 'one can define a pair of values that each follows the other:', PDF page 26 (printed page 25)
+// Transcribed from the page images; text-layer differences noted below.
+
+a <- true fby when timer then b’
+b <- false fby when timer then a’
+
+// Transcription notes
+// - Text layer vs image: no glyph differences found in this listing.
+// - Spacing: indentation and alignment come from glyph positions, checked against the page image.
+// - The prime marks are ’ (U+2019), as printed.
+// - Uncertain glyphs: none.

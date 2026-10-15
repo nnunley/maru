@@ -1,0 +1,27 @@
+// Title: JavaScript (body figure: expressive case statement, CaseJSParser)
+// Author: Alex Warth and Yoshiki Ohshima ("Principal Researchers" on the page)
+// Source: VPRI TR-2007-008, STEPS 2007 first-year progress report (Viewpoints Research Institute, 2008), report body section "JavaScript", p. 19 (PDF p. 19). A body figure, not an appendix.
+// Listing: the example case statement, then the ometa CaseJSParser grammar, in printed order.
+// Explanatory prose omitted: the section text and the sentence introducing the example.
+//
+// Transcribed from the page images; text-layer differences noted below.
+
+case f(x) + 2 of
+  <  0: alert("this is a less than");
+  == 0: alert("this is an ugly equals");
+  >  0: alert("this is a greater than");
+
+ometa CaseJSParser : JSParser {
+  stmt     = "case" expr:v "of" caseBody:b                   -> {#call. {#call. {#func. {'_cv_'}.
+                                                                 {#begin. {#return. b}}}. v}}.
+  operator = "<" | "<=" | "==" | ">=" | ">".
+  caseBody = operator:op addExpr:x ":" srcElem:t caseBody:f  -> {#condExpr. {#binop. op. {#get. '_cv_'}. x}.
+                                                                  {#func. {}. {#begin. t}}.
+                                                                  f}
+           |                                                 -> {#func. {}. {#begin. t}}.
+}
+
+// ---- Transcription notes ----
+// Checked against the 250 dpi page image: the grammar was checked at 250 dpi; the example case statement was compared at about 850 px.
+// Text-layer differences: none found in the comparison.
+// Glyphs marked [?]: none. Spacing is reproduced from glyph positions, so runs of spaces are as printed.
