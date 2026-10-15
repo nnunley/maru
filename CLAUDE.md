@@ -112,7 +112,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
    STEPS reports and papers) into the tree as working grammars, each with a
    check and a `check/lines` entry. TCP first: `net/tcp.k`'s packet handling
    as the 2007/2008 reports' `svc`/`syn`/`req`/`ack` rules.
-4. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
+4. Bare metal: Maru as a bootable live image. The qemu raw-boot
+   environments (i386, x86-64 long mode, A64 `virt`: boot, console, memory
+   map, exit) are the first step, specified after the encoders
+   (`docs/rfc/draft-ndn-table-assemblers-00.md`) as part C of the 2026-10-14
+   assembler design.
+5. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
    POSIX mutexes, arm64 and x86-64), then Gezira, then the windowed demos.
    Nile and Gezira come in as submodules of forks, and count toward the 20k.
    Spec: `docs/rfc/draft-ndn-nile-runtime-in-maru-00.md`.
