@@ -205,6 +205,12 @@
 			    (concat-strings tmp "/gc.k"))
     (unit-assert (equal (last (run "gc" (ir2-build "gc" (concat-strings tmp "/gc.k")))) "gc ok"))))
 
+;;; ---------------------------------------------------------------- boot2
+
+;; boot2.l defines in Maru the string and number operations eval2 dropped.
+(check "boot2_strings"
+  (unit-assert (equal (last (run "boot2-strings" "./eval2 -b boot2.l check/boot2-strings.l")) "boot2 strings ok")))
+
 ;;; ---------------------------------------------------------------- budget
 
 ;; Derived code (marked in .gitattributes) doesn't count.

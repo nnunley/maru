@@ -61,6 +61,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
   and merges adjacent free chunks.
+- `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
+  `string-copy`, `string-compare`, `long->string` and `string->long` behave
+  as `eval`'s C primitives do (the cases pass under both evaluators).
 - `lines`: the source line count equals the sum of `check/lines`. Any change
   in line count needs an entry there with its delta, and an entry that adds
   lines must say why. Derived files are marked `derived` in `.gitattributes`

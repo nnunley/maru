@@ -884,6 +884,53 @@
 (define-function string->number (str)
   (string->number-base str 10))
 
+;; eval.c's string and number primitives, which eval2 dropped, with their semantics.
+
+(define-function string-copy (str . options)	; start=0 length=rest, both clamped
+  (let* ((n     (string-length str))
+	 (start (max 0 (min n (or (car options) 0))))
+	 (len   (max 0 (min (- n start) (or (cadr options) n))))
+	 (out   (string len)))
+    (for (i 0 len) (set-string-at out i (string-at str (+ start i))))
+    out))
+
+(define-function string-compare (str arg . options)	; like wcsncmp (str+offset, arg, length)
+  (let ((off (or (car options) 0))
+	(len (or (cadr options) (string-length str)))
+	(result 0))
+    (if (or (< off 0) (< len 0) (>= off (string-length str)))
+	-1
+      (let ((k 0))
+	(while (< k len)
+	  (let ((a (if (< (+ off k) (string-length str)) (string-at str (+ off k)) 0))
+		(b (if (< k (string-length arg)) (string-at arg k) 0)))
+	    (cond
+	      ((not (= a b))	(set result (- a b)) (set k len))
+	      ((= a 0)		(set k len))
+	      (else		(set k (+ k 1))))))
+	result))))
+
+(define-function long->string (n)
+  (cond
+    ((string? n)	n)
+    ((not (long? n))	())
+    ((< n 0)		(concat-string "-" (long->string (- n))))
+    ((< n 10)		(character->string (+ ?0 n)))
+    (else		(concat-string (long->string (/ n 10)) (character->string (+ ?0 (% n 10)))))))
+
+(define-function string->long (str)	; like wcstol with base 0: 0x hex, leading 0 octal
+  (if (not (string? str))
+      (and (long? str) str)
+    (let ((i 0) (s 1) (radix 10) (l (string-length str)))
+      (while (and (< i l) (or (= 32 (string-at str i)) (= ?\t (string-at str i)))) (set i (+ i 1)))
+      (and (< i l) (= ?- (string-at str i)) (let () (set s -1) (set i (+ i 1))))
+      (and (< i l) (= ?+ (string-at str i)) (set i (+ i 1)))
+      (when (and (< i l) (= ?0 (string-at str i)))
+	(if (and (< (+ i 1) l) (or (= ?x (string-at str (+ i 1))) (= ?X (string-at str (+ i 1)))))
+	    (let () (set radix 16) (set i (+ i 2)))
+	  (set radix 8)))
+      (* s (string->number-base (string-copy str i) radix)))))
+
 (define-function array->string (arr)
   (let* ((ind 0)
 	 (lim (array-length arr))
