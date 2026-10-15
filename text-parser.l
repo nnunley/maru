@@ -65,7 +65,7 @@
 
 (define text-parser-match-string
   (define-method parser-match-string <text-parser> (string len)
-    (when (and (or (< (+ self.position len) self.limit) (self.refill self len))
+    (when (and (or (<= (+ self.position len) self.limit) (self.refill self len))
 	       (= 0 (string-compare self.string string self.position len)))
       (set self.result string)
       (incr self.position len))))

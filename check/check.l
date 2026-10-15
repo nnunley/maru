@@ -156,6 +156,10 @@
 	 (results (select (lambda (l) (starts l " => ")) out)))
     (unit-assert (equal (last (after " => 12" results)) " => 3"))))
 
+;; text-parser.l matches a string literal that ends at the end of the input.
+(check "text_parser"
+  (unit-assert (equal (last (run "text-parser" "./eval check/text-parser.l")) "text parser ok")))
+
 ;;; ---------------------------------------------------------------- asm
 
 ;; The table-driven encoders: one interface for every instruction set, under
