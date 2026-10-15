@@ -57,8 +57,8 @@
       (set i (+ i 1)))
     found))
 
-(define-function asm-field-range (isa row position pc)
-  ((car (cddddr (asm-isa isa))) row position pc))
+(define-function asm-field-range (isa row position pc . insn)	; insn: lengths of PC-relative fields
+  ((car (cddddr (asm-isa isa))) row position pc (car insn)))
 
 (define-function asm-attempt (isa buffer insn)
   (let* ((i (asm-isa isa))
@@ -73,7 +73,7 @@
       (and (or open (not out)) (= (car insn) (car r))
 	   (let ((o (encode r insn pc)))
 	     (when o
-	       (let ((n (if open (let ((range (asm-field-range isa r open pc))) (/ (- (cadr range) (car range)) (caddr range))) 0)))
+	       (let ((n (if open (let ((range (asm-field-range isa r open pc insn))) (/ (- (cadr range) (car range)) (caddr range))) 0)))
 		 (when (< size n) (set size n) (set out o) (set row r)))))))
     (if out
 	(let ((offset (array-length (asm-buffer-bytes buffer))))

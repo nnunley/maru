@@ -13,6 +13,7 @@
 
 (require "asm-table.l")
 (require "asm-arm64.l")
+(require "asm-x86.l")
 
 (define-function split (str sep)
   (let ((out ()) (start 0) (n (string-length str)))

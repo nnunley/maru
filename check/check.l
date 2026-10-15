@@ -176,8 +176,12 @@
 (check "asm_rows_arm64"
   (unit-assert (equal (last (run "asm-rows-arm64" (concat-string "./eval check/asm-rows.l arm64 " tmp))) "asm rows arm64 ok")))
 
+(check "asm_rows_x64"
+  (unit-assert (equal (last (run "asm-rows-x64" (concat-string "./eval check/asm-rows.l x64 " tmp))) "asm rows x64 ok")))
+
 (check "asm_coverage"
-  (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok")))
+  (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
+  (unit-assert (equal (last (run "asm-coverage-x64" "./eval check/asm-coverage.l x64")) "asm coverage x64 ok")))
 
 (check "jit_run"
   (let ((out (run "jit-run-arm64" "./eval2 -b boot2.l check/jit-run.l arm64")))
@@ -185,7 +189,8 @@
     (unit-assert (equal (last out) "jit run arm64 ok"))))
 
 (check "asm_patch"
-  (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok")))
+  (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok"))
+  (unit-assert (equal (last (run "asm-patch-x64" "./eval check/asm-patch.l x64")) "asm patch x64 ok")))
 
 ;;; ---------------------------------------------------------------- ir2
 

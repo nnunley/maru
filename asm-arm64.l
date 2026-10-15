@@ -360,7 +360,7 @@
 ;; (lo hi step) of the values operand position of row can take at pc, or () if
 ;; it has no field a placeholder can stand for.  A memory operand's range is
 ;; its offset's.
-(define-function arm64-field-range (row position pc)
+(define-function arm64-field-range (row position pc . insn)
   (let ((k (cadr row)))
     (while (< 0 position) (set k (cdr k)) (set position (- position 1)))
     (set k (car k))

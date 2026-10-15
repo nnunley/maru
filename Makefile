@@ -39,7 +39,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l .force
+check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l .force
 	./eval check/check.l
 
 maru-check : eval2 .force
@@ -197,6 +197,10 @@ test-cpp : eval cpp.g.l .force
 
 asm-x86.k : gen-asm-x86.k asm-common.k | eval
 	./eval repl.l gen-asm-x86.k > $@.new
+	mv $@.new $@
+
+x86.g.l : x86.g tpeg.l | eval
+	./eval compile-tpeg.l $< > $@.new
 	mv $@.new $@
 
 arm64.g.l : arm64.g tpeg.l | eval

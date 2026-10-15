@@ -1,5 +1,0 @@
-(require "text-parser.l")
-(load "spike/asm/x86.g.l")
-(print "(define x86-rows (quote ")
-(dump (parse-string <x86spec> $file (contents-of-file-named "spike/asm/x86.spec")))
-(println "))")

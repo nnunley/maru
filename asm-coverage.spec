@@ -289,3 +289,183 @@ arm64	vload			LD1 {Vt.T}, [Xn|SP]
 arm64	vstore			ST1 {Vt.T}, [Xn|SP]
 arm64	vload			LDR Qt, [Xn|SP, #imm12*16]
 arm64	vstore			STR Qt, [Xn|SP, #imm12*16]
+
+# ---------------------------------------------------------------- x64: integer
+# Values of 8, 16 and 32 bits are held in 32-bit registers (group i32).
+x64	add.i32	ADD r/m32, r32
+x64	add.i64	ADD r/m64, r64
+x64	add.i32	ADD r/m32, imm32
+x64	add.i64	ADD r/m64, imm32
+x64	add.i32	ADD r/m32, imm8
+x64	add.i64	ADD r/m64, imm8
+x64	sub.i32	SUB r/m32, r32
+x64	sub.i64	SUB r/m64, r64
+x64	sub.i32	SUB r/m32, imm32
+x64	sub.i64	SUB r/m64, imm32
+x64	sub.i32	SUB r/m32, imm8
+x64	sub.i64	SUB r/m64, imm8
+x64	bitand.i32	AND r/m32, r32
+x64	bitand.i64	AND r/m64, r64
+x64	bitand.i32	AND r/m32, imm32
+x64	bitand.i64	AND r/m64, imm32
+x64	bitand.i32	AND r/m32, imm8
+x64	bitand.i64	AND r/m64, imm8
+x64	bitor.i32	OR r/m32, r32
+x64	bitor.i64	OR r/m64, r64
+x64	bitor.i32	OR r/m32, imm32
+x64	bitor.i64	OR r/m64, imm32
+x64	bitor.i32	OR r/m32, imm8
+x64	bitor.i64	OR r/m64, imm8
+x64	bitxor.i32	XOR r/m32, r32
+x64	bitxor.i64	XOR r/m64, r64
+x64	bitxor.i32	XOR r/m32, imm32
+x64	bitxor.i64	XOR r/m64, imm32
+x64	bitxor.i32	XOR r/m32, imm8
+x64	bitxor.i64	XOR r/m64, imm8
+x64	mul.i32	IMUL r32, r/m32
+x64	mul.i64	IMUL r64, r/m64
+x64	mul.i32	IMUL r32, r/m32, imm32
+x64	mul.i64	IMUL r64, r/m64, imm32
+x64	div.s32,mod.s32	IDIV r/m32
+x64	div.s64,mod.s64	IDIV r/m64
+x64	div.u32,mod.u32	DIV r/m32
+x64	div.u64,mod.u64	DIV r/m64
+x64	div.s32,mod.s32	CDQ
+x64	div.s64,mod.s64	CQO
+x64	neg.i32	NEG r/m32
+x64	neg.i64	NEG r/m64
+x64	com.i32	NOT r/m32
+x64	com.i64	NOT r/m64
+x64	shl.i32	SHL r/m32, CL
+x64	shl.i64	SHL r/m64, CL
+x64	shl.i32	SHL r/m32, imm8
+x64	shl.i64	SHL r/m64, imm8
+x64	shr.u32	SHR r/m32, CL
+x64	shr.u64	SHR r/m64, CL
+x64	shr.u32	SHR r/m32, imm8
+x64	shr.u64	SHR r/m64, imm8
+x64	shr.s32	SAR r/m32, CL
+x64	shr.s64	SAR r/m64, CL
+x64	shr.s32	SAR r/m32, imm8
+x64	shr.s64	SAR r/m64, imm8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32	CMP r/m32, r32
+x64	eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64	CMP r/m64, r64
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32	CMP r/m32, imm32
+x64	eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64	CMP r/m64, imm32
+x64	not.i32	TEST r/m32, r32
+x64	not.i64	TEST r/m64, r64
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETE r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETNE r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETL r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETLE r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETG r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETGE r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETB r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETBE r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETA r/m8
+x64	eq.i32,ne.i32,lt.i32,le.i32,ge.i32,gt.i32,eq.i64,ne.i64,lt.i64,le.i64,ge.i64,gt.i64,not.i32,not.i64	SETAE r/m8
+
+# ---------------------------------------------------------------- x64: casts, constants, addresses
+x64	cast.s8.s32	MOVSX r32, r/m8
+x64	cast.s8.s64	MOVSX r64, r/m8
+x64	cast.s16.s32	MOVSX r32, r/m16
+x64	cast.s16.s64	MOVSX r64, r/m16
+x64	cast.s32.s64	MOVSXD r64, r/m32
+x64	cast.u8.u32,cast.u8.u64	MOVZX r32, r/m8
+x64	cast.u16.u32,cast.u16.u64	MOVZX r32, r/m16
+x64	move.i32,cast.u32.u64	MOV r32, r/m32
+x64	move.i64	MOV r64, r/m64
+x64	lit.i32	MOV r32, imm32
+x64	lit.i64	MOV r64, imm64
+x64	lit.i64	MOV r/m64, imm32
+x64	addressof	LEA r64, m
+
+# ---------------------------------------------------------------- x64: loads and stores
+x64	load.s32,load.u32	MOV r32, r/m32
+x64	load.i64	MOV r64, r/m64
+x64	load.u8	MOVZX r32, r/m8
+x64	load.s8	MOVSX r32, r/m8
+x64	load.u16	MOVZX r32, r/m16
+x64	load.s16	MOVSX r32, r/m16
+x64	store.s8,store.u8	MOV r/m8, r8
+x64	store.s16,store.u16	MOV r/m16, r16
+x64	store.s32,store.u32	MOV r/m32, r32
+x64	store.i64	MOV r/m64, r64
+x64	store.i32	MOV r/m32, imm32
+x64	store.i64	MOV r/m64, imm32
+
+# ---------------------------------------------------------------- x64: control
+x64	branch	JMP rel32
+x64	branch	JMP rel8
+x64	branch	JE rel32
+x64	branch	JE rel8
+x64	branch	JNE rel32
+x64	branch	JNE rel8
+x64	branch	JL rel32
+x64	branch	JL rel8
+x64	branch	JLE rel32
+x64	branch	JLE rel8
+x64	branch	JG rel32
+x64	branch	JG rel8
+x64	branch	JGE rel32
+x64	branch	JGE rel8
+x64	branch	JB rel32
+x64	branch	JB rel8
+x64	branch	JBE rel32
+x64	branch	JBE rel8
+x64	branch	JA rel32
+x64	branch	JA rel8
+x64	branch	JAE rel32
+x64	branch	JAE rel8
+x64	branch	JP rel32
+x64	branch	JP rel8
+x64	branch	JNP rel32
+x64	branch	JNP rel8
+x64	call,mod.f32,mod.f64	CALL rel32
+x64	call.indirect	CALL r/m64
+x64	branch	JMP r/m64
+x64	return	RET
+x64	save	PUSH r64
+x64	restore	POP r64
+
+# ---------------------------------------------------------------- x64: floating point (SSE scalar)
+# u64 to float and back need a short sequence around the signed conversions,
+# so those classes name the instructions the sequence uses.
+x64	add.f32	ADDSS xmm, xmm/m32
+x64	add.f64	ADDSD xmm, xmm/m64
+x64	sub.f32	SUBSS xmm, xmm/m32
+x64	sub.f64	SUBSD xmm, xmm/m64
+x64	mul.f32	MULSS xmm, xmm/m32
+x64	mul.f64	MULSD xmm, xmm/m64
+x64	div.f32	DIVSS xmm, xmm/m32
+x64	div.f64	DIVSD xmm, xmm/m64
+x64	sqrt.f32	SQRTSS xmm, xmm/m32
+x64	sqrt.f64	SQRTSD xmm, xmm/m64
+x64	min.f32	MINSS xmm, xmm/m32
+x64	min.f64	MINSD xmm, xmm/m64
+x64	max.f32	MAXSS xmm, xmm/m32
+x64	max.f64	MAXSD xmm, xmm/m64
+x64	neg.f32,neg.f64	XORPS xmm, xmm/m128
+x64	abs.f32,abs.f64	ANDPS xmm, xmm/m128
+x64	abs.f32,abs.f64	ANDNPS xmm, xmm/m128
+x64	eq.f32,ne.f32,lt.f32,le.f32,ge.f32,gt.f32	UCOMISS xmm, xmm/m32
+x64	eq.f64,ne.f64,lt.f64,le.f64,ge.f64,gt.f64	UCOMISD xmm, xmm/m64
+x64	cast.s32.f32	CVTSI2SS xmm, r/m32
+x64	cast.s64.f32,cast.u32.f32,cast.u64.f32	CVTSI2SS xmm, r/m64
+x64	cast.s32.f64	CVTSI2SD xmm, r/m32
+x64	cast.s64.f64,cast.u32.f64,cast.u64.f64	CVTSI2SD xmm, r/m64
+x64	cast.f32.s32	CVTTSS2SI r32, xmm/m32
+x64	cast.f32.s64,cast.f32.u32,cast.f32.u64	CVTTSS2SI r64, xmm/m32
+x64	cast.f64.s32	CVTTSD2SI r32, xmm/m64
+x64	cast.f64.s64,cast.f64.u32,cast.f64.u64	CVTTSD2SI r64, xmm/m64
+x64	cast.f32.f64	CVTSS2SD xmm, xmm/m32
+x64	cast.f64.f32	CVTSD2SS xmm, xmm/m64
+x64	load.f32,move.f32	MOVSS xmm, xmm/m32
+x64	store.f32	MOVSS xmm/m32, xmm
+x64	load.f64,move.f64	MOVSD xmm, xmm/m64
+x64	store.f64	MOVSD xmm/m64, xmm
+x64	move.i32.f32	MOVD xmm, r/m32
+x64	move.f32.i32	MOVD r/m32, xmm
+x64	move.i64.f64	MOVQ xmm, r/m64
+x64	move.f64.i64	MOVQ r/m64, xmm
+x64	lit.f32,lit.f64	MOVQ xmm, xmm/m64

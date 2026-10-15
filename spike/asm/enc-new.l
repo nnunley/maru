@@ -1,6 +1,0 @@
-(define *spike* "spike/asm")
-(define n 0)
-(define-function _B (X b) (set n (+ n 1))) (define-function _PC (X) 0)
-(load "spike/asm/x86-pre.l")
-(for (i 0 10000) (x86 () 'ADD 'EAX 5) (x86 () 'MOV 'EDI '(m32 8 EBP ESI 4)) (x86 () 'PUSH 'EBX) (x86 () 'CMP '(m32 -4 EBX () 1) 1000) (x86 () 'CALL 0))
-(println n)

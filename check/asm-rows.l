@@ -15,6 +15,7 @@
 
 (require "asm-table.l")
 (require "asm-arm64.l")
+(require "asm-x86.l")
 (load "check/asm-samples.l")
 
 (define-function out (f . strs)	(list-do x strs (string-do c x (putc c f))))
@@ -41,19 +42,30 @@
     (SHL (V 0 4S) (V 1 4S) 32)		; shift beyond the element
     (USHR (V 0 4S) (V 1 4S) 0)))	; right shifts are 1..esize
 
+(define x86-refused
+  '((INT -5)			; INT's vector is unsigned
+    (ADD EAX R8D)))		; no R8D in 32-bit mode
+(define x64-refused
+  '((MOV AH R8B)		; AH cannot be encoded with a REX prefix
+    (MOV AH SIL)		; nor beside SIL, which needs one
+    (ADD (m32 0 EAX () 1) 5)	; 32-bit addresses (prefix 67) are not encoded
+    (PUSH EAX)))		; no 32-bit push in 64-bit mode
+
 (define isa-rows		(cadr (asm-isa isa)))
-(define isa-samples		arm64-samples)
-(define isa-variants		arm64-variants)
-(define isa-set-variant		arm64-set-variant)
-(define isa-text		arm64-text)
-(define isa-skip?		arm64-skip?)
-(define isa-refused		arm64-refused)
-(define isa-clang		"-target arm64-apple-macos")
-(define isa-section		"__text")
+(define isa-samples		(if (= isa 'arm64) arm64-samples x86-samples))
+(define isa-variants		(if (= isa 'arm64) arm64-variants x86-variants))
+(define isa-set-variant		(if (= isa 'arm64) arm64-set-variant x86-set-variant))
+(define isa-text		(if (= isa 'arm64) arm64-text x86-text))
+(define isa-skip?		(if (= isa 'arm64) arm64-skip? (lambda (row ops) ())))
+(define isa-refused		(cond ((= isa 'arm64) arm64-refused) ((= isa 'x64) x64-refused) (else x86-refused)))
+(define isa-clang		(cond ((= isa 'arm64) "-target arm64-apple-macos") ((= isa 'x64) "-target x86_64-pc-linux") (else "-target i386-pc-linux")))
+(define isa-section		(if (= isa 'arm64) "__text" ".text"))
+(set x86-sample-mode isa)
 
 ;;; ---------------------------------------------------------------- driver
 
 (define s (open (concat-strings tmp "/" (symbol->string isa) ".s") "w"))
+(or (= isa 'arm64) (out s ".intel_syntax noprefix\n"))
 (define buffer (asm-buffer 0))
 (define lines (array))			; text of each instruction, by index
 (define starts (array))			; its offset in buffer
@@ -61,6 +73,14 @@
 (define roundtrip 0)
 (define aliased 0)
 (define refused 0)
+
+;; A sampled operand made encodable at start: (rel d) and (page d) anywhere in it
+;; become absolute addresses.
+(define-function absolute-at (x start)
+  (cond ((not (pair? x))	x)
+	((= 'rel (car x))	(+ start (cadr x)))
+	((= 'page (car x))	(+ (& start -4096) (cadr x)))
+	(else			(map (lambda (y) (absolute-at y start)) x))))
 
 (define-function slice (bytes from to)
   (let ((a (array))) (for (i from to) (array-append a (array-at bytes i))) a))
@@ -72,10 +92,7 @@
     (list-do sops (product (map (lambda (k) (set pos (+ pos 1)) (isa-samples row k pos)) (cadr row)))
       (unless (isa-skip? row sops)
 	(let* ((start (asm-buffer-pc buffer))
-	       (ops (map (lambda (x) (cond ((and (pair? x) (= 'rel (car x)))	(+ start (cadr x)))
-					   ((and (pair? x) (= 'page (car x)))	(+ (& start -4096) (cadr x)))
-					   (else				x)))
-			  sops))
+	       (ops (map (lambda (x) (absolute-at x start)) sops))
 	       (line (symbol->string (car row)))
 	       (first 1))
 	  	  (let ((ks (cadr row)))

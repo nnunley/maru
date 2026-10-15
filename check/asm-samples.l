@@ -81,3 +81,66 @@
     ((= 'pre (car op))		(concat-strings "[" (arm64-text (cadr op) label) ", " (arm64-text (caddr op) label) "]!"))
     ((= 'post (car op))		(concat-strings "[" (arm64-text (cadr op) label) "], " (arm64-text (caddr op) label)))))
 
+
+;;; ---------------------------------------------------------------- x86 and x64
+
+(define x86-sample-mode 'x64)
+(define-function x86-variants (row)		'(()))
+(define-function x86-set-variant (v)		())
+
+(define-function x86-sample-reg (kind size n)	(x86-reg-named kind size n () x86-sample-mode))
+
+;; Memory samples of tag at register position pos: base only, base + scaled
+;; index + negative displacement, an absolute address, and (x64) RIP-relative.
+(define-function x86-memories (tag pos)
+  (let ((asize (if (= x86-sample-mode 'x64) 8 4))
+	(bases (if (= x86-sample-mode 'x64) '(3 13 4 12 5) '(3 5 4 6 7))))
+    (let ((b (x86-sample-reg 'r asize (x86-nth bases (% pos 5))))
+	  (b2 (x86-sample-reg 'r asize (x86-nth bases (% (+ pos 1) 5))))
+	  (i (x86-sample-reg 'r asize (if (= x86-sample-mode 'x64) 9 6))))
+      (concat-list (list (list tag 0 b () 1) (list tag -4 b2 i 8) (list tag 0x12345678 () () 1))
+		   (if (= x86-sample-mode 'x64) (list (list tag '(rel 16) 'RIP () 1)) ())))))
+
+(define-function x86-samples (row k pos)
+  (let* ((c (x86-kind k)) (size (x86-row-size row x86-sample-mode)) (x64 (= x86-sample-mode 'x64)))
+    (cond
+      ((= 'r (car c))	(if x64
+			    (list (x86-sample-reg 'r (cadr c) (% pos 4)) (x86-sample-reg 'r (cadr c) (+ 8 (% pos 8))))
+			  (list (x86-sample-reg 'r (cadr c) (% pos 4)) (x86-sample-reg 'r (cadr c) (if (= 1 (cadr c)) 7 (+ 4 (% pos 4)))))))
+      ((= 'x (car c))	(list (x86-sample-reg 'x 16 (% pos 8)) (x86-sample-reg 'x 16 (if x64 (+ 8 (% pos 8)) 7))))
+      ((= 'rm (car c))	(concat-list (x86-samples row (list-detect e '(r8 r16 r32 r64) (= (cadr c) (cadr (x86-kind e)))) pos)
+				     (x86-memories (x86-mem-tag (cadr c)) pos)))
+      ((= 'xm (car c))	(concat-list (x86-samples row 'xmm pos) (x86-memories (x86-mem-tag (cadr c)) pos)))
+      ((= 'mem (car c))	(x86-memories (x86-mem-tag (cadr c)) pos))
+      ((= 'm (car c))	(x86-memories 'm pos))
+      ((= 'imm (car c))	(let ((bits (* 8 (cadr c))))
+			  (cond ((= bits 64)		'(5 -2 0x123456789abcdef0))
+				((x86-unsigned? row)	(list 0 (- (<< 1 bits) 1)))
+				((<= size (cadr c))	(list 5 -2 (- (<< 1 (- bits 1)) 1) (- (<< 1 bits) 1)))
+				(else			(list 5 -2 (- (<< 1 (- bits 1)) 1))))))
+            ((= 'rel (car c))	(if (= 1 (cadr c)) '((rel 8) (rel -8)) '((rel 8) (rel -8) (rel 0x10000))))
+      ((= 'one (car c))	'(1))
+      (else		(list k)))))
+
+(define x86-ptr '((m8 . "BYTE PTR ") (m16 . "WORD PTR ") (m32 . "DWORD PTR ") (m64 . "QWORD PTR ") (m128 . "XMMWORD PTR ") (m . "")))
+
+;; Intel syntax, as clang reads it.
+(define-function x86-text (op label . kind)
+  (cond
+    ((symbol? op)	(symbol->string op))
+    ((long? op)		(long->string op))
+    ((= 'rel (car op))	(concat-strings "L" (long->string label) (if (< (cadr op) 0) " - " " + ")
+				(long->string (if (< (cadr op) 0) (- 0 (cadr op)) (cadr op)))))
+    ((x86-mem? op)
+     (let ((d (cadr op)) (b (caddr op)) (i (cadddr op)) (s (car (cddddr op))) (parts ()))
+       (and b (set parts (list (symbol->string b))))
+       (and i (set parts (concat-list parts (list (concat-strings (symbol->string i) "*" (long->string s))))))
+       (concat-strings (cdr (assq (car op) x86-ptr)) "["
+		       (cond ((pair? d)	(concat-strings (car parts) " + " (x86-text d label)))
+			     ((not parts)	(format "0x%lx" d))
+			     (else		(let ((t (car parts)))
+						  (and (cdr parts) (set t (concat-strings t " + " (cadr parts))))
+						  (cond ((< d 0) (concat-strings t " - " (long->string (- 0 d))))
+							((> d 0) (concat-strings t " + " (long->string d)))
+							(else t)))))
+		       "]")))))

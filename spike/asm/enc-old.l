@@ -1,6 +1,0 @@
-(define n 0)
-(define-function _B (X b) (set n (+ n 1))) (define-function _W (X b) (_B X b) (_B X b)) (define-function _L (X b) (_W X b) (_W X b))
-(define-function _D1 (X b) (_B X b)) (define-function _D4 (X b) (_L X b))
-(load "asm-x86.k")
-(for (i 0 10000) (ADDLir () 5 _EAX) (MOVLmr () 8 _EBP _ESI 4 _EDI) (PUSHLr () _EBX) (CMPLim () 1000 -4 _EBX 0 0) (CALLm () 0 0 0 0))
-(println n)
