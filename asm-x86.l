@@ -76,6 +76,23 @@
 
 (define-function x86-unsigned? (row)	(memq 'u (caddr row)))
 
+;; Where each of row's operands goes: reg (ModRM.reg), rm (ModRM.rm), plus
+;; (the opcode's low bits, +r), or its own kind (imm, rel, one, fixed).
+;; Registers go to rm under a /digit; under /r they go to reg beside an r/m
+;; operand, and otherwise the first goes to reg and the rest to rm.
+(define-function x86-slots (row)
+  (let* ((tokens (caddr row))
+	 (plus (list-detect t tokens (and (pair? t) (= '+r (car t)))))
+	 (digit (list-detect t tokens (and (pair? t) (= '/ (car t)))))
+	 (has-rm (list-detect k (cadr row) (memq (car (x86-kind k)) '(rm m mem xm))))
+	 (seen ()))
+    (map (lambda (k)
+	   (let ((c (car (x86-kind k))))
+	     (cond ((memq c '(rm m mem xm))	'rm)
+		   ((memq c '(r x))		(cond (plus 'plus) (digit 'rm) (has-rm 'reg) (seen 'rm) (else (set seen 1) 'reg)))
+		   (else			c))))
+	 (cadr row))))
+
 ;; Whether v fits an n-byte immediate of a row with operand size size: signed,
 ;; or unsigned when the immediate is as wide as the operand (or the row is u).
 ;; Displacements and branch offsets pass size 8, so they are signed only.
@@ -157,16 +174,17 @@
 	(reg ()) (rm ()) (imm ()) (rel ()) (plus ()) (ok 1) (positions ()) (i 0) (needs-rex ()) (no-rex ()))
     (and (= (list-length kinds) (list-length ops))
 	 (let ()
-	   (list-do k kinds
-	     (let ((op (car ops)) (c (car (x86-kind k))))
+	   	   (list-do k kinds
+	     (let ((op (car ops)) (c (car (x86-kind k))) (slot (x86-nth (x86-slots row) i)))
 	       (or (x86-matches? op k size mode unsigned) (set ok ()))
 	       (when ok
 		 (and (x86-reg op)
 		      (let ((flag (car (cddddr (x86-reg op)))))
 			(and (= flag 'rex) (set needs-rex 1))
 			(and (= flag 'high) (set no-rex 1))))
-		 (cond ((memq c '(r x))		(if (list-detect t (caddr row) (and (pair? t) (= '+r (car t)))) (set plus op) (set reg op)))
-		       ((memq c '(rm m mem xm))	(set rm op))
+		 		 (cond ((= slot 'plus)		(set plus op))
+		       ((= slot 'reg)		(set reg op))
+		       ((= slot 'rm)		(set rm op))
 		       ((= c 'imm)		(set imm op))
 		       ((= c 'rel)		(set rel op)))
 		 (and (or (= c 'rel) (x86-reloc? op) (and (x86-mem? op) (or (= 'RIP (caddr op)) (x86-reloc? (cadr op)))))
@@ -265,13 +283,16 @@
 	    ((long? t)			(if (= t (car bs)) (set bs (cdr bs)) (set ok ())))
 	    ((memq t '(rexw rex o32 u)))
 	    ((or (= t 'r) (= (car t) '/))
-	     (let ((rk 'r) (rsize 4) (tag 'm) (xk ()))
+	     	     (let ((rk 'r) (rsize 4) (tag 'm) (slots (x86-slots row)))
 	       (list-do k (cadr row)
 		 (let ((c (x86-kind k)))
-		   (cond ((= 'rm (car c))	(set rsize (cadr c)) (set tag (x86-mem-tag (cadr c))))
-			 ((= 'xm (car c))	(set rk 'x) (set rsize 16) (set tag (x86-mem-tag (cadr c))))
-			 ((= 'mem (car c))	(set tag (x86-mem-tag (cadr c))))
-			 ((= 'm (car c))	(set tag 'm)))))
+		   (when (= 'rm (car slots))
+		     (cond ((= 'rm (car c))	(set rsize (cadr c)) (set tag (x86-mem-tag (cadr c))))
+			   ((= 'xm (car c))	(set rk 'x) (set rsize 16) (set tag (x86-mem-tag (cadr c))))
+			   ((= 'mem (car c))	(set tag (x86-mem-tag (cadr c))))
+			   ((= 'm (car c))	(set tag 'm))
+			   ((memq (car c) '(r x))	(set rk (car c)) (set rsize (cadr c)))))
+		   (set slots (cdr slots))))
 	       (let ((x (x86-unmodrm bs rk rsize tag (if rex (& 1 (>> rex 1)) 0) (if rex (& 1 rex) 0) rex mode)))
 		 (if (and (pair? t) (!= (cadr t) (car x)))
 		     (set ok ())
@@ -293,11 +314,13 @@
     (and ok
 	 (let* ((length (- start (list-length bs))) (end (+ pc length))
 		(rex-r (if rex (& 1 (>> rex 2)) 0))
+				(slots (x86-slots row))
 		(ops (map (lambda (k)
-			    (let ((c (x86-kind k)))
-			      (cond ((memq (car c) '(r x))
-				     (x86-reg-named (car c) (cadr c) (if plus plus (| reg (<< rex-r 3))) (not rex) mode))
-				    ((memq (car c) '(rm m mem xm))
+			    (let ((c (x86-kind k)) (slot (car slots)))
+			      (set slots (cdr slots))
+			      (cond ((= slot 'plus)	(x86-reg-named (car c) (cadr c) plus (not rex) mode))
+				    ((= slot 'reg)	(x86-reg-named (car c) (cadr c) (| reg (<< rex-r 3)) (not rex) mode))
+				    ((= slot 'rm)
 				     (if (and rip (pair? rm)) (list (car rm) (+ end (cadr rm)) 'RIP () 1) rm))
 				    ((= 'imm (car c))	imm)
 				    				    ((= 'rel (car c))	(+ end rel))

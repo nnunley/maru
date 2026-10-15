@@ -349,3 +349,122 @@ F3 0F 7E /r		MOVQ xmm, xmm/m64		V V
 0F 55 /r		ANDNPS xmm, xmm/m128		V V
 0F 56 /r		ORPS xmm, xmm/m128		V V
 0F 57 /r		XORPS xmm, xmm/m128		V V
+
+
+# SSE packed floating point (4 x float as PS, 2 x double as PD)
+0F 58 /r		ADDPS xmm, xmm/m128		V V
+66 0F 58 /r		ADDPD xmm, xmm/m128		V V
+0F 59 /r		MULPS xmm, xmm/m128		V V
+66 0F 59 /r		MULPD xmm, xmm/m128		V V
+0F 5C /r		SUBPS xmm, xmm/m128		V V
+66 0F 5C /r		SUBPD xmm, xmm/m128		V V
+0F 5D /r		MINPS xmm, xmm/m128		V V
+66 0F 5D /r		MINPD xmm, xmm/m128		V V
+0F 5E /r		DIVPS xmm, xmm/m128		V V
+66 0F 5E /r		DIVPD xmm, xmm/m128		V V
+0F 5F /r		MAXPS xmm, xmm/m128		V V
+66 0F 5F /r		MAXPD xmm, xmm/m128		V V
+0F 51 /r		SQRTPS xmm, xmm/m128		V V
+66 0F 51 /r		SQRTPD xmm, xmm/m128		V V
+66 0F 54 /r		ANDPD xmm, xmm/m128		V V
+66 0F 55 /r		ANDNPD xmm, xmm/m128		V V
+66 0F 56 /r		ORPD xmm, xmm/m128		V V
+66 0F 57 /r		XORPD xmm, xmm/m128		V V
+0F C2 /r ib u		CMPPS xmm, xmm/m128, imm8	V V
+66 0F C2 /r ib u	CMPPD xmm, xmm/m128, imm8	V V
+F2 0F 7C /r		HADDPS xmm, xmm/m128		V V
+66 0F 7C /r		HADDPD xmm, xmm/m128		V V
+66 0F 3A 40 /r ib u	DPPS xmm, xmm/m128, imm8	V V
+
+# SSE packed integer
+66 0F FC /r		PADDB xmm, xmm/m128		V V
+66 0F FD /r		PADDW xmm, xmm/m128		V V
+66 0F FE /r		PADDD xmm, xmm/m128		V V
+66 0F D4 /r		PADDQ xmm, xmm/m128		V V
+66 0F F8 /r		PSUBB xmm, xmm/m128		V V
+66 0F F9 /r		PSUBW xmm, xmm/m128		V V
+66 0F FA /r		PSUBD xmm, xmm/m128		V V
+66 0F FB /r		PSUBQ xmm, xmm/m128		V V
+66 0F D5 /r		PMULLW xmm, xmm/m128		V V
+66 0F 74 /r		PCMPEQB xmm, xmm/m128		V V
+66 0F 75 /r		PCMPEQW xmm, xmm/m128		V V
+66 0F 76 /r		PCMPEQD xmm, xmm/m128		V V
+66 0F 64 /r		PCMPGTB xmm, xmm/m128		V V
+66 0F 65 /r		PCMPGTW xmm, xmm/m128		V V
+66 0F 66 /r		PCMPGTD xmm, xmm/m128		V V
+66 0F DB /r		PAND xmm, xmm/m128		V V
+66 0F DF /r		PANDN xmm, xmm/m128		V V
+66 0F EB /r		POR xmm, xmm/m128		V V
+66 0F EF /r		PXOR xmm, xmm/m128		V V
+66 0F 62 /r		PUNPCKLDQ xmm, xmm/m128		V V
+66 0F 6A /r		PUNPCKHDQ xmm, xmm/m128		V V
+66 0F 6C /r		PUNPCKLQDQ xmm, xmm/m128	V V
+66 0F 6D /r		PUNPCKHQDQ xmm, xmm/m128	V V
+66 0F 38 00 /r		PSHUFB xmm, xmm/m128		V V
+66 0F 38 01 /r		PHADDW xmm, xmm/m128		V V
+66 0F 38 02 /r		PHADDD xmm, xmm/m128		V V
+66 0F 38 29 /r		PCMPEQQ xmm, xmm/m128		V V
+66 0F 38 37 /r		PCMPGTQ xmm, xmm/m128		V V
+66 0F 38 38 /r		PMINSB xmm, xmm/m128		V V
+66 0F 38 39 /r		PMINSD xmm, xmm/m128		V V
+66 0F 38 3A /r		PMINUW xmm, xmm/m128		V V
+66 0F 38 3B /r		PMINUD xmm, xmm/m128		V V
+66 0F 38 3C /r		PMAXSB xmm, xmm/m128		V V
+66 0F 38 3D /r		PMAXSD xmm, xmm/m128		V V
+66 0F 38 3E /r		PMAXUW xmm, xmm/m128		V V
+66 0F 38 3F /r		PMAXUD xmm, xmm/m128		V V
+66 0F 38 40 /r		PMULLD xmm, xmm/m128		V V
+
+# SSE shifts: by an immediate count (the register in ModRM.rm), by a count in an XMM register
+66 0F 71 /6 ib u	PSLLW xmm, imm8			V V
+66 0F 72 /6 ib u	PSLLD xmm, imm8			V V
+66 0F 73 /6 ib u	PSLLQ xmm, imm8			V V
+66 0F 71 /2 ib u	PSRLW xmm, imm8			V V
+66 0F 72 /2 ib u	PSRLD xmm, imm8			V V
+66 0F 73 /2 ib u	PSRLQ xmm, imm8			V V
+66 0F 71 /4 ib u	PSRAW xmm, imm8			V V
+66 0F 72 /4 ib u	PSRAD xmm, imm8			V V
+66 0F F1 /r		PSLLW xmm, xmm/m128		V V
+66 0F F2 /r		PSLLD xmm, xmm/m128		V V
+66 0F F3 /r		PSLLQ xmm, xmm/m128		V V
+66 0F D1 /r		PSRLW xmm, xmm/m128		V V
+66 0F D2 /r		PSRLD xmm, xmm/m128		V V
+66 0F D3 /r		PSRLQ xmm, xmm/m128		V V
+66 0F E1 /r		PSRAW xmm, xmm/m128		V V
+66 0F E2 /r		PSRAD xmm, xmm/m128		V V
+
+# SSE conversions
+0F 5B /r		CVTDQ2PS xmm, xmm/m128		V V
+F3 0F 5B /r		CVTTPS2DQ xmm, xmm/m128		V V
+0F 5A /r		CVTPS2PD xmm, xmm/m64		V V
+66 0F 5A /r		CVTPD2PS xmm, xmm/m128		V V
+F3 0F E6 /r		CVTDQ2PD xmm, xmm/m64		V V
+66 0F E6 /r		CVTTPD2DQ xmm, xmm/m128		V V
+
+# SSE moves, shuffles, lanes
+0F 28 /r		MOVAPS xmm, xmm/m128		V V
+0F 29 /r		MOVAPS xmm/m128, xmm		V V
+0F 10 /r		MOVUPS xmm, xmm/m128		V V
+0F 11 /r		MOVUPS xmm/m128, xmm		V V
+66 0F 28 /r		MOVAPD xmm, xmm/m128		V V
+66 0F 29 /r		MOVAPD xmm/m128, xmm		V V
+66 0F 6F /r		MOVDQA xmm, xmm/m128		V V
+66 0F 7F /r		MOVDQA xmm/m128, xmm		V V
+F3 0F 6F /r		MOVDQU xmm, xmm/m128		V V
+F3 0F 7F /r		MOVDQU xmm/m128, xmm		V V
+0F C6 /r ib u		SHUFPS xmm, xmm/m128, imm8	V V
+66 0F C6 /r ib u	SHUFPD xmm, xmm/m128, imm8	V V
+66 0F 70 /r ib u	PSHUFD xmm, xmm/m128, imm8	V V
+0F 14 /r		UNPCKLPS xmm, xmm/m128		V V
+0F 15 /r		UNPCKHPS xmm, xmm/m128		V V
+66 0F 14 /r		UNPCKLPD xmm, xmm/m128		V V
+66 0F 15 /r		UNPCKHPD xmm, xmm/m128		V V
+66 0F 3A 22 /r ib u	PINSRD xmm, r/m32, imm8		V V
+66 REX.W + 0F 3A 22 /r ib u	PINSRQ xmm, r/m64, imm8		V NE
+66 0F 3A 16 /r ib u	PEXTRD r/m32, xmm, imm8		V V
+66 REX.W + 0F 3A 16 /r ib u	PEXTRQ r/m64, xmm, imm8		V NE
+66 0F 3A 21 /r ib u	INSERTPS xmm, xmm/m32, imm8	V V
+66 0F 3A 17 /r ib u	EXTRACTPS r/m32, xmm, imm8	V V
+66 0F 3A 0C /r ib u	BLENDPS xmm, xmm/m128, imm8	V V
+66 0F 38 14 /r		BLENDVPS xmm, xmm/m128, XMM0	V V
+0F 50 /r		MOVMSKPS r32, xmm		V V

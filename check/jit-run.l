@@ -172,6 +172,21 @@
     (fmla d a b)
     (expect (list (float-at d 0) (float-at d 1) (float-at d 2) (float-at d 3)) '(1.5 2.0 2.5 3.0))))
 
+;; The same four lanes on x86-64 with SSE (no FMA before AVX2: multiply, then add).
+(when (= isa 'x64)
+  (let ((madd (assemble '((MOVUPS XMM0 (m128 0 RDI () 1))
+			  (MOVUPS XMM1 (m128 0 RSI () 1))
+			  (MOVUPS XMM2 (m128 0 RDX () 1))
+			  (MULPS XMM1 XMM2)
+			  (ADDPS XMM0 XMM1)
+			  (MOVUPS (m128 0 RDI () 1) XMM0)
+			  (RET))
+			"ppp>p"))
+	(d ((subr "malloc" "l>p") 16)) (a ((subr "malloc" "l>p") 16)) (b ((subr "malloc" "l>p") 16)))
+    (for (i 0 4) (set-float-at d i 1.0) (set-float-at a i (+ i 1.0)) (set-float-at b i 0.5))
+    (madd d a b)
+    (expect (list (float-at d 0) (float-at d 1) (float-at d 2) (float-at d 3)) '(1.5 2.0 2.5 3.0))))
+
 ;; A buffer that runs past the region's end does not fit, and nothing is copied.
 (let ((b (asm-buffer (- (+ (car region) (cadr region)) 2))))
   (asm isa b (if (= isa 'arm64) '(RET) '(ADD RAX R12)))	; 4 and 3 bytes: neither fits in 2

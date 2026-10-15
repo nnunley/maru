@@ -469,3 +469,69 @@ x64	move.f32.i32	MOVD r/m32, xmm
 x64	move.i64.f64	MOVQ xmm, r/m64
 x64	move.f64.i64	MOVQ r/m64, xmm
 x64	lit.f32,lit.f64	MOVQ xmm, xmm/m64
+
+# ---------------------------------------------------------------- x64: SSE packed (to SSE4.1)
+
+x64	vadd.float	ADDPS xmm, xmm/m128
+x64	vadd.float	ADDPD xmm, xmm/m128
+x64	vsub.float	SUBPS xmm, xmm/m128
+x64	vsub.float	SUBPD xmm, xmm/m128
+x64	vmul.float	MULPS xmm, xmm/m128
+x64	vmul.float	MULPD xmm, xmm/m128
+x64	vdiv.float	DIVPS xmm, xmm/m128
+x64	vdiv.float	DIVPD xmm, xmm/m128
+x64	vmin.float	MINPS xmm, xmm/m128
+x64	vmax.float	MAXPS xmm, xmm/m128
+x64	vsqrt.float	SQRTPS xmm, xmm/m128
+x64	vsqrt.float	SQRTPD xmm, xmm/m128
+x64	vbitand	ANDPS xmm, xmm/m128
+x64	vbitor	ORPS xmm, xmm/m128
+x64	vbitxor	XORPS xmm, xmm/m128
+x64	vbitandnot	ANDNPS xmm, xmm/m128
+x64	vadd.int	PADDD xmm, xmm/m128
+x64	vadd.int	PADDQ xmm, xmm/m128
+x64	vsub.int	PSUBD xmm, xmm/m128
+x64	vsub.int	PSUBQ xmm, xmm/m128
+x64	vmul.int	PMULLD xmm, xmm/m128
+x64	vmul.int	PMULLW xmm, xmm/m128
+x64	veq.int	PCMPEQD xmm, xmm/m128
+x64	veq.int	PCMPEQQ xmm, xmm/m128
+x64	vgt.s	PCMPGTD xmm, xmm/m128
+x64	vgt.s	PCMPGTQ xmm, xmm/m128
+x64	vmin.s	PMINSD xmm, xmm/m128
+x64	vmax.s	PMAXSD xmm, xmm/m128
+x64	vmin.u	PMINUD xmm, xmm/m128
+x64	vmax.u	PMAXUD xmm, xmm/m128
+x64	vbitand	PAND xmm, xmm/m128
+x64	vbitor	POR xmm, xmm/m128
+x64	vbitxor	PXOR xmm, xmm/m128
+x64	vbitandnot	PANDN xmm, xmm/m128
+x64	vreduce.add.float	HADDPS xmm, xmm/m128
+x64	vreduce.add	PHADDD xmm, xmm/m128
+x64	vpermute	PSHUFB xmm, xmm/m128
+x64	vshuffle	PUNPCKLDQ xmm, xmm/m128
+x64	vshuffle	PUNPCKHDQ xmm, xmm/m128
+x64	vshuffle	UNPCKLPS xmm, xmm/m128
+x64	vshuffle	UNPCKHPS xmm, xmm/m128
+x64	vshl.int	PSLLD xmm, xmm/m128
+x64	vshr.u	PSRLD xmm, xmm/m128
+x64	vshr.s	PSRAD xmm, xmm/m128
+x64	veq.float,vgt.float,vge.float	CMPPS xmm, xmm/m128, imm8
+x64	veq.float,vgt.float,vge.float	CMPPD xmm, xmm/m128, imm8
+x64	vshl.imm	PSLLD xmm, imm8
+x64	vshr.imm.u	PSRLD xmm, imm8
+x64	vshr.imm.s	PSRAD xmm, imm8
+x64	vcast.s.float	CVTDQ2PS xmm, xmm/m128
+x64	vcast.float.s	CVTTPS2DQ xmm, xmm/m128
+x64	vload,vstore	MOVUPS xmm, xmm/m128
+x64	vstore	MOVUPS xmm/m128, xmm
+x64	vload	MOVDQU xmm, xmm/m128
+x64	vstore	MOVDQU xmm/m128, xmm
+x64	vbroadcast,vshuffle	SHUFPS xmm, xmm/m128, imm8
+x64	vbroadcast,vshuffle	PSHUFD xmm, xmm/m128, imm8
+x64	vinsert	PINSRD xmm, r/m32, imm8
+x64	vinsert	INSERTPS xmm, xmm/m32, imm8
+x64	vextract	PEXTRD r/m32, xmm, imm8
+x64	vextract	EXTRACTPS r/m32, xmm, imm8
+x64	vselect	BLENDVPS xmm, xmm/m128, XMM0
+x64	vreduce.dot	DPPS xmm, xmm/m128, imm8
