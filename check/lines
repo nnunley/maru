@@ -12,3 +12,5 @@
 +593 gezira submodule (nnunley/gezira): Gezira's kernels in Nile (nl/), the graphics the stack renders with; its C, Haskell, JS and Squeak bindings are marked unused
 +1 check.l: the lines check counts nile/ and gezira/ and skips files marked unused
 +1395 spike/asm: the table-driven assembler spike (x86 and A64 rows, encoders, decoders, clang cross-checks, JIT probe), committed as-is for review; the assembler plan promotes or removes every file (the .spec rows are not yet counted)
++125 lines check counts .spec rows (RFC R-spec-counted): arm64.spec (46) and the spike's x86.spec (79), already in the tree
++221 asm-table.l (one interface for every instruction set), asm-arm64.l promoted from spike/asm/arm64.l, checks asm_interface (both evaluators) and asm_rows_arm64 (every row against clang); less the spike's axcheck.l and at0.l

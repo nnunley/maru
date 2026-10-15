@@ -4,3 +4,4 @@ peg.l            derived
 *.osdefs.k       derived
 system.osdefs.c  derived
 spike/asm/*.g.l   derived
+arm64.g.l        derived

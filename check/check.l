@@ -156,6 +156,17 @@
 	 (results (select (lambda (l) (starts l " => ")) out)))
     (unit-assert (equal (last (after " => 12" results)) " => 3"))))
 
+;;; ---------------------------------------------------------------- asm
+
+;; The table-driven encoders: one interface for every instruction set, under
+;; both evaluators, and every row's samples against clang (check/asm-rows.l).
+(check "asm_interface"
+  (unit-assert (equal (last (run "asm-interface" "./eval check/asm-interface.l")) "asm interface ok"))
+  (unit-assert (equal (last (run "asm-interface2" "./eval2 -b boot2.l check/asm-interface.l")) "asm interface ok")))
+
+(check "asm_rows_arm64"
+  (unit-assert (equal (last (run "asm-rows-arm64" (concat-string "./eval check/asm-rows.l arm64 " tmp))) "asm rows arm64 ok")))
+
 ;;; ---------------------------------------------------------------- ir2
 
 ;; maru-test.k's sieve prints the primes below 32, then its struct code sets
@@ -218,7 +229,7 @@
 ;; Every source line is accounted for: the count must equal the sum of the
 ;; entries in check/lines, and each entry that adds lines must say why.
 (check "lines"
-  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|osdefs|irl|irgol|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
+  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|irgol|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
 	(sum 0))
     (list-do entry (lines (contents-of-file-named "check/lines"))
       (let ((w (words entry)))

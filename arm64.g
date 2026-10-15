@@ -1,6 +1,6 @@
 # Arm ARM encoding-diagram rows -> (MNEMONIC (operand...) (field...))
 
-<a64spec> : <text-parser> ()
+<arm64spec> : <text-parser> ()
 
 blank	= [\t ] ;
 eol	= "\n""\r"* | "\r""\n"* ;
