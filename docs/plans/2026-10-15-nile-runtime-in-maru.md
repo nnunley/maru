@@ -17,7 +17,7 @@
 - No spinning, no spin locks, no atomics: `pthread_mutex_*` and `pthread_cond_*` only.
 - Each commit that changes the source line count adds a `check/lines` entry with its delta and reason, so `./eval check/check.l lines` passes after every commit.
 - Commit messages are Conventional Commits. No `Co-Authored-By` or other Claude attribution (a hook blocks it).
-- Work in `maru` happens on a branch in `.worktrees/`; work in the forks on a branch named `maru-runtime`. Never push or force-push `main` without the author's explicit yes.
+- Work happens on short-lived branches (`nile-runtime` in `maru`, `maru-runtime` in the forks), merged into `main` and deleted when done; no stale branches. Push `main` and the forks' branches as work lands.
 - A task is done when its `maru-check` cases print `PASS` and `make check` stays green. `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-nile-runtime-in-maru-00.md` keeps reporting "red as declared" until Task 11, after which the RFC's `**Corpus:**` line is removed and it reports green.
 - Runs on arm64 macOS by default. Task 12 repeats `make check` on `ndn.lan` (x86-64 Linux, fish shell).
 
