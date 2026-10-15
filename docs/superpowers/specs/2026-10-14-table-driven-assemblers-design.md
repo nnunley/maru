@@ -1,5 +1,12 @@
 # Table-driven assemblers and disassemblers (x86, A64)
 
+> **Superseded in part (2026-10-15).** The encoders and the in-process code
+> region are now `docs/rfc/draft-ndn-table-assemblers-00.md`, revised by a
+> pushback review. The rest of this document is the source text for three
+> later drafts, in this order: running code outside the evaluator (`exe.l`
+> and the VMs), the disassemblers, and moving the 32-bit users onto the
+> table encoder.
+
 ## Goal
 
 Each instruction set is described once, in its vendor manual's own notation,
