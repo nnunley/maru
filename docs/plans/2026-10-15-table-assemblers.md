@@ -8,7 +8,7 @@
 
 **Tech Stack:** Untyped Maru (`boot.l` under `./eval`, `boot2.l` under `./eval2`), `text-parser.l`/`compile-tpeg.l` grammars, libffi, `/usr/bin/clang` and `/usr/bin/objdump`, Rosetta 2.
 
-**Spec:** `docs/rfc/draft-ndn-table-assemblers-00.md` (branch `table-asm`). Requirement IDs below (`[R-…]`) are its markers.
+**Spec:** `docs/rfc/draft-ndn-table-assemblers-01.md` (branch `table-asm`). Requirement IDs below (`[R-…]`) are its markers.
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - Work order: A64 scalar integer and FP, A64 NEON, x64 scalar integer and FP, x64 SSE, x64 AVX2, x86. The foreign-call and code-region tasks sit after A64 scalar, because running code is the priority.
 - Every commit passes `./eval check/check.l lines`, with a `check/lines` entry (delta and reason) for each change in counted lines; spike lines removed are a negative entry.
 - Conventional Commits; no Claude attribution. Branch `table-asm`, merged into `main` and deleted when the plan is done.
-- `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-table-assemblers-00.md` reports "red as declared" until Task 12 removes the `**Corpus:**` line, then green.
+- `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-table-assemblers-01.md` reports "red as declared" until Task 12 removes the `**Corpus:**` line, then green.
 
 ## Review Focus
 
@@ -200,7 +200,7 @@
 
 **Implements:** all markers, corpus green.
 
-**Files:** Delete what remains of `spike/asm/` (`run.l`, `arun.l`, `jit.c`, `afib-main.c`, `README.md`); modify `CLAUDE.md` (Verify list: `asm_rows_a64`, `asm_rows_x64`, `asm_rows_x86`, `asm_patch`, `asm_coverage`, `asm_interface`, `eval2_subr`, `jit_run`; Build: `bin/x86_64/`), `docs/rfc/draft-ndn-table-assemblers-00.md` (remove the `**Corpus:**` line), `check/lines`.
+**Files:** Delete what remains of `spike/asm/` (`run.l`, `arun.l`, `jit.c`, `afib-main.c`, `README.md`); modify `CLAUDE.md` (Verify list: `asm_rows_a64`, `asm_rows_x64`, `asm_rows_x86`, `asm_patch`, `asm_coverage`, `asm_interface`, `eval2_subr`, `jit_run`; Build: `bin/x86_64/`), `docs/rfc/draft-ndn-table-assemblers-01.md` (remove the `**Corpus:**` line), `check/lines`.
 
 - [ ] **Step 1:** Run `rfc-run --expect` on the RFC after removing the `**Corpus:**` line. Expected: green, 0 failing blocks.
 - [ ] **Step 2:** `make check` on this Mac and on `ndn.lan` (where `jit_run` runs `x64` natively and builds no `bin/`). Expected: all PASS on both.

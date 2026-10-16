@@ -20,6 +20,9 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
     make eval eval2 osdefs.k    # not plain `make`: it builds eval32 with -m32
 
+On arm64 macOS with Rosetta, `make check` also builds `bin/x86_64/eval` and
+`bin/x86_64/eval2` (`-arch x86_64`) to run x86-64 code in-process.
+
 `nile/` and `gezira/` are submodules (forks on `nnunley`); clone with
 `--recurse-submodules` or run `git submodule update --init`.
 
@@ -64,6 +67,28 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
   and merges adjacent free chunks.
+- `text_parser`: `text-parser.l` matches a string literal that ends at the
+  end of its input.
+- `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
+  by name or address, with typed results (`"dd>d"`), variadic calls and raw
+  byte access.
+- `asm_interface` (`check/asm-interface.l`): the one encoder interface
+  (`asm`, `asm-forms`, `asm-decode`, refusals) answers the same way for arm64
+  and x64, under both evaluators.
+- `asm_rows_arm64`, `asm_rows_x64`, `asm_rows_x86` (`check/asm-rows.l`): every
+  row of `arm64.spec` or `x86.spec`, sampled in every operand position (and
+  every NEON arrangement), assembles to the bytes clang gives and decodes
+  back to them; unencodable operands are refused.
+- `asm_coverage` (`check/asm-coverage.l`): every form in `asm-coverage.spec`
+  has a row, and every operation `ir2.k` declares, on every type, is named
+  there for each instruction set.
+- `asm_patch` (`check/asm-patch.l`): a placeholder patched later gives the
+  same row's bytes for the final value; one past the field's range is refused.
+- `jit_run` (`check/jit-run.l`): code assembled into a code region runs
+  in-process through the C ABI on each evaluator the host has (arm64, and
+  x86-64 under Rosetta through `bin/x86_64/eval2`).
+- `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
+  are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
   `string-copy`, `string-compare`, `long->string` and `string->long` behave
   as `eval`'s C primitives do (the cases pass under both evaluators).

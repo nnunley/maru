@@ -1,7 +1,6 @@
-# draft-ndn-table-assemblers-00: Table-Driven Encoders for x86, x86-64 and A64, and an In-Process Code Region
+# draft-ndn-table-assemblers-01: Table-Driven Encoders for x86, x86-64 and A64, and an In-Process Code Region
 
 **Status:** DRAFT
-**Corpus:** red (spec-first: the checks named below are the acceptance criteria)
 **Category:** Standards-Track
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
@@ -51,12 +50,13 @@ document are to be interpreted as described in BCP 14 (RFC 2119, RFC 8174)
 when, and only when, they appear in all capitals, as shown here.
 
 - **ISA** — one of three instruction sets: `x86` (32-bit x86, protected
-  mode), `x64` (x86-64, 64-bit mode) and `a64` (Armv8-A A64).
+  mode), `x64` (x86-64, 64-bit mode) and `arm64` (Armv8-A A64), named as the
+  instruction set's files are.
 - **row** — one line of a `.spec` file: an encoding in the vendor manual's
   notation, then the instruction it encodes with its operand kinds.
 - **form** — a mnemonic with a list of operand kinds, such as
   `ADD r/m32, imm8` or `FADD Vd.4S, Vn.4S, Vm.4S`. A row encodes one form.
-- **encoder** — the function compiled from a row when the rows load.
+- **encoder** — the code that encodes an instruction with a row.
 - **field** — the bits of an encoding that hold one operand's value.
 - **placeholder** — the operand `(reloc)`, standing for a value fixed later.
 - **assembly buffer** — the growable byte buffer an encode writes to, with
@@ -101,13 +101,13 @@ also executed somewhere in `make check` on a host that can run it.
 
 | File | Contents | Counted |
 |---|---|---|
-| `asm-table.l` | Loads rows, compiles encoders while loading, `asm`, `asm-forms`, `asm-patch`, `asm-decode`, the assembly buffer | yes |
+| `asm-table.l` | The interface (`asm`, `asm-forms`, `asm-patch`, `asm-decode` …), rows indexed by mnemonic, the assembly buffer | yes |
 | `x86.spec` | x86 and x64 rows: SDM vol. 2 opcode column, 64-bit and compat/legacy validity columns, instruction column | yes |
 | `x86.g`, `x86.g.l` | Grammar reading `x86.spec`; its compiled parser | yes; derived |
-| `asm-x86.l` | x86/x64 operand kinds, operand size, ModRM/SIB, REX, VEX, row compiler and decoder | yes |
-| `a64.spec` | A64 rows: encoding diagram from bit 31 to 0, then assembler syntax | yes |
-| `a64.g`, `a64.g.l` | As for x86 | yes; derived |
-| `asm-a64.l` | A64 fields, arrangements, operand binding, row compiler and decoder | yes |
+| `asm-x86.l` | x86/x64 operand kinds, operand size, ModRM/SIB, REX, VEX, operand slots, encoder and decoder (indexed by opcode byte) | yes |
+| `arm64.spec` | A64 rows: encoding diagram from bit 31 to 0, then assembler syntax | yes |
+| `arm64.g`, `arm64.g.l` | As for x86 | yes; derived |
+| `asm-arm64.l` | A64 fields, arrangements, operand binding, encoder and decoder | yes |
 | `asm-coverage.spec` | The coverage table | yes |
 | `code-region.l` | The code region, in Maru, over `subr` | yes |
 | `eval2.c` | `subr`, `ffcall`, `subr-name`, `byte-at`, `set-byte-at` restored and extended | yes |
@@ -139,17 +139,20 @@ RECORD FieldReport:                     -- one per placeholder or target operand
     position    : Integer               -- the operand's index in the instruction
     offset      : Integer               -- the instruction's byte offset in the buffer
     row         : Row                   -- the row that encoded it
+    instruction : Instruction           -- as given, placeholders included
 
 ENUM ISA:
     x86         -- 32-bit protected mode, `x86.spec` rows valid in 32-bit mode
     x64         -- 64-bit mode, `x86.spec` rows valid in 64-bit mode
-    a64         -- A64, `a64.spec`
+    arm64       -- A64, `arm64.spec`
 ```
 
 **Instruction syntax.** An instruction is `(MNEMONIC operand...)`. Registers
 are their names (`EAX`, `R12D`, `XMM3`, `YMM15`, `X0`, `W7`, `SP`, `XZR`,
 `S0`, `D31`, `Q2`). An A64 vector register carries its arrangement:
-`(V 3 4S)` is `V3.4S`, `(V 3 S 1)` is lane `V3.S[1]`. Immediates and branch
+`(V 3 4S)` is `V3.4S` (Maru reads `4S` as `4` and `S`, so this is the list
+`(V 3 4 S)`: register, lane count, element size), and `(V 3 S 1)` is lane
+`V3.S[1]`. Immediates and branch
 targets are integers; targets are absolute addresses. x86 memory is
 `(mN disp base index scale)` with `N` the access size (`m` for any, as for
 `LEA`), and `RIP` as base on x64 meaning RIP-relative; A64 memory is
@@ -163,19 +166,21 @@ A row means what its manual's notation means, plus the rules below and
 nothing else.
 
 **Every ISA**
-- When rows load, each is compiled into an encoder specialised to it. No
-  source file is generated.
-- An instruction encodes with the first row, in file order, whose form
-  matches its operands. File order only orders equivalent encodings (shorter
-  first, aliases before what they alias); it never decides which operation
-  an instruction is.
+- Rows are read when the instruction set's file loads and interpreted at
+  each encode. No source file is generated. (Compiling each row into a
+  specialised encoder at load is left for when encoding speed matters.)
+- Of the rows whose form matches an instruction's operands, the one giving
+  the shortest encoding encodes it, and among equals the first in file
+  order; with an open placeholder, the one with the widest field. File
+  order only orders equivalent encodings (aliases before what they alias);
+  it never decides which operation an instruction is.
 - An immediate is signed unless its row is marked `u`. A negative value for
   an unsigned field, or any value outside a field's range, is an error, never
   truncated. [R-field-range]
 
 ```maru-check @R-field-range
 asm_rows_x86
-asm_rows_a64
+asm_rows_arm64
 ```
 
 **x86 and x64** (`x86.spec`)
@@ -192,8 +197,24 @@ asm_rows_a64
   rows valid in 64-bit mode.
 - The operand size is the widest register or memory operand; 16-bit emits
   `66`. An immediate narrower than the operand size is sign-extended.
-- `o32` sets a 32-bit operand size where no operand shows one; `u` marks an
-  unsigned immediate (`INT imm8`, `RET imm16`, `OUT imm8`, `ENTER`).
+- The row's columns are tab-separated: opcode, instruction, and the two
+  validity columns.
+- `o32` sets a 32-bit operand size where no operand shows one (64-bit in
+  64-bit mode, where such rows default to 64 bits); `u` marks an unsigned
+  immediate (`INT imm8`, `RET imm16`, `OUT imm8`, shift counts, shuffle and
+  compare selectors).
+- An immediate is read modulo its row's operand size before matching:
+  `ADD EAX, 0xFFFFFFFF` is `ADD EAX, -1`, as the processor sees it.
+  Displacements and branch offsets are signed only.
+- `c` marks two sources that commute, which the encoder swaps when that
+  allows the two-byte VEX prefix; `cp` marks a compare whose sources commute
+  when its predicate is symmetric (imm8 & 3 is 0 or 3).
+- Where an operand goes (ModRM.reg, ModRM.rm, VEX.vvvv, or the opcode's low
+  bits) follows from the row: under a `/digit` registers go to rm (in a VEX
+  row the first to vvvv); under `/r` the first register goes to reg, a VEX
+  row's second register ahead of the r/m operand to vvvv, and others to rm.
+- A memory-only operand (`m`, `m32` …) never takes ModRM mod 11; that
+  encoding belongs to another row.
 - ModRM, SIB and displacement are canonical: no displacement when 0 (except
   an `EBP`/`RBP`/`R13` base, which takes disp8 0), disp8 when it fits,
   otherwise disp32; SIB only when an index or an `ESP`/`RSP`/`R12` base
@@ -205,7 +226,7 @@ asm_rows_a64
 - VEX replaces REX: the two-byte `C5` form when `VEX.X`, `VEX.B` and `VEX.W`
   are zero and the map is `0F`, otherwise the three-byte `C4` form.
 
-**A64** (`a64.spec`)
+**A64** (`arm64.spec`)
 - Each row is 32 bits; loading fails on any row that is not.
 - Fields are the diagram's names: `Rx` is 5 bits, `immN` N bits, any other
   field `name:width`.
@@ -227,11 +248,20 @@ asm_rows_a64
 
 ```
 (asm isa buffer instruction)          => list of FieldReport
+(asm-attempt isa buffer instruction)  => list of FieldReport | (error . message)
 (asm-forms isa mnemonic)              => list of (kinds row)
 (asm-patch isa buffer report value)   => buffer
-(asm-decode isa bytes pc)             => (instruction . rest) | ()
+(asm-patch-attempt isa buffer report value) => buffer | (error . message)
+(asm-field-range isa row position pc [instruction]) => (lo hi step) | ()
+(asm-decode isa bytes pc)             => (instruction . length) | ()
+(asm-parse-form isa text)             => (mnemonic kinds) | ()
 (asm-buffer origin)                   => AsmBuffer
 ```
+
+The `-attempt` forms return an error instead of raising it and leave the
+buffer unchanged; Maru cannot catch an error, so callers that need to survive a
+refusal (the checks, a back end trying alternatives) use them. `asm-decode`'s
+`bytes` is an array whose first element is the instruction's first byte.
 
 `asm` MUST be the only encoding entry point, and it MUST behave the same way
 for every ISA: same buffer, same instruction syntax, same reports and
@@ -251,8 +281,13 @@ returns a report for every placeholder and every branch-target operand.
 (bit positions, scale, split fields, range, and PC-relativity from the
 report's instruction offset) and writes the result over the instruction in
 the buffer. For every row with a field a placeholder can stand for, encoding
-with a placeholder and then patching MUST produce the same bytes as encoding
-the final value directly. [R-patch]
+with a placeholder and then patching MUST produce the same bytes as that
+row encodes for the final value directly. [R-patch] (A patch never changes
+an instruction's length; a shorter row the value would otherwise choose is
+not the comparison.) On x86, placeholders stand for immediates, branch
+targets and RIP-relative displacements; a base-plus-displacement address
+takes its final value when encoded, since its canonical width depends on
+the value.
 
 ```maru-check @R-patch
 asm_patch
@@ -267,12 +302,22 @@ instruction, with immediates in canonical form (signed unless the row is
 ```maru-check @R-round-trip
 asm_rows_x86
 asm_rows_x64
-asm_rows_a64
+asm_rows_arm64
 ```
 
 ### Coverage
 
-`asm-coverage.spec` lists, for each ISA, the forms needed to compile:
+`asm-coverage.spec` lists, for each ISA, forms in that ISA's row notation,
+each with the classes it serves: `OP.TYPE` or `cast.FROM.TO`, a type being
+`s8 u8 s16 u16 s32 u32 s64 u64 f32 f64` or a group (`i32`: any value held in
+a 32-bit register; `i64`; `s32`; `u32`). The needs are not listed by
+hand: the check reads `ir2.k`'s own declarations (`define-unary-arithmetic`
+and the rest, with their type predicates) and requires every
+(operation, type) pair, every cast, load and store, and control, to be named
+by some class. A need met by a sequence names the instructions the sequence
+uses (unsigned 64-bit to float on x64 is a shift and `CVTSI2SS`); one met by
+a runtime routine names `CALL` (64-bit divide on 32-bit x86, float `mod`).
+The forms needed are those that compile:
 
 1. every `ir2` operation (`add` `sub` `mul` `div` `mod` `neg` `com` `not`
    `bitand` `bitor` `bitxor` `shl` `shr` `eq` `ne` `lt` `le` `ge` `gt`,
@@ -291,13 +336,14 @@ The vector extensions in scope are:
 
 | ISA | Scalar | Vector |
 |---|---|---|
-| `a64` | integer, FP (`S`, `D`) | Advanced SIMD (NEON), 64- and 128-bit, all arrangements |
+| `arm64` | integer, FP (`S`, `D`) | Advanced SIMD (NEON), 64- and 128-bit, all arrangements |
 | `x64` | integer, scalar SSE/SSE2 | SSE through SSE4.1 (128-bit); AVX and AVX2 (128- and 256-bit, VEX) |
 | `x86` | integer, scalar SSE/SSE2 | none |
 
-Every form in the coverage table MUST have a row, and every row's sample
-encodings MUST equal what `clang` produces for the same instruction:
-`clang -target arm64-apple-macos` for `a64`, `-target x86_64` for `x64`,
+Every form in the coverage table MUST have a row, every (operation, type)
+need `ir2.k` declares MUST be named by some form's classes, and every row's
+sample encodings MUST equal what `clang` produces for the same instruction:
+`clang -target arm64-apple-macos` for `arm64`, `-target x86_64-pc-linux` for `x64`,
 `-target i386-pc-linux` for `x86`. [R-coverage] Samples cover every register
 position, including R8–R15, XMM8–XMM15 and register 31 in both meanings;
 every addressing mode; immediates at the edges of each width; branches in
@@ -307,13 +353,13 @@ both directions; and every vector arrangement.
 asm_coverage
 asm_rows_x86
 asm_rows_x64
-asm_rows_a64
+asm_rows_arm64
 ```
 
 ### Work order
 
 The ISAs are built in this order, each complete with its checks before the
-next starts: `a64` scalar integer and FP; `a64` NEON; `x64` scalar integer
+next starts: `arm64` scalar integer and FP; `arm64` NEON; `x64` scalar integer
 and FP; `x64` SSE; `x64` AVX2; `x86`. A64 comes first because it runs
 natively on the development machine (an Apple M3).
 
@@ -338,14 +384,20 @@ eval2_subr
 ### The code region
 
 `code-region.l` is Maru. It allocates, writes and runs code through `subr`
-calls to libc, with constants from `osdefs`:
+calls to libc, with constants from `osdefs`. The platform-specific calls
+(`pthread_jit_write_protect_np`, `sys_icache_invalidate`, `__clear_cache`)
+are looked up with `dlsym` and skipped where the system lacks them, so the
+file has no platform branches:
 
 ```
-FUNCTION code-region-allocate(size) -> region:
-    -- MAP_JIT on macOS; elsewhere an ordinary anonymous mapping
+FUNCTION code-region-allocate(size) -> region:       -- region = (base size next)
+    -- MAP_JIT is 0 where osdefs finds no such flag
     RETURN mmap(0, size, PROT_READ|PROT_WRITE|PROT_EXEC,
-                MAP_PRIVATE|MAP_ANON|(MAP_JIT if __APPLE__), -1, 0)
+                MAP_PRIVATE|MAP_ANON|MAP_JIT, -1, 0)
            or error "code region: mmap failed"
+
+FUNCTION code-region-next(region) -> address:     -- next free address, 16-aligned
+FUNCTION code-region-fits?(region, buffer) -> boolean
 
 FUNCTION code-region-install(region, buffer) -> address:
     -- buffer was assembled with origin = the address it will occupy
@@ -357,7 +409,8 @@ FUNCTION code-region-install(region, buffer) -> address:
     sys_icache_invalidate / __clear_cache over the range
     RETURN buffer.origin
 
--- Calling: (subr address "sig>ret") makes a C-ABI callable.
+FUNCTION code-callable(address, signature) -> subr:
+    RETURN subr(address, signature)              -- e.g. "dd>d" for a double function
 ```
 
 `osdefs` gains `PROT_READ`, `PROT_WRITE`, `PROT_EXEC`, `MAP_PRIVATE`,
@@ -366,9 +419,9 @@ FUNCTION code-region-install(region, buffer) -> address:
 On every evaluator the host can run, a function assembled into the code
 region and made callable with `subr` MUST return the right value through the
 C ABI, for integer, pointer, `float` and `double` arguments and results, and
-a recursive function calling itself and a C function (`putchar`) MUST
-produce the expected output. [R-jit-run] The `a64` case runs on an arm64
-evaluator; the `x64` case on an x86-64 evaluator, natively on x86-64 Linux
+a recursive function calling itself and a C function (`write`, through an
+address it is given) MUST produce the expected output. [R-jit-run] The
+`arm64` case runs on an arm64 evaluator; the `x64` case on an x86-64 evaluator, natively on x86-64 Linux
 and under Rosetta on macOS.
 
 ```maru-check @R-jit-run
@@ -400,10 +453,10 @@ a back end compiling the whole runtime allocates further regions as needed.
 
 | Error | Example | Recovery |
 |---|---|---|
-| No row matches | `(asm 'a64 b '(ADD X0 W1 #3))` | Error naming the ISA, the instruction and the forms `asm-forms` lists for the mnemonic; nothing is written |
-| Field out of range | `(INT -5)`; a branch farther than `imm19` reaches | Error naming the operand and the field's range; nothing is written |
-| Patch value out of range | patching an 8-bit placeholder with 300 | Error as above; the buffer is unchanged |
-| Row invalid at load | an A64 row not 32 bits; an unknown opcode token | Loading stops with the file and line |
+| No row matches | `(asm 'arm64 b '(ADD X0 W1 3))` | Error naming the ISA, the instruction and the forms `asm-forms` lists for the mnemonic; nothing is written |
+| Field out of range | `(INT -5)`; a branch farther than `imm19` reaches | No row matches: the error above; nothing is written |
+| Patch value out of range | patching an 8-bit placeholder with 300 | Error naming the value, the operand and the instruction; the buffer is unchanged |
+| Row invalid at load | an A64 row not 32 bits; an unknown opcode token | Loading stops with an error naming the row, or the grammar's parse failure |
 | Symbol not found | `(subr "no_such_fn" "i")` | Fatal, as `eval`'s `subr` is |
 | `mmap` fails | out of address space | Error from `code-region-allocate`; no region is returned |
 | Buffer outside region | origin not inside the region | Error; nothing is copied |
@@ -417,7 +470,7 @@ the coverage table, which they draw from.
 
 **Disassembly of code no row describes.** Unknown-fragment decoding, the x86
 opcode-map length decoder (with VEX/EVEX), the bytes-to-bytes identity on
-foreign code, and the `asm_x86_eval`/`asm_x86_foreign`/`asm_a64_eval`
+foreign code, and the `asm_x86_eval`/`asm_x86_foreign`/`asm_arm64_eval`
 checks. Extension point: `asm-decode`, which returns `()` today where that
 specification will return a `(data ...)` fragment. Source text:
 `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
@@ -433,10 +486,22 @@ onto `asm 'x86`, and removing `gen-asm-x86.k`, `asm-x86.k`, `dsm-x86.k`,
 `x86` ISA, which covers `emit.l`'s 28 mnemonics as part of the coverage
 table. Same source text.
 
+**Correct sequences for what no instruction does alone.** On x64,
+unsigned 64-bit to float and back are sequences around the signed
+conversions; on 32-bit x86, 64-bit arithmetic is register pairs and 64-bit
+divide a runtime call. The coverage table names the parts; choosing and
+checking the sequences is the back end's, which MUST test unsigned 64-bit
+conversions at and above 2^63 on every instruction set. Extension point: the
+intent layer.
+
+**Placeholders in base-plus-displacement addresses on x86.** Their canonical
+width depends on the value. Extension point: a `(reloc 32)` form fixing the
+width, through `asm-field-range` and `asm-patch`.
+
 **AVX-512, SVE and SME.** EVEX encoding, masks and 512-bit vectors on x86-64;
 scalable vectors on A64. Excluded because neither development host can run
 SVE or SME (the M3 has neither), and AVX-512 runs only on `ndn.lan`.
-Extension point: new rows and tokens in `x86.spec` and `a64.spec`, and new
+Extension point: new rows and tokens in `x86.spec` and `arm64.spec`, and new
 columns in the coverage table.
 
 **Packed SIMD on 32-bit x86.** Extension point: `x86`-valid SSE rows, which
@@ -504,7 +569,9 @@ no entitlement; signing them with the hardened runtime would require the
 - `eval2` gains functions it lacked; nothing it had changes. `eval`'s `subr`
   gains the address form and return types; existing signatures mean what
   they did.
-- `spike/asm/` is removed as its contents are promoted.
+- `spike/asm/` is removed; its contents were promoted.
+- The row checks need `clang` and LLVM's `objdump` (`llvm-objdump` where
+  installed, else `/usr/bin/objdump`, which is LLVM's on macOS).
 - Rosetta is deprecated: Apple has said it stays through macOS 27. When it
   goes, `bin/x86_64/` is not built and x86-64 runs only on x86-64 hosts.
 
@@ -518,8 +585,8 @@ no entitlement; signing them with the hardened runtime would require the
 - `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`:
   the earlier design, source for the disassembler, running-code and
   migration specifications.
-- `spike/asm/README.md` (branch `table-asm`): the spike and its measured
-  state.
+- The spike, committed on branch `table-asm` with a README of its measured
+  state and removed as it was promoted (see the branch history).
 - `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md`: the first user of the
   native back ends.
 - libffi: https://github.com/libffi/libffi
