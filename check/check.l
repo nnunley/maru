@@ -33,7 +33,7 @@
 ;; Run a shell command with no input and a 120 s limit; keep its output in
 ;; tmp/NAME.out.  Returns the output's lines, or fails the current case.
 (define-function run (name cmd)
-  (let ((status (system (concat-strings "exec perl -e 'alarm shift; exec @ARGV' 120 sh -c '" cmd
+  (let ((status (system (concat-strings "exec /usr/bin/perl -e 'alarm shift; exec @ARGV' 120 sh -c '" cmd
 					"' </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err"))))
     (or (= 0 status) (error "FAIL " name ": exit status " status " running: " cmd))
     (lines (contents-of-file-named (concat-strings tmp "/" name ".out")))))

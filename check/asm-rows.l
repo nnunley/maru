@@ -4,7 +4,7 @@
 ;;;
 ;;; For each row, operands are sampled in every position; the instructions are
 ;;; written in clang's syntax to TMPDIR/ISA.s, assembled, and clang's bytes
-;;; (read with objdump -s) compared with ours.  Each instruction is also
+;;; (read with LLVM's objdump -s, which reads Mach-O and ELF alike) compared with ours.  Each instruction is also
 ;;; decoded and re-encoded, and must give the same bytes.  Instructions the
 ;;; rows must refuse are tried with asm-attempt.  The last line is
 ;;; "asm rows ISA ok" only when everything holds.
@@ -131,7 +131,7 @@
 ;; clang's bytes, from objdump -s's hex dump of the text section.
 (define base (concat-strings tmp "/" (symbol->string isa)))
 (system (concat-strings "/usr/bin/clang " isa-clang " -c " base ".s -o " base ".o && "
-			"/usr/bin/objdump -s -j " isa-section " " base ".o > " base ".dump"))
+			"$(command -v llvm-objdump || echo /usr/bin/objdump) -s -j " isa-section " " base ".o > " base ".dump"))
 
 (define-function hex-digit (c)
   (cond ((and (<= ?0 c) (<= c ?9)) (- c ?0)) ((and (<= ?a c) (<= c ?f)) (+ 10 (- c ?a))) (else ())))
