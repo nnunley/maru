@@ -30,3 +30,4 @@
 -147 the rest of the spike removed (run.l, arun.l, jit.c, afib-main.c, README.md); its every part is promoted or superseded by the asm checks
 +43 final review fixes: a placeholder beside an x86 base register refused, asm-patch never changes an instruction's length (tested on a toy instruction set that grows), 32-bit arm64 logical immediates wider than 32 bits refused, (data byte...) implemented as the RFC states, and a code region refusing a buffer below its installed code; each with its failing test
 +23 check.l runs each command through fork, alarm, execl and waitpid called with subr, replacing the /usr/bin/perl alarm wrapper (one code path on macOS and Linux, no perl or coreutils timeout); the run_limit case tests exit status and the alarm
++12 check.l fails a run that names a check that does not exist (it printed "all checks passed" with nothing run); the unmatched case tests the name matching

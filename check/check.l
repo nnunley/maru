@@ -3,7 +3,7 @@
 ;;; boot.l's unit-test (which stops at the first failure).
 ;;;
 ;;;   ./eval check/check.l              run every case
-;;;   ./eval check/check.l pepsi ...    run the named cases
+;;;   ./eval check/check.l pepsi ...    run the named cases; a name no case has fails
 
 (define system (subr "system" "s"))
 (define tmp "/tmp/maru-check")
@@ -62,9 +62,14 @@
 
 (define *selected* *arguments*)
 (set *arguments* ())
+(define *ran* ())
 (define-form check (name . body)
   `(when (or (not *selected*) (member? ,name *selected*))
+     (push *ran* ,name)
      (unit-test ,name ,@body (println "PASS " ,name))))
+
+;; The names in selected that no check ran.
+(define-function unmatched (selected ran)	(select (lambda (n) (not (member? n ran))) selected))
 
 ;; A command's status is its exit code << 8, or the signal that ended it; one
 ;; still running at its limit ends by SIGALRM (14).
@@ -72,6 +77,11 @@
   (unit-assert (= 0 (run-status 5 "true")))
   (unit-assert (= 768 (run-status 5 "exit 3")))
   (unit-assert (= 14 (run-status 1 "sleep 30"))))
+
+;; A name asked for that no check has fails the run instead of passing unrun.
+(check "unmatched"
+  (unit-assert (equal (unmatched '("pepsi" "pepsy") '("pepsi")) '("pepsy")))
+  (unit-assert (equal (unmatched () '("pepsi")) ())))
 
 ;;; ---------------------------------------------------------------- osdefs
 
@@ -303,4 +313,6 @@
 			 "; add an entry for " (- n sum) " saying why"))
     (println "lines: " n ", tests included; the budget of 20000 is soft")))
 
+(let ((missing (unmatched *selected* *ran*)))
+  (and missing (error "FAIL no check named: " missing)))
 (println "all checks passed")
