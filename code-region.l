@@ -2,7 +2,7 @@
 ;;;
 ;;;   (code-region-allocate size)          => region, a list (base size next)
 ;;;   (code-region-next region)            the next free address, 16-byte aligned
-;;;   (code-region-fits? region buffer)    whether an assembly buffer fits at its origin
+;;;   (code-region-fits? region buffer)    whether a buffer fits at its origin, past installed code
 ;;;   (code-region-install region buffer)  copy it there and make it runnable => its origin
 ;;;   (code-callable address signature)    a subr that calls address through the C ABI
 ;;;
@@ -36,7 +36,7 @@
 
 (define-function code-region-fits? (region buffer)
   (let ((from (asm-buffer-origin buffer)) (to (asm-buffer-pc buffer)))
-    (and (<= (car region) from) (<= to (+ (car region) (cadr region))))))
+        (and (<= (caddr region) from) (<= to (+ (car region) (cadr region))))))
 
 (define-function code-region-install (region buffer)
   (or (code-region-fits? region buffer) (error "code region: buffer at " (asm-buffer-origin buffer) " does not fit"))

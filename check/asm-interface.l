@@ -32,6 +32,28 @@
 (expect (asm-decode 'arm64 (byte-array '(0x20 0x00 0x02 0x8b)) 0) '((ADD X0 X1 X2) . 4))
 (expect (asm-decode 'arm64 (byte-array '(0xff 0xff 0xff 0x17)) 0x1004) '((B 0x1000) . 4))
 
+;; (data byte...) is emitted unchanged on every instruction set; bytes are 0..255.
+(let ((a (asm-buffer 0)) (x (asm-buffer 0)))
+  (expect (asm 'arm64 a '(data 1 2 255)) ())
+  (expect (bytes a) '(1 2 255))
+  (expect (asm 'x64 x '(data 0x0f 0x0b)) ())
+  (expect (bytes x) '(0x0f 0x0b))
+  (expect (car (asm-attempt 'x64 x '(data 256))) 'error)
+  (expect (bytes x) '(0x0f 0x0b)))
+
+;; A patch never changes an instruction's length, even where a row would:
+;; LIT's byte count grows with its value past 255.
+(asm-register-isa 'grow '((LIT (imm)))
+		  (lambda (row insn pc) (let ((v (cadr insn)))
+					  (cons (cond ((pair? v) '(0)) ((< v 256) (list v)) (else (list (& v 255) (>> v 8))))
+						(and (pair? v) '(0)))))
+		  () (lambda (row position pc len) '(0 65535 1)) ())
+(let* ((g (asm-buffer 0)) (r (car (asm 'grow g '(LIT (reloc))))))
+  (expect (car (asm-patch-attempt 'grow g r 0x1234)) 'error)
+  (expect (bytes g) '(0))
+  (asm-patch 'grow g r 7)
+  (expect (bytes g) '(7)))
+
 ;; The same calls for x64: no caller branches on the instruction set.
 (let ((b (asm-buffer 0x1000)))
   (expect (asm 'x64 b '(ADD RAX R12)) ())

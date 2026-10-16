@@ -207,4 +207,9 @@
   (asm isa b (if (= isa 'arm64) '(RET) '(ADD RAX R12)))	; 4 and 3 bytes: neither fits in 2
   (expect (code-region-fits? region b) ()))
 
+;; Nor does one below the region's next free address: it would overwrite installed code.
+(let ((b (asm-buffer (car region))))
+  (asm isa b '(RET))
+  (expect (code-region-fits? region b) ()))
+
 (if (= 0 failures) (println "jit run " isa " ok"))

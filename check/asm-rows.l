@@ -40,7 +40,8 @@
     (MUL (V 0 2D) (V 1 2D) (V 2 2D))	; MUL has no 2D form
     (FADD (V 0 8B) (V 1 8B) (V 2 8B))	; no byte floating point
     (SHL (V 0 4S) (V 1 4S) 32)		; shift beyond the element
-    (USHR (V 0 4S) (V 1 4S) 0)))	; right shifts are 1..esize
+        (USHR (V 0 4S) (V 1 4S) 0)		; right shifts are 1..esize
+    (AND W0 W1 0x100000001)))		; a 32-bit logical immediate wider than 32 bits
 
 (define x86-refused
   '((INT -5)			; INT's vector is unsigned (the spike encoded it as 251)
@@ -48,12 +49,16 @@
     (ADD EAX R8D)		; no R8D in 32-bit mode
     (ADD RAX 1)			; nor 64-bit registers
     (ADD (m32 0 RIP () 1) 5)	; nor RIP-relative addressing
-    (VADDPS YMM9 YMM1 YMM2)))	; nor YMM8-YMM15
+        (VADDPS YMM9 YMM1 YMM2)	; nor YMM8-YMM15
+    (MOV EAX (m32 (reloc 32) EBX () 1))))	; nor a placeholder beside a base register
 (define x64-refused
   '((MOV AH R8B)		; AH cannot be encoded with a REX prefix
     (MOV AH SIL)		; nor beside SIL, which needs one
     (ADD (m32 0 EAX () 1) 5)	; 32-bit addresses (prefix 67) are not encoded
-    (PUSH EAX)))		; no 32-bit push in 64-bit mode
+        (PUSH EAX)			; no 32-bit push in 64-bit mode
+    (ADD RAX 0x100000000)	; imm32 sign-extends; this does not fit
+    (MOV EAX (m32 (reloc 32) RBX () 1))	; a placeholder beside a base register: its width
+    (MOV EAX (m32 (reloc) RBX () 1))))	; would depend on the value, so it is refused
 
 (define isa-rows		(cadr (asm-isa isa)))
 (define isa-samples		(if (= isa 'arm64) arm64-samples x86-samples))

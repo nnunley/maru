@@ -79,7 +79,8 @@
 
 ;; (n immr imms) encoding v as a w-bit logical immediate, smallest element first, or ().
 (define-function arm64-bitmask (v w)
-  (let ((found ()) (e 2))
+    (let ((found ()) (e 2))
+    (and (< w 64) (or (< v (- 0 (<< 1 (- w 1)))) (<= (<< 1 w) v)) (set e (+ w 1)))	; wider than w bits: refused
     (set v (& v (arm64-ones w)))
     (while (and (not found) (<= e w))
       (let ((elt (& v (arm64-ones e))) (rep 0) (i 0) (ones 0))

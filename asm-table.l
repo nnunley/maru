@@ -66,7 +66,14 @@
 (define-function asm-field-range (isa row position pc . insn)	; insn: lengths of PC-relative fields
   ((car (cddddr (asm-isa isa))) row position pc (car insn)))
 
+(define-function asm-data (buffer insn)	; (data byte...), bytes 0..255, emitted as given
+  (if (list-detect b (cdr insn) (not (and (long? b) (<= 0 b) (<= b 255))))
+      (cons 'error (list "asm: data bytes are 0..255: " insn))
+    (list-do b (cdr insn) (array-append (asm-buffer-bytes buffer) b))))
+
 (define-function asm-attempt (isa buffer insn)
+  (if (= 'data (car insn))
+      (asm-data buffer insn)
   (let* ((i (asm-isa isa))
 	 (encode (caddr i))
 	 (pc (asm-buffer-pc buffer))
@@ -74,22 +81,22 @@
 	 (size -1)
 	 (row ())
 	 (out ()))
-        ;; of the rows that fit, the shortest (the first among equals), or with an
-    ;; open placeholder the one with the widest field
-        (list-do r (asm-rows-for i (car insn))
-      (and 1
-	   (let ((o (encode r insn pc)))
-	     (when o
-	       (let ((n (if open
-			    (let ((range (asm-field-range isa r open pc insn))) (/ (- (cadr range) (car range)) (caddr range)))
-			  (- 0 (list-length (car o))))))
-		 (when (or (not out) (< size n)) (set size n) (set out o) (set row r)))))))
+                ;; of the rows that fit, the shortest (the first among equals), or with an
+    ;; open placeholder the one with the widest field; a row whose field has no
+    ;; range of its own does not take an open placeholder
+    (list-do r (asm-rows-for i (car insn))
+      (let ((o (encode r insn pc)))
+	(when o
+	  (let* ((range (and open (asm-field-range isa r open pc insn)))
+		 (n (cond ((not open) (- 0 (list-length (car o))))
+			  (range (/ (- (cadr range) (car range)) (caddr range))))))
+	    (when (and n (or (not out) (< size n))) (set size n) (set out o) (set row r))))))
     (if out
 	(let ((offset (array-length (asm-buffer-bytes buffer))))
 	  (list-do b (car out) (array-append (asm-buffer-bytes buffer) b))
 	  (map (lambda (p) (list p offset row insn)) (cdr out)))
       (cons 'error (list "asm: no " isa " row for " insn "; forms: "
-			 (map car (asm-forms isa (car insn))))))))
+			 			 			 (map car (asm-forms isa (car insn)))))))))
 
 (define-function asm (isa buffer insn)
   (let ((r (asm-attempt isa buffer insn)))
@@ -112,8 +119,10 @@
   (let* ((offset (cadr report))
 	 (pc (+ (asm-buffer-origin buffer) offset))
 	 (insn (asm-substitute (cadddr report) (car report) value))
-	 (out ((caddr (asm-isa isa)) (caddr report) insn pc)))
-    (if out
+	 	 (encode (caddr (asm-isa isa)))
+	 (out (encode (caddr report) insn pc))
+	 (was (encode (caddr report) (cadddr report) pc)))
+    (if (and out (= (list-length (car out)) (list-length (car was))))	; never a different length
 	(let ((k offset))
 	  (list-do b (car out) (set-array-at (asm-buffer-bytes buffer) k b) (set k (+ k 1)))
 	  buffer)

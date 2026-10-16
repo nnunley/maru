@@ -181,13 +181,14 @@
 	((and i (not (and (x86-reg-in-mode? i mode) (= asize (caddr (x86-reg i))) (!= 4 (x86-reg-num i))))) ())
 	((not (x86-scale-bits (or s 1))) ())
 	((= b 'RIP)
-	 (and (= mode 'x64) (not i) (list (list (mrm 0 5) 0 0 0 0) 0 0 1)))
+	 	 (and (= mode 'x64) (not i) (list (list (mrm 0 5) 0 0 0 0) 0 0 1)))
+	((and b (x86-reloc? d)) ())	; beside a base, a placeholder's width would depend on its value
 	(else
 	 (let* ((reloc (x86-reloc? d))
 		(bn (and b (x86-reg-num b)))
-		(mod (cond ((not b) 0) (reloc 2) ((and (= d 0) (!= 5 (& bn 7))) 0) ((x86-fits? d 1 4 ()) 1) (else 2)))
+		(mod (cond ((not b) 0) ((and (= d 0) (!= 5 (& bn 7))) 0) ((x86-fits? d 1 4 ()) 1) (else 2)))
 		(disp (cond (reloc (x86-le 0 4)) ((not b) (x86-le d 4)) ((= mod 1) (x86-le d 1)) ((= mod 2) (x86-le d 4)))))
-	   (and (or reloc (and (long? d) (x86-fits? d 4 8 ())))
+	   	   	   (and (or reloc (and (long? d) (x86-fits? d 4 8 ())))
 		(cond
 		  ((and (not i) b (!= 4 (& bn 7)))		(list (cons (mrm mod (& bn 7)) disp) 0 (>> bn 3) ()))
 		  ((and (not i) (not b) (= mode 'x86))		(list (cons (mrm 0 5) disp) 0 0 ()))
