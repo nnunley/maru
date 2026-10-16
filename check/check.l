@@ -30,11 +30,27 @@
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (and (<= i n) i)))
 
+;; Run cmd under sh with a limit of secs seconds, which an alarm set in the
+;; child enforces (it survives exec); returns the status waitpid gives.
+(define fork	(subr "fork" ">i"))
+(define alarm	(subr "alarm" "i>i"))
+(define execl	(subr "execl" "ss.>i"))	; two fixed arguments, the rest variadic
+(define waitpid	(subr "waitpid" "ipi>i"))
+(define _exit	(subr "_exit" "i"))
+(define status-word ((subr "malloc" "l>p") 8))
+(define-function run-status (secs cmd)
+  (let ((pid (fork)))
+    (when (= 0 pid)
+      (alarm secs)
+      (execl "/bin/sh" "sh" "-c" cmd 0)
+      (_exit 127))
+    (waitpid pid status-word 0)
+    (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
+
 ;; Run a shell command with no input and a 120 s limit; keep its output in
 ;; tmp/NAME.out.  Returns the output's lines, or fails the current case.
 (define-function run (name cmd)
-  (let ((status (system (concat-strings "exec /usr/bin/perl -e 'alarm shift; exec @ARGV' 120 sh -c '" cmd
-					"' </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err"))))
+  (let ((status (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; " cmd))))
     (or (= 0 status) (error "FAIL " name ": exit status " status " running: " cmd))
     (lines (contents-of-file-named (concat-strings tmp "/" name ".out")))))
 
@@ -49,6 +65,13 @@
 (define-form check (name . body)
   `(when (or (not *selected*) (member? ,name *selected*))
      (unit-test ,name ,@body (println "PASS " ,name))))
+
+;; A command's status is its exit code << 8, or the signal that ended it; one
+;; still running at its limit ends by SIGALRM (14).
+(check "run_limit"
+  (unit-assert (= 0 (run-status 5 "true")))
+  (unit-assert (= 768 (run-status 5 "exit 3")))
+  (unit-assert (= 14 (run-status 1 "sleep 30"))))
 
 ;;; ---------------------------------------------------------------- osdefs
 

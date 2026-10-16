@@ -92,6 +92,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
   `string-copy`, `string-compare`, `long->string` and `string->long` behave
   as `eval`'s C primitives do (the cases pass under both evaluators).
+- `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
+  the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change
   in line count needs an entry there with its delta, and an entry that adds
   lines must say why. Derived files are marked `derived` in `.gitattributes`
