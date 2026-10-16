@@ -187,6 +187,21 @@
     (madd d a b)
     (expect (list (float-at d 0) (float-at d 1) (float-at d 2) (float-at d 3)) '(1.5 2.0 2.5 3.0))))
 
+;; Eight lanes with AVX2 and FMA: d[i] += a[i] * b[i] in one VFMADD231PS.
+(when (= isa 'x64)
+  (let ((fma (assemble '((VMOVUPS YMM0 (m256 0 RDI () 1))
+			 (VMOVUPS YMM1 (m256 0 RSI () 1))
+			 (VFMADD231PS YMM0 YMM1 (m256 0 RDX () 1))
+			 (VMOVUPS (m256 0 RDI () 1) YMM0)
+			 (VZEROUPPER)
+			 (RET))
+		       "ppp>p"))
+	(d ((subr "malloc" "l>p") 32)) (a ((subr "malloc" "l>p") 32)) (b ((subr "malloc" "l>p") 32)) (got ()))
+    (for (i 0 8) (set-float-at d i 1.0) (set-float-at a i (+ i 1.0)) (set-float-at b i 0.5))
+    (fma d a b)
+    (for (i 0 8) (set got (cons (float-at d (- 7 i)) got)))
+    (expect got '(1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0))))
+
 ;; A buffer that runs past the region's end does not fit, and nothing is copied.
 (let ((b (asm-buffer (- (+ (car region) (cadr region)) 2))))
   (asm isa b (if (= isa 'arm64) '(RET) '(ADD RAX R12)))	; 4 and 3 bytes: neither fits in 2

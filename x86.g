@@ -14,13 +14,14 @@ __	= ([\t ] | comment | eol)* ;
 end	= ![A-Za-z0-9/+.] sp ;
 hex	= [0-9A-F] ;
 
-opcode	= "REX.W" sp "+" sp					-> `rexw
+opcode	= "VEX" ("." ([A-Z0-9]+) @$$)+:p end			-> `(vex ,@p)
+	| "REX.W" sp "+" sp					-> `rexw
 	| "REX" sp "+" sp					-> `rex
 	| (hex hex) @$#16:b ( "+r" [bwdo] end			-> `(+r ,b)
 			    | end				-> b )
 	| "/r" end						-> `r
 	| "/" [0-7] @$#:n end					-> `(/ ,n)
-	| ("ib" | "iw" | "id" | "io" | "cb" | "cd" | "o32" | "u") @$$:x end	-> x ;
+	| ("ib" | "iw" | "id" | "io" | "cb" | "cd" | "o32" | "u" | "cp" | "c") @$$:x end	-> x ;
 
 mnemonic = ([A-Z] [A-Z0-9]*) @$$:m sp				-> m ;
 kind	= ([A-Za-z0-9/]+) @$$:k sp				-> k ;

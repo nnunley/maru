@@ -535,3 +535,108 @@ x64	vextract	PEXTRD r/m32, xmm, imm8
 x64	vextract	EXTRACTPS r/m32, xmm, imm8
 x64	vselect	BLENDVPS xmm, xmm/m128, XMM0
 x64	vreduce.dot	DPPS xmm, xmm/m128, imm8
+
+# ---------------------------------------------------------------- x64: AVX and AVX2 (VEX, 128 and 256 bits)
+
+x64	vadd.float	VADDPS xmm, xmm, xmm/m128
+x64	vadd.float	VADDPD xmm, xmm, xmm/m128
+x64	vsub.float	VSUBPS xmm, xmm, xmm/m128
+x64	vmul.float	VMULPS xmm, xmm, xmm/m128
+x64	vdiv.float	VDIVPS xmm, xmm, xmm/m128
+x64	vmin.float	VMINPS xmm, xmm, xmm/m128
+x64	vmax.float	VMAXPS xmm, xmm, xmm/m128
+x64	vbitand	VANDPS xmm, xmm, xmm/m128
+x64	vbitor	VORPS xmm, xmm, xmm/m128
+x64	vbitxor	VXORPS xmm, xmm, xmm/m128
+x64	vbitandnot	VANDNPS xmm, xmm, xmm/m128
+x64	vadd.int	VPADDD xmm, xmm, xmm/m128
+x64	vsub.int	VPSUBD xmm, xmm, xmm/m128
+x64	vmul.int	VPMULLD xmm, xmm, xmm/m128
+x64	veq.int	VPCMPEQD xmm, xmm, xmm/m128
+x64	vgt.s	VPCMPGTD xmm, xmm, xmm/m128
+x64	vmin.s	VPMINSD xmm, xmm, xmm/m128
+x64	vmax.s	VPMAXSD xmm, xmm, xmm/m128
+x64	vmin.u	VPMINUD xmm, xmm, xmm/m128
+x64	vmax.u	VPMAXUD xmm, xmm, xmm/m128
+x64	vbitand	VPAND xmm, xmm, xmm/m128
+x64	vbitor	VPOR xmm, xmm, xmm/m128
+x64	vbitxor	VPXOR xmm, xmm, xmm/m128
+x64	vpermute	VPSHUFB xmm, xmm, xmm/m128
+x64	vreduce.add.float	VHADDPS xmm, xmm, xmm/m128
+x64	vfma.float	VFMADD231PS xmm, xmm, xmm/m128
+x64	vfma.float	VFMADD231PD xmm, xmm, xmm/m128
+x64	vsqrt.float	VSQRTPS xmm, xmm/m128
+x64	vcast.s.float	VCVTDQ2PS xmm, xmm/m128
+x64	vcast.float.s	VCVTTPS2DQ xmm, xmm/m128
+x64	vload	VMOVUPS xmm, xmm/m128
+x64	vstore	VMOVUPS xmm/m128, xmm
+x64	veq.float,vgt.float,vge.float	VCMPPS xmm, xmm, xmm/m128, imm8
+x64	vshuffle	VSHUFPS xmm, xmm, xmm/m128, imm8
+x64	vbroadcast,vshuffle	VPSHUFD xmm, xmm/m128, imm8
+x64	vshl.imm	VPSLLD xmm, xmm, imm8
+x64	vshr.imm.u	VPSRLD xmm, xmm, imm8
+x64	vshr.imm.s	VPSRAD xmm, xmm, imm8
+x64	vshl.int	VPSLLD xmm, xmm, xmm/m128
+x64	vshr.u	VPSRLD xmm, xmm, xmm/m128
+x64	vshr.s	VPSRAD xmm, xmm, xmm/m128
+x64	vbroadcast	VBROADCASTSS xmm, m32
+x64	vbroadcast	VBROADCASTSS xmm, xmm
+x64	vbroadcast	VPBROADCASTD xmm, xmm/m32
+x64	vload.masked	VMASKMOVPS xmm, xmm, m128
+x64	vselect	VBLENDPS xmm, xmm, xmm/m128, imm8
+x64	vadd.float	VADDPS ymm, ymm, ymm/m256
+x64	vadd.float	VADDPD ymm, ymm, ymm/m256
+x64	vsub.float	VSUBPS ymm, ymm, ymm/m256
+x64	vmul.float	VMULPS ymm, ymm, ymm/m256
+x64	vdiv.float	VDIVPS ymm, ymm, ymm/m256
+x64	vmin.float	VMINPS ymm, ymm, ymm/m256
+x64	vmax.float	VMAXPS ymm, ymm, ymm/m256
+x64	vbitand	VANDPS ymm, ymm, ymm/m256
+x64	vbitor	VORPS ymm, ymm, ymm/m256
+x64	vbitxor	VXORPS ymm, ymm, ymm/m256
+x64	vbitandnot	VANDNPS ymm, ymm, ymm/m256
+x64	vadd.int	VPADDD ymm, ymm, ymm/m256
+x64	vsub.int	VPSUBD ymm, ymm, ymm/m256
+x64	vmul.int	VPMULLD ymm, ymm, ymm/m256
+x64	veq.int	VPCMPEQD ymm, ymm, ymm/m256
+x64	vgt.s	VPCMPGTD ymm, ymm, ymm/m256
+x64	vmin.s	VPMINSD ymm, ymm, ymm/m256
+x64	vmax.s	VPMAXSD ymm, ymm, ymm/m256
+x64	vmin.u	VPMINUD ymm, ymm, ymm/m256
+x64	vmax.u	VPMAXUD ymm, ymm, ymm/m256
+x64	vbitand	VPAND ymm, ymm, ymm/m256
+x64	vbitor	VPOR ymm, ymm, ymm/m256
+x64	vbitxor	VPXOR ymm, ymm, ymm/m256
+x64	vpermute	VPSHUFB ymm, ymm, ymm/m256
+x64	vreduce.add.float	VHADDPS ymm, ymm, ymm/m256
+x64	vfma.float	VFMADD231PS ymm, ymm, ymm/m256
+x64	vfma.float	VFMADD231PD ymm, ymm, ymm/m256
+x64	vsqrt.float	VSQRTPS ymm, ymm/m256
+x64	vcast.s.float	VCVTDQ2PS ymm, ymm/m256
+x64	vcast.float.s	VCVTTPS2DQ ymm, ymm/m256
+x64	vload	VMOVUPS ymm, ymm/m256
+x64	vstore	VMOVUPS ymm/m256, ymm
+x64	veq.float,vgt.float,vge.float	VCMPPS ymm, ymm, ymm/m256, imm8
+x64	vshuffle	VSHUFPS ymm, ymm, ymm/m256, imm8
+x64	vbroadcast,vshuffle	VPSHUFD ymm, ymm/m256, imm8
+x64	vshl.imm	VPSLLD ymm, ymm, imm8
+x64	vshr.imm.u	VPSRLD ymm, ymm, imm8
+x64	vshr.imm.s	VPSRAD ymm, ymm, imm8
+x64	vshl.int	VPSLLD ymm, ymm, xmm/m128
+x64	vshr.u	VPSRLD ymm, ymm, xmm/m128
+x64	vshr.s	VPSRAD ymm, ymm, xmm/m128
+x64	vbroadcast	VBROADCASTSS ymm, m32
+x64	vbroadcast	VBROADCASTSS ymm, xmm
+x64	vbroadcast	VPBROADCASTD ymm, xmm/m32
+x64	vload.masked	VMASKMOVPS ymm, ymm, m256
+x64	vselect	VBLENDPS ymm, ymm, ymm/m256, imm8
+x64	vpermute	VPERMPS ymm, ymm, ymm/m256
+x64	vpermute	VPERMD ymm, ymm, ymm/m256
+x64	vpermute	VPERM2F128 ymm, ymm, ymm/m256, imm8
+x64	vinsert	VINSERTF128 ymm, ymm, xmm/m128, imm8
+x64	vextract	VEXTRACTF128 xmm/m128, ymm, imm8
+x64	vinsert	VPINSRD xmm, xmm, r/m32, imm8
+x64	vextract	VPEXTRD r/m32, xmm, imm8
+x64	fma.f32	VFMADD231SS xmm, xmm, xmm/m32
+x64	fma.f64	VFMADD231SD xmm, xmm, xmm/m64
+x64	vzero.upper	VZEROUPPER

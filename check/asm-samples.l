@@ -107,7 +107,9 @@
       ((= 'r (car c))	(if x64
 			    (list (x86-sample-reg 'r (cadr c) (% pos 4)) (x86-sample-reg 'r (cadr c) (+ 8 (% pos 8))))
 			  (list (x86-sample-reg 'r (cadr c) (% pos 4)) (x86-sample-reg 'r (cadr c) (if (= 1 (cadr c)) 7 (+ 4 (% pos 4)))))))
-      ((= 'x (car c))	(list (x86-sample-reg 'x 16 (% pos 8)) (x86-sample-reg 'x 16 (if x64 (+ 8 (% pos 8)) 7))))
+            ((= 'x (car c))	(list (x86-sample-reg 'x 16 (% pos 8)) (x86-sample-reg 'x 16 (if x64 (+ 8 (% pos 8)) 7))))
+      ((= 'y (car c))	(list (x86-sample-reg 'y 32 (% pos 8)) (x86-sample-reg 'y 32 (if x64 (+ 8 (% pos 8)) 7))))
+      ((= 'ym (car c))	(concat-list (x86-samples row 'ymm pos) (x86-memories (x86-mem-tag (cadr c)) pos)))
       ((= 'rm (car c))	(concat-list (x86-samples row (list-detect e '(r8 r16 r32 r64) (= (cadr c) (cadr (x86-kind e)))) pos)
 				     (x86-memories (x86-mem-tag (cadr c)) pos)))
       ((= 'xm (car c))	(concat-list (x86-samples row 'xmm pos) (x86-memories (x86-mem-tag (cadr c)) pos)))
@@ -122,7 +124,7 @@
       ((= 'one (car c))	'(1))
       (else		(list k)))))
 
-(define x86-ptr '((m8 . "BYTE PTR ") (m16 . "WORD PTR ") (m32 . "DWORD PTR ") (m64 . "QWORD PTR ") (m128 . "XMMWORD PTR ") (m . "")))
+(define x86-ptr '((m8 . "BYTE PTR ") (m16 . "WORD PTR ") (m32 . "DWORD PTR ") (m64 . "QWORD PTR ") (m128 . "XMMWORD PTR ") (m256 . "YMMWORD PTR ") (m . "")))
 
 ;; Intel syntax, as clang reads it.
 (define-function x86-text (op label . kind)

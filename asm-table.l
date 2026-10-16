@@ -27,8 +27,17 @@
 
 (define *asm-isas* ())
 
+;; Each ISA is (name rows encode decode field-range parse-form by-mnemonic),
+;; by-mnemonic an alist from mnemonic to its rows in file order.
 (define-function asm-register-isa (name rows encode decode field-range parse-form)
-  (set *asm-isas* (cons (list name rows encode decode field-range parse-form) *asm-isas*)))
+  (let ((by ()))
+    (list-do r rows
+      (let ((e (assq (car r) by)))
+	(if e (set-cdr e (cons r (cdr e))) (set by (cons (list (car r) r) by)))))
+    (list-do e by (set-cdr e (list-reverse! (cdr e))))
+    (set *asm-isas* (cons (list name rows encode decode field-range parse-form by) *asm-isas*))))
+
+(define-function asm-rows-for (i mnemonic)	(cdr (assq mnemonic (car (cdr (cddddr (cdr i)))))))
 
 (define-function asm-isa (isa)
   (or (assq isa *asm-isas*) (error "asm: unknown instruction set " isa)))
@@ -39,10 +48,7 @@
 (define-function asm-buffer-pc (b)	(+ (car b) (array-length (cdr b))))
 
 (define-function asm-forms (isa mnemonic)
-  (let ((out ()))
-    (list-do row (cadr (asm-isa isa))
-      (and (= mnemonic (car row)) (set out (cons (list (cadr row) row) out))))
-    (list-reverse! out)))
+  (map (lambda (row) (list (cadr row) row)) (asm-rows-for (asm-isa isa) mnemonic)))
 
 (define-function asm-placeholder-in (op)
   (cond ((not (pair? op))		())
@@ -68,13 +74,16 @@
 	 (size -1)
 	 (row ())
 	 (out ()))
-    ;; the first row that fits, or with an open placeholder the widest
-    (list-do r (cadr i)
-      (and (or open (not out)) (= (car insn) (car r))
+        ;; of the rows that fit, the shortest (the first among equals), or with an
+    ;; open placeholder the one with the widest field
+        (list-do r (asm-rows-for i (car insn))
+      (and 1
 	   (let ((o (encode r insn pc)))
 	     (when o
-	       (let ((n (if open (let ((range (asm-field-range isa r open pc insn))) (/ (- (cadr range) (car range)) (caddr range))) 0)))
-		 (when (< size n) (set size n) (set out o) (set row r)))))))
+	       (let ((n (if open
+			    (let ((range (asm-field-range isa r open pc insn))) (/ (- (cadr range) (car range)) (caddr range)))
+			  (- 0 (list-length (car o))))))
+		 (when (or (not out) (< size n)) (set size n) (set out o) (set row r)))))))
     (if out
 	(let ((offset (array-length (asm-buffer-bytes buffer))))
 	  (list-do b (car out) (array-append (asm-buffer-bytes buffer) b))
