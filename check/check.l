@@ -179,9 +179,13 @@
 (check "asm_rows_x64"
   (unit-assert (equal (last (run "asm-rows-x64" (concat-string "./eval check/asm-rows.l x64 " tmp))) "asm rows x64 ok")))
 
+(check "asm_rows_x86"
+  (unit-assert (equal (last (run "asm-rows-x86" (concat-string "./eval check/asm-rows.l x86 " tmp))) "asm rows x86 ok")))
+
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
-  (unit-assert (equal (last (run "asm-coverage-x64" "./eval check/asm-coverage.l x64")) "asm coverage x64 ok")))
+    (unit-assert (equal (last (run "asm-coverage-x64" "./eval check/asm-coverage.l x64")) "asm coverage x64 ok"))
+  (unit-assert (equal (last (run "asm-coverage-x86" "./eval check/asm-coverage.l x86")) "asm coverage x86 ok")))
 
 ;; Encoded code runs in-process on every evaluator this host has: its own,
 ;; and on arm64 macOS bin/x86_64/eval2 under Rosetta.
@@ -200,7 +204,8 @@
 
 (check "asm_patch"
   (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok"))
-  (unit-assert (equal (last (run "asm-patch-x64" "./eval check/asm-patch.l x64")) "asm patch x64 ok")))
+    (unit-assert (equal (last (run "asm-patch-x64" "./eval check/asm-patch.l x64")) "asm patch x64 ok"))
+  (unit-assert (equal (last (run "asm-patch-x86" "./eval check/asm-patch.l x86")) "asm patch x86 ok")))
 
 ;;; ---------------------------------------------------------------- ir2
 

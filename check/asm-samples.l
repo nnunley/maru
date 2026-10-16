@@ -88,7 +88,7 @@
 (define-function x86-variants (row)		'(()))
 (define-function x86-set-variant (v)		())
 
-(define-function x86-sample-reg (kind size n)	(x86-reg-named kind size n () x86-sample-mode))
+(define-function x86-sample-reg (kind size n)	(x86-reg-named kind size n (= x86-sample-mode 'x86) x86-sample-mode))	; byte 4-7: AH..BH in 32-bit mode, SPL..DIL in 64
 
 ;; Memory samples of tag at register position pos: base only, base + scaled
 ;; index + negative displacement, an absolute address, and (x64) RIP-relative.

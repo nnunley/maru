@@ -311,6 +311,48 @@ F4			HLT				V V
 CD ib u			INT imm8			V V
 E6 ib u			OUT imm8, AL			V V
 
+# Carry, borrow, widening multiply and double shifts: 64-bit integers as
+# register pairs on the 32-bit target.
+10 /r			ADC r/m8, r8			V V
+11 /r			ADC r/m16, r16			V V
+11 /r			ADC r/m32, r32			V V
+REX.W + 11 /r		ADC r/m64, r64			V NE
+12 /r			ADC r8, r/m8			V V
+13 /r			ADC r32, r/m32			V V
+REX.W + 13 /r		ADC r64, r/m64			V NE
+14 ib			ADC AL, imm8			V V
+80 /2 ib		ADC r/m8, imm8			V V
+83 /2 ib		ADC r/m32, imm8			V V
+REX.W + 83 /2 ib	ADC r/m64, imm8			V NE
+15 id			ADC EAX, imm32			V V
+REX.W + 15 id		ADC RAX, imm32			V NE
+81 /2 id		ADC r/m32, imm32		V V
+REX.W + 81 /2 id	ADC r/m64, imm32		V NE
+18 /r			SBB r/m8, r8			V V
+19 /r			SBB r/m16, r16			V V
+19 /r			SBB r/m32, r32			V V
+REX.W + 19 /r		SBB r/m64, r64			V NE
+1A /r			SBB r8, r/m8			V V
+1B /r			SBB r32, r/m32			V V
+REX.W + 1B /r		SBB r64, r/m64			V NE
+1C ib			SBB AL, imm8			V V
+80 /3 ib		SBB r/m8, imm8			V V
+83 /3 ib		SBB r/m32, imm8			V V
+REX.W + 83 /3 ib	SBB r/m64, imm8			V NE
+1D id			SBB EAX, imm32			V V
+REX.W + 1D id		SBB RAX, imm32			V NE
+81 /3 id		SBB r/m32, imm32		V V
+REX.W + 81 /3 id	SBB r/m64, imm32		V NE
+F6 /4			MUL r/m8			V V
+F7 /4			MUL r/m32			V V
+REX.W + F7 /4		MUL r/m64			V NE
+0F A4 /r ib u		SHLD r/m32, r32, imm8		V V
+0F A5 /r		SHLD r/m32, r32, CL		V V
+0F AC /r ib u		SHRD r/m32, r32, imm8		V V
+0F AD /r		SHRD r/m32, r32, CL		V V
+REX.W + 0F A4 /r ib u	SHLD r/m64, r64, imm8		V NE
+REX.W + 0F AC /r ib u	SHRD r/m64, r64, imm8		V NE
+
 # SSE scalar: float in the low lane of an XMM register
 F3 0F 58 /r		ADDSS xmm, xmm/m32		V V
 F2 0F 58 /r		ADDSD xmm, xmm/m64		V V

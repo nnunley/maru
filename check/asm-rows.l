@@ -43,8 +43,12 @@
     (USHR (V 0 4S) (V 1 4S) 0)))	; right shifts are 1..esize
 
 (define x86-refused
-  '((INT -5)			; INT's vector is unsigned
-    (ADD EAX R8D)))		; no R8D in 32-bit mode
+  '((INT -5)			; INT's vector is unsigned (the spike encoded it as 251)
+    (RET -1000)			; so is RET's byte count (the spike: 64536)
+    (ADD EAX R8D)		; no R8D in 32-bit mode
+    (ADD RAX 1)			; nor 64-bit registers
+    (ADD (m32 0 RIP () 1) 5)	; nor RIP-relative addressing
+    (VADDPS YMM9 YMM1 YMM2)))	; nor YMM8-YMM15
 (define x64-refused
   '((MOV AH R8B)		; AH cannot be encoded with a REX prefix
     (MOV AH SIL)		; nor beside SIL, which needs one
