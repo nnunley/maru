@@ -3,7 +3,7 @@ title: "Messaging describes itself when method lookup on a cache miss is itself 
 source: "../sources/piumarta-2005-colas-white-paper.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-selector-flush-keeps-a-global-method-cache-correct, ground-as-little-of-the-evaluator-as-possible, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, nil-and-small-integers-are-objects-without-bodies, the-meaning-of-immediates-is-installed-by-user-code, type-indexed-tables-make-every-composition-replaceable]
+links: [a-selector-flush-keeps-a-global-method-cache-correct, delegation-costs-nothing-for-objects-that-do-not-use-it, ground-as-little-of-the-evaluator-as-possible, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, nil-and-small-integers-are-objects-without-bodies, the-meaning-of-immediates-is-installed-by-user-code, type-indexed-tables-make-every-composition-replaceable]
 ---
 
 # Messaging describes itself when method lookup on a cache miss is itself a message send

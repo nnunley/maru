@@ -3,7 +3,7 @@ title: "STEPS budgeted 20,000 lines of meaning code for all of personal computin
 source: "../sources/steps-2006-nsf-proposal.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-line-count-needs-a-stated-boundary, a-self-describing-system-must-count-its-own-bottom]
+links: [a-line-count-needs-a-stated-boundary, a-self-describing-system-must-count-its-own-bottom, inlining-integer-arithmetic-gives-up-redefining-it]
 ---
 
 # STEPS budgeted 20,000 lines of meaning code for all of personal computing, and later counted optimisation too

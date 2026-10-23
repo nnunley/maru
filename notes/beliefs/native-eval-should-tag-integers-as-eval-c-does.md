@@ -5,7 +5,7 @@ status: live
 created: 2026-10-23
 last_reviewed: 2026-10-23
 falsifier: "Tagging makes the native GC, the FFI boundary or the bootstrap fixpoint harder than boxing (e.g. raw words in eval.l can't be told from tagged ints), or a measured boxed native evaluator already meets the check time limits with no allocation pressure"
-links: [nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
+links: [low-bit-integer-tags-rely-on-aligned-object-pointers, nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
 schema_version: 1
 ---
 
@@ -16,3 +16,5 @@ Every system in this lineage that runs at speed tags small integers with bit 0 a
 # Revision log
 ## 2026-10-23 — created
 From reading idst-20070918, the COLA white paper and Maru 2.4 against this tree, 2026-10-23
+## 2026-10-23 — reviewed (no change)
+Strengthened by Piumarta 1992 (thesis p. 55): the low-bit 2n+1 encoding predates COLA by 15 years and came from the Blue Book; every implementation in the lineage uses it.

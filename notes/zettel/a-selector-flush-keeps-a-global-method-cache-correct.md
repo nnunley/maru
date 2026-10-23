@@ -3,7 +3,7 @@ title: "A global method cache stays correct if every method change flushes all e
 source: "../sources/piumarta-2007-idst-source.md"
 created: 2026-10-23
 schema_version: 1
-links: [maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, the-cost-of-meaning-by-indirection-is-recovered-by-staging]
+links: [delegation-costs-nothing-for-objects-that-do-not-use-it, inline-caches-are-harder-to-invalidate-than-a-method-cache, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, the-cost-of-meaning-by-indirection-is-recovered-by-staging]
 ---
 
 # A global method cache stays correct if every method change flushes all entries for that selector

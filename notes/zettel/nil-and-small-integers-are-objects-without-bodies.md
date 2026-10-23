@@ -3,7 +3,7 @@ title: "Nil and small integers are objects without bodies, found by a three-way 
 source: "../sources/piumarta-2007-idst-source.md"
 created: 2026-10-23
 schema_version: 1
-links: [a-header-word-before-the-body-lets-foreign-structs-be-objects, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, native-eval-should-tag-integers-as-eval-c-does, the-meaning-of-immediates-is-installed-by-user-code, word-size-baked-into-tag-tests-blocks-ports]
+links: [a-header-word-before-the-body-lets-foreign-structs-be-objects, inlining-integer-arithmetic-gives-up-redefining-it, low-bit-integer-tags-rely-on-aligned-object-pointers, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, native-eval-should-tag-integers-as-eval-c-does, the-meaning-of-immediates-is-installed-by-user-code, word-size-baked-into-tag-tests-blocks-ports]
 ---
 
 # Nil and small integers are objects without bodies, found by a three-way test on the pointer

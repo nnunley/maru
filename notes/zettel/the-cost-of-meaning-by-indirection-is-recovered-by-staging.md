@@ -3,7 +3,7 @@ title: "The cost of attaching meaning through data is recovered by compiling the
 source: "../sources/piumarta-2011-open-extensible-composition-models.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-selector-flush-keeps-a-global-method-cache-correct, assembler-coverage-should-cost-rows-not-code, type-indexed-tables-make-every-composition-replaceable]
+links: [a-selector-flush-keeps-a-global-method-cache-correct, assembler-coverage-should-cost-rows-not-code, dynamic-binding-dominates-sends-even-with-a-perfect-method-cache, inlining-integer-arithmetic-gives-up-redefining-it, type-indexed-tables-make-every-composition-replaceable]
 ---
 
 # The cost of attaching meaning through data is recovered by compiling the dispatch ahead of use

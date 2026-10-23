@@ -3,7 +3,7 @@ title: "Tag tests, slot offsets and arithmetic written for one word size block e
 source: "../sources/piumarta-2007-idst-source.md"
 created: 2026-10-23
 schema_version: 1
-links: [a-header-word-before-the-body-lets-foreign-structs-be-objects, in-memory-code-generation-needs-instruction-words-built-from-fields, native-eval-should-tag-integers-as-eval-c-does, nil-and-small-integers-are-objects-without-bodies]
+links: [a-header-word-before-the-body-lets-foreign-structs-be-objects, in-memory-code-generation-needs-instruction-words-built-from-fields, low-bit-integer-tags-rely-on-aligned-object-pointers, native-eval-should-tag-integers-as-eval-c-does, nil-and-small-integers-are-objects-without-bodies]
 ---
 
 # Tag tests, slot offsets and arithmetic written for one word size block every port to another
