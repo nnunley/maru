@@ -25,7 +25,10 @@ endif
 # A recipe that fails leaves no half-written target behind.
 .DELETE_ON_ERROR :
 
-all : eval2 eval eval32 osdefs.k
+# eval32 only where the host can link 32-bit code (not macOS since 10.15).
+EVAL32 = $(shell echo 'int main(){return 0;}' | $(CC32) -x c - -o /dev/null 2>/dev/null && echo eval32)
+
+all : eval2 eval $(EVAL32) osdefs.k
 
 run : all
 	rlwrap ./eval

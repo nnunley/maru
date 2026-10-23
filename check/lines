@@ -33,3 +33,4 @@
 +12 check.l fails a run that names a check that does not exist (it printed "all checks passed" with nothing run); the unmatched case tests the name matching
 -36 Makefile: every rule that runs eval depends on it (no recursive make), a failed recipe leaves no target (.DELETE_ON_ERROR, no .new files or dated backups), the osdefs measuring program is an intermediate make deletes, rules for missing inputs (codegen5.l, test-eval.l, boot-emit.l, irgol.k, cpp.g) removed, and clean removes everything the rules make
 -12 system.osdefs.c no longer checked in (it was derived, so uncounted): eval, which builds osdefs.k's generator, never needed osdefs.k, so there was nothing to bootstrap; the osdefs_bootstrap check (-10) and its Makefile comments (-2) go with it
++3 Makefile: plain make builds on macOS, where -m32 can't link; all builds eval32 only where a probe links it, as CROSS probes for Rosetta

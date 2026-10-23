@@ -18,7 +18,7 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
 ## Build
 
-    make eval eval2 osdefs.k    # not plain `make`: it builds eval32 with -m32
+    make    # eval, eval2, osdefs.k, and eval32 where -m32 links (not macOS)
 
 On arm64 macOS with Rosetta, `make check` also builds `bin/x86_64/eval` and
 `bin/x86_64/eval2` (`-arch x86_64`) to run x86-64 code in-process.
