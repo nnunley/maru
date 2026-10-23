@@ -1,4 +1,3 @@
-NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
@@ -22,6 +21,9 @@ SOCFLAGS = -shared -msse -msse2
 endif
 
 .SUFFIXES :
+
+# A recipe that fails leaves no half-written target behind.
+.DELETE_ON_ERROR :
 
 all : eval2 eval eval32 osdefs.k
 
@@ -81,39 +83,24 @@ profile : .force
 osdefs.k : system.osdefs.k
 	cp $< $@
 
-cg : eval .force
-	./eval codegen5.l | tee test.s
-	as test.s
-	ld  --build-id --eh-frame-hdr -m elf_i386 --hash-style=both -dynamic-linker /lib/ld-linux.so.2 -o test /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crt1.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crti.o /usr/lib/gcc/i486-linux-gnu/4.4.5/crtbegin.o -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../.. a.out -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/i486-linux-gnu/4.4.5/crtend.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crtn.o
-	./test
-
 test : emit.l eval.l eval
 	$(TIME) ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
 
-time : .force
+time : eval .force
 	$(TIME) ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test2 : test .force
 	$(TIME) ./test -O boot.l emit.l eval.l > test2.s
 	diff test.s test2.s
 
-time2 : .force
+time2 : test .force
 	$(TIME) ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
-
-test-eval : test .force
-	$(TIME) ./test test-eval.l
-
-test-boot : test .force
-	$(TIME) ./test boot-emit.l
 
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
 
 peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
-	-rm peg.l.new
-	./eval parser.l peg-compile.l peg-boot.l > peg.l.new
-	-mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
-	mv peg.l.new peg.l
+	./eval parser.l peg-compile.l peg-boot.l > $@
 
 test-repl : eval peg.l .force
 	./eval repl.l test-repl.l
@@ -123,32 +110,26 @@ test-peg : eval peg.l .force
 	$(TIME) ./eval parser.l peg.n test-peg.l > peg.m
 	diff peg.n peg.m
 
-test-compile-grammar :
+test-compile-grammar : eval .force
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
-test-compile-irgol : eval32 irgol.g.l .force
+test-compile-irgol : eval eval32 irgol.g.l .force
 	./eval compile-irgol.l test.irgol > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
-irgol.g.l : tpeg.l irgol.g
+irgol.g.l : tpeg.l irgol.g | eval
 	./eval compile-tpeg.l irgol.g > irgol.g.l
 
-test-irgol : eval .force
-	./eval irgol.k |tee test.c
-	$(CC32) -fno-builtin -g -o test test.c
-	@echo
-	./test
-
-test-compile-irl : eval32 irl.g.l .force
+test-compile-irl : eval eval32 irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
 	./test
 
-irl.g.l : tpeg.l irl.g
+irl.g.l : tpeg.l irl.g | eval
 	./eval compile-tpeg.l irl.g > irl.g.l
 
 test-ir : eval .force
@@ -158,14 +139,10 @@ test-ir : eval .force
 	./test
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval
-	$(TIME) ./eval compile-peg.l  tpeg.g > tpeg.l.new
-	-test -f tpeg.l && cp tpeg.l tpeg.l.$(NOW)
-	mv tpeg.l.new tpeg.l
-	$(TIME) ./eval compile-tpeg.l tpeg.g > tpeg.ll
-	sort tpeg.l > tpeg.ls
-	sort tpeg.ll > tpeg.lls
-	diff tpeg.ls tpeg.lls
-	rm tpeg.ls tpeg.ll tpeg.lls
+	$(TIME) ./eval compile-peg.l  tpeg.g > $@
+	$(TIME) ./eval compile-tpeg.l tpeg.g | sort > tpeg.lls
+	sort tpeg.l | diff - tpeg.lls
+	rm tpeg.lls
 
 test-mach-o : eval32 asm-x86.k .force
 	./eval32 test-mach-o.l
@@ -186,7 +163,7 @@ test-elf : eval32 asm-x86.k .force
 test-assembler : eval32 asm-x86.k .force
 	./eval32 assembler.k
 
-test-recursion2 :
+test-recursion2 : eval .force
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
 	./eval compile-recursion2.l test-recursion2.txt
 
@@ -200,44 +177,30 @@ test-main2 : eval32 .force
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
 
-cpp.g.l : cpp.g tpeg.l
-	./eval compile-tpeg.l $< > $@.new
-	mv $@.new $@
-
-test-cpp : eval cpp.g.l .force
-	./eval compile-cpp.l cpp-small-test.c
-
 asm-x86.k : gen-asm-x86.k asm-common.k | eval
-	./eval repl.l gen-asm-x86.k > $@.new
-	mv $@.new $@
+	./eval repl.l gen-asm-x86.k > $@
 
 x86.g.l : x86.g tpeg.l | eval
-	./eval compile-tpeg.l $< > $@.new
-	mv $@.new $@
+	./eval compile-tpeg.l $< > $@
 
 arm64.g.l : arm64.g tpeg.l | eval
-	./eval compile-tpeg.l $< > $@.new
-	mv $@.new $@
+	./eval compile-tpeg.l $< > $@
 
 osdefs.g.l : osdefs.g tpeg.l | eval
-	./eval compile-tpeg.l $< > $@.new
-	mv $@.new $@
+	./eval compile-tpeg.l $< > $@
 
 # Each X.osdefs lists what to measure about a platform, and X.osdefs.c is the
 # C program, generated from it, that measures it.  system.osdefs.c is checked in
-# so a fresh checkout needs only a C compiler.  It is regenerated whenever
-# system.osdefs, the osdefs grammar or its compiler changes; commit the result.
-# The grammar tools are built only when a .c actually needs regenerating.
-%.osdefs.c : %.osdefs osdefs.g compile-osdefs.l
-	$(MAKE) osdefs.g.l
-	./eval compile-osdefs.l $< > $@.new
-	mv $@.new $@
+# and regenerated whenever system.osdefs, the osdefs grammar or its compiler
+# changes; commit the result.  X.osdefs.exe is intermediate: make deletes it.
+%.osdefs.c : %.osdefs osdefs.g compile-osdefs.l | eval osdefs.g.l
+	./eval compile-osdefs.l $< > $@
 
-%.osdefs.k : %.osdefs.c
-	$(CC) -o $<.exe $<
-	./$<.exe > $@.new
-	mv $@.new $@
-	rm -f $<.exe
+%.osdefs.exe : %.osdefs.c
+	$(CC) -o $@ $<
+
+%.osdefs.k : %.osdefs.exe
+	./$< > $@
 
 OSDEFS = $(wildcard *.osdefs) $(wildcard net/*.osdefs)
 OSKEFS = $(OSDEFS:.osdefs=.osdefs.k)
@@ -264,12 +227,13 @@ stats : .force
 	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
+# Everything any rule here makes, except the checked-in peg.l, system.osdefs.c
+# and net/*.osdefs.k.
 clean : .force
-	rm -f irl.g.l irgol.g.l osdefs.k asm-x86.k test.c tpeg.l a.out
-	rm -f *~ *.o eval eval32 eval2 gceval test *.s *.exe *.$(SO)
-	rm -f test-main test-pegen
-	rm -rf *.dSYM *.mshark
-	rm -rf osdefs.g.l *.osdefs.k
+	rm -f eval eval2 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
+	rm -f *.exe net/*.exe net/*.osdefs.c test test.c *.o *.s a.out peg.n peg.m
+	rm -f maru-check test-main test-pegen *.$(SO) *~
+	rm -rf bin *.dSYM *.mshark
 
 #----------------------------------------------------------------
 
