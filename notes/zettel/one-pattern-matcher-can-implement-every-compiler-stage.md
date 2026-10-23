@@ -3,7 +3,7 @@ title: "One pattern matcher over one representation can implement every compiler
 source: "../sources/piumarta-2010-peg-based-transformer.md"
 created: 2026-10-14
 schema_version: 1
-links: [back-ends-are-the-line-budget-lever, compiler-size-concentrates-in-code-generation-not-parsing, in-memory-code-generation-needs-instruction-words-built-from-fields]
+links: [an-object-is-an-interpreter-of-the-messages-sent-to-it, back-ends-are-the-line-budget-lever, compiler-size-concentrates-in-code-generation-not-parsing, in-memory-code-generation-needs-instruction-words-built-from-fields]
 ---
 
 # One pattern matcher over one representation can implement every compiler stage

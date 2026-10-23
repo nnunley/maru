@@ -3,7 +3,7 @@ title: "Putting the header one word before the body lets a foreign struct become
 source: "../sources/piumarta-2005-colas-white-paper.md"
 created: 2026-10-23
 schema_version: 1
-links: [nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
+links: [a-host-vm-takes-away-control-of-lookup-and-layout, a-one-word-object-header-is-reachable-by-two-routes, nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
 ---
 
 # Putting the header one word before the body lets a foreign struct become an object without moving it

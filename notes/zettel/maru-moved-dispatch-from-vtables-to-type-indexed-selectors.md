@@ -3,7 +3,7 @@ title: "Maru replaced Pepsi's per-object vtable with a type index in the header 
 source: "../sources/piumarta-2007-idst-source.md"
 created: 2026-10-23
 schema_version: 1
-links: [a-selector-flush-keeps-a-global-method-cache-correct, delegation-costs-nothing-for-objects-that-do-not-use-it, dynamic-binding-dominates-sends-even-with-a-perfect-method-cache, messaging-is-self-describing-when-lookup-is-a-message, nil-and-small-integers-are-objects-without-bodies, type-indexed-tables-make-every-composition-replaceable]
+links: [a-one-word-object-header-is-reachable-by-two-routes, a-selector-flush-keeps-a-global-method-cache-correct, an-object-is-an-interpreter-of-the-messages-sent-to-it, delegation-costs-nothing-for-objects-that-do-not-use-it, dynamic-binding-dominates-sends-even-with-a-perfect-method-cache, messaging-is-self-describing-when-lookup-is-a-message, nil-and-small-integers-are-objects-without-bodies, type-indexed-tables-make-every-composition-replaceable]
 ---
 
 # Maru replaced Pepsi's per-object vtable with a type index in the header and per-selector method arrays

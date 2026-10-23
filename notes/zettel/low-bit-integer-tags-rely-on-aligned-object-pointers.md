@@ -3,7 +3,7 @@ title: "A low-bit integer tag works because real object pointers are aligned, an
 source: "../sources/piumarta-1992-delayed-code-generation-thesis.md"
 created: 2026-10-23
 schema_version: 1
-links: [inlining-integer-arithmetic-gives-up-redefining-it, native-eval-should-tag-integers-as-eval-c-does, nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
+links: [an-object-table-buys-become-and-enumeration-not-speed, inlining-integer-arithmetic-gives-up-redefining-it, native-eval-should-tag-integers-as-eval-c-does, nil-and-small-integers-are-objects-without-bodies, word-size-baked-into-tag-tests-blocks-ports]
 ---
 
 # A low-bit integer tag works because real object pointers are aligned, and it beats a high-bit tag on sign extension

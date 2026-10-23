@@ -3,7 +3,7 @@ title: "Delegation consulted only after a failed lookup costs nothing for object
 source: "../sources/piumarta-2007-lieberman-prototypes-memo.md"
 created: 2026-10-23
 schema_version: 1
-links: [a-selector-flush-keeps-a-global-method-cache-correct, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message]
+links: [a-selector-flush-keeps-a-global-method-cache-correct, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, object-identity-can-stay-fixed-while-state-varies-by-context]
 ---
 
 # Delegation consulted only after a failed lookup costs nothing for objects that never delegate

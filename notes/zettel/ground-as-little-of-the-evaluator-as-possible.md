@@ -3,7 +3,7 @@ title: "Ground as little of a self-describing evaluator as possible, because gro
 source: "../sources/piumarta-2011-open-extensible-composition-models.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-compiler-is-the-level-shift-that-grounds-a-metacircular-evaluator, messaging-is-self-describing-when-lookup-is-a-message, the-meaning-of-immediates-is-installed-by-user-code, type-indexed-tables-make-every-composition-replaceable]
+links: [a-compiler-is-the-level-shift-that-grounds-a-metacircular-evaluator, a-host-vm-takes-away-control-of-lookup-and-layout, messaging-is-self-describing-when-lookup-is-a-message, the-meaning-of-immediates-is-installed-by-user-code, type-indexed-tables-make-every-composition-replaceable]
 ---
 
 # Ground as little of a self-describing evaluator as possible, because grounded parts stop being modifiable
