@@ -3,7 +3,7 @@ title: "A self-describing system must count its own substrate, not just what it 
 source: "../sources/steps-2011-report.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-line-count-needs-a-stated-boundary, self-hosting-is-shown-only-by-byte-identical-regeneration, steps-budgeted-20k-lines-of-meaning-code]
+links: [a-line-count-needs-a-stated-boundary, self-hosting-is-shown-only-by-byte-identical-regeneration, steps-budgeted-20k-lines-of-meaning-code, the-meaning-of-immediates-is-installed-by-user-code]
 ---
 
 # A self-describing system must count its own substrate, not just what it adds

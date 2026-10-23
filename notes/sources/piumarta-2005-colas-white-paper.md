@@ -188,3 +188,5 @@ several CPUs, on a C++ object system), a C99 header parser (written, not integra
 - [[self-hosting-is-shown-only-by-byte-identical-regeneration]]: self-hosting is demonstrated only by byte-identical regeneration from the seed
 - [[in-memory-code-generation-needs-instruction-words-built-from-fields]]: JIT needs bit-field instruction construction plus back-patching
 - [[ground-as-little-of-the-evaluator-as-possible]]: the grounded (C) part should freeze as few assumptions as possible
+- [[a-header-word-before-the-body-lets-foreign-structs-be-objects]]: the vtable word sits before the body so foreign structs keep their identity (§4.3, Fig. 7)
+- [[the-meaning-of-immediates-is-installed-by-user-code]]: the nil and tagged-integer vtables are initialised by user code at startup (§4.2)

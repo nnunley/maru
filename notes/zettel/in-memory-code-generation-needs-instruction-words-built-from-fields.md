@@ -3,7 +3,7 @@ title: "In-memory code generation needs instruction words built from fields, plu
 source: "../sources/piumarta-2010-peg-based-transformer.md"
 created: 2026-10-14
 schema_version: 1
-links: [a-compiler-is-the-level-shift-that-grounds-a-metacircular-evaluator, assembler-coverage-should-cost-rows-not-code, one-pattern-matcher-can-implement-every-compiler-stage]
+links: [a-compiler-is-the-level-shift-that-grounds-a-metacircular-evaluator, assembler-coverage-should-cost-rows-not-code, one-pattern-matcher-can-implement-every-compiler-stage, word-size-baked-into-tag-tests-blocks-ports]
 ---
 
 # In-memory code generation needs instruction words built from fields, plus label back-patching

@@ -3,7 +3,7 @@ title: "Attaching meaning through type-indexed evaluator and applicator tables m
 source: "../sources/piumarta-2011-open-extensible-composition-models.md"
 created: 2026-10-14
 schema_version: 1
-links: [ground-as-little-of-the-evaluator-as-possible, messaging-is-self-describing-when-lookup-is-a-message, the-cost-of-meaning-by-indirection-is-recovered-by-staging]
+links: [ground-as-little-of-the-evaluator-as-possible, maru-moved-dispatch-from-vtables-to-type-indexed-selectors, messaging-is-self-describing-when-lookup-is-a-message, the-cost-of-meaning-by-indirection-is-recovered-by-staging]
 ---
 
 # Attaching meaning through type-indexed evaluator and applicator tables makes every composition replaceable
