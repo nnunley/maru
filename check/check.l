@@ -85,16 +85,6 @@
 
 ;;; ---------------------------------------------------------------- osdefs
 
-;; system.osdefs.c is the checked-in bootstrap: it must be current, and
-;; compiling it alone must reproduce osdefs.k.
-(check "osdefs_bootstrap"
-  (run "grammar" "make -s osdefs.g.l")
-  (run "regen" "./eval compile-osdefs.l system.osdefs")
-  (unit-assert (equal (contents-of-file-named (concat-strings tmp "/regen.out")) (contents-of-file-named "system.osdefs.c")))
-  (run "osdefs-cc" (concat-strings "cc -o " tmp "/osdefs system.osdefs.c"))
-  (run "osdefs-run" (concat-strings tmp "/osdefs"))
-  (unit-assert (equal (contents-of-file-named (concat-strings tmp "/osdefs-run.out")) (contents-of-file-named "osdefs.k"))))
-
 ;; Every "integer X?" probe in system.osdefs is defined in osdefs.k exactly
 ;; when the compiler predefines X, and the host architecture is probed.
 (check "osdefs"

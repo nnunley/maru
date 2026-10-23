@@ -8,7 +8,7 @@ gceval
 *.mshark
 osdefs.k
 /system.osdefs.k
-/net/*.osdefs.c
+*.osdefs.c
 *.exe
 *.g.l
 /tpeg.l

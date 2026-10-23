@@ -190,9 +190,8 @@ osdefs.g.l : osdefs.g tpeg.l | eval
 	./eval compile-tpeg.l $< > $@
 
 # Each X.osdefs lists what to measure about a platform, and X.osdefs.c is the
-# C program, generated from it, that measures it.  system.osdefs.c is checked in
-# and regenerated whenever system.osdefs, the osdefs grammar or its compiler
-# changes; commit the result.  X.osdefs.exe is intermediate: make deletes it.
+# C program, generated from it, that measures it.  Both it and X.osdefs.exe, the
+# program compiled, are intermediates: make deletes them.
 %.osdefs.c : %.osdefs osdefs.g compile-osdefs.l | eval osdefs.g.l
 	./eval compile-osdefs.l $< > $@
 
@@ -227,11 +226,10 @@ stats : .force
 	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
-# Everything any rule here makes, except the checked-in peg.l, system.osdefs.c
-# and net/*.osdefs.k.
+# Everything any rule here makes, except the checked-in peg.l and net/*.osdefs.k.
 clean : .force
 	rm -f eval eval2 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
-	rm -f *.exe net/*.exe net/*.osdefs.c test test.c *.o *.s a.out peg.n peg.m
+	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c *.o *.s a.out peg.n peg.m
 	rm -f maru-check test-main test-pegen *.$(SO) *~
 	rm -rf bin *.dSYM *.mshark
 

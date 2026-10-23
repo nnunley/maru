@@ -2,6 +2,5 @@
 [attr]derived linguist-generated
 peg.l            derived
 *.osdefs.k       derived
-system.osdefs.c  derived
 arm64.g.l        derived
 x86.g.l          derived
