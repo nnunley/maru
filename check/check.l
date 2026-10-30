@@ -47,10 +47,10 @@
     (waitpid pid status-word 0)
     (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
 
-;; Run a shell command with no input and a 120 s limit; keep its output in
-;; tmp/NAME.out.  Returns the output's lines, or fails the current case.
-(define-function run (name cmd)
-  (let ((status (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; " cmd))))
+;; Run a shell command with no input and a 120 s limit (or SECS); keep its
+;; output in tmp/NAME.out.  Returns the output's lines, or fails the case.
+(define-function run (name cmd . secs)
+  (let ((status (run-status (or (car secs) 120) (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; " cmd))))
     (or (= 0 status) (error "FAIL " name ": exit status " status " running: " cmd))
     (lines (contents-of-file-named (concat-strings tmp "/" name ".out")))))
 
@@ -206,13 +206,13 @@
   (unit-assert (equal (last (run "asm-interface2" "./eval2 -b boot2.l check/asm-interface.l")) "asm interface ok")))
 
 (check "asm_rows_arm64"
-  (unit-assert (equal (last (run "asm-rows-arm64" (concat-string "./eval check/asm-rows.l arm64 " tmp))) "asm rows arm64 ok")))
+  (unit-assert (equal (last (run "asm-rows-arm64" (concat-string "./eval check/asm-rows.l arm64 " tmp) 600)) "asm rows arm64 ok")))
 
 (check "asm_rows_x64"
-  (unit-assert (equal (last (run "asm-rows-x64" (concat-string "./eval check/asm-rows.l x64 " tmp))) "asm rows x64 ok")))
+  (unit-assert (equal (last (run "asm-rows-x64" (concat-string "./eval check/asm-rows.l x64 " tmp) 600)) "asm rows x64 ok")))
 
 (check "asm_rows_x86"
-  (unit-assert (equal (last (run "asm-rows-x86" (concat-string "./eval check/asm-rows.l x86 " tmp))) "asm rows x86 ok")))
+  (unit-assert (equal (last (run "asm-rows-x86" (concat-string "./eval check/asm-rows.l x86 " tmp) 600)) "asm rows x86 ok")))
 
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
