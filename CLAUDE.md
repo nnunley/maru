@@ -47,6 +47,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `pepsi`: the Smalltalk-like language's FFT peaks at bins 2 and 6.
 - `recursion`: left-recursive PEG grammars match as expected and build a
   left-associative tree.
+- `peg_compose` (`check/peg-compose.l`, `check/peg-lr.l`): grammars that
+  call each other's rules keep their memos apart, an inherited rule calls an
+  override, and a left-recursive entry rule grows, in `parser.l` and
+  `text-parser.l`.
 - `repl`: a language defined at the REPL prints a correct multiplication
   table and `nfibs(15)`.
 - `pegen`: a generated PEG matcher stops at the first unmatched character.
@@ -66,6 +70,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   and merges adjacent free chunks.
 - `text_parser`: `text-parser.l` matches a string literal that ends at the
   end of its input.
+- `irl`: `irl.g` (inheriting `cexpr.g`) compiles `test.irl` to C that, where
+  x86_64 code runs, prints what the program should; `irgol.g` still parses
+  `test.irgol`.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
   by name or address, with typed results (`"dd>d"`), variadic calls and raw
   byte access.
