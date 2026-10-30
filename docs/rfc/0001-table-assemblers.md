@@ -1,6 +1,6 @@
-# draft-ndn-table-assemblers-01: Table-Driven Encoders for x86, x86-64 and A64, and an In-Process Code Region
+# RFC 0001: Table-Driven Encoders for x86, x86-64 and A64, and an In-Process Code Region
 
-**Status:** DRAFT
+**Status:** PUBLISHED
 **Category:** Standards-Track
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
