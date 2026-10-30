@@ -1,0 +1,371 @@
+# draft-ndn-maru-forms-as-neutral-tree-00: Maru Forms as the Neutral Tree for Every Front End
+
+**Status:** DRAFT
+**Corpus:** red (spec-first: the cexpr_forms, core_forms and ir_retired checks and irl's move to maru.k do not exist yet)
+**Category:** Standards-Track
+**Authors:** Norman Nunley, Jr <nnunley@gmail.com>
+
+## Abstract
+
+This document specifies the tree that Maru's language front ends produce:
+Maru's own s-expression forms, the same ones a programmer writes in a `.l`
+or `.k` file. A C-level language hands its forms to the typed namespace
+(`maru.k`, compiling to ir2); a dynamic language hands them to untyped
+Maru. It fixes the core forms both namespaces share, the forms only the
+typed namespace has, how a language adds constructs of its own, and how
+`cexpr.g` and irl produce them. It is written for whoever writes or
+changes a front-end grammar.
+
+## Motivation
+
+At the time of writing (October 2026), Maru's front ends each build a
+different tree:
+
+- `irl.g` emits calls to `ir.k`'s constructors (`(ir-add a b)`,
+  `(ir-get 'x)`), an IR that nothing else in the tree uses; `maru.k`
+  compiles to ir2 instead.
+- `irgol.g` targets an older `ir.k` and no longer compiles: its
+  `ir-function-type` calls fail with "too few arguments".
+- `cexpr.g`, shared by irl and irgol since main 0ec9930, builds placeholder
+  nodes (`(name x)`, `(lit 3)`, `(+ a b)`) that no consumer reads; irl
+  overrides every rule that names them.
+- The STEPS languages Maru aims to host each defined a vocabulary of their
+  own: Nothing's `binOp`/`unOp`/`wordAt` nodes, OMeta/JS's
+  `binop`/`get`/`send`, Nile's `opexpr`. Adopting one means writing a
+  translator for every consumer.
+
+Maru already has a neutral tree. `maru.k`'s `maru-compile` (`maru.k`
+lines 74–215) lowers typed Maru's forms to ir2, and untyped Maru evaluates
+the same operator, conditional, loop and binding forms. A grammar that
+produces those forms needs no translator: the namespace that evaluates
+them supplies the meaning. This document makes that the rule, so that
+irl, Nothing and later KScript share one tree, and retires `ir.k`.
+
+## Terminology
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this
+document are to be interpreted as described in BCP 14 (RFC 2119, RFC 8174)
+when, and only when, they appear in all capitals, as shown here.
+
+- **form** — a Maru s-expression as the reader returns it: an atom, a
+  symbol, or a list.
+- **front end** — a grammar and its driver that read a language's source
+  text and produce forms.
+- **typed namespace** — the compilation environment `maru.k` opens with
+  `compile-begin`, whose non-form bindings `compile-namespace` lowers to
+  ir2.
+- **untyped namespace** — the environment `eval` (or `eval2`) evaluates
+  directly.
+- **core form** — a form both namespaces accept with the same shape and
+  the same meaning on integers.
+- **typed form** — a form only the typed namespace accepts.
+- **extension form** — a construct of one language, defined as a
+  `define-form` (or expanded by its front end) into core and typed forms.
+- **handoff** — the point where a front end's forms reach the namespace
+  that compiles or evaluates them.
+
+## Specification
+
+This document defines the forms a front end produces, the core and typed
+forms, the extension rule, the handoff, the forms `cexpr.g` produces, and
+irl's move from `ir.k` to `maru.k`. It does NOT define new ir2
+instructions (owned by `ir2.k`), Nothing's or KScript's own forms (later
+documents), or the surface syntax of any language beyond the mapping
+tables below.
+
+**One vocabulary.** A front end's output is a list of forms in Maru's
+existing vocabulary. A front end that invents a node head no namespace
+defines violates this document.
+
+**Meaning comes from the namespace.** The same form means a machine
+operation in the typed namespace and an object operation in the untyped
+one. A front end chooses a namespace; it does not encode meaning in the
+tree.
+
+### Data model
+
+```
+ENUM Namespace:
+    TYPED       -- maru.k's compilation environment; lowers to ir2
+    UNTYPED     -- eval's environment; evaluates forms directly
+
+RECORD CoreForm:
+    shape       : Form          -- e.g. (+ a b), (if c t e)
+    typed       : Boolean       -- accepted by the typed namespace
+    untyped     : Boolean       -- accepted by the untyped namespace
+```
+
+The core forms, with the namespaces that accept them today:
+
+| Form | Meaning | Typed | Untyped |
+|---|---|---|---|
+| integer, float or string atom | a literal | yes | yes |
+| symbol | a variable reference | yes | yes |
+| `(op a b)`, op ∈ `+ - * / % << >> & \| ^ < <= = != >= >` | binary operation | yes | yes |
+| `(- a)`, `(~ a)`, `(not a)` | unary operation | yes | yes |
+| `(and a b…)`, `(or a b…)` | short-circuit logic | yes | yes |
+| `(if c t e)` | conditional; a value when used as one | yes | yes |
+| `(while c body…)` | loop | yes | yes |
+| `(let (bindings…) body…)` | local bindings | yes | yes |
+| `(set x v)` | assignment to a variable | yes | yes |
+| `(f args…)` | call, where `f` is no other form's head | yes | yes |
+
+The typed forms are the other forms `maru.k` accepts: the definitions
+`define`, `define-function`, `define-struct` and `define-type`, which
+`compile-namespace` and `maru.k`'s own forms handle; and `extern`,
+`return`, `indir`, `set-indir`, `member`, `set-member`, `addressof`,
+`cast` and `sizeof`, which `maru-compile-form-map` and
+`maru->ir-unary-map` name (`maru.k` lines 178–192). Declarations are
+written `(name type…)` in the postfix type notation `maru-check.k`
+documents; a `let` binding written without a type takes its
+initialiser's.
+
+**Field constraints:** equality is `=`, never `==`; logical negation is
+`not` (the typed namespace also accepts `!`, the untyped one does not);
+`(if c t e)` used as a value requires `t` and `e` of one type or
+coercible, as ir2's `ir-check-type` enforces.
+
+### Behavior
+
+A front end MUST produce only core forms, typed forms, and extension
+forms that expand into them. [R-front-end-forms] A node head outside these
+sets reaches `maru-compile` as a call to an undefined function, or reaches
+untyped Maru as an undefined variable, far from the grammar rule that made
+it.
+
+```maru-check @R-front-end-forms
+cexpr_forms
+irl
+```
+
+The core forms MUST mean the same in both namespaces on integer operands:
+one core form, evaluated untyped and compiled typed, yields the same
+value. [R-core-forms] This is what lets one grammar serve both kinds of
+language.
+
+```maru-check @R-core-forms
+core_forms
+```
+
+A language construct that is not a core or typed form MUST be defined as
+an extension form: a `define-form` in the target namespace, or an
+expansion the front end performs, that produces only core, typed and
+other extension forms. [R-extension-forms] irl's `for`, `where`,
+`finally`, `true`, `false` and struct literals are extension forms of this
+kind; `test.irl` uses all but `finally`.
+
+```maru-check @R-extension-forms
+irl
+ir_retired
+```
+
+The handoff interface is the forms printed as a source file: a typed front
+end's output, written to a `.k` file, MUST compile with
+`./eval2 ir-gen-c.k maru.k FILE`. [R-handoff-file] A front end MAY instead
+hand its forms to the namespace in-process; when it does, the forms MUST
+be the ones it would print. The printed file is what a check compares and
+what a person reads when a front end misbehaves.
+
+```maru-check @R-handoff-file
+irl
+ir_retired
+```
+
+`cexpr.g`'s default rules MUST produce core forms, by the mapping in the
+table below, with C's precedence and associativity. [R-cexpr-forms]
+
+<!-- evidence: @R-cexpr-forms -->
+| Source (cexpr.g) | Form |
+|---|---|
+| `x` | `x` |
+| `42` | `42` |
+| `"hi"` | `"hi"` |
+| `a * b / c` | `(/ (* a b) c)` |
+| `a + b * c` | `(+ a (* b c))` |
+| `a << 1 + b` | `(<< a (+ 1 b))` |
+| `a < b == c < d` | `(= (< a b) (< c d))` |
+| `a & b \| c ^ d` | `(\| (& a b) (^ c d))` |
+| `a && b \|\| c` | `(or (and a b) c)` |
+| `-a + ~b` | `(+ (- a) (~ b))` |
+| `!a` | `(not a)` |
+| `c ? a : b` | `(if c a b)` |
+| `f(a, b)` | `(f a b)` |
+
+The precedence, loosest first: `?:`; `||`; `&&`; `|`; `^`; `&`; `==` `!=`;
+`<` `<=` `>` `>=`; `<<` `>>`; `+` `-`; `*` `/` `%`; prefix `-` `~` `!`;
+postfix call. Binary operators associate left; `?:` associates right.
+
+```maru-check @R-cexpr-forms
+cexpr_forms
+```
+
+irl's front end MUST produce typed forms, which `maru.k` compiles: its
+grammar has no `ir-*` action, and `compile-irl.l` prints a `.k` program
+for the handoff. [R-irl-via-maru] Beyond `cexpr.g`'s mapping, irl maps:
+
+| irl | Form |
+|---|---|
+| `x := v` | `(set x v)` |
+| `a[i]` | `(indir a i)` |
+| `a[i] := v` | `(set-indir a i v)` |
+| `*p` | `(indir p)` |
+| `*p := v` | `(set-indir p v)` |
+| `&x` | `(addressof x)` |
+| `s.f` | `(member s f)` |
+| `s.f := v` | `(set-member s f v)` |
+| `return e;` | `(return e)` |
+| `import T name;` | `(define (name T) (extern name))` |
+| `T name := e;` | `(define (name T) e)` |
+| `T name(params) stmt` | `(define-function name T ((p T)…) stmt)` |
+| `int`, `char`, `void`, … , `struct T` | the same name, `struct T` |
+| `T*` | `T *` |
+| `T(A, B)` | `(T A B)` |
+| `T(A, ...)` | `(T A ...)` |
+| `T()` | `(T ...)`, which `ir-gen-c.k` emits unprototyped |
+| `struct T { int x, y; };` | `(define-struct T ((x int) (y int)))` |
+| `struct T(a, b)` | `(let ((t struct T)) (set-member t x a) (set-member t y b) t)`, fields in declaration order |
+| top-level statements | the body of `(define-function main int () … (return 0))` |
+
+irl's type syntax MUST accept `...` as the last parameter type, and
+`test.irl` MUST declare `printf` as `int(char*, ...)`. A function type
+with no parameters, `T()`, becomes `(T ...)`, which `ir-gen-c.k` emits as
+an unprototyped pointer; on arm64 a variadic call through one passes its
+arguments wrongly, which is why `test.irl` prints garbage there today.
+`test.irl`'s program, compiled this way, MUST print what it printed
+through `ir.k` under x86_64: the lines the `irl` check lists, on every
+host.
+
+```maru-check @R-irl-via-maru
+irl
+ir_retired
+```
+
+`ir.k`, `irgol.g`, `compile-irgol.l`, `test.irgol` and `test-ir.k` MUST
+be removed; the files that remain MUST NOT require `ir.k`, and `irl.g`
+and `compile-irl.l` MUST NOT contain `ir-`. [R-ir-retired] The `irl`
+check passes through `ir.k` today, so it shows the move only together
+with this one. Two
+IRs for one language double what a change to the C back end has to keep
+working.
+
+```maru-check @R-ir-retired
+ir_retired
+```
+
+### Errors
+
+| Error | Example | Recovery |
+|---|---|---|
+| unknown head | a grammar emits `(binop + a b)` | the `cexpr_forms` check fails on the printed forms; fix the grammar rule |
+| typed form in the untyped namespace | `(indir p 0)` evaluated by `eval` | undefined-variable error at evaluation; the front end chose the wrong namespace |
+| type mismatch in `(if c t e)` | branches of int and pointer | ir2 reports `ir-error-type-mismatch`; the front end casts one branch |
+| construct with no form | a Nothing `goto` given to `maru.k` | the front end reports the construct as unsupported; a later document adds the typed form |
+
+## Formal Grammar
+
+The printed shape of the core forms. Atoms and symbols are as Maru's
+reader reads them.
+
+```abnf
+core-form   = atom / symbol / binary / unary / logic / conditional / loop / binding / assign / call
+binary      = "(" binop sp form sp form ")"
+binop       = "+" / "-" / "*" / "/" / "%" / "<<" / ">>" / "&" / "|" / "^" / "<" / "<=" / "=" / "!=" / ">=" / ">"
+unary       = "(" unop sp form ")"
+unop        = "-" / "~" / %s"not"
+logic       = "(" ( %s"and" / %s"or" ) 1*( sp form ) ")"
+conditional = "(" %s"if" sp form sp form [ sp form ] ")"
+loop        = "(" %s"while" sp form *( sp form ) ")"
+binding     = "(" %s"let" sp "(" *( binding-pair ) ")" *( sp form ) ")"
+binding-pair = "(" symbol sp form ")"
+assign      = "(" %s"set" sp symbol sp form ")"
+call        = "(" form *( sp form ) ")"
+form        = core-form / typed-form
+typed-form  = "(" symbol *( sp form ) ")"
+atom        = 1*DIGIT / DQUOTE *( %x20-21 / %x23-7E ) DQUOTE
+symbol      = sym-first *( sym-first / DIGIT )
+sym-first   = ALPHA / "-" / "_" / "*" / "<" / ">" / "=" / "!"
+sp          = 1*WSP
+```
+
+## Out of Scope
+
+**Nothing's machine forms.** Labels, `goto`, `wordAt`, `byteAt` and bit
+selection. ir2 has no jump instruction, so `goto` needs one before it can
+be a typed form. Extension point: a later document adding typed forms and
+the ir2 instructions behind them; `wordAt`/`byteAt` map to `indir` with
+`cast` and need none.
+
+**KScript's forms.** Sends, lambdas, stream definitions (`<-`, `fby`,
+`when`). Extension point: extension forms in the untyped namespace, per
+[R-extension-forms].
+
+**Nile's operators.** Nile defines operators by name in the language.
+Extension point: they become calls `(op args…)` to the functions their
+definitions produce.
+
+**In-process handoff.** Running the front ends inside `eval2`. Extension
+point: [R-handoff-file]'s MAY, held to producing the printed forms.
+
+## Alternatives Considered
+
+**Why not tagged nodes in the OMeta/JS style (`binop`, `get`, `send`)?**
+Warth's `BSJSTranslator` and Nothing tag every node. That is a second
+vocabulary beside Maru's, and every consumer (ir2, a Nothing back end,
+KScript) needs a translator grammar from it. Maru's forms already have a
+compiler and an evaluator.
+
+**Why not tagged nodes lowered to Maru forms?** Keeping a syntax-level
+layer (get versus literal, send versus call) above Maru's forms would
+help a consumer that needs those distinctions. None does today; the layer
+can be added for one language when one does.
+
+**Why not keep `ir.k` beside ir2?** irl could lower to both. `ir.k` has no
+other user, and keeping it means every change to the C back end is made
+twice or lets one IR rot, as `irgol.g` shows.
+
+**Why not one namespace for all languages?** Dynamic languages could
+target typed Maru with an object library written in it, as KScript's
+object model sat on a Squeak dictionary. That builds an object system
+before any dynamic language needs one; the untyped namespace is one
+already.
+
+## Security Considerations
+
+The forms are programs: the typed namespace compiles them to C and the
+untyped one evaluates them, with the full authority of the process,
+including `extern` access to any C symbol. A front end's output is
+therefore trusted exactly as its source file is; this document adds no
+input that was not already code. A printed `.k` file is a program and is
+treated as one: compiling an untrusted `.k` file is running untrusted
+code.
+
+## Compatibility
+
+irl's generated C changes completely (ir2's C generator replaces
+`ir.k`'s), so byte comparison with today's output is no longer the test;
+the program's output is. Two behaviors change with C precedence: `==` and
+`!=` move below `<` and `>`, so `a < b == c` parses as `(a < b) == c`; and
+`a < b < c`, which irl's `relation` rejects (it allows one comparison),
+parses as `(a < b) < c`, as in C. `test.irl` uses
+neither. Indexing `a[i]` moves from `ir.k`'s pointer addition to
+`maru.k`'s `indir`; both scale by the element size, and `test.irl`'s
+sieve exercises it. Programs written for `irgol` lose their compiler,
+which already fails. `test.irl` changes in one line, declaring `printf`'s
+parameters, so the `irl` check no longer needs x86_64 to run it.
+
+## References
+
+- BCP 14: RFC 2119, RFC 8174.
+- `maru.k` (`maru-compile`, `maru-compile-form-map`), `maru-check.k`
+  (typed Maru's declaration syntax), `ir2.k`, `cexpr.g`, `irl.g`.
+- A. Warth, `bs-js-compiler.txt` in OMeta/JS (local checkout
+  `~/development/ometa/ometa-js/`): the `BSJSTranslator` node set, the
+  tagged alternative.
+- VPRI, *STEPS Toward Expressive Programming Systems, 2010 Progress
+  Report*, TR-2010-004, Appendix 1: Nothing's grammar in OMeta
+  (`~/pkm/raw/vpri/steps-2010-report.txt`).
+- Y. Ohshima et al., *KScript and KSWorld*, VPRI TR-2012-001, in the 2012
+  STEPS final report (`~/pkm/raw/vpri/steps-2012-final-report.txt`).
+- draft-ndn-table-assemblers-01, draft-ndn-nile-runtime-in-maru-01: the
+  `maru-check` evidence adapter used here.
