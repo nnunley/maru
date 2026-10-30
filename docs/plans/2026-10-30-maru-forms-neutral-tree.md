@@ -8,7 +8,7 @@
 
 **Tech Stack:** Maru (`eval`, `eval2`), tpeg grammars on `text-parser.l`, `maru.k` → ir2 → C, `check/check.l`.
 
-**Spec:** `docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md` (markers `[R-front-end-forms]`, `[R-core-forms]`, `[R-extension-forms]`, `[R-handoff-file]`, `[R-cexpr-forms]`, `[R-irl-via-maru]`, `[R-ir-retired]`, plus `[R-zero-global]` added in Task 1).
+**Spec:** `docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md` (markers `[R-front-end-forms]`, `[R-core-forms]`, `[R-extension-forms]`, `[R-handoff-file]`, `[R-cexpr-forms]`, `[R-irl-via-maru]`, `[R-ir-retired]`, and `[R-zero-global]`).
 
 ## Global Constraints
 
@@ -29,27 +29,20 @@
 
 ---
 
-### Task 1: Amend the RFC to what the probes found
+### Task 1: Amend the RFC to what the probes found — done
 
-**Files:** Modify `docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md`.
-
-Three edits, then `rfc-lint` must exit 0:
-
-- [ ] **Step 1: Truth.** In `[R-core-forms]`, replace "yields the same value" with this: arithmetic and bitwise core forms on integers yield the same integer; comparison forms, `not`, `and` and `or` yield the same truth. Truth is non-`()` untyped and non-zero typed. A condition in `if` or `while` MUST be a comparison or logical form, never a bare integer, because untyped Maru treats `0` as true. Add an Errors row for a bare-integer condition.
-- [ ] **Step 2: Globals.** Under typed forms, add: a top-level `define` initialiser is evaluated by untyped Maru when the namespace is built, so it MUST be a literal, an `(extern name)` or a function. Add `(define (name T))`, which declares a zero-initialised global, marked `[R-zero-global]`, with evidence `ir2`. In the irl table, `T name := e;` with a computed `e` becomes `(define (name T))` plus `(set name e)` at its place in `main`. `import` of a function type `T` becomes `(define (name T *) (extern name))`, and `&name` for an imported function becomes `name`.
-- [ ] **Step 3: Struct literal.** The irl row becomes `(let (((t struct T))) (set-member t f a)… t)`, with the bindings exactly in this form.
-- [ ] **Step 4:** `~/.claude/skills/authoring-rfcs/rfc-lint docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md` exits 0. Commit as `docs(rfc): …`.
+Done before execution began (commit "docs(rfc): document where the namespaces disagree…"): the truth table and the condition rule under `[R-core-forms]`, the rule for global initialisers, `[R-zero-global]` with evidence `zero_global`, and the irl rows for imports, computed initialisers and struct literals.
 
 ### Task 2: Zero-initialised globals in maru.k [R-zero-global]
 
-**Files:** Modify `ir2.k` (`ir-check-type <ir-define>`, lines 618–626) and `ir-gen-c.k` (`ir-gen-initialisation`, around lines 326–345); modify `check/ir2.k`.
+**Files:** Modify `ir2.k` (`ir-check-type <ir-define>`, lines 618–626) and `ir-gen-c.k` (`ir-gen-initialisation`, around lines 326–345); create `check/zero-global.k`; modify `check/check.l` (case `zero_global`, beside `ir2`).
 
 **Interfaces:** Produces the `(define (name T))` typed form, used by Task 5.
 
-- [ ] **Step 1: Failing test.** Append to `check/ir2.k` a global `(define-struct Pair ((a int) (b int)))` and `(define (zero-pair struct Pair))`. In its checks, assert `(= 0 (member zero-pair a))`, then set the member to 5 and assert it reads 5.
-- [ ] **Step 2:** `./eval check/check.l ir2` fails with `statement has no value`.
+- [ ] **Step 1: Failing test.** `check/zero-global.k` defines `(define-struct Pair ((a int) (b int)))`, `(define (zero-pair struct Pair))` and `(define (zero-int int))`. Its `main` prints `zero global ok` only if both start at 0, and if `zero-pair`'s `a` reads 5 after `(set-member zero-pair a 5)`. Case `zero_global` builds it with `ir2-build` and asserts that last line.
+- [ ] **Step 2:** `./eval check/check.l zero_global` fails with `statement has no value`.
 - [ ] **Step 3:** When the initialiser is an `<ir-nop>`, `ir-check-type <ir-define>` declares the global and makes no `<ir-set-var>`, and `ir-gen-initialisation` emits nothing for it. C zero-initialises file-scope objects, so the declaration alone is the zero.
-- [ ] **Step 4:** `./eval check/check.l ir2 maru_check maru_test maru_gc` all PASS.
+- [ ] **Step 4:** `./eval check/check.l zero_global ir2 maru_check maru_test maru_gc` all PASS.
 - [ ] **Step 5:** Add a ledger entry and commit.
 
 ### Task 3: core_forms check [R-core-forms]
