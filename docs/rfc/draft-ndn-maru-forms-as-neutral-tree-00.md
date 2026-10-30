@@ -1,7 +1,7 @@
 # draft-ndn-maru-forms-as-neutral-tree-00: Maru Forms as the Neutral Tree for Every Front End
 
 **Status:** DRAFT
-**Corpus:** red (spec-first: the cexpr_forms, core_forms and ir_retired checks and irl's move to maru.k do not exist yet)
+**Corpus:** red (spec-first: the cexpr_forms, core_forms, zero_global and ir_retired checks and irl's move to maru.k do not exist yet)
 **Category:** Standards-Track
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
@@ -121,10 +121,51 @@ written `(name type…)` in the postfix type notation `maru-check.k`
 documents; a `let` binding written without a type takes its
 initialiser's.
 
+A top-level `define`'s initialiser is evaluated by untyped Maru while
+the namespace is built, before anything is compiled, so it can only be a
+literal, an `(extern name)` or a function; any other expression fails
+there as an undefined variable. A typed program sets a global from a
+computed value at run time, with `set`. `(define (name T))`, with no
+initialiser, declares a global of any type `T`, struct types included,
+whose value starts as zero, as a C file-scope object does.
+
 **Field constraints:** equality is `=`, never `==`; logical negation is
 `not` (the typed namespace also accepts `!`, the untyped one does not);
 `(if c t e)` used as a value requires `t` and `e` of one type or
 coercible, as ir2's `ir-check-type` enforces.
+
+**Truth differs between the namespaces.** Untyped Maru has one false
+value, `nil` (`()`): `if`, `and`, `or`, `while` and `not` test against it
+(`eval.c` lines 1543–1574, 1619 and 2629), so `0`, an ordinary boxed
+integer, is true. Comparisons there answer the symbol `t` or `nil`, and
+`and` and `or` answer the deciding operand. The typed namespace compiles
+to C, where `0` is false and comparisons answer `1` or `0`. So
+`(if 0 1 2)` is `1` untyped and `2` typed, and `(and 1 2)` is `2` untyped
+and `1` typed. Both namespaces agree on the truth of comparison and
+logical forms over integers, and that is all this document relies on.
+Each namespace MUST evaluate the forms below as the table states; a row
+is checked by printing the form with `println` under `eval` and with
+`printf "%d"` from a program `maru.k` compiles (`-` means the form is not
+typed). [R-truth-semantics] A change to either namespace's truth is a
+change to this document.
+
+<!-- evidence: @R-truth-semantics template=truth-row -->
+| Form | Untyped | Typed |
+|---|---|---|
+| `(< 1 2)` | `t` | `1` |
+| `(< 2 1)` | `()` | `0` |
+| `(if 0 1 2)` | `1` | `2` |
+| `(if (< 2 1) 1 2)` | `2` | `2` |
+| `(not 0)` | `()` | `1` |
+| `(not (< 2 1))` | `t` | `1` |
+| `(and 1 2)` | `2` | `1` |
+| `(or () 3)` | `3` | `-` |
+
+```maru-truth id=truth-row
+{{Form}}
+untyped {{Untyped}}
+typed {{Typed}}
+```
 
 ### Behavior
 
@@ -139,9 +180,14 @@ cexpr_forms
 irl
 ```
 
-The core forms MUST mean the same in both namespaces on integer operands:
-one core form, evaluated untyped and compiled typed, yields the same
-value. [R-core-forms] This is what lets one grammar serve both kinds of
+The core forms MUST mean the same in both namespaces on integer
+operands, in this sense: an arithmetic or bitwise form yields the same
+integer, and a comparison or logical form yields the same truth (not
+`nil` untyped, not `0` typed). [R-core-forms] A front end that hands the
+same forms to either namespace MUST make each condition of `if` and
+`while`, and each operand of `and`, `or` and `not`, a comparison or
+logical form, never a bare integer, because the namespaces disagree on
+the truth of `0`. This is what lets one grammar serve both kinds of
 language.
 
 ```maru-check @R-core-forms
@@ -215,8 +261,10 @@ for the handoff. [R-irl-via-maru] Beyond `cexpr.g`'s mapping, irl maps:
 | `s.f` | `(member s f)` |
 | `s.f := v` | `(set-member s f v)` |
 | `return e;` | `(return e)` |
-| `import T name;` | `(define (name T) (extern name))` |
-| `T name := e;` | `(define (name T) e)` |
+| `import T name;` | `(define (name T) (extern name))`; for a function type, `(define (name T *) (extern name))` |
+| `&f`, `f` imported | `f` (already a pointer to the function) |
+| `T name := e;`, `e` a literal | `(define (name T) e)` |
+| `T name := e;`, `e` computed | `(define (name T))`, and `(set name e)` at its place in `main` |
 | `T name(params) stmt` | `(define-function name T ((p T)…) stmt)` |
 | `int`, `char`, `void`, … , `struct T` | the same name, `struct T` |
 | `T*` | `T *` |
@@ -224,7 +272,7 @@ for the handoff. [R-irl-via-maru] Beyond `cexpr.g`'s mapping, irl maps:
 | `T(A, ...)` | `(T A ...)` |
 | `T()` | `(T ...)`, which `ir-gen-c.k` emits unprototyped |
 | `struct T { int x, y; };` | `(define-struct T ((x int) (y int)))` |
-| `struct T(a, b)` | `(let ((t struct T)) (set-member t x a) (set-member t y b) t)`, fields in declaration order |
+| `struct T(a, b)` | `(let (((t struct T))) (set-member t x a) (set-member t y b) t)`, fields in declaration order |
 | top-level statements | the body of `(define-function main int () … (return 0))` |
 
 irl's type syntax MUST accept `...` as the last parameter type, and
@@ -253,12 +301,22 @@ working.
 ir_retired
 ```
 
+`(define (name T))` MUST declare a zero-initialised global of type `T`,
+struct types included. [R-zero-global] Without it a struct-typed global
+cannot be defined at all: no literal initialiser has a struct type, and
+a computed one is evaluated untyped.
+
+```maru-check @R-zero-global
+zero_global
+```
+
 ### Errors
 
 | Error | Example | Recovery |
 |---|---|---|
 | unknown head | a grammar emits `(binop + a b)` | the `cexpr_forms` check fails on the printed forms; fix the grammar rule |
 | typed form in the untyped namespace | `(indir p 0)` evaluated by `eval` | undefined-variable error at evaluation; the front end chose the wrong namespace |
+| bare integer as a condition | `(if n a b)` with `n` an integer, handed to both namespaces | the two disagree when `n` is `0`; the front end writes `(if (!= n 0) a b)` |
 | type mismatch in `(if c t e)` | branches of int and pointer | ir2 reports `ir-error-type-mismatch`; the front end casts one branch |
 | construct with no form | a Nothing `goto` given to `maru.k` | the front end reports the construct as unsupported; a later document adds the typed form |
 
@@ -323,6 +381,16 @@ can be added for one language when one does.
 **Why not keep `ir.k` beside ir2?** irl could lower to both. `ir.k` has no
 other user, and keeping it means every change to the C back end is made
 twice or lets one IR rot, as `irgol.g` shows.
+
+**Why not make `0` false in untyped Maru?** It would make the
+namespaces agree on every condition. But untyped code uses `0` as an
+ordinary value and `nil` as "none" (a position or count of `0` is found,
+not missing), so every such idiom would change meaning, in `eval.c`,
+`eval2.c` and the evaluator written in Maru alike; and each truth test
+would grow from one comparison with `nil` to a type check and a value
+comparison on a boxed integer, unless false became a singleton value of
+its own, as `nil`, `true` and `false` are in Piumarta's Pepsi. Requiring
+comparison or logical forms as conditions costs a front end nothing.
 
 **Why not one namespace for all languages?** Dynamic languages could
 target typed Maru with an object library written in it, as KScript's

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# maru-truth — evidence adapter: line 1 is a form, line 2 "untyped X" and
+# line 3 "typed Y". Conforms when `./eval` prints X for (println FORM) and the
+# typed namespace (maru.k through ir2's C back end) prints Y for
+# (printf "%d\n" FORM); a typed value of "-" skips the typed half.
+set -u
+f="${1:?usage: maru-truth <file>}"
+root="$(cd "$(dirname "$0")/../../.." && pwd)"
+form=$(sed -n 1p "$f")
+untyped=$(sed -n 2p "$f" | sed 's/^untyped //')
+typed=$(sed -n 3p "$f" | sed 's/^typed //')
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+printf '(println %s)\n' "$form" > "$tmp/u.l"
+got=$(cd "$root" && ./eval "$tmp/u.l" 2>&1 | tail -1)
+[ "$got" = "$untyped" ] || { echo "maru-truth: untyped $form gave $got, not $untyped"; exit 1; }
+[ "$typed" = "-" ] && exit 0
+cat > "$tmp/t.k" <<EOF
+(define (printf (int char * ...) *) (extern printf))
+(define-function main int () (printf "%d\n" $form) (return 0))
+EOF
+(cd "$root" && ./eval2 ir-gen-c.k maru.k "$tmp/t.k" > "$tmp/t.c" 2>"$tmp/t.err") || { tail -3 "$tmp/t.err"; exit 1; }
+cc -w -o "$tmp/t" "$tmp/t.c" -ldl || exit 1
+got=$("$tmp/t")
+[ "$got" = "$typed" ] || { echo "maru-truth: typed $form gave $got, not $typed"; exit 1; }
