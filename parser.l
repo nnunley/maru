@@ -590,7 +590,7 @@
       ((= op 'match-object)		1)
       ((= op 'match-string)		1)
       ((= op 'match-class)		1)
-      ((= op 'match-rule-in)		1)	;xxx THIS IS NOT RELIABLE xxx
+      ((= op 'match-rule-in)		1)
       ((= op 'match-rule)		($consumes-input? self (grammar-find-body self (cadr exp))))
       ((= op 'match-any)		1)
       ((= op 'result-expr)		())
@@ -631,7 +631,7 @@
       ((= op 'match-object)		())
       ((= op 'match-string)		())
       ((= op 'match-class)		())
-      ((= op 'match-rule-in)		())	;xxx THIS IS NOT RELIABLE xxx
+      ((= op 'match-rule-in)		())
       ((= op 'match-rule)		(or (= name (cadr exp)) ($recursive-from? self (grammar-find-body self (cadr exp)) name)))
       ((= op 'match-any)		())
       ((= op 'result-expr)		())
@@ -677,11 +677,13 @@
 
 (define-selector $start)
 
+(define peg-invoke-start)	; defined after the rule invokers, below
+
 (define-selector parse-from)
 
 (define-method parse-from <parser> (source rule)
   (set self.source (parser-stream source))
-  (rule self))
+  (peg-invoke-start rule self))
 
 (define-selector parse)
 
@@ -693,7 +695,7 @@
 (define-method parse-all-from <parser> (source rule)
   (set self.source (parser-stream source))
   (let ((results (array)))
-    (while (rule self)
+    (while (peg-invoke-start rule self)
       (array-append results self.result))
     results))
 
@@ -771,6 +773,17 @@
 (define-function peg-source-range-begin (self)	(push (<parser>-position self) ($source-position (<parser>-source self))))
 (define-function peg-source-range-end (self)	(pop (<parser>-position self)))
 
+;; Memos live on the input position, one list per grammar: grammars that
+;; call each other read the same stream and may have rules of the same name.
+(define-function memo-get (self posn name)
+  (get (get (<token>-notes posn) (type-of self)) name))
+
+(define-function memo-put (self posn name memo)
+  (let* ((type (type-of self))
+	 (notes (or (assq type (<token>-notes posn)) (car (put (<token>-notes posn) type ())))))
+    (set-cdr notes (cons (cons name memo) (cdr notes)))
+    memo))
+
 (define-function peg-invoke-rule-simply (rule name self)
   ;;(println "; simple "name)
   (peg-source-range-begin self)
@@ -781,14 +794,14 @@
 (define-function peg-invoke-rule-with-memo (rule name self)
   ;;(println "; memoised "name" "self)
   (let* ((here (<parser-stream>-position (<parser>-source self)))
-	 (memo (get (<token>-notes here) name)))
+	 (memo (memo-get self here name)))
     ;;(println "; memo "memo)
     (cond
       (memo	(and (= *succeeded* (<memo>-state memo))
 		     (let ()
 		       (set (<parser>-result self) (<memo>-result memo))
 		       (set (<parser-stream>-position (<parser>-source self)) (<memo>-position memo)))))
-      (else	(put (<token>-notes here) name (set memo (new <memo>)))
+      (else	(set memo (memo-put self here name (new <memo>)))
 		(if (peg-invoke-rule-simply rule name self)
 		    (memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position (<parser>-source self)))
 		  (set (<memo>-state memo) *failed*)
@@ -797,8 +810,7 @@
 (define-function peg-invoke-rule-with-recursion (rule name self)
   (let* ((stream (<parser>-source self))
 	 (posn   (<parser-stream>-position stream))
-	 (notes  (<token>-notes posn))
-	 (memo   (get notes name)))
+	 (memo   (memo-get self posn name)))
     (if memo
 	;; this rule has already been entered at this position and has either succeeded, failed, or is in left-recursive iteration
 	(let ((state  (<memo>-state  memo))
@@ -810,7 +822,7 @@
 					())
 	    (else			())))
       ;; this rule has not been entered at this position
-      (put (<token>-notes posn) name (set memo (new <memo> *active* () posn)))
+      (set memo (memo-put self posn name (new <memo> *active* () posn)))
       (if (peg-invoke-rule-simply rule name self)
 	  ;; rule succeeded without recursion or entered recursion and found a non-recursive initial prefix
 	  (let ((state (<memo>-state memo)))
@@ -831,6 +843,9 @@
 
 (define peg-invoke-rule peg-invoke-rule-simply)
 
+;; An entry rule goes through the invoker too, so a left-recursive one grows.
+(define-function peg-invoke-start (rule self) (peg-invoke-rule rule (<selector>-name rule) self))
+
 ;;(define rule-counter 0)
 
 (define-form peg-match-rule (name self)
@@ -849,7 +864,7 @@
 (define-function parse-stream (grammar rule stream)
   (let* ((s (parser-stream stream))
 	 (p (parser grammar s)))
-    (or (rule p)
+    (or (peg-invoke-start rule p)
 	(let ()
 	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
 	  (until (parser-stream-at-end stream)

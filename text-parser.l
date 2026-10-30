@@ -213,7 +213,7 @@
 
 (define-function parse-string (grammar rule source)
   (let* ((p (text-parser-for-on grammar source)))
-    (or (rule p)
+    (or (text-parser-invoke-rule (<selector>-name rule) rule p)	; so a left-recursive entry rule grows
 	(let ()
 	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
 	  (parser-context p)

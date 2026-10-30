@@ -132,6 +132,15 @@
 			  "input matched: \"aaa\"" "input matched: \"aaaaaaaaaaaaa\"")))
     (unit-assert (equal (last out) tree))))
 
+;; Grammars composed by calling (pb-expr) and inheriting (<lang> : <cexpr>)
+;; keep their memo entries apart, and an entry rule may be left-recursive,
+;; in parser.l and in text-parser.l (tpeg grammars).
+(check "peg_compose"
+  (unit-assert (equal (until-blank (after "; PEG recursion enabled" (run "peg-compose" "./eval repl.l check/peg-compose.l")))
+		      '("from-a" "(+ (+ 1 2) 3)" "(+ (+ (name \"a\") (+ 1 2)) (name \"b\"))")))
+  (run "peg-lr-gen" (concat-strings "./eval compile-tpeg.l check/peg-lr.g > " tmp "/peg-lr.g.l"))
+  (unit-assert (equal (last (run "peg-lr" (concat-strings "./eval check/peg-lr.l " tmp "/peg-lr.g.l"))) "(+ (+ 1 2) 3)")))
+
 ;; A language built at the REPL prints the 10x10 multiplication table, and
 ;; nfibs(n) = nfibs(n-1) + nfibs(n-2) + 1 is 2*fib(n+1) - 1.
 (check "repl"
