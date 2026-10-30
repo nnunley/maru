@@ -56,7 +56,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l $(CROSS) .force
+check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l irgol.g.l $(CROSS) .force
 	./eval check/check.l
 
 maru-check : eval2 .force
@@ -117,7 +117,7 @@ test-compile-grammar : eval .force
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
-test-compile-irgol : eval eval32 irgol.g.l .force
+test-compile-irgol : eval eval32 cexpr.g.l irl.g.l irgol.g.l .force
 	./eval compile-irgol.l test.irgol > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
@@ -126,7 +126,7 @@ test-compile-irgol : eval eval32 irgol.g.l .force
 irgol.g.l : tpeg.l irgol.g | eval
 	./eval compile-tpeg.l irgol.g > irgol.g.l
 
-test-compile-irl : eval eval32 irl.g.l .force
+test-compile-irl : eval eval32 cexpr.g.l irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
 	@echo
@@ -134,6 +134,9 @@ test-compile-irl : eval eval32 irl.g.l .force
 
 irl.g.l : tpeg.l irl.g | eval
 	./eval compile-tpeg.l irl.g > irl.g.l
+
+cexpr.g.l : tpeg.l cexpr.g | eval
+	./eval compile-tpeg.l cexpr.g > cexpr.g.l
 
 test-ir : eval .force
 	./eval test-ir.k > test.c

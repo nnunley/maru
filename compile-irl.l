@@ -10,6 +10,7 @@
 (define-function param-list-types (pl)	(map car pl))
 (define-function param-list-decls (pl)	(map (lambda (p) `(ir-arg ',(cadr p) ,(car p))) pl))
 
+(require "cexpr.g.l")
 (require "irl.g.l")
 
 (while *arguments*

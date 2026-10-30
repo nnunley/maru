@@ -10,13 +10,15 @@
 (define-function param-list-types (pl)	(map car pl))
 (define-function param-list-decls (pl)	(map (lambda (p) `(ir-arg ',(cadr p) ,(car p))) pl))
 
+(require "cexpr.g.l")
+(require "irl.g.l")
 (require "irgol.g.l")
 
 (while *arguments*
   (let* ((file    (next-argument))
 	 (source  (contents-of-file-named file))
-	 (parser  (text-parser-for-on <irl> source))
-	 (program (if ($program parser) (<irl>-result parser) (error "syntax error"))))
+	 (parser  (text-parser-for-on <irgol> source))
+	 (program (if ($program parser) (<irgol>-result parser) (error "syntax error"))))
     (print "/*")
     (map (lambda (x) (print "\n   ")  (println x)) program)
     (println "*/")
