@@ -3,7 +3,8 @@
 ;;; prints "law NAME: " (flushed before it runs) and its outcome:
 ;;;   TESTED n | PROVED n | REFUTED x=v ... seed=s | STARVED k of n | VACUOUS
 ;;;   | INCONCLUSIVE status=s input=(args) | E_BINDING ... | E_GRAMMAR ...
-;;; and the run exits 1 if any law is neither TESTED nor PROVED.
+;;; A file with no under test: line prints E_NO_UNDER_TEST and runs none of its
+;;; laws.  The run exits 1 if any law is neither TESTED nor PROVED.
 ;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Laws" and "References".
 (load "rules.l")
 (load "law-compile.l")
@@ -85,8 +86,9 @@
 ;; one set of values: skip (conditions false), hold, fail or crash
 (define-function law-try (vals)
   (set *law-crash* ())
-  (if (not (apply *lc* vals)) 'skip
-    (let ((h (apply *lf* vals))) (cond (*law-crash* 'crash) (h 'hold) (else 'fail)))))
+  (let ((c (apply *lc* vals)))	; a crash in a condition or the claim makes no verdict
+    (cond (*law-crash* 'crash) ((not c) 'skip)
+	  (else (let ((h (apply *lf* vals))) (cond (*law-crash* 'crash) (h 'hold) (else 'fail)))))))
 
 ;; shrinking: a number toward 0, a set member toward the first, a rule-built
 ;; value by drawing again at a smaller size; kept only while the claim fails
@@ -173,15 +175,24 @@
       (let ((d (defined? u)))
 	(and d (let ((f (eval u))) (and (or (expr? f) (= <subr> (type-of f))) (push out (cons u f)))))))
     out))
+;; the stand-ins run in a forked child: one that errors or crashes shows the law depends on the code
+(define fork	(subr "fork" ">i"))
+(define waitpid	(subr "waitpid" "ipi>i"))
+(define _exit	(subr "_exit" "i"))
+(define status-word ((subr "malloc" "l>p") 8))
+(define-function law-quiet ()	; the child's output, an error's backtrace included, goes nowhere
+  (let ((fd ((subr "open" "si>i") "/dev/null" 1))) ((subr "dup2" "ii>i") fd 1) ((subr "dup2" "ii>i") fd 2)))
 (define-function law-holds-with (fs k)
-  (list-do f fs (law-set-global (car f) (lambda args k)))
-  (let ((r (law-method)))
-    (list-do f fs (law-set-global (car f) (cdr f)))
-    (law-pass? r)))
+  (let ((pid (fork)))
+    (when (= 0 pid)
+      (law-quiet)
+      (list-do f fs (law-set-global (car f) (lambda args k)))
+      (_exit (if (law-pass? (law-method)) 0 1)))
+    (waitpid pid status-word 0)
+    (= 0 (+ (byte-at status-word 0) (byte-at status-word 1)))))
 (define-function law-vacuous? ()
-  (and *law-under*
-       (or (not (law-names-under?))
-	   (let ((fs (law-functions))) (and fs (law-holds-with fs 0) (law-holds-with fs 1))))))
+  (or (not (law-names-under?))
+      (let ((fs (law-functions))) (and fs (law-holds-with fs 0) (law-holds-with fs 1)))))
 
 (define-function law-report (r)
   (let ((k (car r)))
@@ -219,6 +230,7 @@
 	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (eval (cadr it))))))))
     (list-do n (law-file-numbers items) (or (member? n *rules-numbers*) (set *rules-numbers* (concat-list *rules-numbers* (list n)))))
     (set *law-rules* (rules-expand (law-rules items)))
+    (or *law-under* (let () (println "E_NO_UNDER_TEST " path ": no under test: line, so its laws test nothing") (set *law-failed* 1) (set items ())))
     (list-do it items (and (= 'law (car it)) (let () (law-one it (+ (law-setting 'seed) pos)) (set pos (+ pos 1)))))
     (set *rules-numbers* saved)))
 

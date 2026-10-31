@@ -1,3 +1,4 @@
 reference verdict(x)
 under test: verdict
 law answers: all n: number. verdict(n) = accept
+law guarded: all n: number, verdict(n) = accept. n = n

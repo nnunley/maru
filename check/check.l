@@ -250,13 +250,15 @@
 (define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
 (check "law_rules"
   (let ((d "check/laws/fixtures/double.l"))
-    (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
+    (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
-		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR cexpr.primary waits for grammar domains"))
+		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR cexpr.primary waits for grammar domains")
+		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
-  ;; a crashed reference is no verdict; a claim that exits leaves its law's name last
+  ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))
-    (unit-assert (and (= 256 (car r)) (starts (cadr r) "law answers: INCONCLUSIVE status=139 input=("))))
+    (unit-assert (and (= 256 (car r)) (starts (cadr r) "law answers: INCONCLUSIVE status=139 input=(")
+		      (starts (caddr r) "law guarded: INCONCLUSIVE status=139 input=("))))
   (let ((r (law-fixture "crash" "")))
     (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
   ;; a - b = b - a shrinks to the smallest pair, a=0 b=0.5; the printed seed alone reproduces it
@@ -264,8 +266,8 @@
     (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
     (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
 		      (equal ab "a=0 b=0.500000")))
-    (contents-to-file-named (concat-strings "defaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
-    (unit-assert (equal (cdr (law-run "reseed" (concat-strings tmp "/reseed.law"))) (cddr r)))))
+    (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
+    (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.
@@ -373,7 +375,7 @@
 ;; Every source line is accounted for: the count must equal the sum of the
 ;; entries in check/lines, and each entry that adds lines must say why.
 (check "lines"
-  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
+  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|dc|law)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
 	(sum 0))
     (list-do entry (lines (contents-of-file-named "check/lines"))
       (let ((w (words entry)))

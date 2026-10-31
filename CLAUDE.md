@@ -92,8 +92,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `law_rules` (`check/law.l`, `check/laws/fixtures/`): the runner prints one line per law, `law NAME:` (flushed
   first, so a claim that exits leaves it last) and `TESTED n`, `PROVED n`, `REFUTED x=v … seed=s` (shrunk: `a - b = b - a`
   gives `a=0 b=0.500000`, and the seed alone reproduces it), `STARVED k of n`, `VACUOUS` (nothing under test named, or holds with
-  the functions under test returning a constant) or `INCONCLUSIVE status=s input=…` (a reference answering `(crash 139)`);
-  a goal domain must bind its last argument (`E_BINDING`), and grammar domains are not yet supported (`E_GRAMMAR`).
+  the functions under test returning a constant, tried in a forked child so one that errors is no pass) or
+  `INCONCLUSIVE status=s input=…` (a reference answering `(crash 139)`, in the claim or a condition); a file with no
+  `under test:` line is `E_NO_UNDER_TEST`, a goal domain must bind its last argument (`E_BINDING`), and grammar domains
+  are not yet supported (`E_GRAMMAR`). `.law` files count toward `lines`.
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
