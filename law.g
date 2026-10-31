@@ -54,6 +54,8 @@ item		= "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		| "defaults"  keyword setting:a (","_ setting)*:b		-> `(defaults ,a ,@b)
 		| "law"       keyword xidentifier:n ":"_ "all" keyword bindings:b "."_ xexpression:c method:m
 									-> `(law ,n ,b ,c ,(car m) ,(cadr m))
+		| "law"       keyword xidentifier:n ":"_ "mutants" keyword "of" keyword xidentifier:r "by" keyword "exhaustion" keyword
+		  ( "size" keyword number )?:s "."_ names:l			-> `(adequacy ,n ,r ,(car s) ,@l)
 		;
 
 bindings	= binding:a (","_ binding)*:b					-> `(,a ,@b) ;

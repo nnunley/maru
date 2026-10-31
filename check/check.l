@@ -266,7 +266,9 @@
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
 		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR nope.primary names no grammar language"
 		  "law listed: E_EXHAUST cexpr.primary is generated, not enumerated; use by test")
-		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing"))
+		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing")
+		 ("adequacy" "check/laws/fixtures/holds.l" 256 "law listed: TESTED 100" "law painted_listed: TESTED 100" "law adequate: PROVED 7"
+		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))

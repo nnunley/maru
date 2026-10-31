@@ -103,7 +103,7 @@
 (define-function law-file-numbers (items)
   (let ((acc ()))
     (list-do it items
-      (cond ((= 'defaults (car it)))
+      (cond ((member? (car it) '(defaults adequacy)))
 	    ((= 'law (car it))	(set acc (law-numbers-in (list (caddr it) (cadddr it) (car (cddddr it))) acc)))
 	    (else		(set acc (law-numbers-in it acc)))))
     acc))

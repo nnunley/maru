@@ -100,7 +100,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   the functions under test returning a constant, tried in a forked child so one that errors is no pass) or
   `INCONCLUSIVE status=s input=…` (a reference answering `(crash 139)`, in the claim or a condition); a file with no
   `under test:` line is `E_NO_UNDER_TEST`, a goal domain must bind its last argument (`E_BINDING`), a grammar domain
-  must name a registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`). `.law` files count toward `lines`.
+  must name a registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`). `law NAME: mutants of R by exhaustion size n. L, …`
+  builds every mutant of the rules R reaches (a fact's set member replaced by each other member, a fact removed, a rule's
+  premise removed) and exhausts the named laws over domains from the file's own rules, claims run under the mutant:
+  `PROVED n` if each fails one, else `REFUTED k of n survive: …` (`check/laws/fixtures/adequacy.law`: 7 of 7 killed, and
+  6 survivors for a weaker suite). A reference's answers are kept by their text. `.law` files count toward `lines`.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for well-typed Nile expressions, their operator
   facts read from `nile/compilers/prelude.nl` through Nile's grammar, are sound (Nile's own resolver and type checker,
   loaded into `eval` and forked per question under an alarm, accept what they generate), checked by themselves, all

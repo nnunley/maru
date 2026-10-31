@@ -1,0 +1,10 @@
+-- mutant adequacy: listed and painted_listed together kill all 7 mutants; painted_listed alone misses the color facts'
+set Color = Red | Green | Blue
+under test: color, painted
+fact color(Red)
+fact color(Green)
+rule paint: color(c) => painted(c)
+law listed: all c: color(c). holds(color, c) = Yes
+law painted_listed: all c: Color. holds(painted, c) = holds(color, c)
+law adequate: mutants of painted by exhaustion size 1. listed, painted_listed
+law weak: mutants of painted by exhaustion size 1. painted_listed

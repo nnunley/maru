@@ -107,9 +107,11 @@
 (define-function rules-note (rl v)
   (and v (not (member? rl *rules-used*)) (push *rules-used* rl) (not (member? (car rl) *rules-fired*)) (push *rules-fired* (car rl)))
   v)
+(define *rules-touching* ())  (define *rules-touched* ())	; while touching, the rules whose conclusion unified with a goal
 (define-function rules-try (rules rl goal s size k)
   (let* ((env (list ())) (head (rules-rename (cadr rl) env)) (body (rules-rename (cddr rl) env))
 	 (s2 (unify (cdr head) (cdr goal) s)))
+    (and s2 *rules-touching* (not (member? rl *rules-touched*)) (push *rules-touched* rl))
     (and s2 (rules-solve-all rules body s2 (- size 1) (lambda (s3) (rules-note rl (k s3)))))))
 (define-function rules-solve-rules (rules goal s size k)
   (let ((p (car goal)) (r ()))
