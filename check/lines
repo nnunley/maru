@@ -48,3 +48,4 @@
 +11 check nile_compile: Nile's compiler, run on eval2 and boot2.l through its script, writes what it wrote on eval and boot.l (kept in the check as the oracle)
 -226 Nile's C target is marked unused, outside the Maru stack: nile-gen-code-c.l (-199) and nile-builtins-c.l (-27)
 +165 rules.l, a first-order logic engine in untyped Maru that runs one rule set as generate, check and enumerate, with a size bound, an occurs check and the in/number/= builtins, rule sets passed explicitly (+125); check law_engine (check/rules-test.l +37, case +3)
++40 rules.l: a rule is recursive when its relation is reachable through other rules, so mutual recursion ends at size 0 (+17), numbers are Maru numbers; check law_engine gains seed variety, mutual recursion, depth bound and fired-after-check cases (+23)

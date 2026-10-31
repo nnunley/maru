@@ -4,7 +4,7 @@
 ;;; a rule set a list of rules, and $x a logic variable.  Rule sets are passed
 ;;; in, never global, so mutants can swap them.  See docs/rfc/draft-ndn-maru-laws-and-rules-00.md.
 
-;; seeded, replayable
+;; seeded, replayable.  rules-fired names the rules used in successful generate and check derivations.
 (define *rules-seed* 42)
 (define *rules-fired* ())	; rule names used in successful derivations
 (define-function rules-seed (n) (set *rules-seed* n) (set *rules-fired* ()))
@@ -58,10 +58,23 @@
     ((pair? x)		(cons (rules-rename (car x) env) (rules-rename (cdr x) env)))
     (else		x)))
 
-;; a rule is recursive when a premise names its own relation; only the others run at size 0
-(define-function rules-recursive? (r)
+;; a rule is recursive when its own relation is reachable from its premises' relations,
+;; directly or through other rules of the set; only the others run at size 0
+(define-function rules-reaches? (from target rules seen)
+  (let ((y ()))
+    (and (not (member? from seen))
+	 (let ((seen (cons from seen)))
+	   (list-do rl rules
+	     (and (not y) (= from (car (cadr rl)))
+		  (list-do g (cddr rl)
+		    (and (not y) (pair? g)
+			 (or (= (car g) target) (rules-reaches? (car g) target rules seen))
+			 (set y 1)))))))
+    y))
+(define-function rules-recursive? (r rules)
   (let ((p (car (cadr r))) (y ()))
-    (list-do g (cddr r) (and (pair? g) (= p (car g)) (set y 1)))
+    (list-do g (cddr r)
+      (and (not y) (pair? g) (or (= (car g) p) (rules-reaches? (car g) p rules ())) (set y 1)))
     y))
 
 (define rules-solve)
@@ -71,8 +84,12 @@
     (k s)))
 
 ;; builtins: (in x t list), (number n), (= a b)
-(define *rules-numbers* '("0" "1" "2" "0.5" "10"))
-(define-function rules-number? (x) (and (string? x) (member? x *rules-numbers*)))
+(define *rules-numbers* '(0 1 2 0.5 10))
+(define-function rules-number? (x)	; numeric equality with one of them, long or double
+  (let ((y ()))
+    (and (or (= <long> (type-of x)) (= <double> (type-of x)))
+	 (list-do n *rules-numbers* (and (= x n) (set y 1))))
+    y))
 (define-function rules-solve-in (goal s k)	; list is a list of (x . t) pairs
   (let ((pr (cons (cadr goal) (caddr goal))) (r ()))
     (list-do e (rules-choices (walk* (cadddr goal) s))
@@ -96,7 +113,7 @@
   (let ((p (car goal)) (r ()))
     (list-do rl (rules-choices rules)
       (and (not r) (= p (car (cadr rl)))
-	   (or (> size 0) (not (rules-recursive? rl)))
+	   (or (> size 0) (not (rules-recursive? rl rules)))
 	   (set r (rules-try rules rl goal s size k))))
     r))
 (define-function rules-solve (rules goal s size k)
