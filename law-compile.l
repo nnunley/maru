@@ -9,6 +9,11 @@
 
 (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
+;; a comment's -- needs blank space or a line start before it
+(define-function law-after-space? (p)
+  (let ((i (<text-parser>-position p)))
+    (or (= i 0) (member? (string-at (<text-parser>-string p) (- i 1)) '(9 10 13 32)))))
+
 (require "cexpr.g.l")
 (require "law.g.l")
 
@@ -16,6 +21,7 @@
 ;;; a Capitalised name, a string and a number are constants.  Elsewhere (let,
 ;;; set, a claim, a condition) names are plain.
 
+(define *law-lets* ())		; (name . value) for each let so far
 (define-function law-lower? (x)
   (let ((c (string-at (symbol->string x) 0))) (and (<= ?a c) (<= c ?z))))
 (define-function law-var (x) (string->symbol (concat-string "$" (symbol->string x))))
@@ -24,7 +30,10 @@
   (if elems (cons (law-conv (car elems) var) (law-list-from (cdr elems) tail var)) (and tail (law-conv (car tail) var))))
 (define-function law-conv (x var)	; var: lower-case names become variables
   (cond
-    ((symbol? x)		(if (and var (law-lower? x)) (law-var x) x))
+    ((symbol? x)		(let ((l (assq x *law-lets*)))
+				  (cond (l		(if (and (pair? (cdr l)) (= var 'claim)) (list 'quote (cdr l)) (cdr l)))
+					((and (= var 1) (law-lower? x))	(law-var x))
+					(else		x))))
     ((not (pair? x))		x)
     ((= 'law-pair (car x))	(cons (law-conv (cadr x) var) (law-conv (caddr x) var)))
     ((= 'law-list (car x))	(law-list-from (cadr x) (cddr x) var))
@@ -34,18 +43,18 @@
   (cons (if (member? (car g) scope) (law-var (car g)) (car g)) (map (lambda (a) (law-conv a 1)) (cdr g))))
 
 (define-function law-domain (d)
-  (cond ((symbol? d)		d)
+  (cond ((symbol? d)		(law-conv d ()))
 	((= 'law-grammar (car d))	(cons 'grammar (cdr d)))
 	(else			(law-goal d ()))))
 (define-function law-bindings (raw)	; (law-bind (names) domain) -> (name domain)...
   (let ((out ()))
     (list-do b raw
       (list-do n (cadr b)
-	(set out (concat-list out (list (list n (law-domain (caddr b))))))))
+	(set out (concat-list out (list (list (law-var n) (law-domain (caddr b))))))))
     out))
 (define-function law-conditions (raw)
   (let ((out ()))
-    (list-do b raw (or (cadr b) (set out (concat-list out (list (caddr b))))))
+    (list-do b raw (or (cadr b) (set out (concat-list out (list (law-conv (caddr b) 'claim))))))
     out))
 (define-function select-binds (raw)
   (let ((out ())) (list-do b raw (and (cadr b) (set out (concat-list out (list b))))) out))
@@ -53,11 +62,11 @@
 (define-function law-conv-law (it)	; (law n raw claim method size)
   (let ((raw (caddr it)))
     (list 'law (cadr it) (law-bindings (select-binds raw)) (law-conditions raw)
-	  (law-conv (cadddr it) ()) (car (cddddr it)) (cadr (cddddr it)))))
+	  (law-conv (cadddr it) 'claim) (car (cddddr it)) (cadr (cddddr it)))))
 (define-function law-item (it scope)
   (let ((k (car it)))
     (cond
-      ((= k 'let)	(list 'let (cadr it) (law-conv (caddr it) ())))
+      ((= k 'let)	(let ((v (law-conv (caddr it) ()))) (set *law-lets* (cons (cons (cadr it) v) *law-lets*)) (list 'let (cadr it) v)))
       ((= k 'rule)	(cons 'rule (cons (cadr it) (cons (map law-var (caddr it))
 			    (map (lambda (g) (law-goal g (concat-list scope (caddr it)))) (cdddr it))))))
       ((= k 'fact)	(list 'fact (law-goal (cadr it) ())))
@@ -69,7 +78,14 @@
 (define-function law-text-read (text)
   (let ((parser (text-parser-for-on <law> text)))
     (or ($program parser) (error "syntax error"))
-    (map (lambda (it) (law-item it ())) (<law>-result parser))))
+    (set *law-lets* ())
+    (let ((out ())) (list-do it (<law>-result parser) (set out (concat-list out (list (law-item it ()))))) out)))
+
+;;; The items rules-expand takes: rules, facts, schemas and facts-from-function.
+(define-function law-rules (items)
+  (let ((out ()))
+    (list-do it items (and (member? (car it) '(rule fact schema facts)) (set out (concat-list out (list it)))))
+    out))
 (define-function law-file-read (path) (law-text-read (contents-of-file-named path)))
 
 ;;; The numbers a file mentions in its rules, facts, lets and laws, not its

@@ -173,6 +173,7 @@
 	    ((= k 'schema)	(let ((l ())) (list-do v (caddr it) (set l (concat-list l (rules-flatten (list (rules-subst (cadddr it) (cadr it) v)) ho)))) l))
 	    ((= k 'facts)	(rules-read-facts it))
 	    ((= k 'rule)	(if (caddr it) (rules-keep ho (cdr it)) (list (cons (cadr it) (cdddr it)))))
+	    ((member? k '(let set law under-test reference defaults))	(rules-reject-with "E_UNKNOWN_ITEM: " (symbol->string k)) ())
 	    (else		(list it)))))))
     out))
 

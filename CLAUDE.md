@@ -88,7 +88,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `law_cexpr` (`check/law-compile-test.l`): `law.g` (inheriting `cexpr.g`) and `law-compile.l` read the RFC's
   example law file to rule, let, set and law items; a template's holes fill by text with no grouping added
   (`{x} * c` with `a + b` parses to `(+ a (* b c))`), `{{` is a literal brace, a file with an error
-  fails naming its line, and an unbound hole is `E_TEMPLATE_PARSE`.
+  fails naming its line, an unbound hole is `E_TEMPLATE_PARSE`, `let` names resolve where used, `--` comments sit only between items, and the example's rules expand through `rules-expand`.
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,

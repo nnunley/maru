@@ -6,8 +6,10 @@
 
 <law> : <cexpr> ()
 
-dash		= "--" (&. !eol .)* ;
-_		= (blank | eol | comment | dash)* ;
+# -- starts a comment only between items, after blank space or a line start
+dash		= &-> (law-after-space? self) "--" (&. !eol .)* ;
+gap		= (blank | eol | comment | dash)* ;
+termop		= "+" -> '+ | "-" !"-" -> '- ;
 
 equalop		= "==" -> '=
 		| "=" !"=" !">" -> '=
@@ -59,4 +61,5 @@ domain		= goal
 method		= ( "by" keyword ( "test" keyword -> 'test | "exhaustion" keyword -> 'exhaustion ):m
 		    ( "size" keyword number )?:s -> `(,m ,@s) )?:m		-> (car m) ;
 
-program		= _ item*:p (!. ~"item")					-> p ;
+entry		= item:i gap							-> i ;
+program		= gap entry*:p (!. ~"item")					-> p ;
