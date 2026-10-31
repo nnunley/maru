@@ -44,7 +44,7 @@ char		= "\\"	( "t"					->  9
 string		= "\"" ("\"\""->34 | !"\"" char)* $:x "\"" _			-> x ;
 
 idpart		= (letter (letter | digit)*) @ $$ ;
-identifier	= idpart:x !":" _						-> x ;
+identifier	= idpart:x _						-> x ;
 
 keyword		= !idpart _ ;
 
