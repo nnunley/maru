@@ -1,0 +1,3 @@
+set Type = Number | Boolean
+let x = 1
+rule oops x => y

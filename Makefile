@@ -56,7 +56,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l $(CROSS) .force
+check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l $(CROSS) .force
 	./eval check/check.l
 
 maru-check : eval2 .force
@@ -129,6 +129,9 @@ irl.g.l : tpeg.l irl.g | eval
 
 cexpr.g.l : tpeg.l cexpr.g | eval
 	./eval compile-tpeg.l cexpr.g > cexpr.g.l
+
+law.g.l : tpeg.l law.g | eval
+	./eval compile-tpeg.l law.g > law.g.l
 
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval

@@ -1,0 +1,15 @@
+-- the RFC's Formal Grammar example
+set Type = Number | Boolean
+let abpq = [a: Number, b: Number, p: Boolean, q: Boolean]
+reference nile_accepts(e, t)
+under test: expr
+
+facts infix, prefix from nile_signatures      -- read from Nile's prelude
+
+rule e_var:    v: t in env                                        => expr(env, t, v)
+rule e_num:    number(n)                                          => expr(env, Number, n)
+rule e_prefix: prefix(op, at, t), expr(env, at, a)                => expr(env, t, nile`{op}({a})`)
+rule e_infix:  infix(op, at, bt, t), expr(env, at, a), expr(env, bt, b)
+                                                                  => expr(env, t, nile`({a} {op} {b})`)
+
+law sound: all t: Type, e: expr(abpq, t, e). nile_accepts(e, t) = accept

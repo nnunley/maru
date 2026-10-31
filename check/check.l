@@ -240,6 +240,9 @@
 ;; rules.l: one rule set generates, checks and enumerates; size bounds recursion; unify has an occurs check; builtins (check/rules-test.l).
 (check "law_engine" (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok")))
 
+;; law.g reads law files to items, and templates fill by text (check/law-compile-test.l).
+(check "law_cexpr" (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok")))
+
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.
 (check "ir_retired"

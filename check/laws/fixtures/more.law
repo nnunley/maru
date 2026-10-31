@@ -1,0 +1,9 @@
+defaults trials = 50, seed = 7
+fact color(Red)
+rule paint: color(c) => painted(c)
+rule cons: painted(h), painted_list(t) => painted_list([h | t])
+rule nil: => painted_list([])
+for r in color | painted: rule both_r: r(x) => both(r, x)
+rule lst(r): r(x) => all_r(r, x)
+law small: all n: number, g: cexpr.primary, n > 2, n < 40. f(n, g) == 3 by exhaustion size 4
+law plain: all a, b: Type. a + b == b + a

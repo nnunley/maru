@@ -1,0 +1,72 @@
+;;; Checks for law.g and law-compile.l (law_cexpr in check.l).  Run with no
+;;; argument it runs the checks; "file F", "hole" and "parse" are the child
+;;; processes whose error messages it inspects, since Maru has no catch.
+(load "rules.l")
+(load "law-compile.l")
+
+(define system (subr "system" "s"))
+(define ok 1)
+(define-function expect (what c) (or c (and (println "FAIL " what) (set ok ()))))
+(define-function has? (str sub)
+  (let ((i 0) (n (- (string-length str) (string-length sub))))
+    (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
+    (<= i n)))
+(define-function child (name args)
+  (system "mkdir -p /tmp/maru-check")
+  (let ((out (concat-strings "/tmp/maru-check/law-" name ".out")))
+    (system (concat-strings "./eval check/law-compile-test.l " args " >" out " 2>&1"))
+    (contents-of-file-named out)))
+
+(define-function suite ()
+  (expect "the RFC's example reads to items"
+    (equal (law-file-read "check/laws/fixtures/syntax.law")
+	   '((set Type (Number Boolean))
+	     (let abpq ((a . Number) (b . Number) (p . Boolean) (q . Boolean)))
+	     (reference nile_accepts e t)
+	     (under-test expr)
+	     (facts (infix prefix) nile_signatures)
+	     (rule e_var () (expr $env $t $v) (in $v $t $env))
+	     (rule e_num () (expr $env Number $n) (number $n))
+	     (rule e_prefix () (expr $env $t (template nile "{op}({a})")) (prefix $op $at $t) (expr $env $at $a))
+	     (rule e_infix () (expr $env $t (template nile "({a} {op} {b})")) (infix $op $at $bt $t) (expr $env $at $a) (expr $env $bt $b))
+	     (law sound ((t Type) (e (expr $abpq $t $e))) () (= (nile_accepts e t) accept) () ()))))
+  (let ((items (law-file-read "check/laws/fixtures/more.law")))
+    (expect "defaults, lists, schemas, parameters, grammar domains, conditions"
+      (equal items
+	     '((defaults (trials . 50) (seed . 7))
+	       (fact (color Red))
+	       (rule paint () (painted $c) (color $c))
+	       (rule cons () (painted_list ($h . $t)) (painted $h) (painted_list $t))
+	       (rule nil () (painted_list ()))
+	       (schema $r (color painted) (rule both_r () (both $r $x) ($r $x)))
+	       (rule lst ($r) (all_r $r $x) ($r $x))
+	       (law small ((n number) (g (grammar cexpr primary))) ((> n 2) (< n 40)) (= (f n g) 3) exhaustion 4)
+	       (law plain ((a Type) (b Type)) () (= (+ a b) (+ b a)) () ()))))
+    (expect "numbers the file mentions, in order, once"
+      (equal (law-file-numbers items) '(2 40 3))))
+  (let ((rs (rules-expand (law-text-read "fact color(Red)\nrule paint: color(c) => painted(c)\n"))))
+    (expect "read rules expand and run" (rules-holds? rs '(painted Red) 1)))
+
+  (expect "a filler is inserted as written"
+    (equal (template-parse 'cexpr (template-fill 'cexpr "{x} * c" '((x . "a + b")))) '(+ a (* b c))))
+  (expect "a parenthesised filler groups"
+    (equal (template-parse 'cexpr (template-fill 'cexpr "({x}) * c" '(($x . "a + b")))) '(* (+ a b) c)))
+  (expect "doubled braces are literal" (equal (template-fill 'cexpr "{{ x }}" ()) "{ x }"))
+  (expect "a hole fills with a number or symbol"
+    (equal (template-fill 'cexpr "{n}{s}" '((n . 42) (s . y))) "42y"))
+
+  (let ((out (child "line3" "file check/laws/fixtures/error-line3.law")))
+    (expect "a malformed file fails with its line" (has? out "line 3")))
+  (let ((out (child "hole" "hole")))
+    (expect "an unbound hole is E_TEMPLATE_PARSE naming the template"
+      (and (has? out "E_TEMPLATE_PARSE") (has? out "cexpr`{x} * c`"))))
+  (let ((out (child "parse" "parse")))
+    (expect "unparseable filled text is E_TEMPLATE_PARSE" (has? out "E_TEMPLATE_PARSE")))
+  (and ok (println "law compile ok")))
+
+(define-function driver (mode)
+  (cond
+    ((= mode "file")	(law-file-read (next-argument)))
+    ((= mode "hole")	(template-fill 'cexpr "{x} * c" ()))
+    ((= mode "parse")	(template-parse 'cexpr "a +"))))
+(if *arguments* (driver (next-argument)) (suite))
