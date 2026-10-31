@@ -408,6 +408,7 @@ hole        = "{" name "}"
 defaults    = %s"defaults" setting *( "," setting )
 setting     = name "=" number
 law         = %s"law" name ":" %s"all" binding *( "," binding ) "." claim [ method ]
+law         =/ %s"law" name ":" %s"mutants" %s"of" name %s"by" %s"exhaustion" [ %s"size" number ] "." name *( "," name )
 binding     = name *( "," name ) ":" domain / expression
 domain      = goal / name "." name / name
 claim       = expression
