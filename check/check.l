@@ -267,6 +267,14 @@
     (unit-assert (member? "sum is 708" out))
     (unit-assert (equal (last out) "print-foo: 84 1332"))))
 
+;; Core forms give the same integers, and comparisons the same truth, untyped
+;; and through maru.k (check/core-forms.l).
+(check "core_forms"
+  (run "core_forms-gen" (concat-strings "./eval check/core-forms.l k > " tmp "/core-forms.k"))
+  (let ((untyped (run "core_forms-untyped" "./eval check/core-forms.l")))
+    (unit-assert (= 23 (list-length untyped)))
+    (unit-assert (equal (run "core_forms" (ir2-build "core-forms" (concat-strings tmp "/core-forms.k"))) untyped))))
+
 ;; The x86 assembler generated from gen-asm-x86.k encodes as clang -target i386
 ;; does: check/asm-x86.l assembles movl, addl, pushl, an SIB load, int, call, ret.
 (check "asm_x86"

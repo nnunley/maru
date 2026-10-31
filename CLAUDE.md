@@ -63,6 +63,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `clang -target i386` does. Change the spec, never `asm-x86.k`.
 - `ir2` (`check/ir2.k`): sizes, alignment and struct padding match `osdefs.k`;
   pointer offsets of any integer width move by bytes at full pointer width.
+- `core_forms` (`check/core-forms.l`): arithmetic, comparison and logical
+  forms give the same values untyped and through `maru.k`.
 - `zero_global` (`check/zero-global.k`): a global declared with no
   initialiser, `(define (name T))`, starts at zero, for a scalar and a struct.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
