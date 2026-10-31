@@ -237,6 +237,9 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
+;; rules.l: one rule set generates, checks and enumerates; size bounds recursion; unify has an occurs check; builtins (check/rules-test.l).
+(check "law_engine" (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok")))
+
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.
 (check "ir_retired"

@@ -47,3 +47,4 @@
 +60 print-structure.l is back from before the refactor (f6671da^), which Nile's compiler requires to print a structure when an operation lookup fails
 +11 check nile_compile: Nile's compiler, run on eval2 and boot2.l through its script, writes what it wrote on eval and boot.l (kept in the check as the oracle)
 -226 Nile's C target is marked unused, outside the Maru stack: nile-gen-code-c.l (-199) and nile-builtins-c.l (-27)
++165 rules.l, a first-order logic engine in untyped Maru that runs one rule set as generate, check and enumerate, with a size bound, an occurs check and the in/number/= builtins, rule sets passed explicitly (+125); check law_engine (check/rules-test.l +37, case +3)

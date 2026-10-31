@@ -80,6 +80,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
   a type mismatch in the `if` (`check/irl-errors.l` records it in Maru).
+- `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
+  enumerates alike; at size 0 a recursive rule never applies; unification has
+  an occurs check; the `in`, `number` and `=` builtins behave as specified.
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
