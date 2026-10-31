@@ -57,4 +57,38 @@
 (rules-holds? rs '(term (pair a b)) 1)
 (expect "check records fired rules" (and (member? 'tm (rules-fired)) (member? 'tp (rules-fired))))
 
+;; higher-order rules expand to first-order ones; a rejection goes to *rules-reject* (error by default)
+(define *msgs* ())
+(define-function collect (m) (push *msgs* m))
+(set *rules-reject* collect)
+(expect "a schema over two values yields two facts"
+  (equal (rules-expand '((schema $op ("+" "-") (fact (infix $op Number Number Number)))))
+	 '((infix (infix "+" Number Number Number)) (infix (infix "-" Number Number Number)))))
+(define ho '((rule nil_list ($r) (list_of $r ()))
+	     (rule cons_list ($r) (list_of $r (cons $x $xs)) ($r $x) (list_of $r $xs))
+	     (fact (expr $e N a)) (fact (expr $e N b))
+	     (top (top $es) (list_of (expr e0 N) $es))))
+(define LO (string->symbol "list_of[expr]")) ; the reader takes [ for its own
+(define fo (rules-subst (rules-subst (rules-subst '((nil_list@ (LO $e $t ()))
+	     (cons_list@ (LO $e $t (cons $x $xs)) (expr $e $t $x) (LO $e $t $xs))
+	     (expr (expr $e N a)) (expr (expr $e N b))
+	     (top (top $es) (LO e0 N $es))) 'LO LO) 'nil_list@ (string->symbol "nil_list[expr]")) 'cons_list@ (string->symbol "cons_list[expr]")))
+(expect "a relation parameter specialises once per relation passed"
+  (equal (rules-enumerate (rules-expand ho) '(top $v) 2) (rules-enumerate fo '(top $v) 2)))
+(expect "the specialised relation is named relation[passed]"
+  (equal (cadr (assq (string->symbol "cons_list[expr]") (rules-expand ho))) (list LO '$r.1 '$r.2 '(cons $x $xs))))
+(expect "the enumeration is not empty" (= 3 (list-length (rules-enumerate fo '(top $v) 2))))
+(expect "nothing was rejected so far" (not *msgs*))
+(rules-expand '((rule nil_list ($r) (list_of $r ())) (top (top $es) (list_of (nosuch e0) $es))))
+(expect "a parameter applied to an unknown relation is rejected" (member? "E_UNKNOWN_RELATION: nosuch" *msgs*))
+(set *msgs* ())
+(rules-expand '((top (top $x) (missing $x))))
+(expect "a premise nothing concludes is rejected" (equal *msgs* '("E_UNKNOWN_RELATION: missing")))
+(define-function infix-facts () '((infix "+" Number Number Number) (infix "-" Number Number Number)))
+(set *msgs* ())
+(expect "facts from a function are facts"
+  (and (equal (rules-expand (list (list 'facts '(infix) infix-facts))) '((infix (infix "+" Number Number Number)) (infix (infix "-" Number Number Number)))) (not *msgs*)))
+(rules-expand (list (list 'facts '(prefix) infix-facts)))
+(expect "a fact of an unlisted relation is rejected" (equal *msgs* '("E_UNKNOWN_RELATION: infix" "E_UNKNOWN_RELATION: infix")))
+
 (println (if ok "rules ok" "rules FAILED"))
