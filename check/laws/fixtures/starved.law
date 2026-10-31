@@ -1,0 +1,5 @@
+-- no rule concludes painted(Blue, p)
+under test: painted
+fact color(Red)
+rule paint: color(c) => painted(c, c)
+law blue: all p: painted(Blue, p). p = Blue

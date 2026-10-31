@@ -1,0 +1,2 @@
+under test: double
+law double_sum: all n: number. double(n) = n + n

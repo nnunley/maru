@@ -1,0 +1,6 @@
+under test: painted
+fact color(Red)
+fact color(Green)
+fact color(Blue)
+rule paint: color(c) => painted(c, shade(c))
+law shaded: all c: color(c), p: painted(c, p). car(cdr(p)) = c by exhaustion

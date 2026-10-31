@@ -243,6 +243,30 @@
 ;; law.g reads law files to items, and templates fill by text (check/law-compile-test.l).
 (check "law_cexpr" (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok")))
 
+;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
+(define-function law-run (name files)
+  (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; ./eval check/law.l " files))))
+    (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
+(define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
+(check "law_rules"
+  (let ((d "check/laws/fixtures/double.l"))
+    (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
+		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
+		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR cexpr.primary waits for grammar domains"))
+      (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
+  ;; a crashed reference is no verdict; a claim that exits leaves its law's name last
+  (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))
+    (unit-assert (and (= 256 (car r)) (starts (cadr r) "law answers: INCONCLUSIVE status=139 input=("))))
+  (let ((r (law-fixture "crash" "")))
+    (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
+  ;; a - b = b - a shrinks to the smallest pair, {0, 0.5}; the printed seed alone reproduces it
+  (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l")) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
+    (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
+    (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
+		      (or (equal ab "a=0 b=0.500000") (equal ab "a=0.500000 b=0"))))
+    (contents-to-file-named (concat-strings "defaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
+    (unit-assert (equal (cdr (law-run "reseed" (concat-strings tmp "/reseed.law"))) (cddr r)))))
+
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.
 (check "ir_retired"
