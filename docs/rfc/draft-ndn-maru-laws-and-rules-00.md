@@ -26,8 +26,8 @@ Generating inputs finds what nobody thought of, but only when the inputs
 are valid. A throwaway spike (Appendix A) measured both halves:
 
 - Generating sentences from `cexpr.g`'s own rules found, in its first
-  run, that `0xq` is accepted as a hexadecimal number (`higit` is
-  `[0-9A-Za-z]`) and that parsing it crashes `eval`.
+  run, that `0xq` is accepted as a hexadecimal number, the number 0
+  (`higit` is `[0-9A-Za-z]`).
 - From Nile's grammar alone, 0 of 40 generated operations and kernels
   that parse are valid Nile: Nile's own compiler rejects all of them.
   The same run found input that crashes Nile's resolver instead of
@@ -534,7 +534,7 @@ time of writing (October 2026). All runs are seeded and repeatable.
 | Measurement | Result |
 |---|---|
 | `cexpr.g` sentences from its own records that its parser accepts | `primary` 184 of 200, `expression` 148 of 200 |
-| Found by those sentences | `0xq` parses as a number; parsing it crashes `eval` (exit 139) |
+| Found by those sentences | `0xq` parses as the number 0 (any letter is taken as a hex digit) |
 | Nile sentences from its grammar that parse | `expr` 168, `stmt` 150, `typedef` 200, `opdef` 100, `processdef` 25, of 200 each |
 | Of those, accepted by Nile's own compiler | operations and kernels: 0 of 40 cross-checked |
 | Found by them | `ϫ():ρ` then `forall_` crashes Nile's resolver (`intype` has no method for `<nile-typeref>`), also on Nile's own setup |

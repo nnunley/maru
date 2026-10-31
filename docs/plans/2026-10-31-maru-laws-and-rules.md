@@ -22,7 +22,7 @@
 
 ## Review Focus
 
-1. A generated sentence that crashes `eval` (as `0xq` did) kills the run; the runner prints `law NAME:` before evaluating a law, so the last line names it. Test in Task 6.
+1. A generated sentence that crashes `eval` kills the run; the runner prints `law NAME:` before evaluating a law, so the last line names it. Test in Task 6.
 2. A goal no rule can satisfy (`expr(env, Boolean, e)` with no Boolean rule) is `STARVED`, not a hang or a pass. Test in Task 6.
 3. A filler goes into a template as text: `{x} * c` with `x` = `a + b` parses as `(+ a (* b c))`. Rules that need grouping write it, as the Nile rules do. Test in Task 5, and the RFC says so (Task 1).
 4. Non-ASCII operators (`√ ∧ ≤ ¬`) survive filling and parsing. Test in Task 9.
@@ -42,13 +42,13 @@ Execute Task 3 of `docs/plans/2026-10-15-nile-runtime-in-maru.md` as written (it
 - [ ] **Step 2:** Under Templates, add that a filler is inserted as text and grouping is the template author's (Review Focus 3).
 - [ ] **Step 3:** `rfc-lint` exits 0; two-key commit `docs(rfc): …`.
 
-### Task 2: `cexpr.g` hex digits, and the crash `0xq` exposed
+### Task 2: `cexpr.g` hex digits
 
 **Files:** `cexpr.g` (`higit`), the crashing primitive (find it), `check/cexpr-forms.l`.
 
-- [ ] **Step 1: Failing rows** in `check/cexpr-forms.l`: `"0xff"` → `255`, `"0xFF"` → `255`. A separate assertion runs `./eval` on a one-line file parsing `0xq` with `$expression` and requires an exit status other than 139 (it parses as `0` followed by unparsed input, or fails to parse).
-- [ ] **Step 2:** `./eval check/check.l cexpr_forms` fails (exit 139 on the `0xq` assertion).
-- [ ] **Step 3:** Find why `make-number 16` over `q` segfaults (superpowers:systematic-debugging); fix the cause, then make `higit = [0-9A-Fa-f]`.
+- [ ] **Step 1: Failing rows** in `check/cexpr-forms.l`: `"0xff"` → `255`, `"0xFF"` → `255`, and `"0xq+1"`, which must not parse as `(+ 0 1)`.
+- [ ] **Step 2:** `./eval check/cexpr-forms.l` fails on the `0xq+1` row.
+- [ ] **Step 3:** make `higit = [0-9A-Fa-f]`. (`0xq` never crashed `eval`: the spike's probe lacked `text-parser-invoke-rule-with-recursion`, without which any input overflows the stack.)
 - [ ] **Step 4:** `cexpr_forms irl lines` PASS; ledger entry; commit.
 
 ### Task 3: The engine, `rules.l` [R-rules-three-modes] [R-size-bound] [R-occurs-check] [R-builtins]

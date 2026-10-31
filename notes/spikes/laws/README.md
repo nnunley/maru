@@ -12,7 +12,7 @@ first (the output is ignored by git, as every `*.g.l` is):
 | Script | Measures |
 |---|---|
 | `m1.l` | `cexpr.g` sentences generated from its own records that its parser accepts |
-| `hex.l` | `0xq` crashes `eval` (exit 139) |
+| `hex.l` | parses `0xq`; it lacks `text-parser-invoke-rule-with-recursion`, so `eval` overflows its stack on any input (exit 139), which was first misread as `0xq` crashing |
 | `m2.l` | Nile sentences generated from its grammar that parse |
 | `m3.l` | of those, how many Nile resolves and type-checks (forked, one per candidate) |
 | `m4.l` | hole kinds inferred from the parser (fails) |
