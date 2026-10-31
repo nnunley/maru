@@ -3,11 +3,14 @@
 ;;; prints "law NAME: " (flushed before it runs) and its outcome:
 ;;;   TESTED n | PROVED n | REFUTED x=v ... seed=s | STARVED k of n | VACUOUS
 ;;;   | INCONCLUSIVE status=s input=(args) | E_BINDING ... | E_GRAMMAR ...
+;;; and after a file's laws, for each grammar domain they drew from,
+;;;   grammar LANG.RULE: accepted a of n
 ;;; A file with no under test: line prints E_NO_UNDER_TEST and runs none of its
 ;;; laws.  The run exits 1 if any law is neither TESTED nor PROVED.
 ;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Laws" and "References".
-(load "rules.l")
-(load "law-compile.l")
+(require "rules.l")
+(require "law-compile.l")
+(require "grammar-gen.l")
 
 (define accept 'accept)		; a reference's verdicts, as claims name them
 (define reject 'reject)
@@ -32,13 +35,17 @@
   (while vars (set g (rules-subst g (car vars) (car vals))) (set vars (cdr vars)) (set vals (cdr vals)))
   g)
 
-;; claims and conditions: = compares values, a Capitalised name is a constant
+;; claims and conditions: = compares values, a Capitalised name is a constant, a
+;; template is filled with the law's values and parsed
+(define-function law-template (lang text bindings) (template-parse lang (template-fill lang text bindings)))
 (define-function law-upper? (x) (let ((c (string-at (symbol->string x) 0))) (and (<= ?A c) (<= c ?Z))))
 (define-function law-ne (a b) (not (equal a b)))
 (define-function law-form (x)
   (cond ((symbol? x)		(if (law-upper? x) (list 'quote x) x))
 	((not (pair? x))	x)
 	((= 'quote (car x))	x)
+	((= 'template (car x))	(list 'law-template (list 'quote (cadr x)) (caddr x)
+				      (cons 'list (map (lambda (n) (list 'cons (list 'quote n) n)) *lnames*))))
 	(else			(cons (cond ((= '= (car x)) 'equal) ((= '!= (car x)) 'law-ne) (else (car x)))
 				      (map law-form (cdr x))))))
 
@@ -50,12 +57,23 @@
   (lambda args (let ((v (apply f args))) (if (or (= v 'accept) (= v 'reject)) v (law-crashed v args)))))
 (define-function law-set-global (name v) (eval (list 'set name (list 'quote v))))
 
-;; domains: a set, a goal whose last argument is the variable, or a grammar (not yet)
+;; domains: a set, a goal whose last argument is the variable, or a grammar's
+;; rule, lang.rule, its sentences generated with the law's size as fuel
 (define *law-err* ())
+(define *law-domains* ())	; (lang . domain), each built when first drawn from
+(define *law-drawn-from* ())	; (label domain rule) for each grammar domain in this file
+(define-function law-grammar-domain (lang)
+  (or (cdr (assq lang *law-domains*))
+      (let ((l (assq lang *grammar-languages*)))
+	(and l (cdar (push *law-domains* (cons lang (grammar-domain (cadr l) (caddr l)))))))))
+(define-function law-grammar (v lang rule)
+  (let ((label (string->symbol (concat-strings (symbol->string lang) "." (symbol->string rule)))) (d (law-grammar-domain lang)))
+    (if (not d) (set *law-err* (list 'E_GRAMMAR (concat-string (symbol->string label) " names no grammar language")))
+      (or (assq label *law-drawn-from*) (let () (grammar-reset d rule) (set *law-drawn-from* (concat-list *law-drawn-from* (list (list label d rule))))))
+      (list v 'grammar d rule))))
 (define-function law-binding (b)
   (let ((v (car b)) (d (cadr b)))
-    (cond ((and (pair? d) (= 'grammar (car d)))
-	   (set *law-err* (list 'E_GRAMMAR (concat-strings (symbol->string (cadr d)) "." (symbol->string (caddr d)) " waits for grammar domains"))))
+    (cond ((and (pair? d) (= 'grammar (car d)))	(law-grammar v (cadr d) (caddr d)))
 	  ((and (symbol? d) (assq d *law-sets*))	(list v 'set (cdr (assq d *law-sets*))))
 	  ((symbol? d)					(list v 'goal (list d v)))
 	  ((= v (rules-last d))				(list v 'goal d))
@@ -67,9 +85,11 @@
   (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)))
     (rules-solve *law-rules* g *rules-empty* size (lambda (s) (list (walk* out s))))))
 (define-function law-pick (l) (array-at (list->array l) (rules-rand (list-length l))))
-(define-function law-draw-value (b vars vals)	; (value) or ()
-  (if (= 'set (cadr b)) (list (law-pick (caddr b)))
-    (law-gen (law-subst (caddr b) vars vals) *ls*)))
+(define-function law-draw-at (b vars vals size)	; (value) or ()
+  (cond ((= 'set (cadr b))	(list (law-pick (caddr b))))
+	((= 'grammar (cadr b))	(let ((s (grammar-sentence (caddr b) (cadddr b) size))) (and s (list s))))
+	(else			(law-gen (law-subst (caddr b) vars vals) size))))
+(define-function law-draw-value (b vars vals) (law-draw-at b vars vals *ls*))
 (define-function law-draw ()		; every variable's value, earlier ones substituted into later domains
   (let ((vars ()) (vals ()) (bs *lb*) (ok 1))
     (while (and ok bs)
@@ -78,10 +98,12 @@
       (set bs (cdr bs)))
     (and ok vals)))
 (define-function law-values (b vars vals)	; every value of a domain
+  (and (= 'grammar (cadr b)) (error "E_GRAMMAR: a grammar domain is drawn from, not exhausted"))
   (if (= 'set (cadr b)) (caddr b) (rules-enumerate *law-rules* (law-subst (caddr b) vars vals) *ls*)))
 (define-function law-member? (b vars vals v)
-  (if (= 'set (cadr b)) (member? v (caddr b))
-    (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*)))
+  (cond ((= 'set (cadr b)) (member? v (caddr b)))
+	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
+	(else (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*))))
 
 ;; one set of values: skip (conditions false), hold, fail or crash
 (define-function law-try (vals)
@@ -90,11 +112,11 @@
     (cond (*law-crash* 'crash) ((not c) 'skip)
 	  (else (let ((h (apply *lf* vals))) (cond (*law-crash* 'crash) (h 'hold) (else 'fail)))))))
 
-;; shrinking: a number toward 0, a set member toward the first, a rule-built
-;; value by drawing again at a smaller size; kept only while the claim fails
+;; shrinking: a number toward 0, a set member toward the first, a rule-built or
+;; generated value by drawing again at a smaller size; kept only while the claim fails
 (define-function law-regen (b vars vals size)	; (value . size)...
   (let ((out ()))
-    (for (s 0 size) (for (k 0 10) (let ((v (law-gen (law-subst (caddr b) vars vals) s))) (and v (push out (cons (car v) s))))))
+    (for (s 0 size) (for (k 0 10) (let ((v (law-draw-at b vars vals s))) (and v (push out (cons (car v) s))))))
     (list-reverse! out)))
 (define-function law-candidates (b vars vals v size)
   (let ((out ()))
@@ -221,7 +243,7 @@
 
 (define-function law-file (path)
   (let ((items (law-file-read path)) (saved *rules-numbers*) (pos 0))
-    (set *law-config* ()) (set *law-sets* ()) (set *law-under* ())
+    (set *law-config* ()) (set *law-sets* ()) (set *law-under* ()) (set *law-drawn-from* ())
     (list-do it items
       (let ((k (car it)))
 	(cond ((= k 'defaults)		(set *law-config* (cdr it)))
@@ -232,6 +254,8 @@
     (set *law-rules* (rules-expand (law-rules items)))
     (or *law-under* (let () (println "E_NO_UNDER_TEST " path ": no under test: line, so its laws test nothing") (set *law-failed* 1) (set items ())))
     (list-do it items (and (= 'law (car it)) (let () (law-one it (+ (law-setting 'seed) pos)) (set pos (+ pos 1)))))
+    (list-do g *law-drawn-from*
+      (let ((c (grammar-counts (cadr g) (caddr g)))) (println "grammar " (car g) ": accepted " (car c) " of " (cdr c))))
     (set *rules-numbers* saved)))
 
 (define-function law-suffix? (s x)

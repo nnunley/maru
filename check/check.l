@@ -237,8 +237,6 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
-;; law.g reads law files to items, and templates fill by text (check/law-compile-test.l).
-(check "law_cexpr" (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok")))
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
 (define-function law-run (name files)
@@ -246,6 +244,15 @@
     (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
 (define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
 
+;; law.g reads law files and templates fill by text (check/law-compile-test.l); cexpr.law's laws hold over primaries generated from cexpr.g's records, at least 80% of them accepted; a false one is refuted, shrunk.
+(check "law_cexpr"
+  (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok"))
+  (let* ((r (law-run "cexpr" "check/laws/cexpr.law")) (w (words (last r))) (n (string->long (last w))))
+    (unit-assert (equal (list (car r) (cadr r) (caddr r) (cadddr r))
+			'(0 "law conditional_right: TESTED 100" "law minus_left: TESTED 100" "law comment_blank: TESTED 100")))
+    (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
+  (unit-assert (equal (law-fixture "minus-right" "")
+		      '(256 "law minus_right: REFUTED a=7.0 b=\"\" c=\"\" seed=42" "grammar cexpr.primary: accepted 363 of 363"))))
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
@@ -255,7 +262,7 @@
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
-		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR cexpr.primary waits for grammar domains")
+		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR nope.primary names no grammar language")
 		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last

@@ -4,6 +4,7 @@
 ;;;   (law-file-numbers items)    the distinct numbers the file mentions
 ;;;   (template-fill lang text bindings)   {name} replaced by its binding's text
 ;;;   (template-parse lang text)           the filled text, parsed by lang's grammar
+;;;   (grammar-language lang class paths)  registers a grammar for domains lang.rule
 
 (require "text-parser.l")
 
@@ -151,4 +152,11 @@
 	  (error "E_TEMPLATE_PARSE: " (symbol->string lang) " cannot parse: " text))
       (<text-parser>-result p))))
 
+;;; Grammar languages, for domains like cexpr.primary: (lang class paths)
+(define *grammar-languages* ())
+(define-function grammar-language (lang class paths)
+  (set *grammar-languages* (cons (list lang class paths) *grammar-languages*))
+  lang)
+
 (template-language 'cexpr <cexpr> 'expression)
+(grammar-language 'cexpr <cexpr> '("cexpr.g"))

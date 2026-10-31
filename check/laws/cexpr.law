@@ -1,0 +1,7 @@
+-- cexpr.g's grouping and layout, over primaries generated from its own records
+under test: cexpr
+defaults size = 12
+
+law conditional_right: all a, b, c, d, e: cexpr.primary. cexpr`{a}?{b}:{c}?{d}:{e}` == cexpr`{a}?{b}:({c}?{d}:{e})`
+law minus_left: all a, b, c: cexpr.primary. cexpr`{a}-{b}-{c}` == cexpr`({a}-{b})-{c}`
+law comment_blank: all a, b: cexpr.primary. cexpr`{a} /* x */ + {b}` == cexpr`{a} + {b}`

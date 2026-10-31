@@ -1,0 +1,3 @@
+under test: cexpr
+defaults size = 12
+law minus_right: all a, b, c: cexpr.primary. cexpr`{a}-{b}-{c}` == cexpr`{a}-({b}-{c})`

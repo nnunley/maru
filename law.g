@@ -28,6 +28,12 @@ list		= "["_ args?:e ( "|"_ arg )?:r "]"_				-> `(law-list ,(car e) ,@r) ;
 
 tpart		= "{{" | "}}" | "{" idpart "}" | !"`" !"{" !"}" !eol . ;
 template	= idpart:l "`" tpart*@$:t "`"_					-> `(template ,l ,t) ;
+primary		= template						# a claim compares templates
+		| identifier
+		| number
+		| string
+		| "("_ xexpression:e ")"_					-> e
+		;
 
 goal		= identifier:n "("_ args?:a ")"_				-> `(,n ,@(car a))
 		| identifier:v ":"_ arg:t "in" keyword arg:e			-> `(in ,v ,t ,e)

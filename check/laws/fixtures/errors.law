@@ -2,4 +2,4 @@ under test: painted
 fact color(Red)
 rule paint: color(c) => painted(c, c)
 law backwards: all c: painted(c, Red). c = Red
-law parsed: all g: cexpr.primary. g = g
+law parsed: all g: nope.primary. g = g
