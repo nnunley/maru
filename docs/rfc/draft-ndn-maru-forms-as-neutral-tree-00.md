@@ -1,7 +1,6 @@
 # draft-ndn-maru-forms-as-neutral-tree-00: Maru Forms as the Neutral Tree for Every Front End
 
 **Status:** DRAFT
-**Corpus:** red (spec-first: the cexpr_forms, core_forms, zero_global and ir_retired checks and irl's move to maru.k do not exist yet)
 **Category:** Standards-Track
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
@@ -270,19 +269,21 @@ for the handoff. [R-irl-via-maru] Beyond `cexpr.g`'s mapping, irl maps:
 | `T*` | `T *` |
 | `T(A, B)` | `(T A B)` |
 | `T(A, ...)` | `(T A ...)` |
-| `T()` | `(T ...)`, which `ir-gen-c.k` emits unprototyped |
+| `T()` | `(T ...)` |
 | `struct T { int x, y; };` | `(define-struct T ((x int) (y int)))` |
 | `struct T(a, b)` | `(let (((t struct T))) (set-member t x a) (set-member t y b) t)`, fields in declaration order |
 | top-level statements | the body of `(define-function main int () … (return 0))` |
 
-irl's type syntax MUST accept `...` as the last parameter type, and
-`test.irl` MUST declare `printf` as `int(char*, ...)`. A function type
-with no parameters, `T()`, becomes `(T ...)`, which `ir-gen-c.k` emits as
-an unprototyped pointer; on arm64 a variadic call through one passes its
-arguments wrongly, which is why `test.irl` prints garbage there today.
-`test.irl`'s program, compiled this way, MUST print what it printed
-through `ir.k` under x86_64: the lines the `irl` check lists, on every
-host.
+irl's type syntax MUST accept `...` as the last parameter type. A
+function type with no parameters, `T()`, becomes `(T ...)`. A function
+pointer's type MUST say how the function is called: on arm64 a variadic
+function takes its variadic arguments differently from its fixed ones,
+so a call through a pointer of type `(T ...)` cannot reach a function of
+type `(T A ...)` correctly, and ir2 rejects that assignment as a type
+mismatch. `test.irl` therefore MUST declare `printf` as
+`int(char*, ...)` and `fun` as `int(char*, ...)*`. `test.irl`'s program,
+compiled this way, MUST print what it printed through `ir.k` under
+x86_64: the lines the `irl` check lists, on every host.
 
 ```maru-check @R-irl-via-maru
 irl
@@ -291,9 +292,9 @@ ir_retired
 
 `ir.k`, `irgol.g`, `compile-irgol.l`, `test.irgol` and `test-ir.k` MUST
 be removed; the files that remain MUST NOT require `ir.k`, and `irl.g`
-and `compile-irl.l` MUST NOT contain `ir-`. [R-ir-retired] The `irl`
-check passes through `ir.k` today, so it shows the move only together
-with this one. Two
+and `compile-irl.l` MUST NOT contain an `ir-` form. [R-ir-retired] The
+`irl` check passed through `ir.k` before the move, so it shows the move
+only together with this one. Two
 IRs for one language double what a change to the C back end has to keep
 working.
 
@@ -419,8 +420,9 @@ parses as `(a < b) < c`, as in C. `test.irl` uses
 neither. Indexing `a[i]` moves from `ir.k`'s pointer addition to
 `maru.k`'s `indir`; both scale by the element size, and `test.irl`'s
 sieve exercises it. Programs written for `irgol` lose their compiler,
-which already fails. `test.irl` changes in one line, declaring `printf`'s
-parameters, so the `irl` check no longer needs x86_64 to run it.
+which already fails. `test.irl` changes in two lines, declaring the parameters
+of `printf` and of `fun`, so the `irl` check no longer needs x86_64 to
+run it.
 
 ## References
 
