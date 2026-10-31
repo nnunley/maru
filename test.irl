@@ -19,7 +19,7 @@
 //		type ()				= function of unspecified arguments that returns type
 //		type (param-type, ...)		= function of specified parameter types returning type
 
-import int() printf;	// import 'printf' from an external library
+import int(char*, ...) printf;	// import 'printf' from an external library
 
 //	type identifier := expression ;
 //	

@@ -234,23 +234,19 @@
   (or (!= 'arm64 host-isa) (!= 0 (system "arch -x86_64 /usr/bin/true 2>/dev/null"))
       (unit-assert (= 0 (system "test -x bin/x86_64/eval2 && test -x bin/x86_64/eval")))))
 
-;; irl and irgol inherit cexpr.g's lexing and binary operators.  irl's C
-;; runs where x86_64 code can (on arm64 its untyped printf calls variadic
-;; printf wrongly); irgol, written for an older ir.k, still parses test.irgol.
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
+;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
 (check "irl"
-  (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.c"))
-  (let ((cc (cond ((= 'x64 host-isa) "cc")
-		  ((= 0 (system "arch -x86_64 /usr/bin/true 2>/dev/null")) "cc -arch x86_64"))))
-    (when cc
-      (run "irl-cc" (concat-strings cc " -w -o " tmp "/irl " tmp "/irl.c"))
-      (unit-assert (equal (run "irl" (concat-strings tmp "/irl"))
-			  '("hello, world" "hello again" "42" "15" "15" "Point with x = 1 and y = 2" "Point with x = 1 and y = 2"
-			    "   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47"
-			    "   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47  53  59  61  67  71  73  79  83  89  97")))))
-  (unit-assert (member? "*/" (run "irgol" "./eval compile-irgol.l test.irgol || true"))))
+  (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.k"))
+  (unit-assert (equal (run "irl" (ir2-build "irl" (concat-strings tmp "/irl.k")))
+		      '("hello, world" "hello again" "42" "15" "15" "Point with x = 1 and y = 2" "Point with x = 1 and y = 2"
+			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47"
+			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47  53  59  61  67  71  73  79  83  89  97")))
+  (run "irl-errors-gen" (concat-strings "./eval compile-irl.l check/irl-errors.irl > " tmp "/irl-errors.k"))
+  (unit-assert (not (= 0 (system (concat-strings "./eval2 ir-gen-c.k maru.k " tmp "/irl-errors.k > " tmp "/irl-errors.err 2>&1")))))
+  (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/irl-errors.err")) "type mismatch")))
 
 (check "asm_patch"
   (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok"))

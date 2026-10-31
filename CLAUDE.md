@@ -76,9 +76,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   end of its input.
 - `cexpr_forms` (`check/cexpr-forms.l`): `cexpr.g` parses C's expressions,
   with C's precedence, to Maru forms.
-- `irl`: `irl.g` (inheriting `cexpr.g`) compiles `test.irl` to C that, where
-  x86_64 code runs, prints what the program should; `irgol.g` still parses
-  `test.irgol`.
+- `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
+  into a `.k` program that `maru.k` compiles and that prints what it should;
+  `?:` with branches of different types (`check/irl-errors.irl`) is a type
+  mismatch.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
   by name or address, with typed results (`"dd>d"`), variadic calls and raw
   byte access.

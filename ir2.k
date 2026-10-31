@@ -323,8 +323,19 @@
 		  (set (<ir-insn>-type rhs) ltype)))
 	 )))
 
+;; As in C, a pointer to a function of (...) takes any function with its return type.
+(define-function ir-unprototyped-from? (ltype rtype)
+  (and (ir-pointer-type? ltype) (ir-pointer-type? rtype)
+       (let ((l (<ir-pointer-type>-referent ltype))
+	     (r (<ir-pointer-type>-referent rtype)))
+	 (and (ir-function-type? l) (ir-function-type? r)
+	      (= IR-VARARGS (car (<ir-function-type>-arg-types l)))
+	      (not (cdr (<ir-function-type>-arg-types l)))
+	      (= (<ir-function-type>-ret-type l) (<ir-function-type>-ret-type r))))))
+
 (define-function ir-can-assign (ltype rtype rhs)
   (or (=                      ltype                    rtype )
+      (ir-unprototyped-from?  ltype		       rtype )
       (and (= IR-VOID*        ltype) (ir-pointer-type? rtype))
       (and (ir-pointer-type?  ltype) (= IR-VOID*       rtype))
       (and (ir-pointer-type?  ltype) (ir-zero?         rhs  ))

@@ -1,0 +1,2 @@
+// ?: with branches of different types is a type mismatch.
+int x := 1 < 2 ? 1 : "s";
