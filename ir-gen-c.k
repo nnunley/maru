@@ -330,6 +330,8 @@
 	(ir-gen-c-bol   self)
 	(ir-gen-c value self)
 	(ir-gen-c-eol   self))
+    (if (= <ir-nop> (type-of (car (<ir-define>-operands value))))
+	(ir-gen-global-declaration self (<ir-define>-var value))
     (let* ((setter (car (<ir-define>-operands value)))
 	   (var    (<ir-set-var>-parameters setter))
 	   (name   (<ir-global>-name var))
@@ -344,9 +346,7 @@
 				(print " = ")
 				(print (ir-gen-c-function-name init))
 				(println ";"))
-	(else			(error "cannot initialise: "name" with: "value)))
-;    (println ";")))
-      )))
+	(else			(error "cannot initialise: "name" with: "value)))))))
 
 (define-function ir-gen-c-variable-name (name)	(concat-string "v_" (c-mangle (symbol->string name))))
 

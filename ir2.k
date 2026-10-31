@@ -618,11 +618,13 @@
 (define-method ir-check-type <ir-define> (ir val?)	(let* ((name  (car  self.parameters))
 							       (type  (cadr self.parameters))
 							       (init  (car  self.operands))
-							       (itype (ir-check-type init ir 1)))
+							       (nop   (= <ir-nop> (type-of init)))
+							       (itype (ir-check-type init ir (not nop))))
 							  (or type	(set type itype))
 							  (or self.var	(set self.var (ir-declare-local ir name type)))
-							  (ir-check-assignment (<ir-variable>-type self.var) itype init self)
-							  (set (car self.operands) (new <ir-set-var> self.var (list init) type))
+							  (unless nop
+							    (ir-check-assignment (<ir-variable>-type self.var) itype init self)
+							    (set (car self.operands) (new <ir-set-var> self.var (list init) type)))
 							  (set self.type type)))
 
 ;
