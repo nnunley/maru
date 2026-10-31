@@ -18,6 +18,7 @@ osdefs.k
 *.s
 /test
 /test.c
+/test.k
 /a.out
 /peg.n
 /peg.m

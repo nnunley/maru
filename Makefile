@@ -56,7 +56,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l irgol.g.l $(CROSS) .force
+check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l $(CROSS) .force
 	./eval check/check.l
 
 maru-check : eval2 .force
@@ -117,18 +117,10 @@ test-compile-grammar : eval .force
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
-test-compile-irgol : eval eval32 cexpr.g.l irl.g.l irgol.g.l .force
-	./eval compile-irgol.l test.irgol > test.c
-	$(CC32) -fno-builtin -g -o test test.c
-	@echo
-	./test
-
-irgol.g.l : tpeg.l irgol.g | eval
-	./eval compile-tpeg.l irgol.g > irgol.g.l
-
-test-compile-irl : eval eval32 cexpr.g.l irl.g.l .force
-	./eval compile-irl.l test.irl > test.c
-	$(CC32) -fno-builtin -g -o test test.c
+test-compile-irl : eval eval2 cexpr.g.l irl.g.l .force
+	./eval compile-irl.l test.irl > test.k
+	./eval2 ir-gen-c.k maru.k test.k > test.c
+	$(CC) -fno-builtin -w -o test test.c -ldl
 	@echo
 	./test
 
@@ -138,11 +130,6 @@ irl.g.l : tpeg.l irl.g | eval
 cexpr.g.l : tpeg.l cexpr.g | eval
 	./eval compile-tpeg.l cexpr.g > cexpr.g.l
 
-test-ir : eval .force
-	./eval test-ir.k > test.c
-	$(CC32) -fno-builtin -g -o test test.c
-	@echo
-	./test
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval
 	$(TIME) ./eval compile-peg.l  tpeg.g > $@
@@ -235,7 +222,7 @@ stats : .force
 # Everything any rule here makes, except the checked-in peg.l and net/*.osdefs.k.
 clean : .force
 	rm -f eval eval2 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
-	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c *.o *.s a.out peg.n peg.m
+	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c test.k *.o *.s a.out peg.n peg.m
 	rm -f maru-check test-main test-pegen *.$(SO) *~
 	rm -rf bin *.dSYM *.mshark
 

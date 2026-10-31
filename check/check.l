@@ -237,6 +237,12 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
+;; maru.k is the one typed IR: nothing requires ir.k, and irl has no ir- action.
+(check "ir_retired"
+  (unit-assert (not (run "ir_retired-grep" "git grep -l 'require \"ir.k\"' -- '*.l' '*.k' '*.g' || true")))
+  (unit-assert (equal (run "ir_retired-irl" "grep -c 'ir-' irl.g compile-irl.l || true") '("irl.g:0" "compile-irl.l:0")))
+  (unit-assert (= 0 (system "! ls ir.k irgol.g compile-irgol.l test.irgol test-ir.k 2>/dev/null"))))
+
 ;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
 (check "irl"
   (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.k"))
@@ -324,7 +330,7 @@
 ;; Every source line is accounted for: the count must equal the sum of the
 ;; entries in check/lines, and each entry that adds lines must say why.
 (check "lines"
-  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|irgol|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
+  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|dc)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
 	(sum 0))
     (list-do entry (lines (contents-of-file-named "check/lines"))
       (let ((w (words entry)))

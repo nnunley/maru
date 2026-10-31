@@ -80,6 +80,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) is a type
   mismatch.
+- `ir_retired`: `ir.k` and irgol are gone; nothing requires `ir.k`, and
+  `irl.g` and `compile-irl.l` have no `ir-` action.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
   by name or address, with typed results (`"dd>d"`), variadic calls and raw
   byte access.
@@ -128,8 +130,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
   on a 64-bit host, which is wrong for its 32-bit target.
 - `test-peg.l` loops forever on every platform: `peg.l`'s `definitions` rule
-  matches empty input, so the parser never advances. `compile-irgol.l` no
-  longer matches the current `ir.k`.
+  matches empty input, so the parser never advances.
 - `make test-emit` runs `emit.l` as a shell script; use
   `./eval emit.l test-emit.l`.
 - `net/*.osdefs` are Linux-only (`linux/tcp.h`, `linux/if_tun.h`).

@@ -1,7 +1,6 @@
 ;;; compile-irl.l									-*- coke -*-
 ;;;
 ;;; ./eval compile-irl.l <filename>.irl > <filename>.k
-;;; ./eval2 ir-gen-c.k maru.k <filename>.k > <filename>.c
 
 (require "text-parser.l")
 
