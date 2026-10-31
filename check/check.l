@@ -235,7 +235,10 @@
       (unit-assert (= 0 (system "test -x bin/x86_64/eval2 && test -x bin/x86_64/eval")))))
 
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
-(check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
+(check "cexpr_forms"
+  (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok"))
+  ;; 0xq is not hex: parsing it must not crash eval (exit 139 is SIGSEGV).
+  (unit-assert (!= 139 (run-status 20 (concat-strings "echo '(require \"text-parser.l\") (require \"cexpr.g.l\") (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion) (parse-string <cexpr> $expression \"0xq\")' > " tmp "/hexq.l; ./eval " tmp "/hexq.l >/dev/null 2>&1")))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.

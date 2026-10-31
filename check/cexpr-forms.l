@@ -10,6 +10,7 @@
 	       ("c ? a : b" (if c a b)) ("f(a, b)" (f a b))
 	       ("a<<b" (<< a b)) ("a<=b" (<= a b)) ("a&&b||c" (or (and a b) c)) ("a!=b" (!= a b))
 	       ("a /* c */ + b" (+ a b)) ("a - -1" (- a -1)) ("a?b:c" (if a b c))
+	       ("0xff" 255) ("0xFF" 255) ("0xq+1" 0)
 	       ("a?b?c:d:e" (if a (if b c d) e)) ("a?b:c?d:e" (if a b (if c d e)))))
 
 (let ((ok 1))

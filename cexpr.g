@@ -14,7 +14,7 @@ _		= (blank   | eol | comment)* ;
 
 oigit		= [0-7] ;
 digit		= [0-9] ;
-higit		= [0-9A-Za-z] ;
+higit		= [0-9A-Fa-f] ;
 letter		= [A-Z_a-z] ;
 
 uinteger	= "0x" higit+ $#16:x _						-> x
