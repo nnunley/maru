@@ -1,0 +1,23 @@
+-- the logic engine's own laws; terms come from rules: atoms, variables (V n), pairs (P a b)
+under test: unify, walk_all, holds, generate, enumerate
+
+fact atom(A)
+fact atom(B)
+fact index(1)
+fact index(2)
+fact index(3)
+rule t_atom: atom(a) => term(a)
+rule t_var:  index(n) => term([V, n])
+rule t_pair: term(a), term(b) => term([P, a, b])
+
+-- a toy relation, generated, checked and enumerated by the same rules
+rule zero: => nat(Z)
+rule succ: nat(n) => nat([S, n])
+fact seed(1)
+fact seed(2)
+fact seed(3)
+fact seed(4)
+
+law unify_equates: all a: term(a), b: term(b), succeeds(unify(realise(a), realise(b), empty)). walk_all(realise(a), empty) = realise(a) && walk_all(realise(a), unify(realise(a), realise(b), empty)) = walk_all(realise(b), unify(realise(a), realise(b), empty))
+law unify_symmetric: all a: term(a), b: term(b). unify(realise(a), realise(a), empty) = empty && succeeds(unify(realise(a), realise(b), empty)) = succeeds(unify(realise(b), realise(a), empty))
+law nat_generated: all i: seed(i). holds(generate(i)) = 1 && elem(generate(i), enumerate()) = 1 by exhaustion size 2

@@ -237,9 +237,6 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
-;; rules.l: one rule set generates, checks and enumerates; size bounds recursion; unify has an occurs check; builtins (check/rules-test.l).
-(check "law_engine" (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok")))
-
 ;; law.g reads law files to items, and templates fill by text (check/law-compile-test.l).
 (check "law_cexpr" (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok")))
 
@@ -248,6 +245,12 @@
   (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; ./eval check/law.l " files))))
     (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
 (define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
+
+;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
+(check "law_engine"
+  (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
+  (unit-assert (equal (law-run "engine" "check/laws/engine.l check/laws/engine.law")
+		      '(0 "law unify_equates: TESTED 100" "law unify_symmetric: TESTED 100" "law nat_generated: PROVED 4"))))
 (check "law_rules"
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
