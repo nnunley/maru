@@ -154,7 +154,8 @@ law_engine
 ```
 
 A derivation MUST NOT nest rules deeper than the size: at size 0 only
-rules whose premises do not use their own relation apply. Generation
+rules whose relation cannot be reached from their premises, directly or
+through other rules, apply. Generation
 therefore always ends, and enumeration is finite. [R-size-bound]
 
 ```maru-check @R-size-bound
