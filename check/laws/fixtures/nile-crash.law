@@ -1,0 +1,5 @@
+-- Nile's resolver crashes on this process definition (intype has no method for <nile-typeref>): no verdict, not a rejection
+reference nile_defines(d)
+under test: nile_defines
+fact crashing("ϫ():ρ\nforall_\n")
+law resolver_crash: all d: crashing(d). nile_defines(d) = reject

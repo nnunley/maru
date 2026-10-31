@@ -281,6 +281,13 @@
 		      (equal ab "a=0 b=0.500000")))
     (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
+;; the Nile rules, judged by Nile's own resolver and type checker; Nile's resolver crash is no verdict
+(check "law_nile"
+  (let ((n "check/laws/nile-reference.l"))
+    (unit-assert (equal (law-run "nile" (concat-strings n " check/laws/nile.law"))
+			'(0 "law sound: TESTED 100" "law generate_checks: TESTED 100" "law coverage: PROVED 1" "law agree: TESTED 100"
+			  "law agree_rejected: TESTED 100" "law round_trip: TESTED 100")))
+    (unit-assert (equal (law-fixture "nile-crash" n) '(256 "law resolver_crash: INCONCLUSIVE status=256 input=(\"ϫ():ρ\\012forall_\\012\")")))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
 ;; can require ir.k), and irl has no ir- form.

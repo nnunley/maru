@@ -35,13 +35,14 @@
   (while vars (set g (rules-subst g (car vars) (car vals))) (set vars (cdr vars)) (set vals (cdr vals)))
   g)
 
-;; claims and conditions: = compares values, a Capitalised name is a constant, a
-;; template is filled with the law's values and parsed
+;; claims and conditions: = compares values, a Capitalised name is a constant, as is
+;; a relation under test (checks(expr, ...)), a template is filled with the law's values and parsed
 (define-function law-template (lang text bindings) (template-parse lang (template-fill lang text bindings)))
 (define-function law-upper? (x) (let ((c (string-at (symbol->string x) 0))) (and (<= ?A c) (<= c ?Z))))
 (define-function law-ne (a b) (not (equal a b)))
+(define-function law-relation? (x) (and (member? x *law-under*) (rules-concludes? x *law-rules*)))
 (define-function law-form (x)
-  (cond ((symbol? x)		(if (law-upper? x) (list 'quote x) x))
+  (cond ((symbol? x)		(if (or (law-upper? x) (law-relation? x)) (list 'quote x) x))
 	((not (pair? x))	x)
 	((= 'quote (car x))	x)
 	((= 'template (car x))	(list 'law-template (list 'quote (cadr x)) (caddr x)
@@ -49,12 +50,13 @@
 	(else			(cons (cond ((= '= (car x)) 'equal) ((= '!= (car x)) 'law-ne) (else (car x)))
 				      (map law-form (cdr x))))))
 
-;; references: anything but accept or reject is a crash, kept with its input
+;; references: a template term is passed as its text; anything but accept or reject
+;; is a crash, kept with its input
 (define-function law-crashed (v args)
   (or *law-crash* (set *law-crash* (cons (if (and (pair? v) (= 'crash (car v))) (cadr v) v) args)))
   'crash)
 (define-function law-wrap (f)
-  (lambda args (let ((v (apply f args))) (if (or (= v 'accept) (= v 'reject)) v (law-crashed v args)))))
+  (lambda args (let* ((in (map template-render args)) (v (apply f in))) (if (or (= v 'accept) (= v 'reject)) v (law-crashed v in)))))
 (define-function law-set-global (name v) (eval (list 'set name (list 'quote v))))
 
 ;; domains: a set, a goal whose last argument is the variable, or a grammar's
@@ -221,10 +223,10 @@
   (let ((k (car r)))
     (print k)
     (cond ((= k 'REFUTED)	(let ((ns *lnames*) (bs *lb*))	; a generated sentence is quoted, as it may hold a newline
-				  (list-do v (cadr r) (print " " (car ns) "=") (if (= 'grammar (cadar bs)) (dump v) (print v)) (set ns (cdr ns)) (set bs (cdr bs)))
+				  (list-do v (cadr r) (print " " (car ns) "=") (if (= 'grammar (cadar bs)) (dump v) (print (template-render v))) (set ns (cdr ns)) (set bs (cdr bs)))
 				  (print " seed=" *lseed*)))
 	  ((= k 'STARVED)	(print " " (cadr r) " of " (caddr r)))
-	  ((= k 'INCONCLUSIVE)	(print " status=" (cadr r) " input=" (cddr r)))
+	  ((= k 'INCONCLUSIVE)	(print " status=" (cadr r) " input=") (dump (cddr r)))
 	  ((= k 'VACUOUS))
 	  (else			(print " " (cadr r))))
     (println "")

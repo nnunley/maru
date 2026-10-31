@@ -1,0 +1,33 @@
+-- well-typed Nile expressions as rules, judged by Nile's own resolver and type checker (check/laws/nile-reference.l)
+set Type = Number | Boolean
+let abpq = [a: Number, b: Number, p: Boolean, q: Boolean]
+reference nile_accepts(e, t)
+under test: expr
+
+facts infix, prefix from nile_signatures      -- read from Nile's prelude
+
+rule e_var:    v: t in env                                        => expr(env, t, v)
+rule e_num:    number(n)                                          => expr(env, Number, n)
+rule e_prefix: prefix(op, at, t), expr(env, at, a)                => expr(env, t, nile`{op}({a})`)
+rule e_infix:  infix(op, at, bt, t), expr(env, at, a), expr(env, bt, b)
+                                                                  => expr(env, t, nile`({a} {op} {b})`)
+-- Nile's parser drops parentheses and its resolver reads a relation whose left operand is one
+-- as a chain (nile-ast-nodes.l, unchain-relational): ((a = b) < c) is (a = b) ∧ (b < c)
+rule c_link:   infix(op, Number, Number, Boolean), expr(env, Number, a), expr(env, Number, b) => chain(env, nile`({a} {op} {b})`)
+rule c_more:   infix(op, Number, Number, Boolean), chain(env, a), expr(env, Number, b)          => chain(env, nile`({a} {op} {b})`)
+rule e_chain:  infix(op, Number, Number, Boolean), chain(env, a), expr(env, Number, b)          => expr(env, Boolean, nile`({a} {op} {b})`)
+
+-- expressions that ignore types: the agreement laws' independent source
+rule u_var:    v: t in env                                        => uexpr(env, v)
+rule u_num:    number(n)                                          => uexpr(env, n)
+rule u_prefix: prefix(op, at, t), uexpr(env, a)                   => uexpr(env, nile`{op}({a})`)
+rule u_infix:  infix(op, at, bt, t), uexpr(env, a), uexpr(env, b) => uexpr(env, nile`({a} {op} {b})`)
+fact draws(100)                                                   -- generations per type, for coverage
+
+law sound: all t: Type, e: expr(abpq, t, e). nile_accepts(e, t) = accept
+law generate_checks: all t: Type, e: expr(abpq, t, e). checks(expr, abpq, t, e) = accept
+law coverage: all n: draws(n). unfired(expr, abpq, Type, n) = 0 by exhaustion
+law agree: all t: Type, e: uexpr(abpq, e). checks(expr, abpq, t, e) = nile_accepts(e, t)
+law agree_rejected: all t: Type, e: uexpr(abpq, e), checks(expr, abpq, t, e) = reject. nile_accepts(e, t) = checks(expr, abpq, t, e)
+-- non-ASCII operators (√ ∧ ≤ ¬ ≠ ≥ ∨) survive filling, Nile's parser and printing back
+law round_trip: all t: Type, e: expr(abpq, t, e), non_ascii(text(e)). unparse(nile`{e}`) = text(e)

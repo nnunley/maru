@@ -3,6 +3,7 @@
 ;;;   (law-file-read path)        items for rules-expand and the law runner
 ;;;   (law-file-numbers items)    the distinct numbers the file mentions
 ;;;   (template-fill lang text bindings)   {name} replaced by its binding's text
+;;;   (template-render v)                  a template term as text, holes filled recursively; else v
 ;;;   (template-parse lang text)           the filled text, parsed by lang's grammar
 ;;;   (grammar-language lang class paths sentinel)  registers a grammar for domains lang.rule
 
@@ -27,6 +28,10 @@
   (let ((c (string-at (symbol->string x) 0))) (and (<= ?a c) (<= c ?z))))
 (define-function law-var (x) (string->symbol (concat-string "$" (symbol->string x))))
 (define law-conv)
+(define template-holes)
+;; in a rule a template is a term, (template lang text ((hole . $hole)...)), so it unifies
+(define-function law-template-term (x)
+  (list 'template (cadr x) (caddr x) (map (lambda (n) (cons n (law-conv n 1))) (template-holes (caddr x)))))
 (define-function law-list-from (elems tail var)
   (if elems (cons (law-conv (car elems) var) (law-list-from (cdr elems) tail var)) (and tail (law-conv (car tail) var))))
 (define-function law-conv (x var)	; var: lower-case names become variables
@@ -38,7 +43,7 @@
     ((not (pair? x))		x)
     ((= 'law-pair (car x))	(cons (law-conv (cadr x) var) (law-conv (caddr x) var)))
     ((= 'law-list (car x))	(law-list-from (cadr x) (cddr x) var))
-    ((= 'template (car x))	x)
+    ((= 'template (car x))	(if (= var 1) (law-template-term x) x))
     (else			(cons (car x) (map (lambda (a) (law-conv a var)) (cdr x))))))
 (define-function law-goal (g scope)	; a goal's relation is a variable only if a parameter or schema variable
   (cons (if (member? (car g) scope) (law-var (car g)) (car g)) (map (lambda (a) (law-conv a 1)) (cdr g))))
@@ -112,11 +117,16 @@
 
 (define-function template-name (lang text)
   (concat-strings (symbol->string lang) "`" text "`"))
+(define template-fill)
+(define-function template-term? (v) (and (pair? v) (= 'template (car v)) (pair? (cdddr v))))
 (define-function template-text (v)
   (cond ((string? v)	v)
 	((symbol? v)	(symbol->string v))
 	((long? v)	(long->string v))
+	((double? v)	(double->string v))
+	((template-term? v)	(template-fill (cadr v) (caddr v) (cadddr v)))
 	(else		(error "E_TEMPLATE_PARSE: a hole's value is not text: " v))))
+(define-function template-render (v) (if (template-term? v) (template-text v) v))
 (define-function template-value (lang text name bindings)
   (let* ((s (string->symbol name)) (b (or (assq s bindings) (assq (law-var s) bindings))))
     (or b (error "E_TEMPLATE_PARSE: no value for {" name "} in " (template-name lang text)))
@@ -126,6 +136,16 @@
     (while (and (< j n) (!= 125 (string-at text j))) (set j (+ j 1)))
     (or (< j n) (error "E_TEMPLATE_PARSE: unclosed { in " (template-name lang text)))
     j))
+(define-function template-holes (text)	; each hole's name, once, in order
+  (let ((out ()) (i 0) (n (string-length text)))
+    (while (< i n)
+      (let ((c (string-at text i)))
+	(if (and (< (+ i 1) n) (or (= c 123) (= c 125)) (= c (string-at text (+ i 1)))) (set i (+ i 2))
+	  (if (!= c 123) (set i (+ i 1))
+	    (let* ((j (template-close 'template text i)) (h (string->symbol (string-copy text (+ i 1) (- (- j i) 1)))))
+	      (or (member? h out) (set out (concat-list out (list h))))
+	      (set i (+ j 1)))))))
+    out))
 (define-function template-fill (lang text bindings)
   (let ((out (array)) (i 0) (n (string-length text)))
     (while (< i n)

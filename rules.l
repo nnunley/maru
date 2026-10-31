@@ -4,11 +4,13 @@
 ;;; a rule set a list of rules, and $x a logic variable.  Rule sets are passed
 ;;; in, never global, so mutants can swap them.  See docs/rfc/draft-ndn-maru-laws-and-rules-00.md.
 
-;; seeded, replayable.  rules-fired names the rules used in successful generate and check derivations.
+;; seeded, replayable.  rules-fired names the rules used in successful generate and check derivations, rules-used lists them.
 (define *rules-seed* 42)
 (define *rules-fired* ())	; rule names used in successful derivations
-(define-function rules-seed (n) (set *rules-seed* n) (set *rules-fired* ()))
+(define *rules-used* ())	; the rules themselves, as facts share their relation's name
+(define-function rules-seed (n) (set *rules-seed* n) (set *rules-fired* ()) (set *rules-used* ()))
 (define-function rules-fired () *rules-fired*)
+(define-function rules-used () *rules-used*)
 (define-function rules-rand (n) (set *rules-seed* (% (+ (* *rules-seed* 75) 74) 65537)) (% *rules-seed* n))
 (define-function rules-shuffle (l)
   (let ((a (list->array l)) (n (list-length l)))
@@ -102,13 +104,13 @@
       (and (rules-number? x) (k s)))))
 (define-function rules-solve-eq (goal s k)
   (let ((s2 (unify (cadr goal) (caddr goal) s))) (and s2 (k s2))))
-(define-function rules-note (name v)
-  (and v (not (member? name *rules-fired*)) (push *rules-fired* name))
+(define-function rules-note (rl v)
+  (and v (not (member? rl *rules-used*)) (push *rules-used* rl) (not (member? (car rl) *rules-fired*)) (push *rules-fired* (car rl)))
   v)
 (define-function rules-try (rules rl goal s size k)
   (let* ((env (list ())) (head (rules-rename (cadr rl) env)) (body (rules-rename (cddr rl) env))
 	 (s2 (unify (cdr head) (cdr goal) s)))
-    (and s2 (rules-solve-all rules body s2 (- size 1) (lambda (s3) (rules-note (car rl) (k s3)))))))
+    (and s2 (rules-solve-all rules body s2 (- size 1) (lambda (s3) (rules-note rl (k s3)))))))
 (define-function rules-solve-rules (rules goal s size k)
   (let ((p (car goal)) (r ()))
     (list-do rl (rules-choices rules)
