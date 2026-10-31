@@ -52,25 +52,47 @@
     (list-do d nile-prelude (and (is-a? d <nile-opdef>) (set out (concat-list out (nile-signature (<nile-opdef>-sig d))))))
     out))
 
-;; one question, in a child: its exit status as a verdict
+;; the prelude, resolved and type-checked once, quietly (resolving prints each operation); a question resolves only its own text
+(define nile-prelude-env
+  (let ((p print) (q println) (env (nile-resolve-env '())))
+    (set print (lambda args 1)) (set println (lambda args 1))
+    (map-with type-check (map-with resolve nile-prelude env) '())
+    (set print p) (set println q)
+    env))
+
+;; one question, in a child: its exit status as a verdict.  An expression is parsed alone, as the body of
+;; \f(a:Number, b:Number, p:Boolean, q:Boolean) : TYPE, whose signature is parsed once per type
 (define alarm (subr "alarm" "i>i"))
-(define-function nile-check (src)
+(define-function nile-parse (rule src)	; in a child, the parser after rule matched src, or exit 4
   (define-method $error <nile-parser> () (_exit 4))	; the grammar's error rule would call error
   (define-method $$error <nile-parser> () (_exit 4))
   (let ((p (text-parser-for-on <nile-parser> src)))
     (set (<nile-parser>-indentation p) 0)
-    (or (text-parser-invoke-rule 'start $start p) (_exit 4))
-    (map-with type-check (map-with resolve (concat-list nile-prelude (<text-parser>-result p)) (nile-resolve-env '())) '())
-    (_exit 0)))
-(define-function nile-verdict (src)
+    (or (text-parser-invoke-rule 'start rule p) (_exit 4))
+    p))
+(define-function nile-check (defs)
+  (map-with type-check (map-with resolve defs nile-prelude-env) '())
+  (_exit 0))
+(define-function nile-verdict (ask)	; ask: run in the child, exiting with its verdict
   (let ((pid (fork)))
-    (when (= 0 pid) (law-quiet) (alarm 10) (nile-check src))
+    (when (= 0 pid) (law-quiet) (alarm 10) (ask))
     (waitpid pid status-word 0)
     (let ((st (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
       (cond ((= 0 st) accept) ((or (= st (<< 3 8)) (= st (<< 4 8))) reject) (else (list 'crash st))))))
+(define nile-sigs ())
+(define-function nile-sig (type)
+  (or (cdr (assq type nile-sigs))
+      (let ((p (text-parser-for-on <nile-parser> (concat-strings "\\f(a:Number, b:Number, p:Boolean, q:Boolean) : " (symbol->string type) "\n    a\n"))))
+	(set (<nile-parser>-indentation p) 0)
+	(text-parser-invoke-rule 'start $start p)
+	(cdar (push nile-sigs (cons type (<nile-opdef>-sig (car (<text-parser>-result p)))))))))
 (define-function nile-accepts (text type)
-  (nile-verdict (concat-strings "\\f(a:Number, b:Number, p:Boolean, q:Boolean) : " (template-text type) "\n    " (template-text text) "\n")))
-(define-function nile-defines (text) (nile-verdict text))
+  (let ((sig (nile-sig (string->symbol (template-text type)))) (src (template-text text)))
+    (nile-verdict (lambda ()
+		    (let ((p (nile-parse $expr src)))
+		      (or (= (<text-parser>-position p) (<text-parser>-limit p)) (_exit 4))
+		      (nile-check (list (nile-opdef sig (nile-opbody () (<text-parser>-result p))))))))))
+(define-function nile-defines (text) (nile-verdict (lambda () (nile-check (<text-parser>-result (nile-parse $start (template-text text)))))))
 (define nile_accepts nile-accepts)
 (define nile_defines nile-defines)
 (define nile_signatures nile-signatures)
