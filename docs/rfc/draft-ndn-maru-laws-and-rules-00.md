@@ -236,6 +236,9 @@ each hole's variable has a value that is source text in the same
 language, and the filled template is parsed by that language's grammar.
 `{{` and `}}` stand for literal braces, which Nile's conditional
 expressions need.
+A filler is inserted as text, with no parentheses added, so grouping is
+the template author's: a template that needs a filler to bind as a unit
+writes the parentheses itself (`(a + b)`, as `e_infix` does).
 A template that does not parse when filled is an error in the rule or law
 that wrote it, reported with the filled text. [R-template-holes]
 
@@ -320,11 +323,11 @@ law_nile
 
 A reference SHOULD run in-process, with its errors caught as values (as
 `check/irl-errors.l` catches ir2's). A reference that exits on its first
-error, as Nile's checker does today, MAY run in a forked child, which is
-a host facility, until its errors become values. The Nile reference MUST
-be Nile's compiler loaded into this tree's Maru, not its vendored copy;
-moving Nile onto this tree's Maru is also when its fatal errors become
-values, so the Nile laws run in-process.
+error, as Nile's checker does today (`nile-fatal-error` calls `(exit)`),
+MAY run in a forked child, which is a host facility. Maru has no
+non-local exit, and `error` aborts the process, so such a reference runs
+forked until one exists. The Nile reference MUST be Nile's compiler
+loaded into this tree's Maru, not its vendored copy.
 
 ### Laws every rule set is held to
 
@@ -451,6 +454,13 @@ Extension point: a third `Method`, `INDUCT`, with its own marker.
 routing it through a C compiler is what the bare-metal goal rules out.
 Extension point: a domain or reference backed by the in-process code
 region of RFC 0001.
+
+**Non-local exit in Maru.** A `catch`/`throw` or an `error` that returns
+to its caller as a value, in `eval.c` and `eval2`. Excluded because
+neither evaluator has one today and adding it changes the evaluators, not
+the laws. Owned by the evaluators. Extension point: once it exists, a
+reference that exits on error runs in-process and its fatal errors become
+`(crash status)` values, so the Nile laws no longer need a forked child.
 
 **Weights on rules.** QuickCheck's `frequency`, choosing some rules more
 often. Excluded until a measured distribution needs it; laws can already
