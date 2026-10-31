@@ -147,12 +147,21 @@
 ;;; A goal that passes a relation, (list_of (expr env t) es), calls the rule specialised for it:
 ;;; (list_of[expr] env t es).  Rejections go to *rules-reject* (error), then expansion goes on.
 (define *rules-reject* error)
-(define-structure <rx> (hos done todo used))	; higher-order rules, specialised relations made, rules to rewrite, relations passed
+(define-structure <rx> (hos done todo used arity))	; higher-order rules, specialised relations made, rules to rewrite, relations passed
 (define-function rules-cat-list (l) (if (cdr l) (concat-string (car l) (rules-cat-list (cdr l))) (car l)))
 (define-function rules-cat l (rules-cat-list l))
+(define-function rules-reject-with (code what) (*rules-reject* (rules-cat code what)))
+(define-function rules-unknown (what) (rules-reject-with "E_UNKNOWN_RELATION: " what))
 (define-function rules-subst (x v val)
   (cond ((= x v) val) ((pair? x) (cons (rules-subst (car x) v val) (rules-subst (cdr x) v val))) (else x)))
 (define-function rules-fact (g) (list (car g) g))
+(define-function rules-read-facts (it)	; (facts (relation...) function), the function a value or a global's name
+  (let* ((f (caddr it)) (l ()) (gs ((if (symbol? f) (eval f) f))))
+    (or gs (rules-reject-with "E_NO_FACTS: " (if (symbol? f) (symbol->string f) (rules-cat "facts for " (symbol->string (caadr it))))))
+    (list-do g gs
+      (if (member? (car g) (cadr it)) (set l (concat-list l (list (rules-fact g))))
+	(rules-unknown (symbol->string (car g)))))
+    l))
 (define-function rules-keep (ho r) (set-car ho (concat-list (car ho) (list r))) ())
 (define-function rules-flatten (items ho)	; first-order rules; higher-order ones go to the cell ho
   (let ((out ()))
@@ -162,15 +171,12 @@
 	  (cond
 	    ((= k 'fact)	(list (rules-fact (cadr it))))
 	    ((= k 'schema)	(let ((l ())) (list-do v (caddr it) (set l (concat-list l (rules-flatten (list (rules-subst (cadddr it) (cadr it) v)) ho)))) l))
-	    ((= k 'facts)	(let ((l ())) (list-do g ((caddr it))
-				(if (member? (car g) (cadr it)) (set l (concat-list l (list (rules-fact g))))
-				  (*rules-reject* (rules-cat "E_UNKNOWN_RELATION: " (symbol->string (car g)))))) l))
+	    ((= k 'facts)	(rules-read-facts it))
 	    ((= k 'rule)	(if (caddr it) (rules-keep ho (cdr it)) (list (cons (cadr it) (cdddr it)))))
 	    (else		(list it)))))))
     out))
 
 ;; specialisation.  A binding is (param rel extras...): the relation a goal passes for a parameter.
-(define-function rules-unknown (what) (*rules-reject* (rules-cat "E_UNKNOWN_RELATION: " what)))
 (define-function rules-bind (r g)	; r: (name params conclusion premise...)
   (let ((b ()) (cs (cdr (caddr r))) (gs (cdr g)))
     (while (and cs gs)
@@ -212,12 +218,17 @@
 (define-function rules-splice (r gs cs binds)	; g's arguments, each passed relation's own arguments in its place
   (and gs (concat-list (let ((b (and (member? (car cs) (cadr r)) (assq (car cs) binds)))) (if b (cddr b) (list (car gs))))
 		       (rules-splice r (cdr gs) (cdr cs) binds))))
+(define-function rules-arity (rx rel binds)	; one specialised relation, one count of carried arguments per parameter
+  (let ((ns (map (lambda (b) (list-length (cddr b))) binds)) (seen (assq rel (<rx>-arity rx))))
+    (if seen (or (equal (cdr seen) ns) (rules-reject-with "E_ARITY: " (symbol->string rel)))
+      (set (<rx>-arity rx) (cons (cons rel ns) (<rx>-arity rx))))))
 (define-function rules-call (g rx)
   (let ((hos (and (pair? g) (rules-hos (car g) rx))))
     (if hos
 	(let ((binds (rules-bind (car hos) g)))
 	  (if binds
 	      (let* ((suffix (rules-suffix binds)) (rel (string->symbol (rules-cat (symbol->string (car g)) suffix))))
+		(rules-arity rx rel binds)
 		(rules-queue rx g rel suffix)
 		(cons rel (rules-splice (car hos) (cdr g) (cdr (caddr (car hos))) binds)))
 	    g))
@@ -231,7 +242,7 @@
 	   (let () (set seen (cons rel seen)) (not (rules-concludes? rel rules)))
 	   (rules-unknown (symbol->string rel))))))
 (define-function rules-expand (items)
-  (let* ((ho (list ())) (rx (new <rx> () () () ())) (out ()))
+  (let* ((ho (list ())) (rx (new <rx> () () () () ())) (out ()))
     (set (<rx>-todo rx) (rules-flatten items ho))
     (set (<rx>-hos rx) (car ho))
     (while (<rx>-todo rx)

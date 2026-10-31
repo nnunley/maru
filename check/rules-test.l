@@ -77,7 +77,7 @@
   (equal (rules-enumerate (rules-expand ho) '(top $v) 2) (rules-enumerate fo '(top $v) 2)))
 (expect "the specialised relation is named relation[passed]"
   (equal (cadr (assq (string->symbol "cons_list[expr]") (rules-expand ho))) (list LO '$r.1 '$r.2 '(cons $x $xs))))
-(expect "the enumeration is not empty" (= 3 (list-length (rules-enumerate fo '(top $v) 2))))
+(expect "the expansion enumerates three lists" (= 3 (list-length (rules-enumerate (rules-expand ho) '(top $v) 2))))
 (expect "nothing was rejected so far" (not *msgs*))
 (rules-expand '((rule nil_list ($r) (list_of $r ())) (top (top $es) (list_of (nosuch e0) $es))))
 (expect "a parameter applied to an unknown relation is rejected" (member? "E_UNKNOWN_RELATION: nosuch" *msgs*))
@@ -90,5 +90,24 @@
   (and (equal (rules-expand (list (list 'facts '(infix) infix-facts))) '((infix (infix "+" Number Number Number)) (infix (infix "-" Number Number Number)))) (not *msgs*)))
 (rules-expand (list (list 'facts '(prefix) infix-facts)))
 (expect "a fact of an unlisted relation is rejected" (equal *msgs* '("E_UNKNOWN_RELATION: infix" "E_UNKNOWN_RELATION: infix")))
+
+;; one rule, two relations: both specialisations exist and enumerate
+(set *msgs* ())
+(define two (rules-expand '((rule nil_list ($r) (list_of $r ())) (rule cons_list ($r) (list_of $r (cons $x $xs)) ($r $x) (list_of $r $xs))
+			   (fact (ea a)) (fact (eb b)) (ta (ta $l) (list_of (ea) $l)) (tb (tb $l) (list_of (eb) $l)))))
+(expect "two relations passed, two specialisations"
+  (and (assq (string->symbol "cons_list[ea]") two) (assq (string->symbol "cons_list[eb]") two)
+       (equal (rules-enumerate two '(ta $v) 2) '(() (cons a ()))) (equal (rules-enumerate two '(tb $v) 2) '(() (cons b ())))))
+(expect "nothing rejected for two relations" (not *msgs*))
+(expect "a schema nested in a schema yields 2 x 2 facts"
+  (= 4 (list-length (rules-expand '((schema $a (1 2) (schema $b (x y) (fact (pr $a $b)))))))))
+;; the same passed relation with a different number of carried arguments
+(rules-expand '((rule nil_list ($r) (list_of $r ())) (fact (expr q x)) (fact (expr q r s x))
+		(t1 (t1 $l) (list_of (expr q) $l)) (t2 (t2 $l) (list_of (expr q r s) $l))))
+(expect "different argument counts for one specialisation are rejected" (equal *msgs* (list (rules-cat "E_ARITY: " "list_of[expr]"))))
+(set *msgs* ())
+(define-function no-facts () ())
+(rules-expand '((facts (infix) no-facts)))
+(expect "a facts function returning nothing is rejected" (equal *msgs* '("E_NO_FACTS: no-facts")))
 
 (println (if ok "rules ok" "rules FAILED"))
