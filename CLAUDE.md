@@ -74,6 +74,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   and merges adjacent free chunks.
 - `text_parser`: `text-parser.l` matches a string literal that ends at the
   end of its input.
+- `cexpr_forms` (`check/cexpr-forms.l`): `cexpr.g` parses C's expressions,
+  with C's precedence, to Maru forms.
 - `irl`: `irl.g` (inheriting `cexpr.g`) compiles `test.irl` to C that, where
   x86_64 code runs, prints what the program should; `irgol.g` still parses
   `test.irgol`.

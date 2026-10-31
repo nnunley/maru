@@ -38,3 +38,4 @@
 -112 cexpr.g, lexing and binary operators for C-like languages (+83): irl.g inherits it (-59) and irgol.g, a stale copy of irl.g, becomes <irgol> : <irl> overriding the five rules it differs in (-157); compile scripts and Makefile rules (+6); the irl check, which had no coverage before (+15)
 +18 maru.k globals declared with no initialiser, (define (name T)), start at zero, as C file-scope objects do: ir2 declares the global with no assignment and the C back end emits only the declaration (+3); check zero_global with a scalar and a struct (+15)
 +29 check core_forms: 23 arithmetic, comparison and logical forms print the same values untyped and through maru.k, truth forms as (if F 1 0) (check/core-forms.l +21, case +8)
++55 cexpr.g has all of C's expression levels (shift, equality, bitwise, logical, ?:, prefix - ~ !, calls) and its actions build Maru forms (+34); check cexpr_forms with the RFC's table and six lexing cases (+21)

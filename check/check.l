@@ -237,6 +237,9 @@
 ;; irl and irgol inherit cexpr.g's lexing and binary operators.  irl's C
 ;; runs where x86_64 code can (on arm64 its untyped printf calls variadic
 ;; printf wrongly); irgol, written for an older ir.k, still parses test.irgol.
+;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
+(check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
+
 (check "irl"
   (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.c"))
   (let ((cc (cond ((= 'x64 host-isa) "cc")

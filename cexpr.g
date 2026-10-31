@@ -1,8 +1,7 @@
 # -*- coke -*-
 
-# Lexing and binary operators for C-like languages.  A language grammar
-# inherits this one and overrides primary, suffix and expression, and the
-# operator rules to name its own nodes.
+# Lexing and C's expressions, as Maru forms.  A language grammar inherits
+# this one and overrides primary, suffix and expression.
 
 <cexpr> : <text-parser> ()
 
@@ -54,30 +53,65 @@ xexpression	= expression ~"expression" ;
 
 arglist		= expression?:a (","_ xexpression)*:b				-> `(,@a ,@b) ;
 
-primary		= identifier:e							-> `(name ,e)
-		| number:e							-> `(lit ,e)
-		| string:e							-> `(lit ,e)
+primary		= identifier
+		| number
+		| string
 		| "("_ xexpression:e ")"_					-> e
 		;
 
-suffix		= primary ;
+suffix		= primary:a ( "("_ arglist:b ")"_				-> `(,a ,@b) :a
+			    )*							-> a
+		;
+
+unary		= suffix
+		| "-"_ unary:a							-> `(- ,a)
+		| "~"_ unary:a							-> `(~ ,a)
+		| "!" !"=" _ unary:a						-> `(not ,a)
+		;
 
 factorop	= "*" -> '* | "/" -> '/ | "%" -> '% ;
-
-factor		= factor:a factorop:o _ suffix:b				-> `(,o ,a ,b)
-		|			suffix
+factor		= factor:a factorop:o _ unary:b					-> `(,o ,a ,b)
+		| unary
 		;
 
 termop		= "+" -> '+ | "-" -> '- ;
-
 term		= term:a termop:o _ factor:b					-> `(,o ,a ,b)
-		|		    factor
+		| factor
 		;
 
-relop		= "<=" -> '<= | "<" -> '< | "==" -> '== | "!=" -> '!= | ">=" -> '>= | ">" -> '> ;
-
-relation	= term:a ( relop:o _ term:b					-> `(,o ,a ,b) :a
-			 )?							-> a
+shiftop		= "<<" -> '<< | ">>" -> '>> ;
+shift		= shift:a shiftop:o _ term:b					-> `(,o ,a ,b)
+		| term
 		;
 
-expression	= relation ;
+relop		= "<=" -> '<= | "<" -> '< | ">=" -> '>= | ">" -> '> ;
+relation	= relation:a relop:o _ shift:b					-> `(,o ,a ,b)
+		| shift
+		;
+
+equalop		= "==" -> '= | "!=" -> '!= ;
+equality	= equality:a equalop:o _ relation:b				-> `(,o ,a ,b)
+		| relation
+		;
+
+bitand		= bitand:a "&" !"&" _ equality:b				-> `(& ,a ,b)
+		| equality
+		;
+bitxor		= bitxor:a "^"_ bitand:b					-> `(^ ,a ,b)
+		| bitand
+		;
+bitor		= bitor:a "|" !"|" _ bitxor:b					-> `(| ,a ,b)
+		| bitxor
+		;
+logand		= logand:a "&&"_ bitor:b					-> `(and ,a ,b)
+		| bitor
+		;
+logor		= logor:a "||"_ logand:b					-> `(or ,a ,b)
+		| logand
+		;
+
+conditional	= logor:c "?"_ xexpression:a ":" !"=" _ conditional:b		-> `(if ,c ,a ,b)
+		| logor
+		;
+
+expression	= conditional ;
