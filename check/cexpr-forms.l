@@ -9,7 +9,8 @@
 	       ("a && b || c" (or (and a b) c)) ("-a + ~b" (+ (- a) (~ b))) ("!a" (not a))
 	       ("c ? a : b" (if c a b)) ("f(a, b)" (f a b))
 	       ("a<<b" (<< a b)) ("a<=b" (<= a b)) ("a&&b||c" (or (and a b) c)) ("a!=b" (!= a b))
-	       ("a /* c */ + b" (+ a b)) ("a - -1" (- a -1)) ("a?b:c" (if a b c))))
+	       ("a /* c */ + b" (+ a b)) ("a - -1" (- a -1)) ("a?b:c" (if a b c))
+	       ("a?b?c:d:e" (if a (if b c d) e)) ("a?b:c?d:e" (if a b (if c d e)))))
 
 (let ((ok 1))
   (list-do row rows
