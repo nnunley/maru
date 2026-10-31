@@ -325,6 +325,17 @@
 (check "boot2_strings"
   (unit-assert (equal (last (run "boot2-strings" "./eval2 -b boot2.l check/boot2-strings.l")) "boot2 strings ok")))
 
+;; Nile's compiler runs on eval2 and boot2.l (nile-to-maru-compiler.sh) and
+;; writes what it wrote on eval and boot.l, the oracle kept only here.
+(check "nile_compile"
+  (let ((c "$R/nile/compilers/maru"))
+    (run "nile-old" (concat-strings "R=$PWD; mkdir -p " tmp "/old && cd " tmp "/old && $R/eval -b $R/boot.l -L $R/ " c "/nile-compiler.l " c " maru text-layout $R/nile/examples/text-layout.nl"))
+    (run "nile-new" (concat-strings "R=$PWD; mkdir -p " tmp "/new && cd " tmp "/new && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
+    (let ((was (contents-of-file-named (concat-strings tmp "/old/text-layout.k")))
+	  (now (contents-of-file-named (concat-strings tmp "/new/text-layout.k"))))
+      (unit-assert (< 1000 (string-length was)))
+      (unit-assert (equal was now)))))
+
 ;;; ---------------------------------------------------------------- budget
 
 ;; Derived code and code outside the stack (marked derived or unused in

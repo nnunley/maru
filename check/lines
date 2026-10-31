@@ -44,3 +44,6 @@
 -6 ir2 keeps its own typing for function pointers: the rule letting an int()* take any function returning int, borrowed from C, and the C cast it needed go (-14); test.irl's fun says how it is called, int(char*, ...)*; irl's ?: error is caught in Maru as a type mismatch in an if (check/irl-errors.l +6), and ir_retired opens and searches files in Maru instead of running git grep, grep and ls (+2)
 +1 check cexpr_forms: ?: nested in either branch associates right, as in C (a?b?c:d:e, a?b:c?d:e)
 +1 cexpr.g: a hex digit is 0-9A-Fa-f, not any letter (higit, +-0); check cexpr_forms gains 0xff, 0xFF and 0xq+1 rows (+1), the last guarding that q is no hex digit
++60 print-structure.l is back from before the refactor (f6671da^), which Nile's compiler requires to print a structure when an operation lookup fails
++11 check nile_compile: Nile's compiler, run on eval2 and boot2.l through its script, writes what it wrote on eval and boot.l (kept in the check as the oracle)
+-226 Nile's C target is marked unused, outside the Maru stack: nile-gen-code-c.l (-199) and nile-builtins-c.l (-27)
