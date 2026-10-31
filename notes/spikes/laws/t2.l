@@ -1,0 +1,5 @@
+(load "notes/spikes/laws/logic.l")
+(load "notes/spikes/laws/nile-rules.l")
+(load "notes/spikes/laws/oracle.l")
+(list-do c '(("(a + 1)" Number) ("(p + 1)" Number) ("(a < b)" Boolean) ("(a < b)" Number) ("¬(p)" Boolean))
+  (println (car c) " : " (cadr c) "  Nile " (if (nile-accepts? (car c) (cadr c)) "accepts" "rejects")))

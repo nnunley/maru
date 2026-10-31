@@ -1,0 +1,12 @@
+;;; write the spike's cases and verdicts, for Nile's own compiler to judge
+(load "notes/spikes/laws/meta.l")
+(define *n* 0)
+(define-function emit (src verdict)
+  (set *n* (+ *n* 1))
+  (contents-to-file-named src (concat-strings "/tmp/maru-laws-xcheck/c" (long->string *n*) ".nl"))
+  (contents-to-file-named verdict (concat-strings "/tmp/maru-laws-xcheck/c" (long->string *n*) ".spike")))
+(define-function wrap (text t) (concat-strings "\\\\f(a:Number, b:Number, p:Boolean, q:Boolean) : " (symbol->string t) "\n    " text "\n"))
+(for (i 0 12) (let* ((t (typed i)) (e (generate (list 'expr nile-env t '$e) 3)))
+  (emit (wrap (nile-text e) t) (if (nile-accepts? (nile-text e) t) "accept" "reject"))))
+(for (i 0 12) (let* ((t (typed i)) (e (generate (list 'uexpr nile-env '$e) 2)))
+  (emit (wrap (nile-text e) t) (if (nile-accepts? (nile-text e) t) "accept" "reject"))))

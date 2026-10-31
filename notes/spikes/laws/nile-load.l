@@ -1,0 +1,7 @@
+(require "text-parser.l")
+(load "notes/spikes/laws/nile-prelude-defs.l")
+(load "nile/compilers/maru/maru/print-structure.l")
+(define-form nile-fatal-error message `(and (println ,@message) (exit)))
+(load "nile/compilers/maru/nile-ast-nodes.l")
+(load "notes/spikes/laws/nile-grammar.g.l")
+(set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)

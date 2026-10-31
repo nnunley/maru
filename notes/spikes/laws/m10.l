@@ -1,0 +1,38 @@
+;;; SPIKE: mutant facts; a law suite is adequate when some law fails on each
+(load "notes/spikes/laws/meta.l")
+(define original *rules*)
+(define-function flip (t) (if (= t 'Number) 'Boolean 'Number))
+(define-function butlast (l) (if (cdr l) (cons (car l) (butlast (cdr l))) ()))
+(define-function mutants ()
+  (let ((out ()))
+    (list-do r original
+      (let ((head (cadr r)))
+	(when (member? (car head) '(infix prefix))
+	  (let ((n (list-length head)))
+	    (push out (list (concat-symbol (car r) '-result) r (list (car r) (concat-list (butlast head) (list (flip (last-of head)))))))
+	    (push out (list (concat-symbol (car r) '-operand) r (list (car r) (concat-list (list (car head) (cadr head) (flip (caddr head))) (cdddr head)))))
+	    (push out (list (concat-symbol (car r) '-dropped) r ()))))))
+    out))
+(define-function with-mutant (m)
+  (let ((rs ()))
+    (list-do r original (if (= r (cadr m)) (and (caddr m) (push rs (caddr m))) (push rs r)))
+    (list-reverse! rs)))
+(define leaves '((var a) (var p) (num "1")))
+;; every size-1 expression over the mutated fact's operator, at each type
+(define-function exhaustive-agree (m)
+  (let ((op (cadr (cadr (cadr m)))) (fix (car (cadr (cadr m)))) (bad ()))
+    (list-do x leaves
+      (list-do y (if (= fix 'infix) leaves '(none))
+	(let ((e (if (= fix 'infix) (list 'infix op x y) (list 'prefix op x))))
+	  (list-do t law-types
+	    (or (= (holds? (list 'expr nile-env t e) 2) (nile-accepts? (nile-text e) t))
+		(push bad (list (nile-text e) t)))))))
+    bad))
+(let ((killed 0) (survivors ()) (ms (mutants)))
+  (list-do m ms
+    (set *rules* (with-mutant m))
+    (let ((dead (exhaustive-agree m)))
+      (if dead (set killed (+ killed 1)) (push survivors (car m)))))
+  (set *rules* original)
+  (println "exhaustive: mutants killed " killed " of " (list-length ms))
+  (println "survivors: " survivors))

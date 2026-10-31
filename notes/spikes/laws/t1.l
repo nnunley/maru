@@ -1,0 +1,6 @@
+(load "notes/spikes/laws/logic.l")
+(load "notes/spikes/laws/nile-rules.l")
+(for (i 0 6) (let ((e (generate (list 'expr nile-env (if (< i 3) 'Number 'Boolean) '$e) 3))) (println (nile-text e))))
+(println "check (a + 1) : Number => " (holds? (list 'expr nile-env 'Number '(infix "+" (var a) (num "1"))) 3))
+(println "check (p + 1) : Number => " (holds? (list 'expr nile-env 'Number '(infix "+" (var p) (num "1"))) 3))
+(println "Boolean expressions up to size 1: " (list-length (enumerate (list 'expr nile-env 'Boolean '$e) 1)))

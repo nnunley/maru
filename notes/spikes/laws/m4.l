@@ -1,0 +1,8 @@
+(load "notes/spikes/laws/gen.l")
+(load "notes/spikes/laws/holes.l")
+(require "cexpr.g.l")
+(set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
+(set *rules* (grammar-rules '("cexpr.g"))) (compute-nullable)
+(enable-holes)
+(list-do s '("a + {x} * b" "{c} ? {t} : {e}" "f({x}, 1)" "{x: unary} + 1" "-{x}")
+  (print "cexpr  " s "  =>  ") (dumpln (car (parses <cexpr> 'expression s))))
