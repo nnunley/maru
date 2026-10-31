@@ -136,12 +136,19 @@
   (set *rules-random* ())
   (rules-solve rules (rules-rename goal (list ())) *rules-empty* size (lambda (s) 1)))
 (define-function rules-has? (v l) (let ((y ())) (list-do e l (and (equal e v) (set y 1))) y))
-;; enumerate: every distinct solution for the goal's last argument
+(define-function rules-hash (x)	; equal terms hash alike (every number alike, as = compares 2 and 2.0)
+  (cond ((pair? x)	(% (+ (* 31 (rules-hash (car x))) (rules-hash (cdr x))) 4093))
+	((symbol? x)	(rules-hash (symbol->string x)))
+	((string? x)	(let ((h 7)) (for (i 0 (string-length x)) (set h (% (+ (* h 31) (string-at x i)) 4093))) h))
+	(else		1)))
+;; enumerate: every distinct solution for the goal's last argument, those seen kept in buckets by hash
 (define-function rules-enumerate (rules goal size)
   (set *rules-random* ())
-  (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)) (all ()))
-    (rules-solve rules g *rules-empty* size (lambda (s) (let ((v (walk* out s))) (or (rules-has? v all) (set all (concat-list all (list v))))) ()))
-    all))
+  (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)) (all ()) (seen (array 4093)))
+    (rules-solve rules g *rules-empty* size
+		 (lambda (s) (let* ((v (walk* out s)) (h (rules-hash v)))
+			       (or (rules-has? v (array-at seen h)) (let () (push (array-at seen h) v) (push all v)))) ()))
+    (list-reverse! all)))
 
 ;;; Higher-order rules.  rules-expand turns items into the first-order rule set above:
 ;;;   (rule name (param...) conclusion premise...)  a parameter ($r) is a relation; ($r x) applies it
