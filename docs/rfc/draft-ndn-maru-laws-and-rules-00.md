@@ -181,6 +181,8 @@ is rejected before any law runs (`E_UNKNOWN_RELATION`). [R-builtins]
 | `number(n)` | picks from `0 1 2 0.5 10` and the numbers the law file mentions | `n` is one of those | all of them |
 | `a = b` | unifies | unifies | unifies |
 
+A file's `let numerals = [1]` replaces `number(n)`'s numerals, the built-in ones and the file's, with its list.
+
 Numbers the law file mentions are offered because boundary values are
 where bugs live (writ seeds its generators the same way).
 
