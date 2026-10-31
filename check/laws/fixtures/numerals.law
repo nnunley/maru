@@ -1,0 +1,5 @@
+-- let numerals replaces the number builtin's numerals, the file's own number 7 among those it drops
+let numerals = [1, 2]
+under test: small
+rule s: number(n) => small(n)
+law few: all n: small(n). n + 7 > n by exhaustion

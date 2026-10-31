@@ -111,8 +111,15 @@
 	(if v (let () (set vars (concat-list vars (list (caar bs)))) (set vals (concat-list vals v))) (set ok ())))
       (set bs (cdr bs)))
     (and ok vals)))
+(define *law-focus* ())	; in adequacy, (var . pattern): a variable's values are its domain's ground instances of the pattern
+(define-function law-ground? (x) (if (pair? x) (and (law-ground? (car x)) (law-ground? (cdr x))) (not (lv? x))))
 (define-function law-values (b vars vals)	; every value of a domain
-  (if (= 'set (cadr b)) (caddr b) (rules-enumerate *law-rules* (law-subst (caddr b) vars vals) *ls*)))
+  (let ((p (assq (car b) *law-focus*)) (out ()))
+    (cond ((not p)		(if (= 'set (cadr b)) (caddr b) (rules-enumerate *law-rules* (law-subst (caddr b) vars vals) *ls*)))
+	  ((= 'set (cadr b))	(list-do m (caddr b) (and (unify (cdr p) m *rules-empty*) (push out m))) (list-reverse! out))
+	  (else			(list-do v (rules-enumerate *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) (cdr p)) *ls*)
+				  (and (law-ground? v) (push out v)))
+				(list-reverse! out)))))
 (define-function law-member? (b vars vals v)
   (cond ((= 'set (cadr b)) (member? v (caddr b)))
 	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
@@ -281,14 +288,14 @@
     (list-do a (cdr g) (or (law-set-of a) (push cs a)))
     (for (i 1 (list-length g))
       (list-do m (law-set-of (law-nth g i))
-	(or (= m (law-nth g i)) (push out (list (law-fact-label g i m) (law-swap rs r (list (car r) (law-put g i m))) (cons 'constants cs))))))
-    (cons (list (concat-string "-" (law-fact-label g 0 ())) (law-swap rs r ()) (list r)) out)))
-(define-function law-mutants (rel)	; (label rules filter)...
+	(or (= m (law-nth g i)) (let ((f (list (car r) (law-put g i m)))) (push out (list (law-fact-label g i m) (law-swap rs r f) (cons 'constants cs) f r))))))
+    (cons (list (concat-string "-" (law-fact-label g 0 ())) (law-swap rs r ()) (list r) () r) out)))
+(define-function law-mutants (rel)	; (label rules filter new-rule old-rule)...
   (let ((out ()) (rs *law-rules*))
     (list-do r rs
       (and (or (= rel (car (cadr r))) (rules-reaches? rel (car (cadr r)) rs ()))
 	   (if (cddr r)
-	       (for (i 2 (list-length r)) (push out (list (concat-strings (symbol->string (car r)) "-" (long->string (- i 1))) (law-swap rs r (law-drop r i)) (list r))))
+	       (for (i 2 (list-length r)) (let ((n (law-drop r i))) (push out (list (concat-strings (symbol->string (car r)) "-" (long->string (- i 1))) (law-swap rs r n) (list r) n r))))
 	     (set out (concat-list (law-fact-mutants rs r) out)))))
     (list-reverse! out)))
 (define-function law-differs? (f rec)	; rec: (vals outcome touched)
@@ -326,11 +333,43 @@
 	      (list-do rec (cdr l) (and (not k) (law-differs? (caddr m) rec) (= 'fail (law-try (car rec))) (set k 1)))
 	      (set *law-rules* rules))))
     k))
+;; a mutant the size's tuples don't kill is judged on tuples that use its rule, at the least size it appears: the
+;; instances of a named law's goal on rules rel reaches whose derivation uses the rule (the file's, or the mutant's),
+;; each variable then ranging over its own domain's instances of the value; killed where the file's rules pass
+(define *law-kill* ())
+(define-function law-judge (m vals)
+  (set *rules-touched* ()) (set *rules-touching* 1)
+  (let ((r (law-try vals)) (rules *law-rules*))
+    (set *rules-touching* ())
+    (and (not (= 'fail r)) (law-differs? (caddr m) (list vals r *rules-touched*))
+	 (let () (set *law-rules* (cadr m)) (and (= 'fail (law-try vals)) (set *law-kill* 1)) (set *law-rules* rules))))
+  (set *law-out* *law-kill*))
+(define-function law-focus-visit (m named g inst n)
+  (let ((as (cdr g)) (vs (cdr inst)))
+    (set *law-focus* ())
+    (while as (and (rules-var? (car as)) (push *law-focus* (cons (car as) (car vs)))) (set as (cdr as)) (set vs (cdr vs))))
+  (list-do l named
+    (or *law-kill* (let () (law-setup (car l) *lseed* 'exhaustion n) (set *law-out* ()) (law-every *lb* () () (lambda (vals) (law-judge m vals))))))
+  (set *law-focus* ())
+  *law-kill*)
+(define-function law-focus-goals (named rel)	; the named laws' goal domains on relations rel reaches
+  (let ((gs ()))
+    (list-do l named
+      (law-setup (car l) *lseed* 'exhaustion 1)
+      (list-do b *lb* (and (= 'goal (cadr b)) (or (= rel (car (caddr b))) (rules-reaches? rel (car (caddr b)) *law-rules* ())) (not (member? (caddr b) gs)) (push gs (caddr b)))))
+    gs))
+(define-function law-focused? (m named goals)
+  (set *law-kill* ())
+  (list-do g goals
+    (list-do x (if (cadddr m) (list (cons (cadr m) (cadddr m)) (cons *law-rules* (car (cddddr m)))) (list (cons *law-rules* (car (cddddr m)))))
+      (or *law-kill* (rules-focus (car x) g (cdr x) (lambda (inst n) (law-focus-visit m named g inst n))))))
+  *law-kill*)
 (define-function law-adequate (it items)
   (print "law " (cadr it) ": ")
   (let ((named (law-named it items)) (ms (law-mutants (caddr it))) (survivors ()))
     (when named
-      (list-do m ms (or (law-killed? m named (cadddr it)) (push survivors (car m))))
+      (let ((goals (law-focus-goals named (caddr it))))
+	(list-do m ms (or (law-killed? m named (cadddr it)) (law-focused? m named goals) (push survivors (car m)))))
       (if (not survivors) (law-report (list 'PROVED (list-length ms)))
 	(print "REFUTED " (list-length survivors) " of " (list-length ms) " survive:")
 	(list-do s (list-reverse! survivors) (print " " s))
@@ -346,7 +385,10 @@
 	      ((= k 'set)		(push *law-sets* (cons (cadr it) (caddr it))))
 	      ((= k 'under-test)	(set *law-under* (concat-list *law-under* (cdr it))))
 	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (eval (cadr it))))))))
-    (list-do n (law-file-numbers items) (or (member? n *rules-numbers*) (set *rules-numbers* (concat-list *rules-numbers* (list n)))))
+    (let ((ns ()))	; let numerals = [...] replaces the number builtin's numerals; else the file's numbers join them
+      (list-do it items (and (= 'let (car it)) (= 'numerals (cadr it)) (set ns (list (caddr it)))))
+      (if ns (set *rules-numbers* (car ns))
+	(list-do n (law-file-numbers items) (or (member? n *rules-numbers*) (set *rules-numbers* (concat-list *rules-numbers* (list n)))))))
     (set *law-rules* (rules-expand (law-rules items)))
     (or *law-under* (let () (println "E_NO_UNDER_TEST " path ": no under test: line, so its laws test nothing") (set *law-failed* 1) (set items ())))
     (list-do it items

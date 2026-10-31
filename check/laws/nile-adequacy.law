@@ -1,0 +1,26 @@
+-- mutant adequacy of nile.law's expression rules (repeated here, as a law file has no include), over one
+-- leaf per type: the rules type an expression by its leaves' types, never by which leaf it is
+set Type = Number | Boolean
+let ap = [a: Number, p: Boolean]
+let numerals = [1]
+reference nile_accepts(e, t)
+under test: expr
+
+facts infix, prefix from nile_signatures
+rule e_var:    v: t in env                                        => expr(env, t, v)
+rule e_num:    number(n)                                          => expr(env, Number, n)
+rule e_prefix: prefix(op, at, t), expr(env, at, a)                => expr(env, t, nile`{op}({a})`)
+rule e_infix:  infix(op, at, bt, t), expr(env, at, a), expr(env, bt, b)
+                                                                  => expr(env, t, nile`({a} {op} {b})`)
+rule c_link:   infix(op, Number, Number, Boolean), expr(env, Number, a), expr(env, Number, b) => chain(env, nile`({a} {op} {b})`)
+rule c_more:   infix(op, Number, Number, Boolean), chain(env, a), expr(env, Number, b)          => chain(env, nile`({a} {op} {b})`)
+rule e_chain:  infix(op, Number, Number, Boolean), chain(env, a), expr(env, Number, b)          => expr(env, Boolean, nile`({a} {op} {b})`)
+rule u_var:    v: t in env                                        => uexpr(env, v)
+rule u_num:    number(n)                                          => uexpr(env, n)
+rule u_prefix: prefix(op, at, t), uexpr(env, a)                   => uexpr(env, nile`{op}({a})`)
+rule u_infix:  infix(op, at, bt, t), uexpr(env, a), uexpr(env, b) => uexpr(env, nile`({a} {op} {b})`)
+
+law sound: all t: Type, e: expr(ap, t, e). nile_accepts(e, t) = accept by exhaustion size 1
+law agree: all t: Type, e: uexpr(ap, e). checks(expr, ap, t, e) = nile_accepts(e, t) by exhaustion size 1
+-- every mutant fails sound or agree, each judged at the least size its rule appears
+law adequate: mutants of expr by exhaustion size 1. sound, agree

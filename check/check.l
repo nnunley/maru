@@ -268,7 +268,8 @@
 		  "law listed: E_EXHAUST cexpr.primary is generated, not enumerated; use by test")
 		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing")
 		 ("adequacy" "check/laws/fixtures/holds.l" 256 "law listed: TESTED 100" "law painted_listed: TESTED 100" "law adequate: PROVED 7"
-		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)"))
+		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)")
+		 ("numerals" "" 0 "law few: PROVED 2"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))
@@ -289,6 +290,9 @@
     (unit-assert (equal (law-run "nile" (concat-strings n " check/laws/nile.law"))
 			'(0 "law sound: TESTED 100" "law generate_checks: TESTED 100" "law coverage: PROVED 1" "law agree: TESTED 100"
 			  "law agree_rejected: TESTED 100" "law round_trip: TESTED 100")))
+    ;; every mutant of the expr rules fails sound or agree, at one leaf per type
+    (unit-assert (equal (law-run "nile_adequacy" (concat-strings n " check/laws/nile-adequacy.law"))
+			'(0 "law sound: PROVED 46" "law agree: PROVED 222" "law adequate: PROVED 69")))
     (unit-assert (equal (law-fixture "nile-crash" n) '(256 "law resolver_crash: INCONCLUSIVE status=256 input=(\"ϫ():ρ\\012forall_\\012\")")))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs

@@ -152,6 +152,54 @@
 			       (or (rules-has? v (array-at seen h)) (let () (push (array-at seen h) v) (push all v)))) ()))
     (list-reverse! all)))
 
+;; focus: the distinct instances of goal whose derivation uses rule rl, at the least depth (rules on the
+;; path to rl) with any; premises off the path, and rl's own, at their relation's least size.  visit gets each
+;; instance and the size it needs, and stops the search by answering true.
+(define *rules-mins* ())	; (relation . least size), -99 for none needed
+(define-function rules-min (rel) (if (member? rel '(in number =)) -99 (or (cdr (assq rel *rules-mins*)) 99)))
+(define-function rules-need (r rules) (if (rules-recursive? r rules) 1 0))
+(define-function rules-mins (rules)
+  (let ((more 1))
+    (set *rules-mins* ())
+    (while more
+      (set more ())
+      (list-do r rules
+	(let ((v (if (= 1 (rules-need r rules)) 1 -99)) (p (car (cadr r))))
+	  (list-do g (cddr r) (and (pair? g) (< v (+ 1 (rules-min (car g)))) (set v (+ 1 (rules-min (car g))))))
+	  (and (< v (rules-min p)) (let () (set more 1) (push *rules-mins* (cons p v)))))))))
+(define rules-focus-solve)
+(define-function rules-focus-all (rules goals j s rl depth n k)	; premise j on the path; n the size needed so far
+  (if (not goals) (k s n)
+    (let ((g (car goals)))
+      (if (= j 0) (rules-focus-solve rules g s rl (- depth 1) (lambda (s m) (rules-focus-all rules (cdr goals) -1 s rl depth (if (< n (+ m 1)) (+ m 1) n) k)))
+	(let ((m (rules-min (car g))))
+	  (rules-solve rules g s (if (< m 0) 0 m) (lambda (s) (rules-focus-all rules (cdr goals) (- j 1) s rl depth (if (< n (+ m 1)) (+ m 1) n) k))))))))
+(define-function rules-focus-try (rules r rl goal s depth k)
+  (let* ((env (list ())) (head (rules-rename (cadr r) env)) (body (rules-rename (cddr r) env)) (s2 (unify (cdr head) (cdr goal) s)) (j 0) (y ()))
+    (and s2
+	 (if (= r rl) (rules-focus-all rules body -1 s2 rl depth (rules-need r rules) k)
+	   (list-do g body
+	     (and (not y) (pair? g) (or (= (car g) (car (cadr rl))) (rules-reaches? (car g) (car (cadr rl)) rules ()))
+		  (set y (rules-focus-all rules body j s2 rl depth (rules-need r rules) k)))
+	     (set j (+ j 1)))
+	   y))))
+(define-function rules-focus-solve (rules goal s rl depth k)
+  (let ((y ()))
+    (and (> depth 0) (list-do r rules (and (not y) (= (car goal) (car (cadr r))) (set y (rules-focus-try rules r rl goal s depth k)))))
+    y))
+(define-function rules-focus (rules goal rl visit)	; true if visit stopped it
+  (let ((d 1) (found ()) (stop ()) (seen (array 4093)))
+    (set *rules-random* ())
+    (rules-mins rules)
+    (while (and (not found) (not stop) (<= d (list-length rules)))
+      (let ((g (rules-rename goal (list ()))))
+	(set stop (rules-focus-solve rules g *rules-empty* rl d
+				     (lambda (s n) (let* ((v (walk* g s)) (h (rules-hash v)))
+						     (and (not (rules-has? v (array-at seen h)))
+							  (let () (push (array-at seen h) v) (set found 1) (visit v n)))))))
+	(set d (+ d 1))))
+    stop))
+
 ;;; Higher-order rules.  rules-expand turns items into the first-order rule set above:
 ;;;   (rule name (param...) conclusion premise...)  a parameter ($r) is a relation; ($r x) applies it
 ;;;   (fact goal)   (schema var (value...) item)   (facts (relation...) function)
