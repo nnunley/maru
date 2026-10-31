@@ -149,9 +149,6 @@
 	(value (car self.operands)))
     (unless (= 'main (<ir-variable>-name var))
       (print "("(ir-gen-c-variable-name (<ir-variable>-name var))"=")
-      (let ((type (<ir-variable>-type var)))
-	(when (and (ir-pointer-type? type) (not (= type (<ir-insn>-type value))))
-	  (print "(")  (print-c-declaration type ())  (print ")")))
       (ir-gen-c value gen)
       (print ")"))))
 
@@ -333,7 +330,7 @@
 	(ir-gen-c-bol   self)
 	(ir-gen-c value self)
 	(ir-gen-c-eol   self))
-    (if (= <ir-nop> (type-of (car (<ir-define>-operands value))))
+    (if (ir-nop? (car (<ir-define>-operands value)))
 	(ir-gen-global-declaration self (<ir-define>-var value))
     (let* ((setter (car (<ir-define>-operands value)))
 	   (var    (<ir-set-var>-parameters setter))

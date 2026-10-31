@@ -323,19 +323,8 @@
 		  (set (<ir-insn>-type rhs) ltype)))
 	 )))
 
-;; As in C, a pointer to a function of (...) takes any function with its return type.
-(define-function ir-unprototyped-from? (ltype rtype)
-  (and (ir-pointer-type? ltype) (ir-pointer-type? rtype)
-       (let ((l (<ir-pointer-type>-referent ltype))
-	     (r (<ir-pointer-type>-referent rtype)))
-	 (and (ir-function-type? l) (ir-function-type? r)
-	      (= IR-VARARGS (car (<ir-function-type>-arg-types l)))
-	      (not (cdr (<ir-function-type>-arg-types l)))
-	      (= (<ir-function-type>-ret-type l) (<ir-function-type>-ret-type r))))))
-
 (define-function ir-can-assign (ltype rtype rhs)
   (or (=                      ltype                    rtype )
-      (ir-unprototyped-from?  ltype		       rtype )
       (and (= IR-VOID*        ltype) (ir-pointer-type? rtype))
       (and (ir-pointer-type?  ltype) (= IR-VOID*       rtype))
       (and (ir-pointer-type?  ltype) (ir-zero?         rhs  ))
@@ -629,7 +618,7 @@
 (define-method ir-check-type <ir-define> (ir val?)	(let* ((name  (car  self.parameters))
 							       (type  (cadr self.parameters))
 							       (init  (car  self.operands))
-							       (nop   (= <ir-nop> (type-of init)))
+							       (nop   (ir-nop? init))
 							       (itype (ir-check-type init ir (not nop))))
 							  (or type	(set type itype))
 							  (or self.var	(set self.var (ir-declare-local ir name type)))

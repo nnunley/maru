@@ -26,7 +26,7 @@ import int(char*, ...) printf;	// import 'printf' from an external library
 //	declares and defines the initial value of a variable.  The 'expression' must yield a value
 //	of the given 'type'.
 
-int()* fun := &printf;	// declare pointer to function 'fun' and initialise with the address of 'printf'
+int(char*, ...)* fun := &printf;	// declare pointer to function 'fun' and initialise with the address of 'printf'
 
 //	fn-expression (arg-expression, ...)
 //	

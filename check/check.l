@@ -237,11 +237,13 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
-;; maru.k is the one typed IR: nothing requires ir.k, and irl has no ir- action.
+;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
+;; can require ir.k), and irl has no ir- form.
 (check "ir_retired"
-  (unit-assert (not (run "ir_retired-grep" "git grep -l 'require \"ir.k\"' -- '*.l' '*.k' '*.g' || true")))
-  (unit-assert (equal (run "ir_retired-irl" "grep -c 'ir-' irl.g compile-irl.l || true") '("irl.g:0" "compile-irl.l:0")))
-  (unit-assert (= 0 (system "! ls ir.k irgol.g compile-irgol.l test.irgol test-ir.k 2>/dev/null"))))
+  (list-do f '("ir.k" "irgol.g" "compile-irgol.l" "test.irgol" "test-ir.k")
+    (unit-assert (not (let ((s (open f))) (and s (close s) 1)))))
+  (list-do f '("irl.g" "compile-irl.l")
+    (unit-assert (not (string-find (contents-of-file-named f) "(ir-")))))
 
 ;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
 (check "irl"
@@ -251,8 +253,8 @@
 			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47"
 			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47  53  59  61  67  71  73  79  83  89  97")))
   (run "irl-errors-gen" (concat-strings "./eval compile-irl.l check/irl-errors.irl > " tmp "/irl-errors.k"))
-  (unit-assert (not (= 0 (system (concat-strings "./eval2 ir-gen-c.k maru.k " tmp "/irl-errors.k > " tmp "/irl-errors.err 2>&1")))))
-  (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/irl-errors.err")) "type mismatch")))
+  (unit-assert (equal (last (run "irl-errors" (concat-strings "./eval2 ir-gen-c.k check/irl-errors.l maru.k " tmp "/irl-errors.k")))
+		      "irl errors ok")))
 
 (check "asm_patch"
   (unit-assert (equal (last (run "asm-patch-arm64" "./eval check/asm-patch.l arm64")) "asm patch arm64 ok"))
