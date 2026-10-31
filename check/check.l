@@ -259,11 +259,11 @@
     (unit-assert (and (= 256 (car r)) (starts (cadr r) "law answers: INCONCLUSIVE status=139 input=("))))
   (let ((r (law-fixture "crash" "")))
     (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
-  ;; a - b = b - a shrinks to the smallest pair, {0, 0.5}; the printed seed alone reproduces it
+  ;; a - b = b - a shrinks to the smallest pair, a=0 b=0.5; the printed seed alone reproduces it
   (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l")) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
     (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
     (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
-		      (or (equal ab "a=0 b=0.500000") (equal ab "a=0.500000 b=0"))))
+		      (equal ab "a=0 b=0.500000")))
     (contents-to-file-named (concat-strings "defaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings tmp "/reseed.law"))) (cddr r)))))
 
