@@ -1,8 +1,10 @@
 ;;; Checks for law.g and law-compile.l (law_cexpr in check.l).  Run with no
 ;;; argument it runs the checks; "file F", "hole" and "parse" are the child
-;;; processes whose error messages it inspects, since Maru has no catch.
-(load "rules.l")
-(load "law-compile.l")
+;;; processes whose error messages it inspects, since Maru has no catch, and
+;;; "primary S..." prints whether each S is a sentence of cexpr.primary.
+(require "rules.l")
+(require "law-compile.l")
+(require "grammar-gen.l")
 
 (define system (subr "system" "s"))
 (define ok 1)
@@ -91,5 +93,8 @@
   (cond
     ((= mode "file")	(law-file-read (next-argument)))
     ((= mode "hole")	(template-fill 'cexpr "{x} * c" ()))
-    ((= mode "parse")	(template-parse 'cexpr "a +"))))
+    ((= mode "parse")	(template-parse 'cexpr "a +"))
+    ((= mode "primary")	(let ((d (grammar-domain <cexpr> '("cexpr.g") ")")) (vs *arguments*))
+			  (set *arguments* ())
+			  (list-do v vs (println (if (grammar-accepts? d 'primary v) "yes" "no")))))))
 (if *arguments* (driver (next-argument)) (suite))

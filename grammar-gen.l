@@ -1,14 +1,17 @@
 ;;; grammar-gen.l -- sentences generated from a tpeg grammar's own records.
 ;;;
-;;;   (grammar-domain class paths)             the grammar's rules, read from paths (later ones override)
-;;;   (grammar-sentence domain rule fuel)      text class's parser accepts in full as rule, or () after 50 tries
+;;;   (grammar-domain class paths sentinel)    the grammar's rules, read from paths (later ones override)
+;;;   (grammar-sentence domain rule fuel)      an accepted sentence of rule, or () after 50 tries; counted
+;;;   (grammar-regenerate domain rule fuel)    the same, not counted (for shrinking)
 ;;;   (grammar-acceptance domain rule n fuel)  (accepted . n) of n sentences generated
-;;;   (grammar-accepts? domain rule text)      class's parser accepts all of text as rule
+;;;   (grammar-accepts? domain rule text)      class's parser takes all of text as rule, and stops there
+;;;                                            when the sentinel follows
 ;;;   (grammar-counts domain rule)             (accepted . generated) so far; grammar-reset clears them
 ;;;
 ;;; Choices come from rules.l's seeded source, so rules-seed reproduces them.
-;;; The layout rule _ generates nothing: a sentence ending in a // comment would
-;;; swallow whatever a template puts after it.
+;;; The sentinel is text the language never absorbs after a sentence (cexpr: ")"),
+;;; so a sentence ending in a // comment, which would swallow what a template
+;;; puts after it, is refused.
 ;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Generating from a grammar".
 
 (require "tpeg.l")
@@ -17,7 +20,7 @@
 
 (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
-(define-structure <grammar-domain> (class rules height reach counts))
+(define-structure <grammar-domain> (class rules height reach counts sentinel))
 (define-function grammar-pick (l) (array-at (list->array l) (rules-rand (list-length l))))
 (define-function grammar-rule-body (d name)
   (cadr (or (assq name (<grammar-domain>-rules d)) (error "grammar-gen: no rule " name))))
@@ -65,7 +68,7 @@
 (define-function grammar-reaches? (d pe name)
   (let ((r ())) (list-do n (grammar-refs pe) (or r (set r (or (= n name) (member? name (grammar-rule-reach d n)))))) r))
 
-(define-function grammar-domain (class paths)
+(define-function grammar-domain (class paths sentinel)
   (let ((rules ()))
     (list-do path paths
       (list-do r (cdr (parse-file <tpeg> $parser_spec path))
@@ -73,6 +76,7 @@
     (let ((d (new <grammar-domain>)))
       (set (<grammar-domain>-class d) class)
       (set (<grammar-domain>-rules d) rules)
+      (set (<grammar-domain>-sentinel d) sentinel)
       (grammar-heights d)
       (grammar-reaches d)
       d)))
@@ -103,12 +107,11 @@
       (list-do e parts (and s (let ((x (grammar-gen d e each))) (set s (and x (concat-string s x))))))
       s)))
 (define-function grammar-expand (d name f)
-  (if (= '_ name) ""
-    (let ((outer *grammar-current*))
-      (set *grammar-current* name)
-      (let ((s (grammar-gen d (grammar-rule-body d name) f)))
-	(set *grammar-current* outer)
-	s))))
+  (let ((outer *grammar-current*))
+    (set *grammar-current* name)
+    (let ((s (grammar-gen d (grammar-rule-body d name) f)))
+      (set *grammar-current* outer)
+      s)))
 (define-function grammar-char (cs) (character->string (string-at cs (rules-rand (string-length cs)))))
 (define-function grammar-gen (d pe f)
   (let ((k (car pe)) (a (cdr pe)))
@@ -127,29 +130,37 @@
       ((member? k '(result-expr peek-not peek-for peek-expr)) "")
       (else			(error "grammar-gen: no case for " k)))))
 
-;; the parser, quiet: a failed ~"..." returns no match instead of stopping
+;; the parser, quiet: a failed ~"..." returns no match instead of stopping.  The
+;; stub is removed on every return; an error inside the parser ends the run
+;; (Maru has no unwind), so nothing is left to restore.
 (define-function grammar-quiet (self what) ())
-(define-function grammar-accepts? (d rule text)
-  (let ((expected text-parser-expected) (p (text-parser-for-on (<grammar-domain>-class d) text)))
+(define-function grammar-stop (d rule text)	; where rule's parse of text stops, or ()
+  (let ((expected text-parser-expected) (p (text-parser-for-on (<grammar-domain>-class d) text)) (ok ()))
     (set text-parser-expected grammar-quiet)
-    (let ((ok (text-parser-invoke-rule rule (eval (concat-symbol '$ rule)) p)))
-      (set text-parser-expected expected)
-      (and ok (= (<text-parser>-position p) (string-length text))))))
+    (set ok (text-parser-invoke-rule rule (eval (concat-symbol '$ rule)) p))
+    (set text-parser-expected expected)
+    (and ok (<text-parser>-position p))))
+(define-function grammar-accepts? (d rule text)
+  (let ((n (string-length text)))
+    (and (= n (grammar-stop d rule text))
+	 (= n (grammar-stop d rule (concat-string text (<grammar-domain>-sentinel d)))))))
 
 (define-function grammar-counter (d rule)	; (rule accepted generated)
   (or (assq rule (<grammar-domain>-counts d))
       (car (set (<grammar-domain>-counts d) (cons (list rule 0 0) (<grammar-domain>-counts d))))))
 (define-function grammar-counts (d rule) (let ((c (grammar-counter d rule))) (cons (cadr c) (caddr c))))
 (define-function grammar-reset (d rule) (let ((c (grammar-counter d rule))) (set-car (cdr c) 0) (set-cdr (cdr c) (list 0))))
-(define-function grammar-try (d rule fuel)	; one generated sentence, if accepted
-  (let ((c (cdr (grammar-counter d rule))) (s (grammar-expand d rule fuel)))
-    (set-car (cdr c) (+ 1 (cadr c)))
-    (and s (grammar-accepts? d rule s) (set-car c (+ 1 (car c))) s)))
-(define-function grammar-sentence (d rule fuel)
+(define-function grammar-try (d rule fuel c)	; one generated sentence, if accepted; c: (accepted generated) or ()
+  (let ((s (grammar-expand d rule fuel)))
+    (and c (set-car (cdr c) (+ 1 (cadr c))))
+    (and s (grammar-accepts? d rule s) (let () (and c (set-car c (+ 1 (car c)))) s))))
+(define-function grammar-first (d rule fuel c)
   (let ((tries 0) (found ()))
     (while (and (not found) (< tries 50))
       (set tries (+ tries 1))
-      (set found (grammar-try d rule fuel)))
+      (set found (grammar-try d rule fuel c)))
     found))
+(define-function grammar-sentence (d rule fuel) (grammar-first d rule fuel (cdr (grammar-counter d rule))))
+(define-function grammar-regenerate (d rule fuel) (grammar-first d rule fuel ()))
 (define-function grammar-acceptance (d rule n fuel)
-  (let ((ok 0)) (for (i 0 n) (and (grammar-try d rule fuel) (set ok (+ ok 1)))) (cons ok n)))
+  (let ((ok 0) (c (cdr (grammar-counter d rule)))) (for (i 0 n) (and (grammar-try d rule fuel c) (set ok (+ ok 1)))) (cons ok n)))

@@ -251,8 +251,10 @@
     (unit-assert (equal (list (car r) (cadr r) (caddr r) (cadddr r))
 			'(0 "law conditional_right: TESTED 100" "law minus_left: TESTED 100" "law comment_blank: TESTED 100")))
     (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
+  ;; the false law shrinks to three primaries for the seed, and each parses as one
   (unit-assert (equal (law-fixture "minus-right" "")
-		      '(256 "law minus_right: REFUTED a=7.0 b=\"\" c=\"\" seed=42" "grammar cexpr.primary: accepted 363 of 363"))))
+		      '(256 "law minus_right: REFUTED a=\"\\\"\\\"\" b=\"\\\"\\\"\" c=\"6\" seed=42" "grammar cexpr.primary: accepted 3 of 6")))
+  (unit-assert (equal (run "law_primary" "./eval check/law-compile-test.l primary '\"\"' '6'") '("yes" "yes"))))
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
@@ -262,7 +264,8 @@
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
-		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR nope.primary names no grammar language")
+		 ("errors" "" 256 "law backwards: E_BINDING c is not the last argument of painted" "law parsed: E_GRAMMAR nope.primary names no grammar language"
+		  "law listed: E_EXHAUST cexpr.primary is generated, not enumerated; use by test")
 		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
