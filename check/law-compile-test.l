@@ -67,7 +67,7 @@
     (equal (law-text-read "let k = [a: N]\nrule r: p(k) => q(k)\nlaw l: all x: T. f(k, x)\n")
 	   '((let k ((a . N))) (rule r () (q ((a . N))) (p ((a . N)))) (law l (($x T)) () (f (quote ((a . N))) x) () ()))))
   (expect "-- comments sit between items, and after a claim"
-    (equal (law-text-read "-- one\nset T = A | B -- two\nlaw l: all x: T. x == 1 -- three\n-- four\n")
+    (equal (law-text-read "-- one\nset T = A | B -- two\nlaw l: all x: T. x == 1 -- three\n-- four\n--five\n")
 	   '((set T (A B)) (law l (($x T)) () (= x 1) () ()))))
   (expect "a - -1 is not a comment" (equal (law-text-read "law l: all x: T. a - -1 == 0\n") '((law l (($x T)) () (= (- a -1) 0) () ()))))
   (expect "a filler is inserted as written"
@@ -82,6 +82,8 @@
     (expect "a malformed file fails with its line" (has? out "line 3")))
   (let ((out (child "dash" "file check/laws/fixtures/error-dash.law")))
     (expect "-- inside an expression is no comment" (has? out "line 2")))
+  (let ((out (child "comment" "file check/laws/fixtures/error-comment.law")))
+    (expect "--1 after a claim is no comment" (has? out "line 2")))
   (let ((out (child "hole" "hole")))
     (expect "an unbound hole is E_TEMPLATE_PARSE naming the template"
       (and (has? out "E_TEMPLATE_PARSE") (has? out "cexpr`{x} * c`"))))

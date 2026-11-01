@@ -1,0 +1,2 @@
+set T = A | B
+law l: all x: T. f(a) --1 == 0

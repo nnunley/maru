@@ -6,8 +6,8 @@
 
 <law> : <cexpr> ()
 
-# -- starts a comment only between items, after blank space or a line start
-dash		= &-> (law-after-space? self) "--" (&. !eol .)* ;
+# -- starts a comment at a line's start, or after a blank space when a blank or the line's end follows
+dash		= &-> (law-dash? self) "--" (&. !eol .)* ;
 gap		= (blank | eol | comment | dash)* ;
 termop		= "+" -> '+ | "-" !"-" -> '- ;
 

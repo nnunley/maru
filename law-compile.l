@@ -11,10 +11,12 @@
 
 (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
-;; a comment's -- needs blank space or a line start before it
-(define-function law-after-space? (p)
-  (let ((i (<text-parser>-position p)))
-    (or (= i 0) (member? (string-at (<text-parser>-string p) (- i 1)) '(9 10 13 32)))))
+;; a comment's -- starts a line (after blanks), or follows a blank with a blank or the line's end after it
+(define-function law-dash? (p)
+  (let* ((s (<text-parser>-string p)) (i (<text-parser>-position p)) (j i) (n (string-length s)))
+    (while (and (< 0 j) (member? (string-at s (- j 1)) '(9 32))) (set j (- j 1)))
+    (or (= j 0) (member? (string-at s (- j 1)) '(10 13))
+	(and (< j i) (or (<= n (+ i 2)) (member? (string-at s (+ i 2)) '(9 10 13 32)))))))
 
 (require "cexpr.g.l")
 (require "law.g.l")
