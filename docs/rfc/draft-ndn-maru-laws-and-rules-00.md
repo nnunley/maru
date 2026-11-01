@@ -311,7 +311,7 @@ returns a constant. [R-weak-laws]
 The constant stand-in judges only names that are Maru functions. It cannot
 judge a grammar law: a constant parser satisfies a template equality. It
 also satisfies idempotence- and positivity-style laws
-(`absv(absv(n)) = absv(n)`), which are therefore reported `VACUOUS`;
+(`absv(absv(n)) = absv(n)`), which are therefore reported `VACUOUS`.
 Authors SHOULD state such laws another way. A law file
 without an `under test:` line is rejected (`E_NO_UNDER_TEST`).
 
