@@ -94,7 +94,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   7 for `hanoi3.john` (both ours, after the memo's Hanoi2 tables), and reports the worlds
   it looked at. Qualifications take the first clause whose guard holds (`sorted`), a
   class is its instances in `for every`, `for some` and `select`, and a name, property
-  or qualification nothing defines is an error. Optimizations and heuristics are not
+  or qualification nothing defines is an error. An `action-optimization` narrows an
+  action's arguments and a `goal-optimization` the actions each world tries, so the memo's
+  x86 allocator (`check/john/x86-allocator.john`) finds a plan in 6 steps, one a split, and
+  its allocation fills every live range slot by slot. Lists count from 1 (`at:`, `to:`,
+  `from:`). The puzzle allocator, asked to satisfy its goal, stops at
+  `unknown name: live-vars`, the memo's slip for `each live-vars`. Heuristics are not
   read yet; `hanoi4.john` as printed is inconsistent (`Peg1` supports `B`, which sits on
   `C`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`

@@ -1,6 +1,8 @@
 ;;; john-eval.l runs JOHN programs: Towers of Hanoi with 2 and 3 disks solved in the fewest
 ;;; moves by searching possible worlds, qualifications clause by clause, quantifiers over a
-;;; class's instances, and an unknown name as an error.  "program TEXT" runs TEXT in a child.
+;;; class's instances, and an unknown name as an error; the memos' x86 allocator, its
+;;; optimizations choosing the actions and arguments, to a valid allocation.  "program TEXT"
+;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
 
 (define system (subr "system" "s"))
@@ -12,10 +14,11 @@
     (<= i n)))
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function run-text (text) (john-run (john-read-text text)))
-(define-function child (text)	; a program's output and errors, run in a child process
+(define-function child-mode (args)	; output and errors of this file run in a child with args
   (system "mkdir -p /tmp/maru-check")
-  (system (concat-strings "./eval check/john-run.l program '" text "' >/tmp/maru-check/john-run.out 2>&1"))
+  (system (concat-strings "./eval check/john-run.l " args " >/tmp/maru-check/john-run.out 2>&1"))
   (contents-of-file-named "/tmp/maru-check/john-run.out"))
+(define-function child (text) (child-mode (concat-strings "program '" text "'")))
 
 (define-function suite ()
   (expect "Hanoi2 in 3 moves"
@@ -43,6 +46,34 @@
   (expect "an unknown name is an error" (has? (child "nosuch.") "unknown name: nosuch"))
   (expect "an unknown property is an error" (has? (child "create C. make C X. X colour.") "no property or qualification colour of X"))
   (expect "make gives every property a value" (has? (child "create C a b. make C X 1.") "make X: 2 properties, 1 values"))
+;; lists count from 1; Word holds names that are not objects, so empty repeatn: works
+  (expect "list operations" (equal (run-text "[ 1, 2, 3 ] at: 2. [ 1, 2, 3 ] to: 2. [ 1, 2, 3 ] from: 2. [ 1, 2, 3 ] last.
+					      qualify Word repeatn: N [ ] if N = 0. qualify Word repeatn: N (its repeatn: (N - 1)) + it.
+					      empty repeatn: 2.")
+				   '("2" "[ 1, 2 ]" "[ 2, 3 ]" "3" "[ empty, empty ]")))
+  (expect "the x86 allocator"
+    (equal (john-run-file "check/john/x86-allocator.john")
+	   '("looking 1 time unit ahead (4 possible worlds)" "looking 2 time unit ahead (4 possible worlds)"
+	     "looking 3 time unit ahead (4 possible worlds)" "looking 4 time unit ahead (8 possible worlds)"
+	     "looking 5 time unit ahead (12 possible worlds)" "looking 6 time unit ahead (12 possible worlds)"
+	     "satisfied at time: 6"
+	     "satisfied by: [ Al assign R1 Va , Al assign R3 VB , Al assign R2 Vc , Al assign R3 Vd , Al split R1 R4 , Al assign R1 VE ]")))
+  ;; and the allocation is one: every slot from a variable's start to just before its end holds it in
+  ;; one register (two for length 4, a register pair), and nowhere else does.  The memo's room check
+  ;; reads only a range's two ends, so an assignment could overwrite a variable; this would catch it.
+  (let ((slots (map (lambda (r) (john-eval (list 'send r 'allocations) *john-world* ())) '(R1 R2 R3 R4))) (fits 1))
+    (list-do v '(Va VB Vc Vd VE)
+      (let ((range (john-eval (list 'send v 'live-range) *john-world* ())) (want (/ (john-eval (list 'send v 'length) *john-world* ()) 2)))
+	(for (i 1 13)
+	  (let ((n 0) (inside (and (<= (car range) i) (< i (cadr range)))))
+	    (list-do r slots (and (= v (john-builtin r 'at: (list i))) (set n (+ n 1))))
+	    (or (= n (if inside want 0)) (let () (set fits ()) (println "slot " i " holds " v " " n " times")))))))
+    (expect "the x86 allocation fills each live range, slot by slot" fits))
+  ;; the memo's puzzle goal reads live-vars, a name, where each live-vars is meant
+  (expect "the puzzle allocator's goal names nothing" (has? (child-mode "puzzle") "unknown name: live-vars"))
   (and ok (println "john run ok")))
 
-(if *arguments* (let () (next-argument) (println (run-text (next-argument)))) (suite))
+(if (not *arguments*) (suite)
+  (if (= "puzzle" (next-argument))
+      (println (john-run (concat-list (john-read "check/john/puzzle-allocator.john") '((satisfy Al done () () ())))))
+    (println (run-text (next-argument)))))
