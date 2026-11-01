@@ -35,12 +35,15 @@
     '(qualify Block span-for-var:at: (Var Inst)
        (value (send it area-span-x:area-span-y: (send (send Var inst-piece: Inst) x-length) (send (send Var inst-piece: Inst) y-length)))))))
 
-;; before a name is declared a relation it reads as a send
+;; a name no rel-qualify declares reads as a send; a declared one is infix even above its rel-qualify
 (expect "an undeclared name is a send" (equal (john-read-text "it smaller Surface.") '((query (send (send it smaller) Surface)))))
+(expect "a relation used before its rel-qualify" (equal (car (john-read-text "rule Disk move is it smaller Surface. rel-qualify Surface:S1 smaller Surface:S2 if S1 = S2."))
+  '(rule Disk move (rel smaller it Surface))))
 (expect "a computed object name" (equal (john-read-text "for [ [ \"Va\" name ] ] do make V (each first).")
 					'((for (list (list (send "Va" name))) (make V (send each first))))))
-;; ours, not JOHN's: for some C reads as the memo's for any all C once C is a class
-(expect "for some over a class" (equal (cadr (john-read-text "create Register next-right. qualify Allocator canAllocate: Variable if for some Register do each canAllocate: Variable = yes."))
-  '(qualify Allocator canAllocate: (Variable) (if (any (all Register) (= (send each canAllocate: Variable) yes))))))
+;; ours, not JOHN's: for some is for any; over a class it means its instances, an evaluation rule,
+;; so it reads alike whether or not the class is created yet
+(expect "for some over a class" (equal (john-read-text "qualify Allocator canAllocate: Variable if for some Register do each canAllocate: Variable = yes.")
+  '((qualify Allocator canAllocate: (Variable) (if (any Register (= (send each canAllocate: Variable) yes)))))))
 (expect "for some over a collection" (equal (john-read-text "for some its items do each = 2.") '((query (any (send it items) (= each 2))))))
 (and ok (println "john forms ok"))

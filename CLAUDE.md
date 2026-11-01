@@ -85,7 +85,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `check/john/` (Hanoi4, the puzzle and x86 register allocators) to 31, 47 and 33
   statement forms. A keyword argument is one primary and sends chain on after it
   (`a at: (i) length = 2`), `+` ends a keyword send, and a name is an infix relation
-  only once declared (`it smaller Surface`).
+  if a `rel-qualify` anywhere in the program declares it (`it smaller Surface`; the
+  program is read twice). `for some X` (ours) is `for any X`; over a class it means the
+  class's instances, a rule for evaluation, not parsing.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at

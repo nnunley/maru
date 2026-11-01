@@ -6,17 +6,13 @@
 (require "text-parser.l")
 (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
-;; a name reads as an infix relation only once declared (G6): by rel-qualify, or here,
-;; for the built-in in and the relations the sources use without showing them
+;; a name reads as an infix relation only if declared (G6): by a rel-qualify anywhere in
+;; the program, or here, for the built-in in and the relations the sources use without
+;; showing them
 (define *john-prelude-relations* '(in permutation-of in-chess-move-span))
 (define *john-relations* ())
 (define-function john-relation? (n) (member? n *john-relations*))
 (define-function john-relation (n form) (or (member? n *john-relations*) (push *john-relations* n)) form)
-
-;; and a name reads as a class in for some C only once create or group declares it
-(define *john-classes* ())
-(define-function john-class? (n) (member? n *john-classes*))
-(define-function john-class (n form) (or (member? n *john-classes*) (push *john-classes* n)) form)
 
 (define-function john-kw (x) (string->symbol (concat-string (symbol->string x) ":")))
 (define-function john-selector (parts)	; ((at: . x) (put: . y)) -> at:put:
@@ -29,10 +25,13 @@
 (require "cexpr.g.l")
 (require "john.g.l")
 
+;; two passes, so a relation may be used before its rel-qualify, as JOHN lets any name be:
+;; the first collects the declared relations (its forms may misread a use above one)
+(define-function john-parse (text) (let ((parser (text-parser-for-on <john> text))) (and ($program parser) parser)))
 (define-function john-read-text (text)
   (set *john-relations* *john-prelude-relations*)
-  (set *john-classes* ())
-  (let ((parser (text-parser-for-on <john> text)))
-    (or ($program parser) (error "syntax error"))
+  (john-parse text)
+  (let ((parser (john-parse text)))
+    (or parser (error "syntax error"))
     (<john>-result parser)))
 (define-function john-read (path) (john-read-text (contents-of-file-named path)))
