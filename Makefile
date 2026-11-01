@@ -57,7 +57,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l $(CROSS) .force
-	./eval check/check.l
+	./eval check/check.l $(CHECKS)
 
 maru-check : eval2 .force
 	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s

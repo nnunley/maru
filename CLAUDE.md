@@ -39,7 +39,10 @@ sizes by definition.
     make check
 
 `check/check.l` (untyped Maru, built on boot.l's `unit-test`) runs each demo and
-asserts what it computes; `./eval check/check.l NAME…` runs selected cases.
+asserts what it computes; `make check CHECKS="NAME…"` runs selected cases, after
+building what is stale. Run cases through make, not `./eval check/check.l`
+directly: no case names the derived files it needs (`law.g.l`, `cexpr.g.l` …), so a
+direct run in a fresh or stale tree fails on a missing or old grammar.
 Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 `maru-check.k` is.
 
@@ -202,3 +205,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
    - Array types in `maru.k`/`ir2`, replacing the runtime's `long` field runs.
    - Blocks sized to a stream's element size, so kernels over large tensors
      can run (one 512-byte block size caps an element at about 118 floats).
+6. Checks without make or a shell, for the bare-metal image. `check/check.l`
+   compiles a stale grammar in-process with `compile-tpeg.l` (each case naming the
+   derived files it needs), and `lines` counts the tree in Maru instead of through
+   `git ls-files | grep | wc`. Today the cases reach the shell through `run`
+   (`system`), and only `make` builds what they need.
