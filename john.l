@@ -9,7 +9,7 @@
 ;; a name reads as an infix relation only if declared (G6): by a rel-qualify anywhere in
 ;; the program, or here, for the built-in in and the relations the sources use without
 ;; showing them
-(define *john-prelude-relations* '(in permutation-of in-chess-move-span))
+(define *john-prelude-relations* '(in did permutation-of in-chess-move-span))	; did: ours
 (define *john-relations* ())
 (define-function john-relation? (n) (member? n *john-relations*))
 (define-function john-relation (n form) (or (member? n *john-relations*) (push *john-relations* n)) form)

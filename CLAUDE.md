@@ -109,7 +109,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `set-opt merge-worlds yes` drops a world whose state (every property of every object)
   was reached before, so Hanoi3 looks at 8 worlds at its last level instead of 1086 and
   a consistent Hanoi4 (`check/john/hanoi4-ours.john`) is solved in 15 moves; a commit
-  forgets the states seen on the branches it drops. `hanoi4.john` as printed is
+  forgets the states seen on the branches it drops. Time is the chain of worlds:
+  `at time t E` reads an earlier world, and a later t gives the values over the possible
+  worlds that far ahead (RN-2008-003). Ours, after McCarthy's Elephant: an expression
+  may read earlier times (`at time T E`, `for some time T after A up to B do P`) and ask
+  which action made a world (`X did reserve`), an action may be an event with no
+  effects, and `X do act` runs one action now. So the airline
+  (`check/john/airline.john`) keeps no record of reservations: a passenger has one if a
+  request made while the flight had room wasn't cancelled since. An expression can't
+  read the future. Qualifications are kept per world. `hanoi4.john` as printed is
   inconsistent (`Peg1` supports `B`, which sits on `C`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;

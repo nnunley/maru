@@ -1,0 +1,19 @@
+; An airline reservation system with no record of who holds a seat.  Ours, after McCarthy,
+; "The Programming Language Elephant" (1979), section 5: "a passenger has a reservation if
+; he has made one that has not been cancelled", and a request succeeds only if the flight
+; wasn't full just before it.  The history is the chain of worlds; reserve and cancel are
+; events that change nothing, and every answer is read from what happened.
+start-world airline.
+create Flight seats.
+create Passenger.
+make Flight F 2.
+make Passenger P1. make Passenger P2. make Passenger P3.
+action Passenger reserve.
+action Passenger cancel.
+qualify Flight booked (select all Passenger by which has-reservation = yes) size.
+; a request at time T succeeded if the flight had room at T - 1
+qualify Passenger reserved-at: T if (at time T it did reserve) and (at time (T - 1) F booked < F seats).
+; a quantifier's body is one comparison, so the and needs parentheses to stay inside T's scope
+qualify Passenger has-reservation if
+  for some time T up to time do (it reserved-at: T = yes and
+                                 not for some time U after T up to time do (at time U it did cancel)).

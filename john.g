@@ -39,7 +39,11 @@ chain		= chain:r kwpart+:ps						-> `(send ,r ,(john-selector ps) ,@(map cdr ps)
 		| primary ;
 quant		= "every" wb -> 'every | "any" wb -> 'any | "some" wb -> 'any ;	# some: ours
 pair		= name:v name:p							-> (list v p) ;
-prefix		= "for" wb quant:q chain:l "do" wb compare:p			-> `(,q ,l ,p)
+# ours, after Elephant: times T from just after A (default 0) up to B, and the value of E at time T
+prefix		= "for" wb quant:q "time" wb name:v ("after" wb primary)?:a "up" wb "to" wb primary:b "do" wb compare:p
+										-> `(,q time ,v ,(car a) ,b ,p)
+		| "at" wb "time" wb primary:t compare:e				-> `(at-time ,t ,e)
+		| "for" wb quant:q chain:l "do" wb compare:p			-> `(,q ,l ,p)
 		| "select" wb "all" wb name:c "by" wb expr:p			-> `(select ,c ,p)
 		| "all" wb pair*:ps name:c					-> `(all ,c ,@ps)
 		| "one-from" wb chain:s						-> `(one-from ,s) ;
@@ -79,6 +83,7 @@ statement	= "start-world" wb name:n end					-> `(start-world ,n)
 										-> (john-relation r `(rel-qualify ,(car n) ,a ,r ,b ,e))
 		| "action" wb name:c name:a aparam*:ps "consequence" wb effects:es end
 										-> `(action ,c ,a ,ps ,@es)
+		| "action" wb name:c name:a aparam*:ps end			-> `(action ,c ,a ,ps)	# ours: an event, no effects
 		| "rule" wb name:c name:a ("is" wb)? expr:e end			-> `(rule ,c ,a ,e)
 		| "goal-optimization" wb name:c name:g "use" wb name+:as "if" wb expr:e end
 										-> `(goal-optimization ,c ,g ,as ,e)

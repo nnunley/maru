@@ -12,11 +12,15 @@
 ;;; Heuristics score a world; with max-time-ahead H the search commits, every H levels,
 ;;; to the next move toward the best-scoring world (RN-2008-003 §10), and in a
 ;;; two-player-game the opponent makes only its best-scoring replies (§12).  Ours, not the
-;;; memos': with merge-worlds a world whose state was reached before is dropped (G12).  A name nothing defines is an error, never a quiet no.
+;;; memos': with merge-worlds a world whose state was reached before is dropped (G12).
+;;; Time is the chain of worlds.  at time t E reads E in the world at time t: at the REPL
+;;; a later t gives the values over the possible worlds that far ahead (RN-2008-003 §4);
+;;; ours, after McCarthy's Elephant, an expression may read earlier times, quantify over
+;;; them (for some time T up to B), and ask which action made a world (X did act).  A name nothing defines is an error, never a quiet no.
 
 (require "john.l")
 
-(define-structure <john-world> (time parent action writes))	; writes: ((obj prop . value) ...)
+(define-structure <john-world> (time parent action writes cache))	; writes: ((obj prop . value) ...)
 
 (define *john-classes* ())	; (class props . groups-it-belongs-to)
 (define *john-objects* ())	; (name . class), newest first
@@ -59,7 +63,10 @@
       (set w (<john-world>-parent w)))
     (or found (john-fail "no value for " o " " p))
     v))
-(define-function john-write (w o p v) (set (<john-world>-writes w) (cons (cons o (cons p v)) (<john-world>-writes w))))
+(define-function john-write (w o p v)
+  (set (<john-world>-cache w) ())	; qualifications read the old value
+  (set (<john-world>-writes w) (cons (cons o (cons p v)) (<john-world>-writes w))))
+(define-function john-at-time (w t) (while (> (<john-world>-time w) t) (set w (<john-world>-parent w))) w)
 
 ;;; ---- values
 
@@ -89,6 +96,7 @@
 	  ((member? x '(yes no empty)) x)
 	  ((john-object? x) x)
 	  ((john-class x) (cons 'class x))
+	  ((= x 'time) (<john-world>-time w))
 	  (else (john-fail "unknown name: " x)))))
 (define-function john-quals (c sel)	; clauses for sel on c, then on c's groups
   (let ((out ()))
@@ -98,7 +106,7 @@
 (define-function john-bind (names vals env)
   (while names (set env (cons (cons (car names) (car vals)) env)) (set names (cdr names)) (set vals (cdr vals)))
   env)
-(define-function john-qualify (r clauses args w)	; first clause whose guard holds
+(define-function john-qualify-now (r clauses args w)	; first clause whose guard holds
   (let ((v ()) (done ()))
     (list-do q clauses
       (or done
@@ -108,6 +116,13 @@
 	      (and (or (not (cddr b)) (john-true? (john-eval (caddr b) w env)))
 		   (let () (set v (john-eval (cadr b) w env)) (set done 1)))))))
     (if done v (if (= 'if (car (cadddr (car clauses)))) 'no (john-fail "no clause of " (cadr (car clauses)) " applies to " r)))))
+(define-function john-assoc (k al) (let ((r ())) (while (and al (not r)) (and (equal k (caar al)) (set r (car al))) (set al (cdr al))) r))
+(define-function john-qualify (r clauses args w)	; a world never changes, so its answers are kept
+  (let* ((key (cons r (cons (cadr (car clauses)) args))) (hit (john-assoc key (<john-world>-cache w))))
+    (if hit (cdr hit)
+      (let ((v (john-qualify-now r clauses args w)))
+	(set (<john-world>-cache w) (cons (cons key v) (<john-world>-cache w)))
+	v))))
 ;; lists count from 1: at: n is the nth element, to: n the first n, from: n the nth onward
 (define-function john-drop (l n) (while (and l (< 0 n)) (set l (cdr l)) (set n (- n 1))) l)
 (define-function john-take (l n) (let ((out ())) (while (and l (< 0 n)) (push out (car l)) (set l (cdr l)) (set n (- n 1))) (list-reverse! out)))
@@ -133,14 +148,23 @@
 	  (else (john-builtin r sel args)))))
 (define-function john-holds (r a b w env)
   (if (= r 'in) (john-bool (member? a (john-collection b)))
+   (if (= r 'did) (let ((st (<john-world>-action w))) (john-bool (and st (= a (car st)) (= b (cadr st)))))
     (let ((d (assq r *john-rels*)))
       (or d (john-fail "no relation " r))
-      (john-bool (john-true? (john-eval (cadddr d) w (list (cons (cadr (cadr d)) a) (cons (cadr (caddr d)) b))))))))
+      (john-bool (john-true? (john-eval (cadddr d) w (list (cons (cadr (cadr d)) a) (cons (cadr (caddr d)) b)))))))))
 (define-function john-quantify (all? l p w env)
   (let ((r all?))
     (list-do x (john-collection (john-eval l w env))
       (let ((h (john-true? (john-eval p w (cons (cons 'each x) env)))))
 	(if all? (or h (set r ())) (and h (set r 1)))))
+    (john-bool r)))
+(define-function john-quantify-time (all? v lo hi p w env)	; times lo+1 ... hi, none later than w
+  (let ((r all?) (t (+ 1 (if lo (john-eval lo w env) 0))) (end (john-eval hi w env)))
+    (or (<= end (<john-world>-time w)) (john-fail "time " end " is later than now, " (<john-world>-time w)))
+    (while (<= t end)
+      (let ((h (john-true? (john-eval p w (cons (cons v t) env)))))
+	(if all? (or h (set r ())) (and h (set r 1))))
+      (set t (+ t 1)))
     (john-bool r)))
 (define-function john-arith (o a b)
   (cond ((and (long? a) (long? b)) (cond ((= o '+) (+ a b)) ((= o '-) (- a b)) ((= o '*) (* a b)) (else (/ a b))))
@@ -162,9 +186,15 @@
 		      ((= op 'and) (john-bool (and (john-true? (john-eval (cadr x) w env)) (john-true? (john-eval (caddr x) w env)))))
 		      ((= op 'or) (john-bool (or (john-true? (john-eval (cadr x) w env)) (john-true? (john-eval (caddr x) w env)))))
 		      ((= op 'not) (john-bool (not (john-true? (john-eval (cadr x) w env)))))
-		      ((= op 'rel) (john-holds (cadr x) (john-eval (caddr x) w env) (john-eval (cadddr x) w env) w env))
+		      ((= op 'rel) (john-holds (cadr x) (john-eval (caddr x) w env)
+					       (if (= 'did (cadr x)) (cadddr x) (john-eval (cadddr x) w env)) w env))
+		      ((and (member? op '(every any)) (= 'time (cadr x)) (cddddr x))
+		       (john-quantify-time (= op 'every) (caddr x) (cadddr x) (car (cddddr x)) (cadr (cddddr x)) w env))
 		      ((= op 'every) (john-quantify 1 (cadr x) (caddr x) w env))
 		      ((= op 'any) (john-quantify () (cadr x) (caddr x) w env))
+		      ((= op 'at-time) (let ((t (john-eval (cadr x) w env)))
+					 (or (<= t (<john-world>-time w)) (john-fail "at time " t ": an expression reads only the past, now " (<john-world>-time w)))
+					 (john-eval (caddr x) (john-at-time w t) env)))
 		      ((= op 'all) (if (cddr x) (john-fail "all with property values is not read yet") (john-instances (cadr x))))
 		      ((= op 'select) (let ((out ()))
 					(list-do o (john-instances (cadr x))
@@ -236,8 +266,6 @@
       (let ((mine ()) (theirs ()))
 	(list-do c kids (if (= opp (car (<john-world>-action c))) (push theirs c) (push mine c)))
 	(concat-list (list-reverse! mine) (john-best (list-reverse! theirs) opp g))))))
-(define-function john-at-time (w t) (while (> (<john-world>-time w) t) (set w (<john-world>-parent w))) w)
-
 ;; a world's state: every property of every object, as text; seen states kept in buckets by hash
 (define-function john-state (w)
   (let ((s ""))
@@ -294,6 +322,23 @@
     (let ((ps (cadr cl)))
       (or (= (list-length ps) (list-length vals)) (john-fail "make " o ": " (list-length ps) " properties, " (list-length vals) " values"))
       (list-do v vals (john-write *john-world* o (car ps) (if (symbol? v) v (john-eval v *john-world* env))) (set ps (cdr ps))))))
+(define-function john-at-time-query (t e)	; past: that world; future: every possible world that far ahead
+  (let ((now (<john-world>-time *john-world*)))
+    (if (<= t now) (john-say (john-text (john-eval e (john-at-time *john-world* t) ())))
+      (let ((ws (list *john-world*)) (vs ()) (k now))
+	(while (< k t)
+	  (let ((next ())) (list-do w ws (list-do c (john-children w () ()) (push next c))) (set ws (list-reverse! next)))
+	  (set k (+ k 1)))
+	(list-do w ws (let ((v (john-eval e w ()))) (or (member? v vs) (set vs (concat-list vs (list v))))))
+	(john-say (concat-strings "Possible World values (" (format "%d" (- t now)) " time unit from now):"))
+	(let ((s "{ ") (first 1)) (list-do v vs (set s (concat-strings s (if first "" ", ") (john-text v))) (set first ()))
+	  (john-say (concat-string s " }")))))))
+(define-function john-do (r a args)	; one action, here and now; the memo's do (§11), its arguments given
+  (let ((d ()))
+    (list-do x *john-actions* (and (= a (cadr x)) (john-isa? (john-object-class r) (car x)) (set d x)))
+    (or d (john-fail r " has no action " a))
+    (let ((c (john-step *john-world* r d args)))
+      (if c (set *john-world* c) (john-say (concat-strings (john-text r) " can't " (john-text a)))))))
 (define-function john-statement (s)
   (let ((op (car s)))
     (cond ((= op 'start-world) (set *john-world* (new <john-world>)) (set (<john-world>-time *john-world*) 0))
@@ -320,6 +365,8 @@
 	  ((= op 'satisfy) (john-satisfy (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cadddr s))
 					 (car (cddddr s)) (cadr (cddddr s))))
 	  ((= op 'query) (john-say (john-text (john-eval (cadr s) *john-world* ()))))
+	  ((= op 'at-time) (john-at-time-query (john-eval (cadr s) *john-world* ()) (caddr s)))
+	  ((= op 'do) (john-do (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cdddr s))))
 	  (else (john-fail "statement not read yet: " op)))))
 (define-function john-run (forms)
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())

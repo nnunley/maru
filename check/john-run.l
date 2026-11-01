@@ -3,7 +3,8 @@
 ;;; class's instances, and an unknown name as an error; the memos' x86 allocator, its
 ;;; optimizations choosing the actions and arguments, to a valid allocation; heuristics
 ;;; committing a search every max-time-ahead levels, and minimax in a two-player game; and,
-;;; ours, merge-worlds dropping a world whose state was reached before.  "program TEXT"
+;;; ours, merge-worlds dropping a world whose state was reached before; time: at time t E in
+;;; the past and over the possible futures, and McCarthy's airline, read from its history.  "program TEXT"
 ;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
 
@@ -37,6 +38,7 @@
   heuristic Player win 1 minimize G pile. ")
 (define-function no-satisfy (fs) (let ((out ())) (list-do f fs (or (= 'satisfy (car f)) (push out f))) (list-reverse! out)))
 (define-function hanoi (f opts) (john-run (concat-list (no-satisfy (john-read f)) (concat-list opts '((satisfy Hanoi win () () ()))))))
+(define-function airline (text) (john-run (concat-list (john-read "check/john/airline.john") (john-read-text text))))
 (define-function maze (more) (john-run (concat-list (john-read "check/john/maze.john") more)))
 
 (define-function suite ()
@@ -136,6 +138,31 @@
 	     "satisfied by: [ Bot move R , Bot move L , Bot move G ]")))
   (expect "the maze merged, two levels ahead" (equal (last (maze '((set-opt merge-worlds yes) (set-opt max-time-ahead 2) (satisfy R reach () () ()))))
     "satisfied by: [ R move B1 , R move B2 , R move C2 , R move C3 , R move C4 , R move D4 ]"))
+  ;; RN-2008-003 section 4: the world at an earlier time answers for it, and a later time has the
+  ;; values over every possible world that far ahead
+  (expect "time in the maze" (equal (maze (john-read-text "time. at time 1 R position. at time 3 R position.
+							       R satisfy reach. time. at time 1 R position. at time 4 R position."))
+    '("0" "Possible World values (1 time unit from now):" "{ B1, A2 }"
+      "Possible World values (3 time unit from now):" "{ A2, C2, B3, B1, A4 }"
+      "looking 1 time unit ahead (2 possible worlds)" "looking 2 time unit ahead (3 possible worlds)"
+      "looking 3 time unit ahead (8 possible worlds)" "looking 4 time unit ahead (13 possible worlds)"
+      "looking 5 time unit ahead (25 possible worlds)" "looking 6 time unit ahead (33 possible worlds)"
+      "satisfied at time: 6" "satisfied by: [ R move B1 , R move B2 , R move C2 , R move C3 , R move C4 , R move D4 ]"
+      "6" "B1" "C3")))
+  ;; Elephant's airline (ours): no record of reservations, only the events.  A request made when the
+  ;; flight was full is forgotten; a cancelled reservation frees its seat
+  (expect "the airline" (equal (airline "P1 do reserve. P2 do reserve. P3 do reserve.
+					  P1 has-reservation. P2 has-reservation. P3 has-reservation. F booked.
+					  P1 do cancel. P3 has-reservation. F booked.
+					  P3 do reserve. P3 has-reservation. F booked. P1 has-reservation.
+					  P1 do reserve. P1 has-reservation.
+					  at time 2 P2 has-reservation. at time 4 P1 has-reservation. time.")
+			       '("yes" "yes" "no" "2" "no" "1" "yes" "2" "no" "no" "yes" "no" "6")))
+  ;; an expression reads only the past: Elephant's futuristic reference is a goal for satisfy
+  (expect "a future time in an expression" (has? (child "create C a. make C X 1. qualify C later if at time 5 it a = 1. X later.")
+						 "at time 5: an expression reads only the past"))
+  (expect "a future time in a quantifier" (has? (child "create C a. make C X 1. qualify C ever if for some time T up to 3 do it a = 1. X ever.")
+						"time 3 is later than now"))
   (and ok (println "john run ok")))
 
 (if (not *arguments*) (suite)
