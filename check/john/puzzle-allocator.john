@@ -1,0 +1,49 @@
+; A register allocator by puzzle solving: Samimi, "Programming as Planning", VPRI Memo
+; M-2009-001, Appendix II (Table 26), transcribed.  The memo says no results were obtained.
+start-world ssa.
+create Allocator instructions registers.
+create Instruction id live-vars allocated-vars free-blocks allocations.
+create Block row reg index.
+create Reg num.
+create Row num.
+create Var puzzle-piece half-puzzle-piece start-inst end-inst.
+create PuzzlePiece x-length y-length.
+qualify Block area-span-x: X area-span-y: Y
+  select all Block by which row num <= its row num and which row num > (its row num - X) and
+  which reg num >= its reg num and which reg num < (its reg num + Y).
+qualify Block span-for-var: Var at: Inst
+  its area-span-x: ((Var inst-piece: Inst) x-length)
+  area-span-y: ((Var inst-piece: Inst) y-length).
+qualify Var inst-piece: Inst its puzzle-piece
+  if not (Inst = its start-inst or Inst = its end-inst).
+qualify Var inst-piece: InstId its half-puzzle-piece.
+qualify List contains: L1 is for every L1 do each in it.
+make PuzzlePiece P22 2 2.
+make PuzzlePiece P12 2 1.
+make PuzzlePiece P21 1 2.
+make PuzzlePiece P11 1 1.
+make Reg R1 1. make Reg R2 2. make Reg R3 3. make Reg R4 4.
+make Row Row1 1. make Row Row2 2.
+make Var Va P21 P11 I1 I6.
+make Var VB P22 P12 I2 I4.
+make Var Vc P21 P11 I3 I5.
+make Var Vd P21 P11 I4 I6.
+make Var VE P22 P12 I5 I6.
+make Block B11 Row1 R1 0. make Block B12 Row2 R1 1.
+make Block B21 Row1 R2 2. make Block B22 Row2 R2 3.
+make Block B31 Row1 R3 4. make Block B32 Row2 R3 5.
+make Block B41 Row1 R4 6. make Block B42 Row2 R4 7.
+make Instruction I1 1 [ Va ] [ ] (all Block) [ ].
+make Instruction I2 2 [ Va, VB ] [ ] (all Block) [ ].
+make Instruction I3 3 [ Va, VB, Vc ] [ ] (all Block) [ ].
+make Instruction I4 4 [ Va, VB, Vc, Vd ] [ ] (all Block) [ ].
+make Instruction I5 5 [ Va, Vc, Vd, VE ] [ ] (all Block) [ ].
+make Instruction I6 6 [ Va, Vd, VE ] [ ] (all Block) [ ].
+make Allocator Al (all Instruction) (all Reg).
+action Allocator allocate Inst Block Var consequence
+  Inst free-blocks = Inst free-blocks - (Block span-for-var: Var at: Inst) and
+  Inst allocated-vars = Inst allocated-vars + Var and
+  Inst allocations = Inst allocations + [ [ Block, Var ] ].
+rule Allocator allocate is ((Inst free-blocks) contains: (Block span-for-var: Var at: Inst)) = yes.
+goal Allocator done try for every its instructions do each allocated-vars size = live-vars size.
+end-world.

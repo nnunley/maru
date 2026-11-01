@@ -1,0 +1,58 @@
+; An x86 register allocator: Samimi, "Research Summary: A Programming Methodology and
+; A Reliability Mechanism", VPRI Memo M-2009-008, section 1, transcribed.
+start-world allocatorx86.
+;; CLASSES
+create Allocator unallocated-variables.
+create Variable length live-ranges.
+create Register next-right allocations.
+;; QUALIFICATIONS
+qualify Word repeatn: N [ ] if N = 0.
+qualify Word repeatn: N (its repeatn: (N - 1)) + it.
+qualify Variable live-range [its live-ranges first first / 2, its live-ranges first second / 2]. ;; fixme
+qualify Variable repeatn: N [ ] if N = 0.
+qualify Variable repeatn: N (its repeatn: (N - 1)) + it.
+qualify Variable repeatList it repeatn: (its live-range second - its live-range first).
+qualify Allocator next-variable its unallocated-variables first.
+qualify Allocator next-variable-start its next-variable live-range first.
+qualify Allocator canAllocate: Variable if
+  for any all Register do each canAllocate: Variable = yes.
+qualify Register allocationWith: Variable
+  its allocations to: (Variable live-range first - 1) +
+  Variable repeatList + its allocations from: (Variable live-range last).
+qualify Register canAllocate: Variable if
+  (Variable length = 2 or
+   (not its next-right = no and
+    for every Variable live-range do its next-right allocations at: each = empty)) and
+  for every Variable live-range do its allocations at: each = empty.
+;; ACTIONS
+action Allocator assign Register Variable consequence
+  Register allocations = Register allocationWith: Variable and
+  Register next-right allocations = (Register next-right) allocationWith: Variable if Variable length = 4 and
+  its unallocated-variables = its unallocated-variables rest.
+rule Allocator assign is Register canAllocate: Variable = yes.
+action Allocator split Register:RegisterFrom Register:RegisterTo consequence
+  RegisterTo allocations = RegisterTo allocations to: (its next-variable-start - 2) +
+                           RegisterFrom allocations from: (its next-variable-start - 1) and
+  RegisterFrom allocations = RegisterFrom allocations to: (its next-variable-start - 2) +
+                             empty repeatn: (RegisterFrom allocations size - (its next-variable-start - 2)).
+rule Allocator split is not RegisterFrom = RegisterTo.
+rule Allocator split is not RegisterTo = RegisterFrom next-right.
+rule Allocator split is not (RegisterFrom allocations at: (its next-variable-start)) = empty.
+rule Allocator split is RegisterFrom allocations at: (its next-variable-start) length = 2.
+rule Allocator split is RegisterTo allocations at: (its next-variable-start - 2) = empty.
+;; GOALS
+goal Allocator allocation try its unallocated-variables size = 0.
+;; OPTIMIZATIONS
+action-optimization Allocator assign dynamically establish Variable = its next-variable.
+action-optimization Allocator assign dynamically establish Variable length = 2 or not Register next-right = no.
+goal-optimization Allocator allocation use split if it canAllocate: (its next-variable) = no.
+goal-optimization Allocator allocation use assign if it canAllocate: (its next-variable) = yes.
+;; OBJECTS
+for [ [ "Va" name, 2, [ [ 2, 22 ] ] ], [ "VB" name, 4, [ [ 6, 14 ] ] ], [ "Vc" name, 2, [ [ 10, 18 ] ] ],
+      [ "Vd" name, 2, [ [ 14, 22 ] ] ], [ "VE" name, 4, [ [ 18, 22 ] ] ] ]
+  do make Variable (each first) (each second) (each third).
+for [ ["R1" name, "R2" name], ["R2" name, no], ["R3" name, "R4" name], ["R4" name, no] ]
+  do make Register (each first) (each second) (empty repeatn: 12).
+make Allocator Al (all Variable).
+Al satisfy allocation.
+end-world.

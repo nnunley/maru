@@ -79,6 +79,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   end of its input.
 - `cexpr_forms` (`check/cexpr-forms.l`): `cexpr.g` parses C's expressions,
   with C's precedence, to Maru forms.
+- `john_forms` (`check/john-forms.l`): `john.g` (inheriting `cexpr.g`) and `john.l` read
+  JOHN, Samimi's VPRI planning language, as reconstructed in
+  `~/pkm/wiki/synthesis/john-language-reconstruction.md`: the three complete programs in
+  `check/john/` (Hanoi4, the puzzle and x86 register allocators) to 31, 47 and 33
+  statement forms. A keyword argument is one primary and sends chain on after it
+  (`a at: (i) length = 2`), `+` ends a keyword send, and a name is an infix relation
+  only once declared (`it smaller Surface`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at

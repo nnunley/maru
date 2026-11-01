@@ -1,0 +1,47 @@
+; Towers of Hanoi with 4 disks, in JOHN-SAT: Samimi, "Programming as Planning",
+; VPRI Memo M-2009-001, Appendix I (Table 25), transcribed.
+start-world towers-of-hanoi.
+;; GROUPS
+group Surface Peg Disk.
+group Thing NotApplicable Disk.
+;; CLASSES
+create NotApplicable.
+create Num.
+create Towers.
+create Peg: Num bigness, * Thing supporting.
+create Disk: Num bigness, * Surface supporter, * Thing supporting.
+;; OBJECTS
+make NotApplicable None.
+make Num One. make Num Two. make Num Three. make Num Four.make Num Five.
+make Towers Hanoi.
+make Peg Peg1 Five B. make Peg Peg2 Five None. make Peg Peg3 Five None.
+make Disk D Four Peg1 C.
+make Disk C Three D B.
+make Disk B Two C A.
+make Disk A One B None.
+;; QUALIFFICATIONS (RELATIONS)
+rel-qualify Surface:S1 smaller Surface:S2 if
+  ( S1 bigness = One and S2 bigness = Two ) or
+  ( S1 bigness = One and S2 bigness = Three ) or
+  ( S1 bigness = One and S2 bigness = Four ) or
+  ( S1 bigness = One and S2 bigness = Five ) or
+  ( S1 bigness = Two and S2 bigness = Three ) or
+  ( S1 bigness = Two and S2 bigness = Four ) or
+  ( S1 bigness = Two and S2 bigness = Five ) or
+  ( S1 bigness = Three and S2 bigness = Four ) or
+  ( S1 bigness = Three and S2 bigness = Five ) or
+  ( S1 bigness = Four and S2 bigness = Five ).
+rel-qualify not Surface:S1 smaller Surface:S2 if S2 smaller S1.
+;; ACTIONS
+action Disk move Surface consequence
+  Surface supporting = it and
+  its supporter supporting = None and
+  its supporter = Surface.
+rule Disk move is its supporting = None.
+rule Disk move is Surface supporting = None.
+rule Disk move is it smaller Surface.
+;; GOALS
+goal Towers win try B supporter = Peg3 and A supporter = B.
+;; QUERY
+Hanoi satisfy win.
+end-world.

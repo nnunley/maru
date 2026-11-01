@@ -237,6 +237,9 @@
 ;; cexpr.g parses C's expressions to Maru forms (check/cexpr-forms.l).
 (check "cexpr_forms" (unit-assert (equal (last (run "cexpr_forms" "./eval check/cexpr-forms.l")) "cexpr forms ok")))
 
+;; john.g reads the three complete JOHN programs to forms, with the precedence and relations the reconstruction gives (check/john-forms.l).
+(check "john_forms" (unit-assert (equal (last (run "john_forms" "./eval check/john-forms.l")) "john forms ok")))
+
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
 (define-function law-run (name files)
@@ -423,7 +426,7 @@
 ;; Every source line is accounted for: the count must equal the sum of the
 ;; entries in check/lines, and each entry that adds lines must say why.
 (check "lines"
-  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|dc|law)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
+  (let ((n (string->long (car (words (car (run "count" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g|c|h|nl|spec|osdefs|irl|dc|law|john)$|Makefile$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | xargs cat | wc -l"))))))
 	(sum 0))
     (list-do entry (lines (contents-of-file-named "check/lines"))
       (let ((w (words entry)))
