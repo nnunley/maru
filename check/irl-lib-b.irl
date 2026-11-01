@@ -1,0 +1,3 @@
+// The other half of check/irl-library.l's shared library.
+long add3(long a, long b, long c) return a + b + c;
+export add3;

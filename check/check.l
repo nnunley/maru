@@ -331,6 +331,9 @@
     (unit-assert (not (string-find (contents-of-file-named f) "(ir-")))))
 
 ;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
+;; compile-irl.l --library builds a shared library whose exported functions untyped Maru calls (check/irl-library.l).
+(check "irl_library" (unit-assert (equal (last (run "irl_library" "./eval check/irl-library.l")) "irl library ok")))
+
 (check "irl"
   (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.k"))
   (unit-assert (equal (run "irl" (ir2-build "irl" (concat-strings tmp "/irl.k")))

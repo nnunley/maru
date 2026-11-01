@@ -1,6 +1,7 @@
 ;;; compile-irl.l									-*- coke -*-
 ;;;
 ;;; ./eval compile-irl.l <filename>.irl > <filename>.k
+;;; ./eval compile-irl.l --library <a>.irl <b>.irl ... > <lib>.k	(no main: definitions only)
 
 (require "text-parser.l")
 
@@ -54,12 +55,18 @@
 (define-function irl-literal? (e)	(or (long? e) (double? e) (string? e)))
 
 ;; Definitions stay at top level, in order; every other statement, and the
-;; assignment of each computed initialiser, goes in main.
+;; assignment of each computed initialiser, goes in main.  A library has no main, so there
+;; either is an error naming the file.
+(define *irl-library* ())	; the file being read in library mode, or ()
+(define-function irl-main (form)
+  (and *irl-library* (error "irl library: top-level statement in " *irl-library* ": " form))
+  form)
 (define-function irl-program (forms)
   (let ((defs ()) (main ()))
     (list-do f forms
       (let ((head (and (pair? f) (car f))))
 	(cond
+	  ((= head 'export)		(push defs f))
 	  ((= head 'define-struct)	(push *irl-structs* (cons (cadr f) (map car (caddr f))))
 					(push defs f))
 	  ((= head 'define-function)	(push defs `(define-function ,(cadr f) ,(caddr f) ,(cadddr f) ,@(irl-body (cddddr f)))))
@@ -72,13 +79,17 @@
 	  ((and (= head 'define) (irl-literal? (caddr f)))
 					(push defs f))
 	  ((= head 'define)		(push defs `(define ,(cadr f)))
-					(push main `(set ,(car (cadr f)) ,(irl-expand (caddr f)))))
-	  (else				(push main f)))))
-    (concat-list (list-reverse! defs)
-		 `((define-function main int () ,@(irl-body (list-reverse! main)) (return 0))))))
+					(push main (irl-main `(set ,(car (cadr f)) ,(irl-expand (caddr f))))))
+	  (else				(push main (irl-main f))))))
+    (if *irl-library* (list-reverse! defs)
+      (concat-list (list-reverse! defs)
+		   `((define-function main int () ,@(irl-body (list-reverse! main)) (return 0)))))))
 
+(define irl-library-mode ())
 (while *arguments*
-  (let* ((file   (next-argument))
-	 (parser (text-parser-for-on <irl> (contents-of-file-named file))))
-    (or ($program parser) (error "syntax error"))
-    (list-do form (irl-program (<irl>-result parser)) (dumpln form))))
+  (let ((file (next-argument)))
+    (if (= file "--library") (set irl-library-mode 1)
+      (let ((parser (text-parser-for-on <irl> (contents-of-file-named file))))
+	(or ($program parser) (error "syntax error"))
+	(and irl-library-mode (set *irl-library* file))
+	(list-do form (irl-program (<irl>-result parser)) (dumpln form))))))

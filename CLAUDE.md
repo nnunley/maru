@@ -123,6 +123,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
   a type mismatch in the `if` (`check/irl-errors.l` records it in Maru).
+- `irl_library` (`check/irl-library.l`): `compile-irl.l --library A.irl B.irl` reads
+  several irl files to one program with no `main` (a top-level statement is an error), and
+  `export f;` keeps a function visible; ir2's C, compiled with `cc -shared` (the Makefile's
+  `%.dylib` pattern), is a library untyped Maru opens by absolute path and calls by address.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
   check; the `in`, `number` and `=` builtins work as specified; schemas, relation

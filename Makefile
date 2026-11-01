@@ -133,6 +133,12 @@ cexpr.g.l : tpeg.l cexpr.g | eval
 law.g.l : tpeg.l law.g | eval
 	./eval compile-tpeg.l law.g > law.g.l
 
+# a typed program built as a shared library (compile-irl.l --library makes the .k)
+SHLIB = $(if $(filter Darwin,$(shell uname)),dylib,so)
+%.$(SHLIB) : %.k ir-gen-c.k maru.k | eval2
+	./eval2 ir-gen-c.k maru.k $< > $*.c
+	$(CC) -shared -fPIC -fno-builtin -w -o $@ $*.c
+
 john.g.l : tpeg.l john.g | eval
 	./eval compile-tpeg.l john.g > john.g.l
 
