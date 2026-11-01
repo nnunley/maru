@@ -57,9 +57,10 @@ when, and only when, they appear in all capitals, as shown here.
 ## Specification
 
 This document defines the solver, its programming interface, its proofs, the checker, the
-DIMACS reader, and the encoding of JOHN planning into formulas. It does NOT define JOHN's
-language or its search (`john.g`, `john-eval.l`, and the reconstruction they follow), irl
-(`irl.g`), ir2 or its backends, or how the laws search will use the solver (Out of Scope).
+grammars that read formulas and proofs, the grammar blocks in irl that those grammars need,
+and the encoding of JOHN planning into formulas. It does NOT define JOHN's language or its
+search (`john.g`, `john-eval.l`, and the reconstruction they follow), irl beyond its grammar
+blocks, ir2 or its backends, or how the laws search will use the solver (Out of Scope).
 
 **The solver is typed Maru.** The solver and the checker are irl programs, compiled through
 `compile-irl.l` and ir2 like any typed program. Neither is C written by hand, and neither
@@ -76,6 +77,11 @@ bounds, and the encoder is cross-checked against the search wherever the search 
 
 **The checker is simpler than the solver.** It shares no code with the solver beyond reading
 literals. An error in the solver therefore can't hide behind the same error in the checker.
+
+**Formats are grammars.** DIMACS and the proof format are read by grammars, written once with
+their semantic actions in the target language, never by a lexer written out by hand. This is the
+tree's own rule ("prefer a DSL or grammar over writing code out"), and how Pepsi
+(`test-pepsi.l`) carries target code through its grammar.
 
 ### Data model
 
@@ -232,9 +238,53 @@ doesn't follow. These are tested by mutating real proofs. [R-checker-rejects]
 sat_proof
 ```
 
+#### Grammars in irl
+
+`compile-tpeg.l` MUST compile a foreign rule call, `p-r` in a grammar (`(match-rule-in p r)`):
+the rule `r` of grammar `<p>`, run on the same input from the same position, with its own memo
+table, its result and end position carried back. [R-tpeg-foreign]
+
+`tpeg.g` already reads `p-r`, but only `parser.l` compiled it. It is how one grammar uses
+another's rules without copying them, and irl uses it to read grammar blocks with tpeg's own
+rules.
+
+```maru-check @R-tpeg-foreign
+irl_grammar
+```
+
+irl MUST read a grammar block, `grammar <name> : <parent> (fields) { rules }`, in tpeg's own
+syntax, through a foreign call to tpeg's `grammar` rule. `compile-irl.l` MUST compile the
+block's records to typed Maru:
+- each rule becomes a typed function over the input and a position, returning the position
+  after its match, or failure;
+- `:x` bindings are typed locals;
+- `@$#` spans become numbers;
+- the grammar's fields are the state its actions share;
+- each action (`-> sexpression`) is a maru.k form, copied into the function unchanged.
+
+Rules from `<parent>` that the block doesn't override are inherited. [R-irl-grammar]
+
+The actions are the target language passed through, as Pepsi passes Maru through its method
+bodies. A rule's value is a number or a pointer, since typed Maru has no lists, so a grammar
+builds structure by its actions' effects. DIMACS does exactly that: a clause's action adds its
+literals.
+
+```maru-check @R-irl-grammar
+irl_grammar
+```
+
 #### DIMACS and the generated instances
 
-The DIMACS reader MUST:
+DIMACS and the proof format MUST be read by irl grammar blocks in the library: one for formulas,
+whose actions add each clause, and one for proofs, whose actions add or delete each line. No
+character of either format is read by code written out by hand. [R-formats-grammars]
+
+```maru-check @R-formats-grammars
+sat_dimacs
+sat_proof
+```
+
+The DIMACS grammar MUST:
 - accept the `p cnf V C` header, `c` comment lines, and clauses ending in 0;
 - reject a literal larger than `V`, a count that disagrees with `C`, or anything else, as
   `E_DIMACS`, naming the line. [R-dimacs]
@@ -482,6 +532,12 @@ Excluded from the first version, though the bounded model holds every earlier st
 fit it naturally. Extension point: [R-expression-circuits], extended to read the state at a
 constant or quantified time.
 
+**Memoization and left recursion in typed grammars.** `text-parser.l` memoizes rule results and
+grows left-recursive rules; [R-irl-grammar]'s typed functions do neither. Excluded because
+DIMACS and the proof format need neither, and both are linear. A left-recursive rule in a
+grammar block is an error, never a silent loop. Extension point: [R-irl-grammar]'s generator,
+which would add a memo table per rule.
+
 **Optimization (MaxSAT) and model counting.** Finding the best plan by a cost, or counting
 plans. Extension point: none in this document; the solver's interface would grow an objective.
 
@@ -519,6 +575,15 @@ checker larger than the forward check. LRAT proofs carry hints that make checkin
 the solver would have to record every clause's antecedents. DRAT keeps the solver simple, and
 the forward check keeps the checker simple.
 
+**Why not a DIMACS reader written by hand?** A lexer in irl, character by character. One was
+started, and stopped: it is the code the tree's rule says to replace with a grammar. A grammar
+also states the format once, beside its ABNF, where a lexer hides it in loops.
+
+**Why not run the DIMACS grammar as untyped tpeg, its actions calling the library?** That needs
+nothing new, but leaves the formats outside the typed stack, read by the interpreter at every
+proof line. A grammar block in irl compiles with the solver into native code, and makes grammars
+with typed actions available to every later typed program.
+
 **Why not SATLIB benchmark files?** They are the standard test set, but they are third-party
 data, and the public tree keeps third-party files out. Their answers would also rest on other
 solvers' agreement. Families generated with answers known by construction test the same paths.
@@ -540,15 +605,22 @@ Solving time is bounded by `sat-conflicts`. A formula that doesn't finish within
 
 ## Compatibility
 
-New: `sat.irl` (the solver), `drat-check.irl` (the checker), the encoder, and the `sat.dylib`
-make target. JOHN programs behave as before unless they set `planner sat`.
+New: `sat.irl` (the solver), `drat-check.irl` (the checker), `dimacs.irl` (the two format
+grammars), the encoder, and the `sat.dylib` make target. JOHN programs behave as before unless
+they set `planner sat`.
+
+`compile-tpeg.l` gains foreign rule calls ([R-tpeg-foreign]). Existing grammars don't use them,
+so their compiled output doesn't change.
 
 irl needs small extensions to build a shared library, each its own change:
 - an `export` declaration, so a function isn't `static` in ir2's C output (`maru.k`'s `export`
   already supports it underneath);
 - a library mode in `compile-irl.l` with no `main`, since a library's top-level statements
   never run;
-- building one library from the solver's and the checker's irl together.
+- building one library from the solver's and the checker's irl together;
+- `cast(e, type)` and `sizeof(type)`, onto `maru.k`'s existing forms, since `struct F` in an
+  irl expression is a struct literal;
+- grammar blocks ([R-irl-grammar]), with a small typed matching runtime.
 
 The library is opened by its absolute path in the tree, not through `dlopen.k`'s directory
 search, so [R-native] holds. A `break` statement in irl would shorten the solver's loops, and
