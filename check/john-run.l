@@ -42,6 +42,7 @@
 			  '("looking 1 time unit ahead (1 possible worlds)" "satisfied at time: 1" "satisfied by: [ X swap ]")))
   (expect "an unknown name is an error" (has? (child "nosuch.") "unknown name: nosuch"))
   (expect "an unknown property is an error" (has? (child "create C. make C X. X colour.") "no property or qualification colour of X"))
+  (expect "make gives every property a value" (has? (child "create C a b. make C X 1.") "make X: 2 properties, 1 values"))
   (and ok (println "john run ok")))
 
 (if *arguments* (let () (next-argument) (println (run-text (next-argument)))) (suite))
