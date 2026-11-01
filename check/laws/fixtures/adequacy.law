@@ -8,3 +8,4 @@ law listed: all c: color(c). holds(color, c) = Yes
 law painted_listed: all c: Color. holds(painted, c) = holds(color, c)
 law adequate: mutants of painted by exhaustion size 1. listed, painted_listed
 law weak: mutants of painted by exhaustion size 1. painted_listed
+law typo: mutants of paintd by exhaustion size 1. listed

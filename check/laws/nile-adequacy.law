@@ -19,6 +19,7 @@ rule u_var:    v: t in env                                        => uexpr(env, 
 rule u_num:    number(n)                                          => uexpr(env, n)
 rule u_prefix: prefix(op, at, t), uexpr(env, a)                   => uexpr(env, nile`{op}({a})`)
 rule u_infix:  infix(op, at, bt, t), uexpr(env, a), uexpr(env, b) => uexpr(env, nile`({a} {op} {b})`)
+fact draws(100)                                                   -- nile.law's, for coverage; unused here
 
 law sound: all t: Type, e: expr(ap, t, e). nile_accepts(e, t) = accept by exhaustion size 1
 law agree: all t: Type, e: uexpr(ap, e). checks(expr, ap, t, e) = nile_accepts(e, t) by exhaustion size 1

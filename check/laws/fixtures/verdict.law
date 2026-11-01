@@ -1,0 +1,7 @@
+-- a verdict is no truth value: a claim or condition must compare it
+set Side = Left | Right
+reference no(x)
+under test: no
+law truthy: all s: Side. no(s)
+law guarded: all s: Side, no(s), s = s. s = s
+law compared: all s: Side. no(s) = reject

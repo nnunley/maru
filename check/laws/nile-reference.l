@@ -7,7 +7,7 @@
 ;;;   (nile-defines text)       the same for top-level definitions
 ;;;   (nile-signatures)         infix and prefix facts for the prelude's Number and Boolean operations
 ;;; Nile's checker exits on its first error, so each question runs in a forked child under
-;;; an alarm (fork, waitpid, _exit and law-quiet are check/law.l's): nile-fatal-error and
+;;; an alarm (law-child and _exit are check/law.l's): nile-fatal-error and
 ;;; nile-op-lookup-error exit 3, a parse failure 4.  Nile's grammar is compiled in process,
 ;;; as nile-compiler.l does.  For claims: checks, unfired, text, unparse and non_ascii (below).
 (require "print-structure.l")
@@ -73,12 +73,9 @@
 (define-function nile-check (defs)
   (map-with type-check (map-with resolve defs nile-prelude-env) '())
   (_exit 0))
-(define-function nile-verdict (ask)	; ask: run in the child, exiting with its verdict
-  (let ((pid (fork)))
-    (when (= 0 pid) (law-quiet) (alarm 10) (ask))
-    (waitpid pid status-word 0)
-    (let ((st (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
-      (cond ((= 0 st) accept) ((or (= st (<< 3 8)) (= st (<< 4 8))) reject) (else (list 'crash st))))))
+(define-function nile-verdict (ask)	; ask: run in the child, exiting with its verdict; (crash -1) if no child ran
+  (let ((st (law-child (lambda () (alarm 10) (ask)))))
+    (cond ((= 0 st) accept) ((or (= st (<< 3 8)) (= st (<< 4 8))) reject) (else (list 'crash st)))))
 (define nile-sigs ())
 (define-function nile-sig (type)
   (or (cdr (assq type nile-sigs))

@@ -1,0 +1,6 @@
+-- flaky crashes once, then accepts: the crash isn't kept, so again asks anew and accepts; its vacuity probe can't fork
+set One = A
+reference flaky(x)
+under test: flaky
+law first: all s: One. flaky(s) = accept
+law again: all s: One. flaky(s) = accept

@@ -7,7 +7,8 @@
 ;;; and after a file's laws, for each grammar domain they drew from,
 ;;;   grammar LANG.RULE: accepted a of n
 ;;; A file with no under test: line prints E_NO_UNDER_TEST and runs none of its
-;;; laws.  The run exits 1 if any law is neither TESTED nor PROVED.
+;;; laws, as does one with two laws of one name (E_DUPLICATE).  A claim or condition valued a
+;;; reference's verdict is E_CLAIM.  The run exits 1 if any law is neither TESTED nor PROVED.
 ;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Laws" and "References".
 (require "rules.l")
 (require "law-compile.l")
@@ -22,7 +23,7 @@
 (define *law-crash* ())		; (status arg...) once a reference answers neither accept nor reject
 (define *law-failed* ())
 (define *lb* ())  (define *lvars* ())  (define *lnames* ())	; the law: bindings (var kind data), $vars, plain names
-(define *lc* ())  (define *lf* ())  (define *ls* 3)  (define *lclaim* ())  (define *lseed* 42)  (define *lmethod* ())
+(define *lname* ())  (define *lc* ())  (define *lf* ())  (define *ls* 3)  (define *lclaim* ())  (define *lseed* 42)  (define *lmethod* ())
 
 (define-function law-setting (key)
   (cdr (or (assq key *law-config*) (assq key '((size . 3) (trials . 100) (seed . 42) (starved_ratio . 20))))))
@@ -36,11 +37,15 @@
   (while vars (set g (rules-subst g (car vars) (car vals))) (set vars (cdr vars)) (set vals (cdr vals)))
   g)
 
-;; claims and conditions: = compares values, a Capitalised name is a constant, as is
+;; claims and conditions: a value is true unless false, but a verdict is no truth value (law-truth); = compares values, a Capitalised name is a constant, as is
 ;; a relation under test (checks(expr, ...)), a template is filled with the law's values and parsed
 (define-function law-template (lang text bindings) (template-parse lang (template-fill lang text bindings)))
 (define-function law-upper? (x) (let ((c (string-at (symbol->string x) 0))) (and (<= ?A c) (<= c ?Z))))
 (define-function law-ne (a b) (not (equal a b)))
+(define *law-verdict* ())	; claim or condition, once one's value is a reference's verdict
+(define-function law-truth (what v)
+  (and (or (= v 'accept) (= v 'reject) (and (pair? v) (= 'crash (car v)))) (not *law-verdict*) (set *law-verdict* what))
+  v)
 (define-function law-relation? (x) (and (member? x *law-under*) (rules-concludes? x *law-rules*)))
 (define-function law-form (x)
   (cond ((symbol? x)		(if (or (law-upper? x) (law-relation? x)) (list 'quote x) x))
@@ -52,7 +57,8 @@
 				      (map law-form (cdr x))))))
 
 ;; references: a template term is passed as its text; anything but accept or reject
-;; is a crash, kept with its input.  A reference is pure, so its answers to text are kept, hashed by it
+;; is a crash, kept with its input.  A reference is pure, so its verdicts on text are kept, hashed by it;
+;; a crash is not kept, so the same question is asked again
 (define-function law-crashed (v args)
   (or *law-crash* (set *law-crash* (cons (if (and (pair? v) (= 'crash (car v))) (cadr v) v) args)))
   'crash)
@@ -64,7 +70,10 @@
     (if (not k) (apply f in)
       (for (i 0 (string-length k)) (set h (% (+ (* h 31) (string-at k i)) 1021)))
       (list-do e (array-at *law-answers* h) (and (= k (car e)) (set c e)))
-      (cdr (or c (car (push (array-at *law-answers* h) (cons k (apply f in)))))))))
+      (if c (cdr c)
+	(let ((v (apply f in)))
+	  (and (or (= v 'accept) (= v 'reject)) (push (array-at *law-answers* h) (cons k v)))
+	  v)))))
 (define-function law-wrap (name f)
   (lambda args (let* ((in (map template-render args)) (v (law-answer name f in))) (if (or (= v 'accept) (= v 'reject)) v (law-crashed v in)))))
 (define-function law-set-global (name v) (eval (list 'set name (list 'quote v))))
@@ -125,12 +134,12 @@
 	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
 	(else (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*))))
 
-;; one set of values: skip (conditions false), hold, fail or crash
+;; one set of values: skip (conditions false), hold, fail, crash or verdict (a claim or condition valued a verdict)
 (define-function law-try (vals)
-  (set *law-crash* ())
+  (set *law-crash* ()) (set *law-verdict* ())
   (let ((c (apply *lc* vals)))	; a crash in a condition or the claim makes no verdict
-    (cond (*law-crash* 'crash) ((not c) 'skip)
-	  (else (let ((h (apply *lf* vals))) (cond (*law-crash* 'crash) (h 'hold) (else 'fail)))))))
+    (cond (*law-crash* 'crash) (*law-verdict* 'verdict) ((not c) 'skip)
+	  (else (let ((h (apply *lf* vals))) (cond (*law-crash* 'crash) (*law-verdict* 'verdict) (h 'hold) (else 'fail)))))))
 
 ;; shrinking: a number toward 0, a set member toward the first, a rule-built or
 ;; generated value by drawing again at a smaller size; kept only while the claim fails
@@ -163,9 +172,11 @@
       (for (i 0 (list-length vals))
 	(let ((c (law-smaller i vals sizes))) (and c (let () (set vals (car c)) (set sizes (cdr c)) (set more 1))))))
     vals))
-(define-function law-failed (r vals)	; the outcome of a failing or crashing try
-  (if (= r 'fail) (list 'REFUTED (law-shrink vals))
-    (cons 'INCONCLUSIVE *law-crash*)))
+(define-function law-failed (r vals)	; the outcome of a failing, crashing or verdict-valued try
+  (cond ((= r 'fail)	(list 'REFUTED (law-shrink vals)))
+	((= r 'verdict)	(list 'E_CLAIM (concat-strings (if (= 'claim *law-verdict*) "the claim of " "a condition of ") (symbol->string *lname*)
+					       " is a verdict; compare it, e.g. `= accept`")))
+	(else		(cons 'INCONCLUSIVE *law-crash*))))
 
 ;; TEST: trials values meeting the conditions, from at most trials x starved_ratio draws
 (define-function law-test ()
@@ -224,17 +235,16 @@
 (define status-word ((subr "malloc" "l>p") 8))
 (define-function law-quiet ()	; the child's output, an error's backtrace included, goes nowhere
   (let ((fd ((subr "open" "si>i") "/dev/null" 1))) ((subr "dup2" "ii>i") fd 1) ((subr "dup2" "ii>i") fd 2)))
-(define-function law-holds-with (fs k)
+(define-function law-child (run)	; run in a forked, silenced child that exits: its wait status, or -1 if fork or waitpid failed
   (let ((pid (fork)))
-    (when (= 0 pid)
-      (law-quiet)
-      (list-do f fs (law-set-global (car f) (lambda args k)))
-      (_exit (if (law-pass? (law-method)) 0 1)))
-    (waitpid pid status-word 0)
-    (= 0 (+ (byte-at status-word 0) (byte-at status-word 1)))))
-(define-function law-vacuous? ()
+    (when (= 0 pid) (law-quiet) (run))
+    (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
+(define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
+  (let ((st (law-child (lambda () (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+    (cond ((< st 0) 'crash) ((= 0 st) 1))))
+(define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))
-      (let ((fs (law-functions))) (and fs (law-holds-with fs 0) (law-holds-with fs 1)))))
+      (let* ((fs (law-functions)) (a (and fs (law-holds-with fs 0)))) (if (= 1 a) (law-holds-with fs 1) a))))
 
 (define-function law-report (r)
   (let ((k (car r)))
@@ -257,16 +267,16 @@
   (or *law-err*
       (let ()
 	(set *lvars* (map car *lb*)) (set *lnames* (map law-plain *lvars*))
-	(set *lclaim* (car (cddddr it))) (set *lseed* seed)
+	(set *lname* (cadr it)) (set *lclaim* (car (cddddr it))) (set *lseed* seed)
 	(set *lmethod* method) (set *ls* (or size (law-setting 'size)))
-	(set *lc* (eval `(lambda ,*lnames* (and 1 ,@(map law-form (cadddr it))))))
-	(set *lf* (eval `(lambda ,*lnames* ,(law-form *lclaim*)))))))
+	(set *lc* (eval `(lambda ,*lnames* (and 1 ,@(map (lambda (c) (list 'law-truth ''condition (law-form c))) (cadddr it))))))
+	(set *lf* (eval `(lambda ,*lnames* (law-truth 'claim ,(law-form *lclaim*))))))))
 (define-function law-one (it seed)
   (print "law " (cadr it) ": ")
   (law-setup it seed (cadr (cddddr it)) (caddr (cddddr it)))
   (if *law-err* (law-report *law-err*)
-    (let ((r (law-method)))
-      (law-report (if (and (law-pass? r) (law-vacuous?)) '(VACUOUS) r)))))
+    (let* ((r (law-method)) (v (and (law-pass? r) (law-vacuous?))))	; a probe that can't fork is no verdict
+      (law-report (cond ((= 'crash v) '(INCONCLUSIVE -1 stand-in)) (v '(VACUOUS)) (else r))))))
 
 ;; ADEQUATE: (adequacy name rel size law...): every mutant of the rules rel reaches fails a named law, each
 ;; exhausted at the size over domains from the file's own rules, its conditions and claim run under the mutant.
@@ -321,8 +331,8 @@
 	      (law-setup l *lseed* 'exhaustion (cadddr it))
 	      (if *law-err* (law-report (set err *law-err*))
 		(let ((rs (law-records)) (bad ()))
-		  (list-do rec rs (and (not bad) (= 'fail (cadr rec)) (set bad rec)))
-		  (if bad (let () (print n " ") (law-report (set err (law-failed 'fail (car bad)))))
+		  (list-do rec rs (and (not bad) (member? (cadr rec) '(fail verdict)) (set bad rec)))
+		  (if bad (let () (print n " ") (law-report (set err (law-failed (law-try (car bad)) (car bad)))))
 		    (set out (concat-list out (list (cons l rs)))))))))))
     (and (not err) out)))
 (define-function law-killed? (m named size)	; does a named law fail a tuple under the mutant?
@@ -403,8 +413,10 @@
   *law-kill*)
 (define-function law-adequate (it items)
   (print "law " (cadr it) ": ")
-  (let ((named (law-named it items)) (ms (law-mutants (caddr it))) (survivors ()))
+  (let ((ms (law-mutants (caddr it))) (named ()) (survivors ()))
     (set *law-kill* ())
+    (if ms (set named (law-named it items))
+      (law-report (list 'E_ADEQUATE (concat-strings "no rule concludes " (symbol->string (caddr it)) ", so it has no mutants"))))
     (when named
       (let ((goals (law-focus-goals named (caddr it))))
 	(list-do m ms (or (= 'false *law-kill*) (law-killed? m named (cadddr it)) (law-focused? m named goals) (push survivors (car m)))))
@@ -431,6 +443,9 @@
 	(list-do n (law-file-numbers items) (or (member? n *rules-numbers*) (set *rules-numbers* (concat-list *rules-numbers* (list n)))))))
     (set *law-rules* (rules-expand (law-rules items)))
     (or *law-under* (let () (println "E_NO_UNDER_TEST " path ": no under test: line, so its laws test nothing") (set *law-failed* 1) (set items ())))
+    (let ((seen ()) (dup ()))	; a law's name is its own in the file, as adequacy names laws
+      (list-do it items (and (member? (car it) '(law adequacy)) (if (member? (cadr it) seen) (or dup (set dup (cadr it))) (push seen (cadr it)))))
+      (and dup (let () (println "E_DUPLICATE " path ": two laws are named " (symbol->string dup) ", so none of its laws run") (set *law-failed* 1) (set items ()))))
     (list-do it items
       (cond ((= 'law (car it))		(law-one it (+ (law-setting 'seed) pos)) (set pos (+ pos 1)))
 	    ((= 'adequacy (car it))	(law-adequate it items))))

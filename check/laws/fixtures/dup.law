@@ -1,0 +1,3 @@
+under test: double
+law twice: all n: number. double(n) = n + n
+law twice: all n: number. double(n) = n

@@ -268,11 +268,16 @@
 		  "law listed: E_EXHAUST cexpr.primary is generated, not enumerated; use by test")
 		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing")
 		 ("adequacy" "check/laws/fixtures/holds.l" 256 "law listed: TESTED 100" "law painted_listed: TESTED 100" "law adequate: PROVED 7"
-		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)")
+		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)"
+		  "law typo: E_ADEQUATE no rule concludes paintd, so it has no mutants")
 		 ("numerals" "" 0 "law few: PROVED 2") ("refs" "check/laws/fixtures/refs.l" 0 "law differ: TESTED 100")
 		 ("reach" "check/laws/fixtures/holds.l" 256 "law sound: PROVED 9" "law sound_uv: PROVED 9" "law direct: PROVED 2"
 		  "law adequate: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)"
-		  "law adequate_uv: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)" "law adequate_direct: direct REFUTED x=A y=C seed=44"))
+		  "law adequate_uv: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)" "law adequate_direct: direct REFUTED x=A y=C seed=44")
+		 ("verdict" "check/laws/fixtures/refs.l" 256 "law truthy: E_CLAIM the claim of truthy is a verdict; compare it, e.g. `= accept`"
+		  "law guarded: E_CLAIM a condition of guarded is a verdict; compare it, e.g. `= accept`" "law compared: TESTED 100")
+		 ("dup" ,d 256 "E_DUPLICATE check/laws/fixtures/dup.law: two laws are named twice, so none of its laws run")
+		 ("flaky" "check/laws/fixtures/flaky.l" 256 "law first: INCONCLUSIVE status=7 input=(A)" "law again: INCONCLUSIVE status=-1 input=(stand-in)"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))
@@ -287,9 +292,23 @@
 		      (equal ab "a=0 b=0.500000")))
     (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
+;; a law file's rule, fact and facts lines, and a rule's continuation lines, each without its -- comment
+(define-function law-uncomment (l)
+  (let ((i 0) (n (string-length l)))
+    (while (and (< i n) (not (and (< 0 i) (= 32 (string-at l (- i 1))) (starts (string-copy l i (- n i)) "--")))) (set i (+ i 1)))
+    (while (and (< 0 i) (= 32 (string-at l (- i 1)))) (set i (- i 1)))
+    (string-copy l 0 i)))
+(define-function law-rule-lines (path)
+  (let ((out ()) (in ()))
+    (list-do l (lines (contents-of-file-named path))
+      (set in (or (starts l "rule ") (starts l "fact") (and in (starts l " "))))
+      (and in (push out (law-uncomment l))))
+    (list-reverse! out)))
 ;; the Nile rules, judged by Nile's own resolver and type checker; Nile's resolver crash is no verdict
 (check "law_nile"
   (let ((n "check/laws/nile-reference.l"))
+    ;; nile-adequacy.law repeats nile.law's rules and facts, so its mutants are nile.law's
+    (unit-assert (equal (law-rule-lines "check/laws/nile.law") (law-rule-lines "check/laws/nile-adequacy.law")))
     (unit-assert (equal (law-run "nile" (concat-strings n " check/laws/nile.law"))
 			'(0 "law sound: TESTED 100" "law generate_checks: TESTED 100" "law coverage: PROVED 1" "law agree: TESTED 100"
 			  "law agree_rejected: TESTED 100" "law round_trip: TESTED 100")))
