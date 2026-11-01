@@ -99,9 +99,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   x86 allocator (`check/john/x86-allocator.john`) finds a plan in 6 steps, one a split, and
   its allocation fills every live range slot by slot. Lists count from 1 (`at:`, `to:`,
   `from:`). The puzzle allocator, asked to satisfy its goal, stops at
-  `unknown name: live-vars`, the memo's slip for `each live-vars`. Heuristics are not
-  read yet; `hanoi4.john` as printed is inconsistent (`Peg1` supports `B`, which sits on
-  `C`).
+  `unknown name: live-vars`, the memo's slip for `each live-vars`. Heuristics score a
+  world: with `set-opt max-time-ahead H`, every H levels the next move toward the
+  best-scoring world is certain and the other branches are dropped, so the maze
+  (`check/john/maze.john`, ours) is solved looking at fewer worlds, and a dead end that
+  scores better is committed to (the incompleteness RN-2008-003 admits). With
+  `set-opt two-player-game [ A, B ]` the opponent makes only its best-scoring replies:
+  Nim from 3 is won only if Black blunders, from 4 always. `hanoi4.john` as printed is
+  inconsistent (`Peg1` supports `B`, which sits on `C`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at

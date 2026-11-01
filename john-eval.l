@@ -8,8 +8,10 @@
 ;;; parent; an action makes a child world one time step on, with every effect evaluated
 ;;; in the parent (the memos' Time1 / Time2).  satisfy searches the worlds level by level
 ;;; (iterative deepening, M-2009-001's brute-force planner); an action-optimization
-;;; narrows an action's arguments and a goal-optimization the actions a world tries;
-;;; heuristics are not yet read.  A name nothing defines is an error, never a quiet no.
+;;; narrows an action's arguments and a goal-optimization the actions a world tries.
+;;; Heuristics score a world; with max-time-ahead H the search commits, every H levels,
+;;; to the next move toward the best-scoring world (RN-2008-003 §10), and in a
+;;; two-player-game the opponent makes only its best-scoring replies (§12).  A name nothing defines is an error, never a quiet no.
 
 (require "john.l")
 
@@ -24,6 +26,8 @@
 (define *john-goals* ())	; (class name params expr)
 (define *john-aopts* ())	; (class action dynamically? expr): an action's arguments must satisfy expr
 (define *john-gopts* ())	; (class goal actions expr): in a world where expr holds, the goal tries actions
+(define *john-heuristics* ())	; (class goal weight maximize|minimize expr)
+(define *john-options* ())	; (name . value), from set-opt
 (define *john-world* ())	; the current world
 (define *john-out* ())		; lines printed, newest first
 (define *john-limit* 16)	; satisfy gives up after this many time steps
@@ -208,10 +212,38 @@
       (list-do p *john-gopts* (and (= g (cadr p)) (john-isa? (john-object-class o) (car p)) (john-true? (john-eval (cadddr p) w env))
 				   (list-do a (caddr p) (or (member? a out) (set out (concat-list out (list a)))))))
       out)))
+;; a world's score for o's goal g: each heuristic's weight times its value, negated to minimize
+(define-function john-score (w o g)
+  (let ((n 0) (env (list (cons 'it o))))
+    (list-do h *john-heuristics*
+      (and (= g (cadr h)) (john-isa? (john-object-class o) (car h))
+	   (let ((v (john-eval (car (cddddr h)) w env)))
+	     (set v (cond ((long? v) v) ((= v 'yes) 1) ((= v 'no) 0) (else (john-fail "a heuristic's value is a number: " (john-text v)))))
+	     (set n (+ n (* (if (= 'maximize (cadddr h)) 1 -1) (* (caddr h) v)))))))
+    n))
+(define-function john-best (ws o g)	; the worlds of ws with the highest score, in order
+  (let ((top ()) (out ()))
+    (list-do w ws (let ((v (john-score w o g))) (and (or (not top) (> v top)) (set top v))))
+    (list-do w ws (and (= top (john-score w o g)) (push out w)))
+    (list-reverse! out)))
+(define-function john-opponent (o)	; o's opponent in a two-player-game, or ()
+  (let ((ps (cdr (assq 'two-player-game *john-options*))))
+    (and ps (member? o ps) (if (= o (car ps)) (cadr ps) (car ps)))))
+(define-function john-expand (w o g using by)	; w's children; the opponent's replies only its best
+  (let ((kids (john-children w (and by (list by)) (john-using w o g using))) (opp (john-opponent o)))
+    (if (not opp) kids
+      (let ((mine ()) (theirs ()))
+	(list-do c kids (if (= opp (car (<john-world>-action c))) (push theirs c) (push mine c)))
+	(concat-list (list-reverse! mine) (john-best (list-reverse! theirs) opp g))))))
+(define-function john-at-time (w t) (while (> (<john-world>-time w) t) (set w (<john-world>-parent w))) w)
+
+(define-function john-step-text (st)	; (actor action args...) as A move Peg2
+  (let ((s (concat-strings (john-text (car st)) " " (john-text (cadr st))))) (list-do v (cddr st) (set s (concat-strings s " " (john-text v)))) s))
 (define-function john-path (w)
   (let ((out ())) (while (<john-world>-action w) (push out (<john-world>-action w)) (set w (<john-world>-parent w))) out))
 (define-function john-satisfy (o g args using by)
-  (let* ((c (john-object-class o)) (goal ()) (frontier (list *john-world*)) (found ()) (k 0))
+  (let* ((c (john-object-class o)) (goal ()) (frontier (list *john-world*)) (found ()) (k 0)
+	 (ahead (cdr (assq 'max-time-ahead *john-options*))) (horizon ahead) (committed *john-world*))
     (list-do d *john-goals* (and (= g (cadr d)) (john-isa? c (car d)) (set goal d)))
     (or goal (john-fail "no goal " g " for " o))
     (let ((env (john-bind (caddr goal) args (list (cons 'it o)))))
@@ -219,7 +251,15 @@
 	(list-do w frontier (and (not found) (john-true? (john-eval (cadddr goal) w env)) (set found w)))
 	(or found
 	    (let ((next ()))
-	      (list-do w frontier (list-do c (john-children w (and by (list by)) (john-using w o g using)) (push next c)))
+	      (and horizon (= k horizon) frontier	; past the flashlight: commit one move toward the best world
+		   (let* ((best (car (john-best frontier o g)))
+			  (step (john-at-time best (+ 1 (<john-world>-time committed)))))
+		     (set committed step)
+		     (set frontier (let ((keep ())) (list-do w frontier (and (= step (john-at-time w (<john-world>-time step))) (push keep w)))
+				     (list-reverse! keep)))
+		     (set horizon (+ horizon ahead))
+		     (john-say (concat-strings "certain: " (john-step-text (<john-world>-action step))))))
+	      (list-do w frontier (list-do c (john-expand w o g using by) (push next c)))
 	      (set next (list-reverse! next))	; concat-list recurses per element and overflows on a wide level
 	      (set k (+ k 1))
 	      (set frontier next)
@@ -228,10 +268,7 @@
       (set *john-world* found)
       (john-say (concat-string "satisfied at time: " (format "%d" (<john-world>-time found))))
       (let ((s "satisfied by: [ ") (first 1))
-	(list-do st (john-path found)
-	  (set s (concat-strings s (if first "" " , ") (john-text (car st)) " " (john-text (cadr st))))
-	  (list-do v (cddr st) (set s (concat-strings s " " (john-text v))))
-	  (set first ()))
+	(list-do st (john-path found) (set s (concat-strings s (if first "" " , ") (john-step-text st))) (set first ()))
 	(john-say (concat-string s " ]"))))))
 
 ;;; ---- statements
@@ -263,6 +300,8 @@
 	  ((= op 'action) (set *john-actions* (concat-list *john-actions* (list (list (cadr s) (caddr s) (cadddr s) (cddddr s))))))
 	  ((= op 'rule) (set *john-rules* (concat-list *john-rules* (list (cdr s)))))
 	  ((= op 'goal) (push *john-goals* (cdr s)))
+	  ((= op 'heuristic) (set *john-heuristics* (concat-list *john-heuristics* (list (cdr s)))))
+	  ((= op 'set-opt) (push *john-options* (cons (cadr s) (john-eval (caddr s) *john-world* ()))))
 	  ((= op 'action-optimization) (set *john-aopts* (concat-list *john-aopts* (list (cdr s)))))
 	  ((= op 'goal-optimization) (set *john-gopts* (concat-list *john-gopts* (list (cdr s)))))
 	  ((= op 'satisfy) (john-satisfy (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cadddr s))
@@ -271,7 +310,7 @@
 	  (else (john-fail "statement not read yet: " op)))))
 (define-function john-run (forms)
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())
-  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
+  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
   (set (<john-world>-time *john-world*) 0)
   (list-do s forms (john-statement s))
   (list-reverse! *john-out*))

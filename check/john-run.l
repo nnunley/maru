@@ -1,7 +1,8 @@
 ;;; john-eval.l runs JOHN programs: Towers of Hanoi with 2 and 3 disks solved in the fewest
 ;;; moves by searching possible worlds, qualifications clause by clause, quantifiers over a
 ;;; class's instances, and an unknown name as an error; the memos' x86 allocator, its
-;;; optimizations choosing the actions and arguments, to a valid allocation.  "program TEXT"
+;;; optimizations choosing the actions and arguments, to a valid allocation; heuristics
+;;; committing a search every max-time-ahead levels, and minimax in a two-player game.  "program TEXT"
 ;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
 
@@ -19,6 +20,21 @@
   (system (concat-strings "./eval check/john-run.l " args " >/tmp/maru-check/john-run.out 2>&1"))
   (contents-of-file-named "/tmp/maru-check/john-run.out"))
 (define-function child (text) (child-mode (concat-strings "program '" text "'")))
+
+(define trap "create Square near blocked. create Robot position.
+  make Square S 2 yes. make Square D 1 no. make Square M 2 no. make Square G 0 no. make Robot R S.
+  rel-qualify Square:A next Square:B if (A = S and (B = D or B = M)) or (A = M and B = G).
+  action Robot move Square consequence its position = Square and Square blocked = yes.
+  rule Robot move is Square blocked = no. rule Robot move is its position next Square.
+  goal Robot reach try its position = G. heuristic Robot reach 1 minimize its position near. ")
+(define nim "create Game pile turn. create Player opponent. make Player White Black. make Player Black White.
+  action Player take1 consequence G pile = G pile - 1 and G turn = its opponent.
+  rule Player take1 is G turn = it. rule Player take1 is G pile >= 1.
+  action Player take2 consequence G pile = G pile - 2 and G turn = its opponent.
+  rule Player take2 is G turn = it. rule Player take2 is G pile >= 2.
+  goal Player win try G pile = 0 and G turn = its opponent.
+  heuristic Player win 1 minimize G pile. ")
+(define-function maze (more) (john-run (concat-list (john-read "check/john/maze.john") more)))
 
 (define-function suite ()
   (expect "Hanoi2 in 3 moves"
@@ -71,6 +87,30 @@
     (expect "the x86 allocation fills each live range, slot by slot" fits))
   ;; the memo's puzzle goal reads live-vars, a name, where each live-vars is meant
   (expect "the puzzle allocator's goal names nothing" (has? (child-mode "puzzle") "unknown name: live-vars"))
+  ;; RN-2008-003 section 10: past max-time-ahead levels the best-scoring world's next move is
+  ;; certain and every other branch is dropped; same path here, fewer worlds looked at
+  (expect "the maze, breadth first" (equal (maze '((satisfy R reach () () ())))
+    '("looking 1 time unit ahead (2 possible worlds)" "looking 2 time unit ahead (3 possible worlds)"
+      "looking 3 time unit ahead (8 possible worlds)" "looking 4 time unit ahead (13 possible worlds)"
+      "looking 5 time unit ahead (25 possible worlds)" "looking 6 time unit ahead (33 possible worlds)"
+      "satisfied at time: 6" "satisfied by: [ R move B1 , R move B2 , R move C2 , R move C3 , R move C4 , R move D4 ]")))
+  (expect "the maze, two levels ahead" (equal (maze '((set-opt max-time-ahead 2) (satisfy R reach () () ())))
+    '("looking 1 time unit ahead (2 possible worlds)" "looking 2 time unit ahead (3 possible worlds)" "certain: R move B1"
+      "looking 3 time unit ahead (3 possible worlds)" "looking 4 time unit ahead (5 possible worlds)" "certain: R move B2"
+      "looking 5 time unit ahead (10 possible worlds)" "looking 6 time unit ahead (13 possible worlds)"
+      "satisfied at time: 6" "satisfied by: [ R move B1 , R move B2 , R move C2 , R move C3 , R move C4 , R move D4 ]")))
+  ;; and pruning is incomplete, as the memo says: a dead end that scores better is committed to
+  (expect "a trap, breadth first" (equal (last (run-text (concat-string trap "R satisfy reach."))) "satisfied by: [ R move M , R move G ]"))
+  (expect "a trap, one level ahead" (equal (run-text (concat-string trap "set-opt max-time-ahead 1. R satisfy reach."))
+					    '("looking 1 time unit ahead (2 possible worlds)" "certain: R move D" "unsatisfiable")))
+  ;; section 12: in a two-player game the opponent makes only its best-scoring replies.  Nim, take 1
+  ;; or 2, the last stick wins: from 3 White wins only if Black blunders, from 4 always
+  (expect "nim from 3, Black blundering" (equal (last (run-text (concat-string nim "make Game G 3 White. White satisfy win.")))
+						 "satisfied by: [ White take1 , Black take1 , White take1 ]"))
+  (expect "nim from 3, Black at its best" (equal (last (run-text (concat-string nim "make Game G 3 White. set-opt two-player-game [ White, Black ]. White satisfy win.")))
+						  "unsatisfiable"))
+  (expect "nim from 4, Black at its best" (equal (last (run-text (concat-string nim "make Game G 4 White. set-opt two-player-game [ White, Black ]. White satisfy win.")))
+						  "satisfied by: [ White take1 , Black take2 , White take1 ]"))
   (and ok (println "john run ok")))
 
 (if (not *arguments*) (suite)
