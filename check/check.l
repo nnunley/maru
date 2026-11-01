@@ -331,6 +331,9 @@
     (unit-assert (not (string-find (contents-of-file-named f) "(ir-")))))
 
 ;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
+;; grammars call each other's rules, and irl compiles grammar blocks to typed Maru (check/irl-grammar.l).
+(check "irl_grammar" (unit-assert (equal (last (run "irl_grammar" "./eval check/irl-grammar.l")) "irl grammar ok")))
+
 ;; compile-irl.l --library builds a shared library whose exported functions untyped Maru calls (check/irl-library.l).
 (check "irl_library" (unit-assert (equal (last (run "irl_library" "./eval check/irl-library.l")) "irl library ok")))
 

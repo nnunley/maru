@@ -1,6 +1,6 @@
 (require "ansiterm.l")
 
-(define-structure <text-parser> (string limit position memos refill result))
+(define-structure <text-parser> (string limit position memos refill result foreign))	; foreign: ((type . parser)...)
 
 (define-function text-parser-refill-default (self len) ())
 
@@ -204,6 +204,20 @@
 	()))))
 
 (define text-parser-invoke-rule text-parser-invoke-rule-simply)
+
+;; a foreign call, p-r: rule r of grammar type on the same input from the same position, through
+;; a parser of that type kept for the caller, so its memos are its own and last the whole parse
+(define-function text-parser-invoke-rule-in (self type name rule)
+  (let ((sub (cdr (assq type (<text-parser>-foreign self)))))
+    (or sub (let ()
+	      (set sub (new type (<text-parser>-string self) (<text-parser>-limit self) 0 (array) (<text-parser>-refill self)))
+	      (set (<text-parser>-foreign self) (cons (cons type sub) (<text-parser>-foreign self)))))
+    (set (<text-parser>-position sub) (<text-parser>-position self))
+    (and (text-parser-invoke-rule name rule sub)
+	 (let ()
+	   (set (<text-parser>-position self) (<text-parser>-position sub))
+	   (set (<text-parser>-result self) (<text-parser>-result sub))
+	   1))))
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-memo)
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 

@@ -21,6 +21,7 @@
     (match-rule		(name . args)	(if args
 					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$ name) self ,@args)
 					  `(text-parser-invoke-rule ',name ,(concat-symbol '$ name) self)))
+    (match-rule-in	(grammar name)	`(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name)))
     (match-require	(exp alt)	`(or ,(value-pe exp) (text-parser-expected self ,alt)))
     (match-first	exps		`(or ,@(map value-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(mapN1 effect-pe value-pe exps)) (set self.position pos) ())))
@@ -75,6 +76,7 @@
     (match-rule		(name . args)	(if args
 					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$$ name) self ,@args)
 					  `(text-parser-invoke-rule ',name ,(concat-symbol '$$ name) self)))
+    (match-rule-in	(grammar name)	`(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name)))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (text-parser-expected self ,alt)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
@@ -128,6 +130,7 @@
 	   (= op 'match-string)
 	   (= op 'match-any)
 	   (= op 'match-rule)
+	   (= op 'match-rule-in)
 	   (= op 'peek-expr)
 	   (= op 'result-expr)))
       (else				(error "cannot find vars in: "pe)))))

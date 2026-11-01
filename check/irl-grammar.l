@@ -1,0 +1,16 @@
+;;; A grammar calls another grammar's rule on the same input (compile-tpeg.l's foreign
+;;; calls, draft-ndn-maru-sat-00 [R-tpeg-foreign]).  Prints "irl grammar ok".
+(require "text-parser.l")
+(define system (subr "system" "s"))
+(define ok 1)
+(define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
+(define dir "/tmp/maru-check")
+(system (concat-strings "mkdir -p " dir " && rm -f " dir "/tpeg-foreign-*.g.l"))
+(list-do g '("a" "b")
+  (system (concat-strings "./eval compile-tpeg.l check/tpeg-foreign-" g ".g > " dir "/tpeg-foreign-" g ".g.l")))
+(load (concat-string dir "/tpeg-foreign-a.g.l"))
+(load (concat-string dir "/tpeg-foreign-b.g.l"))
+(define-function try (rule s) (let ((p (text-parser-for-on <fb> s))) (and (rule p) (<text-parser>-result p))))
+(expect "fb.sum of 12+30 is 42, through fa.num" (= 42 (try $sum "12+30")))
+(expect "fb.sum of 12+ fails" (not (try $sum "12+")))
+(and ok (println "irl grammar ok"))
