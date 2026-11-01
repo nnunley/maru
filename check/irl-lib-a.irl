@@ -1,3 +1,13 @@
 // One half of check/irl-library.l's shared library.
 long twice(long x) return x + x;
 export twice;
+// a typed view of malloc's memory, and a struct's size
+import void*(long) malloc;
+struct Pair { long a, b; };
+long pair_size() return sizeof(struct Pair);
+long view(long n) {
+  let long* p := cast(malloc(8 * n), long*);
+  p[1] := n;
+  return p[1] + sizeof(long);
+}
+export pair_size, view;

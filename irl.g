@@ -18,6 +18,8 @@ primary		= "false" keyword						-> 0
 		;
 
 prefix		= "*"_ prefix:e							-> `(indir ,e)
+		| "cast" keyword "("_ xexpression:e ","_ xtype:t ")"_		-> `(cast ,e ,@t)
+		| "sizeof" keyword "("_ xtype:t ")"_				-> `(sizeof ,@t)
 		| "&"_ xidentifier:i						-> `(addressof ,i)
 		| "struct" keyword xidentifier:a "("_ arglist:b ")"_		-> `(irl-struct ,a ,@b)
 		| primary

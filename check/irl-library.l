@@ -12,6 +12,7 @@
     (<= i n)))
 (define dir "/tmp/maru-check")
 (system (concat-strings "mkdir -p " dir))
+(system (concat-strings "rm -f " dir "/irl-lib.k " dir "/irl-lib.c " dir "/irl-lib.dylib"))	; a failed build mustn't pass on old output
 (system (concat-strings "./eval compile-irl.l --library check/irl-lib-a.irl check/irl-lib-b.irl > " dir "/irl-lib.k"
 			" && ./eval2 ir-gen-c.k maru.k " dir "/irl-lib.k > " dir "/irl-lib.c"
 			" && cc -shared -fPIC -fno-builtin -w -o " dir "/irl-lib.dylib " dir "/irl-lib.c"))
@@ -22,7 +23,11 @@
 	(expect "twice is exported" (not (= 0 twice)))
 	(expect "add3 is exported" (not (= 0 add3)))
 	(and (not (= 0 twice)) (expect "twice 21 is 42" (= 42 ((subr twice "l>l") 21))))
-	(and (not (= 0 add3)) (expect "add3 1 2 3 is 6" (= 6 ((subr add3 "lll>l") 1 2 3)))))))
+	(and (not (= 0 add3)) (expect "add3 1 2 3 is 6" (= 6 ((subr add3 "lll>l") 1 2 3))))
+	;; cast(e, type) and sizeof(type)
+	(let ((size (dlsym lib "pair_size")) (view (dlsym lib "view")))
+	  (expect "sizeof a two-long struct is 16" (and (not (= 0 size)) (= 16 ((subr size ">l")))))
+	  (expect "a cast view of malloc's memory" (and (not (= 0 view)) (= 13 ((subr view "l>l") 5))))))))
 ;; a library has no main, so a statement at its top level would never run
 (system (concat-strings "printf 'printf(\"x\");\\n' > " dir "/irl-lib-bad.irl"))
 (system (concat-strings "./eval compile-irl.l --library " dir "/irl-lib-bad.irl > " dir "/irl-lib-bad.out 2>&1"))
