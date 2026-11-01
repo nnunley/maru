@@ -312,7 +312,7 @@ The constant stand-in judges only names that are Maru functions. It cannot
 judge a grammar law: a constant parser satisfies a template equality. It
 also satisfies idempotence- and positivity-style laws
 (`absv(absv(n)) = absv(n)`), which are therefore reported `VACUOUS`;
-authors SHOULD expect that and state such laws another way. A law file
+Authors SHOULD state such laws another way. A law file
 without an `under test:` line is rejected (`E_NO_UNDER_TEST`).
 
 ```maru-check @R-weak-laws
@@ -398,8 +398,8 @@ the file, so adding a law does not change the values another draws.
 | `E_BINDING` | a goal domain does not bind its last argument | Reject the law; it does not run |
 | `E_GRAMMAR` | a grammar domain names a language that is not registered | Reject the law; it does not run |
 | `E_EXHAUST` | a law asks `EXHAUST` over a grammar domain | Reject the law; a grammar domain cannot be exhausted |
-| `E_UNKNOWN_ITEM` | a schema body is a `let`, `set` or `law` item, not a rule or fact | Reject the rule file, naming the item |
-| `E_ARITY` | one relation is applied with different numbers of arguments | Reject the rule file before any law runs |
+| `E_UNKNOWN_ITEM` | an item other than a rule, fact, schema or facts reaches rule expansion (`let`, `set`, `law`, `under-test`, `reference`, `defaults`) | Reject the rule file, naming the item |
+| `E_ARITY` | a higher-order relation is used with the same passed relation but a different number of carried arguments | Reject the rule file before any law runs |
 | `E_NO_FACTS` | `facts R from f` where `f` returns no fact for `R` | Reject the file; the rules would have no facts |
 | `E_NO_UNDER_TEST` | a law file has no `under test:` line | Reject the file; its laws test nothing |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
