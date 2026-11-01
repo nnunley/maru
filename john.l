@@ -13,6 +13,11 @@
 (define-function john-relation? (n) (member? n *john-relations*))
 (define-function john-relation (n form) (or (member? n *john-relations*) (push *john-relations* n)) form)
 
+;; and a name reads as a class in for some C only once create or group declares it
+(define *john-classes* ())
+(define-function john-class? (n) (member? n *john-classes*))
+(define-function john-class (n form) (or (member? n *john-classes*) (push *john-classes* n)) form)
+
 (define-function john-kw (x) (string->symbol (concat-string (symbol->string x) ":")))
 (define-function john-selector (parts)	; ((at: . x) (put: . y)) -> at:put:
   (let ((s "")) (list-do p parts (set s (concat-string s (symbol->string (car p))))) (string->symbol s)))
@@ -26,6 +31,7 @@
 
 (define-function john-read-text (text)
   (set *john-relations* *john-prelude-relations*)
+  (set *john-classes* ())
   (let ((parser (text-parser-for-on <john> text)))
     (or ($program parser) (error "syntax error"))
     (<john>-result parser)))

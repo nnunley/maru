@@ -39,4 +39,8 @@
 (expect "an undeclared name is a send" (equal (john-read-text "it smaller Surface.") '((query (send (send it smaller) Surface)))))
 (expect "a computed object name" (equal (john-read-text "for [ [ \"Va\" name ] ] do make V (each first).")
 					'((for (list (list (send "Va" name))) (make V (send each first))))))
+;; ours, not JOHN's: for some C reads as the memo's for any all C once C is a class
+(expect "for some over a class" (equal (cadr (john-read-text "create Register next-right. qualify Allocator canAllocate: Variable if for some Register do each canAllocate: Variable = yes."))
+  '(qualify Allocator canAllocate: (Variable) (if (any (all Register) (= (send each canAllocate: Variable) yes))))))
+(expect "for some over a collection" (equal (john-read-text "for some its items do each = 2.") '((query (any (send it items) (= each 2))))))
 (and ok (println "john forms ok"))

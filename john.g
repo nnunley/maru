@@ -12,10 +12,11 @@ idpart		= (letter (letter | digit | "-" &letter)*) @ $$ ;
 wb		= !(letter | digit | "-") _ ;
 reserved	= ( "if" | "is" | "try" | "using" | "use" | "by" | "do" | "consequence" | "establish"
 		  | "dynamically" | "maximize" | "minimize" | "and" | "or" | "not" | "for" | "every"
-		  | "any" | "select" | "all" | "one-from" | "satisfy" | "the" ) !(letter | digit | "-") ;
+		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" ) !(letter | digit | "-") ;
 name		= !reserved idpart:x !":" _					-> x ;
 kw		= idpart:x ":" _						-> (john-kw x) ;
 rel		= name:n &-> (john-relation? n)					-> n ;
+class		= name:n &-> (john-class? n)					-> n ;
 end		= ("." | "?") _ ;
 
 # expressions, loosest first
@@ -39,7 +40,9 @@ chain		= chain:r kwpart+:ps						-> `(send ,r ,(john-selector ps) ,@(map cdr ps)
 		| primary ;
 quant		= "every" wb -> 'every | "any" wb -> 'any ;
 pair		= name:v name:p							-> (list v p) ;
-prefix		= "for" wb quant:q chain:l "do" wb compare:p			-> `(,q ,l ,p)
+prefix		= "for" wb "some" wb class:c "do" wb compare:p			-> `(any (all ,c) ,p)	# ours: for any all C
+		| "for" wb "some" wb chain:l "do" wb compare:p			-> `(any ,l ,p)
+		| "for" wb quant:q chain:l "do" wb compare:p			-> `(,q ,l ,p)
 		| "select" wb "all" wb name:c "by" wb expr:p			-> `(select ,c ,p)
 		| "all" wb pair*:ps name:c					-> `(all ,c ,@ps)
 		| "one-from" wb chain:s						-> `(one-from ,s) ;
@@ -70,9 +73,9 @@ makebody	= "make" wb name:c primary:o primary*:v				-> `(make ,c ,o ,@v) ;
 
 statement	= "start-world" wb name:n end					-> `(start-world ,n)
 		| "end-world" wb end						-> '(end-world)
-		| "group" wb name:g name+:cs end				-> `(group ,g ,@cs)
-		| "create" wb idpart:c ":" _ typed:a ("," _ typed)*:b end	-> `(create ,c typed ,a ,@b)
-		| "create" wb name:c name*:ps end				-> `(create ,c ,@ps)
+		| "group" wb name:g name+:cs end				-> (john-class g `(group ,g ,@cs))
+		| "create" wb idpart:c ":" _ typed:a ("," _ typed)*:b end	-> (john-class c `(create ,c typed ,a ,@b))
+		| "create" wb name:c name*:ps end				-> (john-class c `(create ,c ,@ps))
 		| makebody:m end						-> m
 		| "qualify" wb name:c head:h qbody:b end			-> `(qualify ,c ,(car h) ,(cdr h) ,b)
 		| "rel-qualify" wb ("not" wb -> 'not)?:n tvar:a name:r tvar:b "if" wb expr:e end
@@ -87,7 +90,7 @@ statement	= "start-world" wb name:n end					-> `(start-world ,n)
 		| "heuristic" wb name:c name:g number:w method:m expr:e end	-> `(heuristic ,c ,g ,w ,m ,e)
 		| "goal" wb name:c name:g name*:ps "try" wb expr:e end		-> `(goal ,c ,g ,ps ,e)
 		| "set-opt" wb name:n primary:v end				-> `(set-opt ,n ,v)
-		| "for" wb !quant expr:l "do" wb (makebody | expr):b end	-> `(for ,l ,b)
+		| "for" wb !quant !("some" wb) expr:l "do" wb (makebody | expr):b end	-> `(for ,l ,b)
 		| "at" wb "time" wb primary:t expr:e end			-> `(at-time ,t ,e)
 		| "is" wb expr:e end						-> `(is ,e)
 		| primary:o "satisfy" wb name:g primary*:as ("using" wb name+)?:u ("by" wb primary)?:b end
