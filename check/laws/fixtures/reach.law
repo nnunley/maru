@@ -1,0 +1,14 @@
+-- adequacy finds reach where a law passes it to a function, whatever the law calls its variables; at
+-- size 0 the recursive rule never applies, so its mutants die only at size 1, where direct is false
+set Node = A | B | C
+under test: reach, edge
+fact edge(A, B)
+fact edge(B, C)
+rule one: edge(x, y) => reach(x, y)
+rule more: edge(x, y), reach(y, z) => reach(x, z)
+law sound: all x: Node, y: Node. holds(reach, x, y) == No || reaches(x, y) == Yes by exhaustion
+law sound_uv: all u: Node, v: Node. holds(reach, u, v) == No || reaches(u, v) == Yes by exhaustion
+law direct: all x: Node, y: Node, holds(reach, x, y) = Yes. holds(edge, x, y) = Yes by exhaustion size 0
+law adequate: mutants of reach by exhaustion size 0. sound
+law adequate_uv: mutants of reach by exhaustion size 0. sound_uv
+law adequate_direct: mutants of reach by exhaustion size 0. direct

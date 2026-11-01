@@ -269,7 +269,10 @@
 		 ("untested" "" 256 "E_NO_UNDER_TEST check/laws/fixtures/untested.law: no under test: line, so its laws test nothing")
 		 ("adequacy" "check/laws/fixtures/holds.l" 256 "law listed: TESTED 100" "law painted_listed: TESTED 100" "law adequate: PROVED 7"
 		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)")
-		 ("numerals" "" 0 "law few: PROVED 2"))
+		 ("numerals" "" 0 "law few: PROVED 2") ("refs" "check/laws/fixtures/refs.l" 0 "law differ: TESTED 100")
+		 ("reach" "check/laws/fixtures/holds.l" 256 "law sound: PROVED 9" "law sound_uv: PROVED 9" "law direct: PROVED 2"
+		  "law adequate: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)"
+		  "law adequate_uv: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)" "law adequate_direct: direct REFUTED x=A y=C seed=44"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))

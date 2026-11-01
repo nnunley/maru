@@ -1,0 +1,6 @@
+-- two references given the same argument keep their own answers
+set Side = Left | Right
+reference yes(x)
+reference no(x)
+under test: yes, no
+law differ: all s: Side. yes(s) != no(s)

@@ -106,7 +106,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   one the law's size doesn't kill is judged at the least size its rule appears, on the instances whose derivation uses it:
   `PROVED n` if each fails one, else `REFUTED k of n survive: …` (`check/laws/fixtures/adequacy.law`: 7 of 7 killed, and
   6 survivors for a weaker suite). A file's `let numerals = [1, 2]` replaces `number`'s numerals
-  (`check/laws/fixtures/numerals.law`). A reference's answers are kept by their text. `.law` files count toward `lines`.
+  (`check/laws/fixtures/numerals.law`). The focus follows where a law uses the relation (a goal domain on it, or it and
+  its arguments passed to a function in the claim), whatever the law names its variables, and a named law false at a
+  focused size is reported (`reach.law`). A reference's answers are kept by its name and their text (`refs.law`).
+  `.law` files count toward `lines`.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for well-typed Nile expressions, their operator
   facts read from `nile/compilers/prelude.nl` through Nile's grammar, are sound (Nile's own resolver and type checker,
   loaded into `eval` and forked per question under an alarm, accept what they generate), checked by themselves, all
