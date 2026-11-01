@@ -1,0 +1,31 @@
+; Towers of Hanoi with 2 disks.  Ours: hanoi4.john cut to the memo's Hanoi2 (M-2009-001
+; Tables 5-17: make Peg Peg1 Three B, make Disk B Two Peg1 A, the win goal), since the
+; memo prints Hanoi2 only in pieces.  Solved in 3 moves.
+start-world hanoi2.
+group Surface Peg Disk.
+group Thing NotApplicable Disk.
+create NotApplicable.
+create Num.
+create Towers.
+create Peg: Num bigness, * Thing supporting.
+create Disk: Num bigness, * Surface supporter, * Thing supporting.
+make NotApplicable None.
+make Num One. make Num Two. make Num Three.
+make Towers Hanoi.
+make Peg Peg1 Three B. make Peg Peg2 Three None. make Peg Peg3 Three None.
+make Disk B Two Peg1 A.
+make Disk A One B None.
+rel-qualify Surface:S1 smaller Surface:S2 if
+  ( S1 bigness = One and S2 bigness = Two ) or
+  ( S1 bigness = One and S2 bigness = Three ) or
+  ( S1 bigness = Two and S2 bigness = Three ).
+action Disk move Surface consequence
+  Surface supporting = it and
+  its supporter supporting = None and
+  its supporter = Surface.
+rule Disk move is its supporting = None.
+rule Disk move is Surface supporting = None.
+rule Disk move is it smaller Surface.
+goal Towers win try B supporter = Peg3 and A supporter = B.
+Hanoi satisfy win.
+end-world.

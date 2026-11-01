@@ -88,6 +88,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   if a `rel-qualify` anywhere in the program declares it (`it smaller Surface`; the
   program is read twice). `for some X` (ours) is `for any X`; over a class it means the
   class's instances, a rule for evaluation, not parsing.
+- `john_run` (`check/john-run.l`): `john-eval.l` runs JOHN programs by searching possible
+  worlds level by level, each action's effects all read from the world it starts in (a
+  swap). It solves Towers of Hanoi in the fewest moves, 3 for `check/john/hanoi2.john` and
+  7 for `hanoi3.john` (both ours, after the memo's Hanoi2 tables), and reports the worlds
+  it looked at. Qualifications take the first clause whose guard holds (`sorted`), a
+  class is its instances in `for every`, `for some` and `select`, and a name, property
+  or qualification nothing defines is an error. Optimizations and heuristics are not
+  read yet; `hanoi4.john` as printed is inconsistent (`Peg1` supports `B`, which sits on
+  `C`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at

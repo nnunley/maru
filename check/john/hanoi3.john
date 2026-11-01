@@ -1,0 +1,34 @@
+; Towers of Hanoi with 3 disks.  Ours, in the memo's Hanoi programs' form (M-2009-001):
+; disks A < B < C on Peg1, all to Peg3.  Solved in 7 moves.
+start-world hanoi3.
+group Surface Peg Disk.
+group Thing NotApplicable Disk.
+create NotApplicable.
+create Num.
+create Towers.
+create Peg: Num bigness, * Thing supporting.
+create Disk: Num bigness, * Surface supporter, * Thing supporting.
+make NotApplicable None.
+make Num One. make Num Two. make Num Three. make Num Four.
+make Towers Hanoi.
+make Peg Peg1 Four C. make Peg Peg2 Four None. make Peg Peg3 Four None.
+make Disk C Three Peg1 B.
+make Disk B Two C A.
+make Disk A One B None.
+rel-qualify Surface:S1 smaller Surface:S2 if
+  ( S1 bigness = One and S2 bigness = Two ) or
+  ( S1 bigness = One and S2 bigness = Three ) or
+  ( S1 bigness = One and S2 bigness = Four ) or
+  ( S1 bigness = Two and S2 bigness = Three ) or
+  ( S1 bigness = Two and S2 bigness = Four ) or
+  ( S1 bigness = Three and S2 bigness = Four ).
+action Disk move Surface consequence
+  Surface supporting = it and
+  its supporter supporting = None and
+  its supporter = Surface.
+rule Disk move is its supporting = None.
+rule Disk move is Surface supporting = None.
+rule Disk move is it smaller Surface.
+goal Towers win try C supporter = Peg3 and B supporter = C and A supporter = B.
+Hanoi satisfy win.
+end-world.

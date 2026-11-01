@@ -239,6 +239,8 @@
 
 ;; john.g reads the three complete JOHN programs to forms, with the precedence and relations the reconstruction gives (check/john-forms.l).
 (check "john_forms" (unit-assert (equal (last (run "john_forms" "./eval check/john-forms.l")) "john forms ok")))
+;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
+(check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
 
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
