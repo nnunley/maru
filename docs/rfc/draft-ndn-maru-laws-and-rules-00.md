@@ -1,7 +1,6 @@
 # draft-ndn-maru-laws-and-rules-00: Laws and Rules for Testing Maru's Languages
 
 **Status:** DRAFT
-**Corpus:** red (spec-first: the law_engine, law_cexpr, law_nile and law_rules checks do not exist yet; a throwaway spike measured the design, Appendix A)
 **Category:** Experimental
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
@@ -268,7 +267,10 @@ For laws about syntax, a domain MAY be a grammar rule (`cexpr.primary`);
 its size is the generator's fuel.
 Its values are sentences generated from the grammar's own records (the
 tree `tpeg.l` builds before compiling), each kept only if the grammar's
-compiled parser accepts all of it. [R-grammar-domain]
+compiled parser accepts all of it. A sentence counts as accepted only when
+the parser stops at its end with the language's sentinel after it (for
+`cexpr`, `)`). A grammar domain cannot be exhausted (`E_EXHAUST`).
+[R-grammar-domain]
 
 ```maru-check @R-grammar-domain
 law_cexpr
@@ -305,6 +307,13 @@ reported `STARVED`, not passed; the runner draws up to `trials` times
 `starved_ratio` values before deciding. Replacing "the code under test"
 means rebinding each name on the `under test:` line to a function that
 returns a constant. [R-weak-laws]
+
+The constant stand-in judges only names that are Maru functions. It cannot
+judge a grammar law: a constant parser satisfies a template equality. It
+also satisfies idempotence- and positivity-style laws
+(`absv(absv(n)) = absv(n)`), which are therefore reported `VACUOUS`;
+authors SHOULD expect that and state such laws another way. A law file
+without an `under test:` line is rejected (`E_NO_UNDER_TEST`).
 
 ```maru-check @R-weak-laws
 law_rules
@@ -350,7 +359,13 @@ stated in the law language like any other: [R-rule-set-laws]
    each rule removed.
    Mutants MUST be judged by `EXHAUST` over the values that use the
    mutated rule: random sampling caught 23 of 42 of the spike's mutants
-   and exhaustion caught all 42.
+   and exhaustion caught all 42. Each mutant is judged at the least size at
+   which its rule appears, over values whose derivation uses it.
+
+A law's domain draws from the original rules, so `sound` cannot kill a
+mutant, and `agree` carries adequacy. An adequacy law MAY use one leaf per
+type (`let numerals = [1]`), because these rules type expressions by leaf
+type, not leaf identity.
 
 ```maru-check @R-rule-set-laws
 law_rules
@@ -380,6 +395,13 @@ the file, so adding a law does not change the values another draws.
 | `E_TEMPLATE_PARSE` | a rule fills `{a} {op} {b}` with an operator that is not one | Report the rule and the filled text; the law does not run |
 | `E_UNKNOWN_RELATION` | a premise names `exprs`, which no rule concludes | Reject the rule file before any law runs |
 | `E_REFERENCE_CRASH` | Nile's resolver fails on `ϫ():ρ` | `INCONCLUSIVE`; print the input and the status |
+| `E_BINDING` | a goal domain does not bind its last argument | Reject the law; it does not run |
+| `E_GRAMMAR` | a grammar domain names a language that is not registered | Reject the law; it does not run |
+| `E_EXHAUST` | a law asks `EXHAUST` over a grammar domain | Reject the law; a grammar domain cannot be exhausted |
+| `E_UNKNOWN_ITEM` | a schema body is a `let`, `set` or `law` item, not a rule or fact | Reject the rule file, naming the item |
+| `E_ARITY` | one relation is applied with different numbers of arguments | Reject the rule file before any law runs |
+| `E_NO_FACTS` | `facts R from f` where `f` returns no fact for `R` | Reject the file; the rules would have no facts |
+| `E_NO_UNDER_TEST` | a law file has no `under test:` line | Reject the file; its laws test nothing |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
 ## Formal Grammar
@@ -422,6 +444,9 @@ text        =/ "{{" / "}}"
 expression  = 1*( %x20-10FFFF )
 ```
 
+A claim MUST NOT use bitwise `|`: the law syntax uses `|` to separate set
+members, schema values and list tails.
+
 `text` excludes `` ` `` (%x60), `{` (%x7B) and `}` (%x7D); `expression`
 stands for `cexpr.g`'s `expression`.
 
@@ -443,6 +468,11 @@ rule e_infix:  infix(op, at, bt, t), expr(env, at, a), expr(env, bt, b)
 
 law sound: all t: Type, e: expr(abpq, t, e). nile_accepts(e, t) = accept
 ```
+
+Nile chains parenthesised comparisons: `((a = b) < c)` reads as
+`(a = b) and (b < c)`, because its parser drops the parentheses. For `agree`
+to hold, the rule set needs three chain rules beyond these four. They are in
+`check/laws/nile.law`.
 
 ## Out of Scope
 
@@ -562,3 +592,11 @@ time of writing (October 2026). All runs are seeded and repeatable.
 | Mutants caught, exhaustive over the mutated operator at size 1 | 42 of 42 |
 | Engine law `unify` | first run: crash on `_1003 = ((z . y) . _1003)` (no occurs check); after the fix, 165 of 300 pairs unify, none violate it |
 | Spike verdicts against Nile's own compiler (bundled Maru) | 64 of 64 agree |
+
+As built (October 2026), `check/laws/nile.law` reaches `sound` TESTED 100,
+`generate_checks` TESTED 100, `agree` TESTED 100, `agree_rejected` TESTED
+100, `round_trip` TESTED 100 and `coverage` PROVED 1.
+`check/laws/nile-adequacy.law` reaches `sound` PROVED 46, `agree` PROVED
+222 and `adequate` PROVED 69. `check/laws/cexpr.law` has 1000 of 1079
+generated `cexpr.primary` sentences accepted (about 92%). The `law_nile`
+check takes about 23 seconds of CPU time.
