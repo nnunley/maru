@@ -105,7 +105,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   (`check/john/maze.john`, ours) is solved looking at fewer worlds, and a dead end that
   scores better is committed to (the incompleteness RN-2008-003 admits). With
   `set-opt two-player-game [ A, B ]` the opponent makes only its best-scoring replies:
-  Nim from 3 is won only if Black blunders, from 4 always. `hanoi4.john` as printed is
+  Nim from 3 is won only if Black blunders, from 4 always. Ours, not the memos':
+  `set-opt merge-worlds yes` drops a world whose state (every property of every object)
+  was reached before, so Hanoi3 looks at 8 worlds at its last level instead of 1086 and
+  a consistent Hanoi4 (`check/john/hanoi4-ours.john`) is solved in 15 moves; a commit
+  forgets the states seen on the branches it drops. `hanoi4.john` as printed is
   inconsistent (`Peg1` supports `B`, which sits on `C`).
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;

@@ -1,0 +1,38 @@
+; Towers of Hanoi with 4 disks, consistent.  Ours: the memo's Hanoi4 (hanoi4.john) leaves
+; Peg1 supporting B and the goal moving only A and B, lines from its Hanoi2; here Peg1
+; supports D and all four disks go to Peg3.  Solved in 15 moves.
+start-world hanoi4.
+group Surface Peg Disk.
+group Thing NotApplicable Disk.
+create NotApplicable.
+create Num.
+create Towers.
+create Peg: Num bigness, * Thing supporting.
+create Disk: Num bigness, * Surface supporter, * Thing supporting.
+make NotApplicable None.
+make Num One. make Num Two. make Num Three. make Num Four. make Num Five.
+make Towers Hanoi.
+make Peg Peg1 Five D. make Peg Peg2 Five None. make Peg Peg3 Five None.
+make Disk D Four Peg1 C.
+make Disk C Three D B.
+make Disk B Two C A.
+make Disk A One B None.
+rel-qualify Surface:S1 smaller Surface:S2 if
+  ( S1 bigness = One and S2 bigness = Two ) or
+  ( S1 bigness = One and S2 bigness = Three ) or
+  ( S1 bigness = One and S2 bigness = Four ) or
+  ( S1 bigness = One and S2 bigness = Five ) or
+  ( S1 bigness = Two and S2 bigness = Three ) or
+  ( S1 bigness = Two and S2 bigness = Four ) or
+  ( S1 bigness = Two and S2 bigness = Five ) or
+  ( S1 bigness = Three and S2 bigness = Four ) or
+  ( S1 bigness = Three and S2 bigness = Five ) or
+  ( S1 bigness = Four and S2 bigness = Five ).
+action Disk move Surface consequence
+  Surface supporting = it and
+  its supporter supporting = None and
+  its supporter = Surface.
+rule Disk move is its supporting = None.
+rule Disk move is Surface supporting = None.
+rule Disk move is it smaller Surface.
+goal Towers win try D supporter = Peg3 and C supporter = D and B supporter = C and A supporter = B.

@@ -11,7 +11,8 @@
 ;;; narrows an action's arguments and a goal-optimization the actions a world tries.
 ;;; Heuristics score a world; with max-time-ahead H the search commits, every H levels,
 ;;; to the next move toward the best-scoring world (RN-2008-003 §10), and in a
-;;; two-player-game the opponent makes only its best-scoring replies (§12).  A name nothing defines is an error, never a quiet no.
+;;; two-player-game the opponent makes only its best-scoring replies (§12).  Ours, not the
+;;; memos': with merge-worlds a world whose state was reached before is dropped (G12).  A name nothing defines is an error, never a quiet no.
 
 (require "john.l")
 
@@ -237,13 +238,24 @@
 	(concat-list (list-reverse! mine) (john-best (list-reverse! theirs) opp g))))))
 (define-function john-at-time (w t) (while (> (<john-world>-time w) t) (set w (<john-world>-parent w))) w)
 
+;; a world's state: every property of every object, as text; seen states kept in buckets by hash
+(define-function john-state (w)
+  (let ((s ""))
+    (list-do o *john-objects* (list-do p (john-props (cdr o)) (set s (concat-strings s (john-text (john-lookup w (car o) p)) " "))))
+    s))
+(define-function john-hash (s) (let ((h 7)) (for (i 0 (string-length s)) (set h (% (+ (* h 31) (string-at s i)) 4093))) h))
+(define-function john-new-state? (seen w)	; and records it
+  (let* ((k (john-state w)) (h (john-hash k)) (b (array-at seen h)))
+    (and (not (member? k b)) (let () (set-array-at seen h (cons k b)) 1))))
 (define-function john-step-text (st)	; (actor action args...) as A move Peg2
   (let ((s (concat-strings (john-text (car st)) " " (john-text (cadr st))))) (list-do v (cddr st) (set s (concat-strings s " " (john-text v)))) s))
 (define-function john-path (w)
   (let ((out ())) (while (<john-world>-action w) (push out (<john-world>-action w)) (set w (<john-world>-parent w))) out))
 (define-function john-satisfy (o g args using by)
   (let* ((c (john-object-class o)) (goal ()) (frontier (list *john-world*)) (found ()) (k 0)
-	 (ahead (cdr (assq 'max-time-ahead *john-options*))) (horizon ahead) (committed *john-world*))
+	 (ahead (cdr (assq 'max-time-ahead *john-options*))) (horizon ahead) (committed *john-world*)
+	 (merge (john-true? (cdr (assq 'merge-worlds *john-options*)))) (seen (and merge (array 4093))))
+    (and merge (john-new-state? seen *john-world*))
     (list-do d *john-goals* (and (= g (cadr d)) (john-isa? c (car d)) (set goal d)))
     (or goal (john-fail "no goal " g " for " o))
     (let ((env (john-bind (caddr goal) args (list (cons 'it o)))))
@@ -258,8 +270,9 @@
 		     (set frontier (let ((keep ())) (list-do w frontier (and (= step (john-at-time w (<john-world>-time step))) (push keep w)))
 				     (list-reverse! keep)))
 		     (set horizon (+ horizon ahead))
+		     (and merge (let () (set seen (array 4093)) (list-do w frontier (john-new-state? seen w))))
 		     (john-say (concat-strings "certain: " (john-step-text (<john-world>-action step))))))
-	      (list-do w frontier (list-do c (john-expand w o g using by) (push next c)))
+	      (list-do w frontier (list-do c (john-expand w o g using by) (and (or (not merge) (john-new-state? seen c)) (push next c))))
 	      (set next (list-reverse! next))	; concat-list recurses per element and overflows on a wide level
 	      (set k (+ k 1))
 	      (set frontier next)

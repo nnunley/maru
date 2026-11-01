@@ -2,7 +2,8 @@
 ;;; moves by searching possible worlds, qualifications clause by clause, quantifiers over a
 ;;; class's instances, and an unknown name as an error; the memos' x86 allocator, its
 ;;; optimizations choosing the actions and arguments, to a valid allocation; heuristics
-;;; committing a search every max-time-ahead levels, and minimax in a two-player game.  "program TEXT"
+;;; committing a search every max-time-ahead levels, and minimax in a two-player game; and,
+;;; ours, merge-worlds dropping a world whose state was reached before.  "program TEXT"
 ;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
 
@@ -34,6 +35,8 @@
   rule Player take2 is G turn = it. rule Player take2 is G pile >= 2.
   goal Player win try G pile = 0 and G turn = its opponent.
   heuristic Player win 1 minimize G pile. ")
+(define-function no-satisfy (fs) (let ((out ())) (list-do f fs (or (= 'satisfy (car f)) (push out f))) (list-reverse! out)))
+(define-function hanoi (f opts) (john-run (concat-list (no-satisfy (john-read f)) (concat-list opts '((satisfy Hanoi win () () ()))))))
 (define-function maze (more) (john-run (concat-list (john-read "check/john/maze.john") more)))
 
 (define-function suite ()
@@ -111,6 +114,28 @@
 						  "unsatisfiable"))
   (expect "nim from 4, Black at its best" (equal (last (run-text (concat-string nim "make Game G 4 White. set-opt two-player-game [ White, Black ]. White satisfy win.")))
 						  "satisfied by: [ White take1 , Black take2 , White take1 ]"))
+  ;; merge-worlds (ours, G12): a state reached before is not searched again, so Hanoi3 looks at 8
+  ;; worlds at its last level instead of 1086, and Hanoi4 (15 moves) is in reach; plans stay shortest
+  (let ((lines (hanoi "check/john/hanoi3.john" '((set-opt merge-worlds yes)))))
+    (expect "Hanoi3 merged" (and (member? "looking 7 time unit ahead (8 possible worlds)" lines)
+				  (equal (last lines) "satisfied by: [ A move Peg3 , B move Peg2 , A move B , C move Peg3 , A move Peg1 , B move C , A move B ]"))))
+  (expect "Hanoi4 merged, in 15 moves" (equal (last (hanoi "check/john/hanoi4-ours.john" '((set-opt merge-worlds yes))))
+    "satisfied by: [ A move Peg2 , B move Peg3 , A move B , C move Peg2 , A move D , B move C , A move B , D move Peg3 , A move D , B move Peg1 , A move B , C move D , A move Peg2 , B move C , A move B ]"))
+  ;; a commit forgets the states seen on the branches it drops: L, first reached on the dropped branch,
+  ;; is the only way on from R
+  (expect "a commit forgets dropped states"
+    (equal (run-text "create Spot dist. create Robot position.
+		       make Spot S 3. make Spot L 2. make Spot R 1. make Spot G 0. make Robot Bot S.
+		       rel-qualify Spot:A link Spot:B if (A = S and (B = L or B = R)) or (A = R and (B = S or B = L))
+			 or (A = L and (B = S or B = R or B = G)).
+		       action Robot move Spot consequence its position = Spot. rule Robot move is its position link Spot.
+		       goal Robot reach try its position = G. heuristic Robot reach 1 minimize its position dist.
+		       set-opt merge-worlds yes. set-opt max-time-ahead 1. Bot satisfy reach.")
+	   '("looking 1 time unit ahead (2 possible worlds)" "certain: Bot move R" "looking 2 time unit ahead (2 possible worlds)"
+	     "certain: Bot move L" "looking 3 time unit ahead (3 possible worlds)" "satisfied at time: 3"
+	     "satisfied by: [ Bot move R , Bot move L , Bot move G ]")))
+  (expect "the maze merged, two levels ahead" (equal (last (maze '((set-opt merge-worlds yes) (set-opt max-time-ahead 2) (satisfy R reach () () ()))))
+    "satisfied by: [ R move B1 , R move B2 , R move C2 , R move C3 , R move C4 , R move D4 ]"))
   (and ok (println "john run ok")))
 
 (if (not *arguments*) (suite)
