@@ -81,43 +81,38 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
   a type mismatch in the `if` (`check/irl-errors.l` records it in Maru).
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
-  enumerates alike; at size 0 a recursive rule never applies; unification has
-  an occurs check; the `in`, `number` and `=` builtins behave as specified; schemas, relation
-  parameters and facts read from a function expand to first-order rules, and an
-  unknown relation is rejected.
-- `law_cexpr` (`check/law-compile-test.l`): `law.g` (inheriting `cexpr.g`) and `law-compile.l` read the RFC's
-  example law file to rule, let, set and law items; a template's holes fill by text with no grouping added
-  (`{x} * c` with `a + b` parses to `(+ a (* b c))`), `{{` is a literal brace, a file with an error
-  fails naming its line, an unbound hole is `E_TEMPLATE_PARSE`, `let` names resolve where used, `--` comments sit only between items, and the example's rules expand through `rules-expand`. `check/laws/cexpr.law` holds
-  `?:` to the right, `-` to the left and a comment to a blank, over `cexpr.primary` sentences `grammar-gen.l` generates from
-  `cexpr.g`'s own records (fuel split along a sequence, cheap leaves once spent), at least 80% accepted (a sentence
-  counts when the parser takes all of it and stops there with the language's sentinel, `)`, after it, so a trailing `//`
-  comment is refused); the false `{a}-({b}-{c})` (`check/laws/fixtures/minus-right.law`) is refuted for seed 42 with
-  `a="\"\"" b="\"\"" c="6"`, each of which reparses as a primary.
-- `law_rules` (`check/law.l`, `check/laws/fixtures/`): the runner prints one line per law, `law NAME:` (flushed
-  first, so a claim that exits leaves it last) and `TESTED n`, `PROVED n`, `REFUTED x=v … seed=s` (shrunk: `a - b = b - a`
-  gives `a=0 b=0.500000`, and the seed alone reproduces it), `STARVED k of n`, `VACUOUS` (nothing under test named, or holds with
-  the functions under test returning a constant, tried in a forked child so one that errors is no pass) or
-  `INCONCLUSIVE status=s input=…` (a reference answering `(crash 139)`, in the claim or a condition); a file with no
-  `under test:` line is `E_NO_UNDER_TEST`, a goal domain must bind its last argument (`E_BINDING`), a grammar domain
-  must name a registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`). `law NAME: mutants of R by exhaustion size n. L, …`
-  builds every mutant of the rules R reaches (a fact's set member replaced by each other member, a fact removed, a rule's
-  premise removed) and exhausts the named laws over domains from the file's own rules, claims run under the mutant;
-  one the law's size doesn't kill is judged at the least size its rule appears, on the instances whose derivation uses it:
-  `PROVED n` if each fails one, else `REFUTED k of n survive: …` (`check/laws/fixtures/adequacy.law`: 7 of 7 killed, and
-  6 survivors for a weaker suite). A file's `let numerals = [1, 2]` replaces `number`'s numerals
-  (`check/laws/fixtures/numerals.law`). The focus follows where a law uses the relation (a goal domain on it, or it and
-  its arguments passed to a function in the claim), whatever the law names its variables, and a named law false at a
-  focused size is reported (`reach.law`). A reference's answers are kept by its name and their text (`refs.law`).
-  `.law` files count toward `lines`.
-- `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for well-typed Nile expressions, their operator
-  facts read from `nile/compilers/prelude.nl` through Nile's grammar, are sound (Nile's own resolver and type checker,
-  loaded into `eval` and forked per question under an alarm, accept what they generate), checked by themselves, all
-  used, and agree with Nile on expressions that ignore types (Nile reads `((a = b) < c)` as a chain, so the rules
-  do); a rule's template is a term, rendered to text for a reference or a claim, and non-ASCII operators round-trip;
-  Nile's resolver crash on `ϫ():ρ` / `forall_` (`check/laws/fixtures/nile-crash.law`) is `INCONCLUSIVE`, not a rejection.
-  `check/laws/nile-adequacy.law`: every one of the 69 mutants of the expr rules fails sound or agree, over one leaf per
-  type (`a`, `p`, the numeral 1), the chain rules' at sizes 2 and 3.
+  enumerates alike; a recursive rule never applies at size 0; unification has an occurs
+  check; the `in`, `number` and `=` builtins work as specified; schemas, relation
+  parameters and facts read from a function expand to first-order rules, and an unknown
+  relation is rejected.
+- `law_cexpr` (`check/law-compile-test.l`, `check/laws/cexpr.law`): `law.g` (inheriting
+  `cexpr.g`) and `law-compile.l` read the RFC's example law file to rule, let, set and
+  law items. A template's holes fill by text with no grouping added (`{x} * c` with
+  `a + b` parses to `(+ a (* b c))`), and `{{` is a literal brace. An error fails naming
+  its line, and an unbound hole is `E_TEMPLATE_PARSE`. `cexpr.law` holds `?:` to the
+  right, `-` to the left and a comment to a blank, over `cexpr.primary` sentences
+  generated from `cexpr.g`'s records, at least 80% accepted (a sentence counts when the
+  parser stops at its end with `)` after it). The false `{a}-({b}-{c})`
+  (`check/laws/fixtures/minus-right.law`) is refuted for seed 42.
+- `law_rules` (`check/law.l`, `check/laws/fixtures/`): the runner prints one line per
+  law, `law NAME:`, then `TESTED n`, `PROVED n`, `REFUTED x=v ... seed=s` (shrunk;
+  the seed reproduces it), `STARVED k of n`, `VACUOUS` or `INCONCLUSIVE status=s input=...`
+  (a reference crashed). A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal
+  domain must bind its last argument (`E_BINDING`), and a grammar domain must name a
+  registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`).
+  `law NAME: mutants of R by exhaustion size n. L, ...` judges each mutant of the rules
+  R reaches at the least size its rule appears: `PROVED n` if each fails a named law,
+  else `REFUTED k of n survive` (`fixtures/adequacy.law`). `let numerals = [1, 2]`
+  replaces `number`'s numerals (`fixtures/numerals.law`). The mutant focus follows where a law
+  uses the relation (`reach.law`), and a reference's answers are kept by name and text
+  (`refs.law`). `.law` files count toward `lines`.
+- `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
+  well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
+  are sound (Nile's own resolver and type checker, forked per question, accept what they
+  generate), checked by themselves, all used, and agree with Nile on expressions that
+  ignore types. Nile's resolver crash on `ϫ():ρ` / `forall_`
+  (`fixtures/nile-crash.law`) is `INCONCLUSIVE`. `nile-adequacy.law`: every one of the
+  69 mutants of the expr rules fails sound or agree.
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
@@ -166,6 +161,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   the demos that run i386 code in-process: `test-call.k`, `test-elf.l`,
   `test-mach-o.l`, `assembler.k`. On arm64 they first fail at
   `mprotect: Permission denied` (eval.c:2497).
+- Neither evaluator eliminates tail calls, and a stack overflow is an unguarded
+  segfault. On the default 8 MB stack `eval` overflows between 2,000 and 4,000 nested
+  tail calls, and `eval2` between 4,000 and 7,000.
 - `eval2.c` was hand-edited upstream; nothing here regenerates it.
 - Cross-compiling: ir2 sizes follow the host's `osdefs.k`. Since that change
   (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
