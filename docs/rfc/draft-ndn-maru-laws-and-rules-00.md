@@ -242,7 +242,11 @@ A filler is inserted as text, with no parentheses added, so grouping is
 the template author's: a template that needs a filler to bind as a unit
 writes the parentheses itself (`(a + b)`, as `e_infix` does).
 A template that does not parse when filled is an error in the rule or law
-that wrote it, reported with the filled text. [R-template-holes]
+that wrote it, reported with the filled text.
+In a rule a template is a term, its holes the rule's variables, and the
+rules check template terms, not text: a value given as text (`"a + b"`)
+matches no rule's template, even one whose filled text it is. Text is what
+a reference or a claim receives. [R-template-holes]
 
 ```maru-check @R-template-holes
 law_cexpr
@@ -293,7 +297,11 @@ drawn from its domains that meet its conditions; under `EXHAUST`, when it
 is true for every such value up to the size. A refuted law MUST report
 values small enough to read: the runner shrinks each failing value
 (a rule-built value by rebuilding it at a smaller size, a number toward
-0) while the claim still fails, and prints the seed. [R-law-outcomes]
+0) while the claim still fails, and prints the seed. A claim or condition
+is true unless its value is false, except that a reference's verdict
+(`accept`, `reject` or `(crash status)`) is no truth value: a claim or
+condition valued one is `E_CLAIM`, and the law compares it instead
+(`= accept`). [R-law-outcomes]
 
 ```maru-check @R-law-outcomes
 law_cexpr
@@ -336,9 +344,13 @@ law_nile
 A reference SHOULD run in-process, with its errors caught as values (as
 `check/irl-errors.l` catches ir2's). A reference that exits on its first
 error, as Nile's checker does today (`nile-fatal-error` calls `(exit)`),
-MAY run in a forked child, which is a host facility. Maru has no
+MAY run in a forked child, which is a host facility; so MAY the runner's
+vacuity probe, as a stand-in can raise an error. Maru has no
 non-local exit, and `error` aborts the process, so such a reference runs
-forked until one exists. The Nile reference MUST be Nile's compiler
+forked until one exists. A fork that fails, or a wait that does not return
+the child, is `(crash -1)`, never another child's status.
+A reference's `accept` and `reject` are kept by its name and the text it
+was given; a crash is not kept, so the same question is asked again. The Nile reference MUST be Nile's compiler
 loaded into this tree's Maru, not its vendored copy.
 
 ### Laws every rule set is held to
@@ -349,9 +361,11 @@ stated in the law language like any other: [R-rule-set-laws]
 1. **Sound.** Every value the rules generate, the reference accepts.
 2. **Generate implies check.** Every value the rules generate, the same
    rules check.
-3. **Agree.** On values from a domain that ignores the rules (a grammar
-   rule, or looser rules), the rules and the reference give the same
-   verdict, both ways.
+3. **Agree.** On values from looser rules, which ignore what the rules
+   under test constrain (types, say) but write the same templates, the
+   rules and the reference give the same verdict, both ways. Because the
+   rules check template terms, an agree domain that yields text, such as
+   a grammar rule, cannot be checked by the rules.
 4. **Coverage.** Every rule is used in some generated derivation.
 5. **Adequate.** Every mutant fails at least one of the laws above. The
    mutants are: each constant argument of each fact replaced by each
@@ -392,16 +406,19 @@ the file, so adding a law does not change the values another draws.
 
 | Error | Example | Recovery |
 |---|---|---|
-| `E_TEMPLATE_PARSE` | a rule fills `{a} {op} {b}` with an operator that is not one | Report the rule and the filled text; the law does not run |
-| `E_UNKNOWN_RELATION` | a premise names `exprs`, which no rule concludes | Reject the rule file before any law runs |
+| `E_TEMPLATE_PARSE` | a rule fills `{a} {op} {b}` with an operator that is not one | The run stops with the message and the filled text (Maru's `error`, which has no unwind); the file's later laws and later files do not run |
+| `E_UNKNOWN_RELATION` | a premise names `exprs`, which no rule concludes | The run stops with the message before the file's laws run; later files do not run |
 | `E_REFERENCE_CRASH` | Nile's resolver fails on `ϫ():ρ` | `INCONCLUSIVE`; print the input and the status |
 | `E_BINDING` | a goal domain does not bind its last argument | Reject the law; it does not run |
 | `E_GRAMMAR` | a grammar domain names a language that is not registered | Reject the law; it does not run |
 | `E_EXHAUST` | a law asks `EXHAUST` over a grammar domain | Reject the law; a grammar domain cannot be exhausted |
-| `E_UNKNOWN_ITEM` | an item other than a rule, fact, schema or facts reaches rule expansion (`let`, `set`, `law`, `under-test`, `reference`, `defaults`) | Reject the rule file, naming the item |
-| `E_ARITY` | a higher-order relation is used with the same passed relation but a different number of carried arguments | Reject the rule file before any law runs |
-| `E_NO_FACTS` | `facts R from f` where `f` returns no fact for `R` | Reject the file; the rules would have no facts |
+| `E_UNKNOWN_ITEM` | an item other than a rule, fact, schema or facts reaches rule expansion (`let`, `set`, `law`, `under-test`, `reference`, `defaults`) | The run stops with the message, naming the item; later files do not run |
+| `E_ARITY` | a higher-order relation is used with the same passed relation but a different number of carried arguments | The run stops with the message before the file's laws run; later files do not run |
+| `E_NO_FACTS` | `facts R from f` where `f` returns no fact for `R` | The run stops with the message before the file's laws run; later files do not run |
 | `E_NO_UNDER_TEST` | a law file has no `under test:` line | Reject the file; its laws test nothing |
+| `E_DUPLICATE` | two laws in a file have one name | Reject the file; none of its laws run, as adequacy names laws |
+| `E_CLAIM` | a claim is `nile_accepts(e, t)`, not `nile_accepts(e, t) = accept` | Reject the law, naming it; the next law runs |
+| `E_ADEQUATE` | an adequacy law names a law that does not exist, or a relation with no mutants (no rule concludes it) | Reject the adequacy law; the next law runs |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
 ## Formal Grammar
@@ -449,6 +466,12 @@ members, schema values and list tails.
 
 `text` excludes `` ` `` (%x60), `{` (%x7B) and `}` (%x7D); `expression`
 stands for `cexpr.g`'s `expression`.
+
+A `comment` starts at `--` at the start of a line (after any blanks), or
+at `--` after a blank when a blank or the line's end follows it. Inside an
+item `--` with anything else after it (`f(a) --1 == 0`) is no comment, so
+the item reads as an expression or fails naming its line; it never loses
+its tail to a comment.
 
 An example, the spike's Nile rules and one law about them:
 
