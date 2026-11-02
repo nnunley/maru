@@ -9,15 +9,50 @@
 ;;;   (cnf-assert c x)                          x must hold
 ;;;   (cnf-exactly-one c xs)                    exactly one of xs, by a sequential counter
 ;;;   (cnf-clauses c) (cnf-nvars c)             what the formula is
+;;;   (cnf-count c)                             how many clauses
+;;;   (cnf-mark c) (cnf-restore c mark)         take back what was added since mark
+;;;   (cnf-free c)                              the formula's store, released
 
-(define-structure <cnf> (nvars clauses true))
-(define-function cnf-new () (new <cnf> 0 () ()))
-(define-function cnf-var (c) (set (<cnf>-nvars c) (+ 1 (<cnf>-nvars c))) (<cnf>-nvars c))
+;; The clauses go to a C store (dimacs.irl's store_*) as they are made, never kept in Maru's
+;; heap: a formula of 100,000 clauses there makes every collection slow.
+(require "sat.l")
+
+(define-structure <cnf> (nvars store true))
+(define-function cnf-new () (new <cnf> 0 ((sat-fn "store_new" ">p")) ()))
+(define-function cnf-var (c)
+  (set (<cnf>-nvars c) (+ 1 (<cnf>-nvars c)))
+  (<cnf>-nvars c))
 (define-function cnf-clause (c lits)	; kept as sat-clean leaves it: a repeat once, a tautology not at all
-  (let ((kept ()) (taut ()))
-    (list-do l lits (or (member? l kept) (let () (and (member? (- l) kept) (set taut 1)) (push kept l))))
-    (or taut (set (<cnf>-clauses c) (cons (list-reverse! kept) (<cnf>-clauses c))))))
-(define-function cnf-clauses (c) (let ((out ())) (list-do k (<cnf>-clauses c) (push out k)) out))
+  (let ((kept ())
+	(taut ()))
+    (list-do l lits
+      (or (member? l kept)
+	  (let ()
+	    (and (member? (- l) kept) (set taut 1))
+	    (push kept l))))
+    (or taut
+	(let ((emit (sat-fn "store_lit" "pl"))
+	      (f (<cnf>-store c)))
+	  (list-do l (list-reverse! kept) (emit f l))
+	  (emit f 0)))))
+(define-function cnf-count (c) ((sat-fn "store_count" "p>l") (<cnf>-store c)))
+(define-function cnf-clauses (c)	; the clauses as lists, read back from the store
+  (let ((f (<cnf>-store c))
+	(at (sat-fn "store_at" "pl>l"))
+	(out ())
+	(clause ()))
+    (for (i 0 ((sat-fn "store_length" "p>l") f))
+      (let ((l (at f i)))
+	(if (= l 0)
+	    (let () (push out (list-reverse! clause)) (set clause ()))
+	  (push clause l))))
+    (list-reverse! out)))
+(define-function cnf-mark (c)	; where the formula is now, to come back to
+  (list (<cnf>-nvars c) ((sat-fn "store_length" "p>l") (<cnf>-store c)) (cnf-count c)))
+(define-function cnf-restore (c mark)	; the clauses and variables made since mark, gone
+  (set (<cnf>-nvars c) (car mark))
+  ((sat-fn "store_truncate" "pll") (<cnf>-store c) (cadr mark) (caddr mark)))
+(define-function cnf-free (c) ((sat-fn "store_free" "p") (<cnf>-store c)))
 (define-function cnf-nvars (c) (<cnf>-nvars c))
 (define-function cnf-assert (c x) (cnf-clause c (list x)))
 (define-function cnf-not (x) (- x))

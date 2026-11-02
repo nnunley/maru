@@ -146,7 +146,47 @@ char* text_chars(struct Text* t) return t.p;
 long text_length(struct Text* t) return t.n;
 void text_free(struct Text* t) { free(t.p); free(t); }
 
-export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free, text_new, text_lit, text_chars, text_length, text_free;
+// a formula as Maru builds it (cnf.l), literal by literal, each clause ending in 0, kept out of
+// Maru's heap, where a long formula would make every collection slow.  The solver's input, the
+// DIMACS text for the checker and the model check all read it (sat.irl).
+struct Store { long n, cap, count; long* lits; };
+struct Store* store_new() {
+  let struct Store* f := cast(malloc(cast(sizeof(struct Store), long)), struct Store*);
+  f.n := 0;
+  f.count := 0;
+  f.cap := 1024;
+  f.lits := cast(malloc(words(f.cap)), long*);
+  return f;
+}
+void store_lit(struct Store* f, long l) {	// a literal, or 0 ending a clause
+  if f.n == f.cap then {
+    f.cap := 2 * f.cap;
+    f.lits := cast(realloc(f.lits, words(f.cap)), long*);
+  }
+  f.lits[f.n] := l;
+  f.n := f.n + 1;
+  if l == 0 then f.count := f.count + 1;
+}
+long store_length(struct Store* f) return f.n;
+long store_count(struct Store* f) return f.count;
+long store_at(struct Store* f, long i) return f.lits[i];
+void store_truncate(struct Store* f, long n, long count) {	// back to an earlier length
+  f.n := n;
+  f.count := count;
+}
+struct Text* store_text(struct Store* f, long vars) {
+  let struct Text* t := text_new(vars, f.count);
+  let long i := 0;
+  while i < f.n do {
+    text_lit(t, f.lits[i]);
+    i := i + 1;
+  }
+  return t;
+}
+void store_free(struct Store* f) { free(f.lits); free(f); }
+
+export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free, text_new, text_lit, text_chars, text_length, text_free,
+       store_new, store_lit, store_length, store_count, store_at, store_truncate, store_text, store_free;
 
 // ---- DRAT proofs (R-formats-grammars): a line adds a lemma, or after d deletes a clause, each
 // ending in 0.  The checker (drat-check.irl) owns the actions; a line's literals are gathered

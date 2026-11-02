@@ -146,6 +146,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   complement (`cnf.l`'s add, sub, mul, div, lt, eq, checked on every pair of 4-bit numbers), and
   a result that doesn't fit, or a division by zero, makes its step impossible: Nim from 3 and 4
   agree with the search, and a counter past 32767 is unsatisfiable in 16 bits but not in 17.
+  A list that changes is a length (one of a few values) and its elements' terms; its
+  builtins, `+` and `-`, quantifiers, `in` and `select` are encoded case by case, an index
+  out of range or a list past `sat-list-length` making its step impossible. The x86
+  allocator comes out at 6 and passes the slot-by-slot check (`check/john-allocation.l`,
+  shared with `john_run`); list expressions over symbolic inputs equal the evaluator's on
+  generated lists. The formula's clauses live in a C store (`dimacs.irl`), out of Maru's
+  heap, which the solver, the checker's DIMACS text and the model check all read.
   The search planner is unchanged otherwise.
 - `sat_proof` (`check/sat-proof.l`): every UNSAT answer from `sat-decide` carries a DRAT
   proof (`sat.irl` writes each learned clause, and `0` at the refutation), which

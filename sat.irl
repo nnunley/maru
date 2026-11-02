@@ -383,6 +383,28 @@ long sat_val(struct Solver* s, long l) {
   if v > s.nvars || s.model[v] == 0 then return 0 - l;
   return (s.model[v] > 0) == (l > 0) ? l : 0 - l;
 }
+// a formula from a store (dimacs.irl) as the solver's input, and the solver's model checked
+// against the store's clauses, which the solver never sees as Maru wrote them (R-model-checked)
+void sat_add_store(struct Solver* s, struct Store* f) {
+  let long i := 0;
+  while i < f.n do {
+    sat_add(s, f.lits[i]);
+    i := i + 1;
+  }
+}
+long sat_store_holds(struct Solver* s, struct Store* f) {
+  let long i := 0;
+  let long holds := 0;
+  let long all := 1;
+  while i < f.n do {
+    if f.lits[i] == 0 then {
+      if !holds then all := 0;
+      holds := 0;
+    } else if sat_val(s, f.lits[i]) == f.lits[i] then holds := 1;	// the literal, when it holds
+    i := i + 1;
+  }
+  return all;
+}
 long sat_failed(struct Solver* s, long l) {
   let long v := absl(l);
   return cast(v <= s.nvars && s.failed[v] == l, long);
@@ -396,4 +418,4 @@ void sat_release(struct Solver* s) {
   free(s.wlist); free(s.activity); free(s.abuf); free(s.assum); free(s.lbuf); free(s);
 }
 
-export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_proof_on, sat_proof_text, sat_proof_length, sat_release;
+export sat_init, sat_reserve, sat_add, sat_add_store, sat_store_holds, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_proof_on, sat_proof_text, sat_proof_length, sat_release;

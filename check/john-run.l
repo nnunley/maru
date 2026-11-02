@@ -7,6 +7,7 @@
 ;;; the past and over the possible futures, and McCarthy's airline, read from its history.  "program TEXT"
 ;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
+(require "check/john-allocation.l")
 
 (define system (subr "system" "s"))
 (define ok 1)
@@ -81,17 +82,7 @@
 	     "looking 5 time unit ahead (12 possible worlds)" "looking 6 time unit ahead (12 possible worlds)"
 	     "satisfied at time: 6"
 	     "satisfied by: [ Al assign R1 Va , Al assign R3 VB , Al assign R2 Vc , Al assign R3 Vd , Al split R1 R4 , Al assign R1 VE ]")))
-  ;; and the allocation is one: every slot from a variable's start to just before its end holds it in
-  ;; one register (two for length 4, a register pair), and nowhere else does.  The memo's room check
-  ;; reads only a range's two ends, so an assignment could overwrite a variable; this would catch it.
-  (let ((slots (map (lambda (r) (john-eval (list 'send r 'allocations) *john-world* ())) '(R1 R2 R3 R4))) (fits 1))
-    (list-do v '(Va VB Vc Vd VE)
-      (let ((range (john-eval (list 'send v 'live-range) *john-world* ())) (want (/ (john-eval (list 'send v 'length) *john-world* ()) 2)))
-	(for (i 1 13)
-	  (let ((n 0) (inside (and (<= (car range) i) (< i (cadr range)))))
-	    (list-do r slots (and (= v (john-builtin r 'at: (list i))) (set n (+ n 1))))
-	    (or (= n (if inside want 0)) (let () (set fits ()) (println "slot " i " holds " v " " n " times")))))))
-    (expect "the x86 allocation fills each live range, slot by slot" fits))
+  (expect "the x86 allocation fills each live range, slot by slot" (john-allocation-fits?))
   ;; the memo's puzzle goal reads live-vars, a name, where each live-vars is meant
   (expect "the puzzle allocator's goal names nothing" (has? (child-mode "puzzle") "unknown name: live-vars"))
   ;; RN-2008-003 section 10: past max-time-ahead levels the best-scoring world's next move is
