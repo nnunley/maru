@@ -1,7 +1,7 @@
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -g $(OFLAGS)
+CFLAGS = -Wall -Wno-comment -g $(OFLAGS)
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
@@ -28,7 +28,7 @@ endif
 # eval32 only where the host can link 32-bit code (not macOS since 10.15).
 EVAL32 = $(shell echo 'int main(){return 0;}' | $(CC32) -x c - -o /dev/null 2>/dev/null && echo eval32)
 
-all : eval2 eval $(EVAL32) osdefs.k
+all : eval2 eval eval3 $(EVAL32) osdefs.k
 
 run : all
 	rlwrap ./eval
@@ -59,7 +59,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 # libraries the checks open; a library that fails to build fails only the checks that need it
 CHECK_LIBS = build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l
 
-check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
+check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/check.l $(CHECKS)
 
@@ -70,6 +70,10 @@ maru-check : eval2 .force
 	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
 	cc -m32 -o maru-check maru-check.s
 	./maru-check
+
+eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
@@ -260,7 +264,7 @@ stats : .force
 
 # Everything any rule here makes, except the checked-in peg.l and net/*.osdefs.k.
 clean : .force
-	rm -f eval eval2 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
+	rm -f eval eval2 eval3 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
 	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c test.k *.o *.s a.out peg.n peg.m
 	rm -f maru-check test-main test-pegen *.$(SO) *~
 	rm -rf bin build *.dSYM *.mshark

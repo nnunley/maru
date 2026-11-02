@@ -1,6 +1,7 @@
 # What make builds; make clean removes all of it.
 eval
 eval2
+eval3
 eval32
 gceval
 /bin/

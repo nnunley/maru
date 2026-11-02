@@ -87,8 +87,12 @@
       (gezira_Image_init image (<texbuf>-bits texbuf) window-width window-height (<texbuf>-stride texbuf))
       (for (i 0 n-flakes)
 	(set-array-at flakes i (make <snowflake>
-				     (x	    (random 0 w))      (y     (random 0 h))	 (dy	 (random 0.5 3.0))
-				     (scale (random 0.2 0.7))  (angle (random 0.0 0.4))  (dangle (random -0.1 0.1)))))
+				     x:	     (random 0 w)
+				     y:	     (random 0 h)
+				     dy:     (random 0.5 3.0)
+				     scale:  (random 0.2 0.7)
+				     angle:  (random 0.0 0.4)
+				     dangle: (random -0.1 0.1))))
       (let ((running 1))
 	(while running
 	  (clear image process 1.0 0.0 0.0 0.0)
