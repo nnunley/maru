@@ -135,7 +135,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `drat-check.irl` verifies forward (a lemma RUP, or else RAT on its first literal) against
   the formula it reads itself through `dimacs.irl`'s grammars, else `E_PROOF`. It rejects a
   proof without its final `0`, an empty one, a lemma that doesn't follow (naming its line), and
-  one that deletes what it needs. Proofs go to `/tmp/maru-sat`, never through a symbolic link.
+  one that deletes what it needs. Formula and proof stay in memory; a check that fails writes
+  both to `/tmp/maru-sat` and names them in its error. `make clean` removes `/tmp/maru-check`
+  and `/tmp/maru-sat`.
 - `sat_core` (`check/sat-core.l`): `sat.irl`, a CDCL solver behind IPASIR (`sat_init`,
   `sat_add`, `sat_assume`, `sat_solve` answering 10, 20 or 0, `sat_val`, `sat_failed`), in
   `build/sat.dylib`. `sat.l`'s `sat-decide` solves a formula on a fresh solver and checks

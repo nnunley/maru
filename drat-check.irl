@@ -1,5 +1,5 @@
 // drat-check.irl -- the proof checker (draft-ndn-maru-sat-00 [R-checker]).  It reads the
-// formula from its DIMACS file (dimacs.irl) and the proof with the <drat> grammar, and walks
+// formula from the DIMACS text Maru wrote (dimacs.irl) and the proof with the <proof> grammar, and walks
 // the proof forward: a lemma is kept if unit propagation over the clauses so far refutes its
 // negation (RUP), or else if every resolvent on its first literal is RUP (RAT); a deletion
 // removes a clause; the proof is accepted once the empty clause is kept.  It is deliberately
@@ -8,11 +8,6 @@
 import void*(long) malloc;
 import void*(void*, long) realloc;
 import void(void*) free;
-import void*(char*, char*) fopen;
-import long(void*, long, long, void*) fread;
-import int(void*, long, int) fseek;
-import long(void*) ftell;
-import int(void*) fclose;
 
 struct Checker {
   long nvars, n, asize, acap, tsize, blen, bcap, derived;
@@ -143,13 +138,15 @@ long drat_delete(struct proof* p) {
 }
 long drat_next(struct proof* p) { p.line := p.line + 1; return p.line; }
 
-// 1 if the proof at proof_path shows the formula at cnf_path UNSAT, else 0 (drat_failed_line says where)
-long drat_check(char* cnf_path, char* proof_path) {
-  let struct Formula* f := dimacs_load(cnf_path);
+// 1 if the proof's text shows the formula's DIMACS text UNSAT, else 0 (drat_failed_line says
+// where).  The formula is the text Maru wrote, never the solver's memory.
+long drat_check_text(char* cnf, long cn, char* proof, long pn) {
+  let long bad := 0;
+  let struct Formula* f := dimacs_parse(cnf, cn, &bad);
   let struct Checker* k := cast(malloc(cast(sizeof(struct Checker), long)), struct Checker*);
   let long accepted := 0;
   drat_bad := 1;
-  if cast(f, long) == 0 then return 0;
+  if bad then { dimacs_free(f); return 0; }
   k.nvars := 0; k.n := 0; k.asize := 0; k.acap := 64; k.tsize := 0; k.blen := 0; k.bcap := 16; k.derived := 0; k.scap := 16;
   k.arena := dgrow(cast(0, long*), 64); k.starts := dgrow(cast(0, long*), 16); k.buf := dgrow(cast(0, long*), 16);
   k.assign := dgrow(cast(0, long*), 1); k.trail := dgrow(cast(0, long*), 1); k.tmp := dgrow(cast(0, long*), 2);
@@ -164,23 +161,25 @@ long drat_check(char* cnf_path, char* proof_path) {
     c := c + 1;
   }
   dimacs_free(f);
-  let void* in := fopen(proof_path, "r");
-  if cast(in, long) != 0 then {
-    fseek(in, cast(0, long), 2);
-    let long size := ftell(in);
-    fseek(in, cast(0, long), 0);
-    let char* text := cast(malloc(size + 1), char*);
-    fread(text, cast(1, long), size, in);
-    fclose(in);
-    let struct proof* p := cast(malloc(cast(sizeof(struct proof), long)), struct proof*);
-    p.string := text; p.position := 0; p.limit := size; p.checker := cast(k, long); p.line := 0;
-    if proof_start(p) && k.derived then { accepted := 1; drat_bad := 0; }
-    else drat_bad := p.line + 1;
-    free(p); free(text);
-  }
+  let struct proof* p := cast(malloc(cast(sizeof(struct proof), long)), struct proof*);
+  p.string := proof; p.position := 0; p.limit := pn; p.checker := cast(k, long); p.line := 0;
+  if proof_start(p) && k.derived then { accepted := 1; drat_bad := 0; }
+  else drat_bad := p.line + 1;
+  free(p);
   free(k.arena); free(k.starts); free(k.buf); free(k.assign); free(k.trail); free(k.tmp); free(k);
+  return accepted;
+}
+// the same, for a formula and a proof in files
+long drat_check(char* cnf_path, char* proof_path) {
+  let long cn := 0; let long pn := 0;
+  let char* cnf := dimacs_file(cnf_path, &cn);
+  let char* proof := dimacs_file(proof_path, &pn);
+  let long accepted := 0;
+  if cast(cnf, long) != 0 && cast(proof, long) != 0 then accepted := drat_check_text(cnf, cn, proof, pn);
+  if cast(cnf, long) != 0 then free(cnf);
+  if cast(proof, long) != 0 then free(proof);
   return accepted;
 }
 long drat_failed_line() return drat_bad;
 
-export drat_check, drat_failed_line;
+export drat_check, drat_check_text, drat_failed_line;

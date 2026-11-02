@@ -23,10 +23,10 @@
     (for (i 1 4) (push cs (list (p i 1) (p i 2))))
     (for (h 1 3) (for (i 1 4) (for (j (+ i 1) 4) (push cs (list (- (p i h)) (- (p j h)))))))
     cs))
-(let ((r (sat-decide 6 pigeons)))
+(let ((r (sat-decide 6 pigeons 'keep)))
   (expect "3 pigeons in 2 holes is UNSAT, its proof accepted" (= 'unsat (car r)))
-  (expect "the proof is a file" (and (cdr r) (< 0 (string-length (contents-of-file-named (cdr r))))))
-  (let* ((text (contents-of-file-named (cdr r)))
+  (expect "the proof is kept, in memory" (and (cdr r) (< 0 (string-length (cdr r)))))
+  (let* ((text (cdr r))
 	 (n (string-length text)))
     (expect "the real proof checks again" (= 1 (check-proof pigeons 6 text)))
     ;; the final 0 dropped: the empty clause is never derived
@@ -43,8 +43,8 @@
 (expect "and with it kept, accepted" (= 1 (check-proof '((1) (-1)) 1 "0\n")))
 ;; RAT: a clause over a fresh variable follows
 (expect "a RAT addition is accepted" (= 1 (check-proof '((1) (-1)) 1 "2 0\n0\n")))
-;; a proof dir that is a symbolic link is refused
-((subr "system" "s>i") (concat-strings "rm -rf " dir "/proof-link " dir "/proof-real && mkdir " dir "/proof-real && ln -s " dir "/proof-real " dir "/proof-link"))
-(expect "a symbolic link as the proof dir is refused" (not (sat-proof-dir-usable? (concat-string dir "/proof-link"))))
-(expect "a real dir is used" (sat-proof-dir-usable? (concat-string dir "/proof-real")))
+;; a passing check writes nothing to disk
+((subr "system" "s>i") "rm -rf /tmp/maru-sat")
+(sat-decide 6 pigeons)
+(expect "a refutation that checks leaves no files" (not (= 0 ((subr "system" "s>i") "test -e /tmp/maru-sat"))))
 (and ok (println "sat proof ok"))

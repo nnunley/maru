@@ -39,18 +39,21 @@
 	(list-do l c (and (if (< 0 l) (array-at values l) (not (array-at values (- l)))) (set holds 1)))
 	(or holds (set ok ()))))
     ok))
-;; where formulas and proofs are written: made if missing, never through a symbolic link at
-;; its last component (draft-ndn-maru-sat-00, Security Considerations)
-(define *sat-proof-dir* "/tmp/maru-sat")
-(define *sat-files* 0)
-(define-function sat-proof-dir-usable? (dir)
-  (let ((buf ((subr "malloc" "l>p") 4096)))
-    (and (= 0 ((subr "system" "s>i") (concat-strings "mkdir -p " dir)))
-	 (let ((link ((subr "readlink" "spl>l") dir buf 4096))) ((subr "free" "p") buf) (< link 0)))))
-(define-function sat-file (ext)	; this process's next file there, named so agents running at once don't collide
-  (or (sat-proof-dir-usable? *sat-proof-dir*) (error "E_PROOF_DIR: " *sat-proof-dir* " is not a directory to write proofs in"))
-  (set *sat-files* (+ *sat-files* 1))
-  (concat-strings *sat-proof-dir* "/" (format "%d" ((subr "getpid" ">l"))) "-" (format "%d" *sat-files*) ext))
+;; a formula as DIMACS text, built once and joined: the checker parses this, never the solver's memory
+(define-function sat-dimacs-text (n clauses)
+  (let ((parts (list (concat-strings "p cnf " (format "%d" n) " " (format "%d" (list-length clauses)) "\n"))))
+    (list-do c clauses
+      (let ((line "")) (list-do l c (set line (concat-strings line (format "%d" l) " "))) (push parts (concat-string line "0\n"))))
+    (apply concat-strings (list-reverse! parts))))
+(define-function sat-c-string (p n)	; n bytes at p, as a Maru string
+  (let ((s (string n))) (for (i 0 n) (set-string-at s i (byte-at p i))) s))
+;; a check that fails keeps its evidence: the formula and the proof, written to the scratch
+;; directory and named in the error; a check that passes writes nothing
+(define-function sat-keep (text ext)
+  ((subr "system" "s>i") "mkdir -p /tmp/maru-sat")
+  (let ((path (concat-strings "/tmp/maru-sat/failed-" (format "%d" ((subr "getpid" ">l"))) ext)))
+    (let ((f ((subr "fopen" "ss>p") path "w"))) ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f))
+    path))
 
 ;; a clause with a literal and its negation is dropped, and a repeated literal kept once, so the
 ;; formula written for the checker is well formed DIMACS
@@ -62,24 +65,28 @@
 	(or taut (push out (list-reverse! kept)))))
     (list-reverse! out)))
 
-;; a fresh solver for one formula over n variables: (sat . values), (unsat . proof-path) or
-;; (unknown).  A model is checked against the clauses (E_MODEL), and a refutation's proof by
-;; drat-check.irl against the formula as written (E_PROOF).
-(define-function sat-decide (n given)
-  (let ((s (sat-init)) (out ()) (cnf (sat-file ".cnf")) (proof (sat-file ".drat")) (clauses (sat-clean given)))
-    (sat-write-dimacs cnf n clauses)
+;; a fresh solver for one formula over n variables: (sat . values), (unsat) or (unknown); with
+;; keep, (unsat . proof-text).  A model is checked against the clauses (E_MODEL), and a
+;; refutation's proof by drat-check.irl against the formula's DIMACS text (E_PROOF), in memory.
+(define-function sat-decide (n given . keep)
+  (let ((s (sat-init)) (out ()) (clauses (sat-clean given)))
     ((sat-fn "sat_reserve" "pl") s n)
-    ((sat-fn "sat_set_proof" "ps>l") s proof)
+    ((sat-fn "sat_proof_on" "p") s)
     (list-do c clauses (sat-add-clause s c))
     (let ((r (sat-solve s)))
       (cond ((= r 10) (let ((vals (array (+ n 1))))
 			(for (v 1 (+ n 1)) (set-array-at vals v (< 0 (sat-val s v))))
-			(or (sat-model-holds? clauses vals) (error "E_MODEL: a clause is false in the solver's model"))
+			(or (sat-model-holds? clauses vals)
+			    (error "E_MODEL: a clause is false in the solver's model; the formula is "
+				   (sat-keep (sat-dimacs-text n clauses) ".cnf")))
 			(set out (cons 'sat vals))))
-	    ((= r 20) (sat-release s) (set s ())
-		      (or (= 1 ((sat-fn "drat_check" "ss>l") cnf proof))
-			  (error "E_PROOF: the refutation's proof fails at line " ((sat-fn "drat_failed_line" ">l"))))
-		      (set out (cons 'unsat proof)))
+	    ((= r 20) (let* ((cnf (sat-dimacs-text n clauses))
+			     (text ((sat-fn "sat_proof_text" "p>p") s))
+			     (len ((sat-fn "sat_proof_length" "p>l") s)))
+			(or (= 1 ((sat-fn "drat_check_text" "slpl>l") cnf (string-length cnf) text len))
+			    (error "E_PROOF: the refutation's proof fails at line " ((sat-fn "drat_failed_line" ">l"))
+				   "; the formula is " (sat-keep cnf ".cnf") " and the proof " (sat-keep (sat-c-string text len) ".drat")))
+			(set out (if keep (cons 'unsat (sat-c-string text len)) (list 'unsat)))))
 	    (else (set out (list 'unknown)))))
-    (and s (sat-release s))
+    (sat-release s)
     out))

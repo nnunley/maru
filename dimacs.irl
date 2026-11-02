@@ -73,30 +73,41 @@ long dimacs_clause_end(struct cnf* p) {
 }
 long dimacs_complete(struct cnf* p) return cast(dimacs_formula(p).clauses == dimacs_formula(p).count, long);
 
-// the whole file, parsed; bad is 0, or the first bad line's number
-struct Formula* dimacs_read(char* path, long* bad) {
+// a formula's DIMACS text, parsed; bad is 0, or the first bad line's number
+struct Formula* dimacs_parse(char* text, long n, long* bad) {
   let struct Formula* f := cast(malloc(cast(sizeof(struct Formula), long)), struct Formula*);
   let struct cnf* p := cast(malloc(cast(sizeof(struct cnf), long)), struct cnf*);
-  let void* in := fopen(path, "r");
   f.vars := 0; f.count := 0; f.clauses := 0; f.nlits := 0; f.cap := 64;
   f.lits := cast(malloc(words(cast(64, long))), long*);
   f.starts := cast(malloc(words(cast(1, long))), long*);
   f.starts[0] := 0;
-  bad[0] := 1;
-  if cast(in, long) == cast(0, long) then { free(p); return f; }
-  fseek(in, cast(0, long), 2);
-  let long n := ftell(in);
-  fseek(in, cast(0, long), 0);
-  let char* text := cast(malloc(n + cast(1, long)), char*);
-  fread(text, cast(1, long), n, in);
-  fclose(in);
   p.string := text; p.position := 0; p.limit := n; p.formula := cast(f, long); p.line := 0; p.atend := 0;
   // the first line no whole-line rule matched; every line read but a count wrong: the last
   if cnf_start(p) then bad[0] := 0;
   else if p.atend then bad[0] := p.line > 0 ? p.line : 1;
   else bad[0] := p.line + cast(1, long);
-  free(text);
   free(p);
+  return f;
+}
+// a file's whole text, or 0 (n is its length)
+char* dimacs_file(char* path, long* n) {
+  let void* in := fopen(path, "r");
+  if cast(in, long) == cast(0, long) then return cast(0, char*);
+  fseek(in, cast(0, long), 2);
+  n[0] := ftell(in);
+  fseek(in, cast(0, long), 0);
+  let char* text := cast(malloc(n[0] + cast(1, long)), char*);
+  fread(text, cast(1, long), n[0], in);
+  fclose(in);
+  return text;
+}
+struct Formula* dimacs_read(char* path, long* bad) {
+  let long n := 0;
+  let char* text := dimacs_file(path, &n);
+  bad[0] := 1;
+  if cast(text, long) == cast(0, long) then return dimacs_parse("", 0, bad);
+  let struct Formula* f := dimacs_parse(text, n, bad);
+  free(text);
   return f;
 }
 

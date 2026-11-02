@@ -11,9 +11,7 @@
 import void*(long) malloc;
 import void*(void*, long) realloc;
 import void(void*) free;
-import void*(char*, char*) fopen;
-import int(void*, char*, ...) fprintf;
-import int(void*) fclose;
+import int(char*, long, char*, ...) snprintf;
 
 struct Solver {
   long nvars, cap, unsat, nlevels, tsize, qhead, hsize, asize, acap;
@@ -23,7 +21,7 @@ struct Solver {
   long* wsize; long* wcap; long* wlist;		// wlist[i]: the watch list of literal index i, a long*
   long* abuf; long* assum; long* lbuf;
   double* activity; double inc;
-  long proof;					// the DRAT proof's file, or 0
+  long proof, plen, pcap; char* pbuf;		// the DRAT proof as text, when proof is 1
 };
 
 long swords(long n) return n * cast(sizeof(long), long);
@@ -188,17 +186,17 @@ long propagate(struct Solver* s) {
   return confl;
 }
 
- // ---- the DRAT proof: each learned clause as it is learned, and 0 when the formula is refuted
+ // ---- the DRAT proof, kept as text: each learned clause as it is learned, and 0 when the
+// formula is refuted
+void proof_write(struct Solver* s, long l) {	// a literal and a space, or 0 and a newline
+  if s.plen + 32 > s.pcap then { s.pcap := 2 * s.pcap + 64; s.pbuf := cast(realloc(s.pbuf, s.pcap), char*); }
+  if l == 0 then s.plen := s.plen + cast(snprintf(s.pbuf + s.plen, 32, "0\n"), long);
+  else s.plen := s.plen + cast(snprintf(s.pbuf + s.plen, 32, "%ld ", l), long);
+}
 void proof_clause(struct Solver* s, long* lits, long n) {
-  if s.proof != 0 then {
-    let long i := 0;
-    while i < n do { fprintf(cast(s.proof, void*), "%ld ", lits[i]); i := i + 1; }
-    fprintf(cast(s.proof, void*), "0\n");
-  }
+  if s.proof then { let long i := 0; while i < n do { proof_write(s, lits[i]); i := i + 1; } proof_write(s, 0); }
 }
-void proof_refuted(struct Solver* s) {
-  if s.proof != 0 then { fprintf(cast(s.proof, void*), "0\n"); fclose(cast(s.proof, void*)); s.proof := 0; }
-}
+void proof_refuted(struct Solver* s) { if s.proof then { proof_write(s, 0); s.proof := 0; } }
 
 void push_learnt(struct Solver* s, long l) {
   if s.llen == s.lbcap then { s.lbcap := 2 * s.lbcap; s.lbuf := grow(s.lbuf, s.lbcap); }
@@ -301,7 +299,7 @@ struct Solver* sat_init() {
   let struct Solver* s := cast(malloc(cast(sizeof(struct Solver), long)), struct Solver*);
   s.nvars := 0; s.cap := 0; s.unsat := 0; s.nlevels := 0; s.tsize := 0; s.qhead := 0; s.hsize := 0;
   s.asize := 0; s.acap := 0; s.alen := 0; s.abcap := 16; s.nassum := 0; s.ascap := 16; s.llen := 0;
-  s.lbcap := 16; s.conflicts := 0; s.budget := 1000000; s.inc := 1.0; s.proof := 0;
+  s.lbcap := 16; s.conflicts := 0; s.budget := 1000000; s.inc := 1.0; s.proof := 0; s.plen := 0; s.pcap := 0; s.pbuf := cast(0, char*);
   s.assign := cast(0, long*); s.level := cast(0, long*); s.reason := cast(0, long*); s.phase := cast(0, long*);
   s.model := cast(0, long*); s.seen := cast(0, long*); s.failed := cast(0, long*); s.heap := cast(0, long*);
   s.hpos := cast(0, long*); s.trail := cast(0, long*); s.lim := cast(0, long*); s.arena := cast(0, long*);
@@ -329,11 +327,10 @@ void sat_assume(struct Solver* s, long l) {
   s.nassum := s.nassum + 1;
 }
 void sat_set_conflicts(struct Solver* s, long n) s.budget := n;
-// the proof of the next refutation, for a solve without assumptions on a fresh solver (R-drat)
-long sat_set_proof(struct Solver* s, char* path) {
-  s.proof := cast(fopen(path, "w"), long);
-  return cast(s.proof != 0, long);
-}
+// keep the proof of the next refutation, for a solve without assumptions on a fresh solver (R-drat)
+void sat_proof_on(struct Solver* s) { s.proof := 1; proof_write(s, 1); s.plen := 0; }
+char* sat_proof_text(struct Solver* s) return s.pbuf;	// not NUL-terminated: sat_proof_length bytes
+long sat_proof_length(struct Solver* s) return s.plen;
 
 long sat_solve(struct Solver* s) {
   let long status := -1; let long i := 1;
@@ -395,8 +392,8 @@ void sat_release(struct Solver* s) {
   while i < 2 * s.cap do { if s.wcap[i] > 0 then free(cast(s.wlist[i], void*)); i := i + 1; }
   free(s.assign); free(s.level); free(s.reason); free(s.phase); free(s.model); free(s.seen); free(s.failed);
   free(s.heap); free(s.hpos); free(s.trail); free(s.lim); free(s.arena); free(s.wsize); free(s.wcap);
-  if s.proof != 0 then fclose(cast(s.proof, void*));
+  if s.pcap > 0 then free(s.pbuf);
   free(s.wlist); free(s.activity); free(s.abuf); free(s.assum); free(s.lbuf); free(s);
 }
 
-export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_set_proof, sat_release;
+export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_proof_on, sat_proof_text, sat_proof_length, sat_release;

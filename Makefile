@@ -262,6 +262,7 @@ clean : .force
 	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c test.k *.o *.s a.out peg.n peg.m
 	rm -f maru-check test-main test-pegen *.$(SO) *~
 	rm -rf bin build *.dSYM *.mshark
+	rm -rf /tmp/maru-check /tmp/maru-sat	# what checks write as they run, and failed SAT checks' evidence
 
 #----------------------------------------------------------------
 
