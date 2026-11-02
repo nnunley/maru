@@ -1,6 +1,6 @@
 (require "osdefs.k")
 
-(define *dlopen-path* (list "" "./" "/lib/" "/usr/lib/" "/usr/local/lib/" "/opt/X11/lib/" "/opt/local/lib/" "/usr/X11/lib/"))
+(define *dlopen-path* (list "" "./" "/lib/" "/usr/lib/" "/usr/local/lib/" "/opt/homebrew/lib/" "/opt/X11/lib/" "/opt/local/lib/" "/usr/X11/lib/"))
 
 (define *dlopen-suffix*
   (cond

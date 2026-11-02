@@ -5,6 +5,12 @@
 Dan Amelang's Maru as of 2012-12-24 (`ac07e5e`), as used for Nile, on top of
 Ian Piumarta's 2.4 release, with Kurt Stephens' fork merged in. Kurt's merge
 adds only `maruby.l`; his other changes are in the history, not the code.
+`ac07e5e` is Piumarta's own commit `e8356c4` (less `.hg_archival.txt`); his
+history behind it (from 2010-10-30) and his 2013 commits after it (to
+2013-11-12: label and goto, keyword `make`, `eval3`, the SDL2 example) are
+merged in, from attila-lendvai/maru's `piumarta` branch. A replace ref grafts
+`e8356c4` under `ac07e5e` for log and blame; fetch it with
+`git fetch origin 'refs/replace/*:refs/replace/*'`.
 
 The layout is flat, as upstream intended: `require` and `load` resolve
 relative to the current directory, so run everything from the repo root.
@@ -18,7 +24,10 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
 ## Build
 
-    make    # eval, eval2, osdefs.k, and eval32 where -m32 links (not macOS)
+    make    # eval, eval2, eval3, osdefs.k, and eval32 where -m32 links (not macOS)
+
+`eval3` (Piumarta, 2013) is kept beside `eval2` for comparison: it boots
+`boot2.l` too, and calls C through libffi where `eval2` uses `subr`.
 
 On arm64 macOS with Rosetta, `make check` also builds `bin/x86_64/eval` and
 `bin/x86_64/eval2` (`-arch x86_64`) to run x86-64 code in-process.
@@ -73,6 +82,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `zero_global` (`check/zero-global.k`): a global declared with no
   initialiser, `(define (name T))`, starts at zero, for a scalar and a struct.
 - `maru_check`: upstream's own ir2 test, `maru-check.k`, passes all sections.
+- `maru_label`: Piumarta's `maru-label.k`, through the C back end: `label` and
+  `goto`, plain, computed from an `if`, and through a label held in a variable.
+- `eval3`: `eval3` runs `boot2.l` with the `boot2_strings` and `asm_interface`
+  cases, and `dlextern` (`check/dlextern.l`, as `libsdl2.k` uses it) calls libc
+  through libffi in `eval3` and through `subr` in `eval2` alike.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
@@ -281,6 +295,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `nil`, `true`, `false`, strings or arrays; variables can't be read in
   expressions; the `block` rule is unused, so no blocks.
 - Gezira/GL demos need `libnile` and `libglfw` built from `../nile`.
+- The SDL2 example (`./eval3 libsdl2.k`, a window to draw lines in) needs
+  SDL2 and SDL2_gfx; without SDL2_gfx it stops at `could not load: libSDL2_gfx`.
+- `eval3`'s `subr` predates the typed signatures (`"s>l"`) `eval2_subr` checks.
 
 ## Roadmap
 

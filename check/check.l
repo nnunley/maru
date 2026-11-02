@@ -197,6 +197,14 @@
   (unit-assert (equal (last (run "subr" "./eval check/eval2-subr.l")) "subr ok"))
   (unit-assert (equal (last (run "subr2" "./eval2 -b boot2.l check/eval2-subr.l")) "subr ok")))
 
+;; eval3 (Piumarta, 2013) beside eval2 for comparison: it runs boot2.l and the
+;; same cases, and calls C by libffi (dlextern) where eval2 uses subr.
+(check "eval3"
+  (unit-assert (equal (last (run "eval3-strings" "./eval3 -b boot2.l check/boot2-strings.l")) "boot2 strings ok"))
+  (unit-assert (equal (last (run "eval3-asm" "./eval3 -b boot2.l check/asm-interface.l")) "asm interface ok"))
+  (unit-assert (equal (last (run "dlextern2" "./eval2 -b boot2.l check/dlextern.l")) "dlextern ok"))
+  (unit-assert (equal (last (run "dlextern3" "./eval3 -b boot2.l check/dlextern.l")) "dlextern ok")))
+
 ;;; ---------------------------------------------------------------- asm
 
 ;; The table-driven encoders: one interface for every instruction set, under
@@ -416,6 +424,13 @@
   (let ((out (run "maru_check" (ir2-build "maru-check" "maru-check.k"))))
     (list-do s '("bytes" "words" "ints" "floats" "structs" "pointers")
       (unit-assert (member? (concat-strings s " ok") out)))))
+
+;; maru-label.k (Piumarta, 2013): label and goto, plain and computed, through
+;; the C back end. x counts down from 10; 9 and 7 jump to their labels, and 5
+;; jumps through a label held in a variable to the function's end.
+(check "maru_label"
+  (let ((out (run "maru_label" (ir2-build "maru-label" "maru-label.k"))))
+    (unit-assert (equal (cdr out) '("10" "9" "GOT 9" "8" "7" "GOT 7" "6" "5" "GOT 5")))))
 
 ;; maru-gc.k builds a 256-cell list 10000 times, reporting every 1000
 ;; iterations and after a final collection with no roots.
