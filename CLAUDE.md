@@ -142,7 +142,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   3 and the consistent Hanoi4 come out at 3, 7 and 15, the trap and the maze at the search's
   lengths, every plan replayed by the evaluator (`E_ENCODING` otherwise); a goal no plan
   reaches is `unsatisfiable within 16 steps (width 16, lists 16, unroll 16)`, and
-  `sat-conflicts 1` leaves Hanoi3 `unknown`. The search planner is unchanged otherwise.
+  `sat-conflicts 1` leaves Hanoi3 `unknown`. A number that changes is `sat-width` bits of two's
+  complement (`cnf.l`'s add, sub, mul, div, lt, eq, checked on every pair of 4-bit numbers), and
+  a result that doesn't fit, or a division by zero, makes its step impossible: Nim from 3 and 4
+  agree with the search, and a counter past 32767 is unsatisfiable in 16 bits but not in 17.
+  The search planner is unchanged otherwise.
 - `sat_proof` (`check/sat-proof.l`): every UNSAT answer from `sat-decide` carries a DRAT
   proof (`sat.irl` writes each learned clause, and `0` at the refutation), which
   `drat-check.irl` verifies forward (a lemma RUP, or else RAT on its first literal, propagating

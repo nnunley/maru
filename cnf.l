@@ -50,3 +50,72 @@
 	(cnf-clause c (list (- x) s))
 	(and prev (cnf-clause c (list (- prev) s)))
 	(set prev s)))))
+
+;;; ---- bit vectors: W literals, least significant first, two's complement.  Each gate folds
+;;; where an input is known (the true literal or its negation), so a constant costs no clauses.
+;;;
+;;;   (cnf-bv-const c n w)                       n in w bits
+;;;   (cnf-bv-add c a b) (cnf-bv-sub c a b)      (bits . overflow)
+;;;   (cnf-bv-mul c a b) (cnf-bv-div c a b)      (bits . invalid): overflow, or dividing by zero
+;;;   (cnf-bv-lt c a b) (cnf-bv-eq c a b)        a literal
+
+(define-function cnf-known (c x) (let ((t (cnf-true c))) (cond ((= x t) 1) ((= x (- t)) 0) (else ()))))
+(define-function cnf-and2 (c a b)
+  (let ((ka (cnf-known c a)) (kb (cnf-known c b)))
+    (cond ((= ka 0) a) ((= kb 0) b) ((= ka 1) b) ((= kb 1) a) ((= a b) a) ((= a (- b)) (- (cnf-true c))) (else (cnf-and c (list a b))))))
+(define-function cnf-or2 (c a b) (- (cnf-and2 c (- a) (- b))))
+(define-function cnf-xor2 (c a b)
+  (let ((ka (cnf-known c a)) (kb (cnf-known c b)))
+    (cond ((= ka 0) b) ((= kb 0) a) ((= ka 1) (- b)) ((= kb 1) (- a)) ((= a b) (- (cnf-true c))) ((= a (- b)) (cnf-true c)) (else (cnf-xor c a b)))))
+(define-function cnf-mux2 (c s a b)
+  (let ((ks (cnf-known c s))) (cond ((= ks 1) a) ((= ks 0) b) ((= a b) a) (else (cnf-mux c s a b)))))
+(define-function cnf-bv-const (c n w)
+  (let ((m (if (< n 0) (+ n (let ((p 1)) (for (i 0 w) (set p (* p 2))) p)) n)) (out ()))
+    (for (i 0 w) (push out (if (= 1 (% m 2)) (cnf-true c) (- (cnf-true c)))) (set m (/ m 2)))
+    (list-reverse! out)))
+(define-function cnf-bv-last (a) (if (cdr a) (cnf-bv-last (cdr a)) (car a)))	; the sign bit
+(define-function cnf-bv-adder (c a b carry)	; (bits . carry out), unsigned
+  (let ((out ()))
+    (while a
+      (let* ((x (car a)) (y (car b)) (h (cnf-xor2 c x y)))
+	(push out (cnf-xor2 c h carry))
+	(set carry (cnf-or2 c (cnf-and2 c x y) (cnf-and2 c carry h)))
+	(set a (cdr a)) (set b (cdr b))))
+    (cons (list-reverse! out) carry)))
+(define-function cnf-bv-add (c a b)
+  (let* ((r (cnf-bv-adder c a b (- (cnf-true c)))) (sa (cnf-bv-last a)) (ss (cnf-bv-last (car r))))
+    (cons (car r) (cnf-and2 c (- (cnf-xor2 c sa (cnf-bv-last b))) (cnf-xor2 c ss sa)))))	; signs alike, the sum's not
+(define-function cnf-bv-sub (c a b)
+  (let* ((r (cnf-bv-adder c a (map - b) (cnf-true c))) (sa (cnf-bv-last a)) (ss (cnf-bv-last (car r))))
+    (cons (car r) (cnf-and2 c (cnf-xor2 c sa (cnf-bv-last b)) (cnf-xor2 c ss sa)))))	; signs differ, the difference's from a's
+(define-function cnf-bv-eq (c a b)
+  (let ((r (cnf-true c))) (while a (set r (cnf-and2 c r (- (cnf-xor2 c (car a) (car b))))) (set a (cdr a)) (set b (cdr b))) r))
+(define-function cnf-bv-lt (c a b)	; a - b is negative, or overflowed
+  (let ((d (cnf-bv-sub c a b))) (cnf-xor2 c (cnf-bv-last (car d)) (cdr d))))
+(define-function cnf-bv-negate (c a) (car (cnf-bv-adder c (map - a) (map (lambda (x) (- (cnf-true c))) a) (cnf-true c))))	; mod 2^w
+(define-function cnf-bv-abs (c a) (let ((s (cnf-bv-last a)) (n (cnf-bv-negate c a))) (map (lambda (x y) (cnf-mux2 c s y x)) a n)))	; unsigned
+(define-function cnf-bv-but-last (a) (if (cdr a) (cons (car a) (cnf-bv-but-last (cdr a))) ()))
+(define-function cnf-or-list (c xs) (let ((r (- (cnf-true c)))) (list-do x xs (set r (cnf-or2 c r x))) r))
+(define-function cnf-tail (l n) (while (< 0 n) (set l (cdr l)) (set n (- n 1))) l)
+(define-function cnf-bv-signed (c s m)	; magnitude m, negative where s: (bits . doesn't fit)
+  (let* ((w (list-length m)) (top (cnf-bv-last m)) (rest (cnf-or-list c (cnf-bv-but-last m))))
+    (cons (map (lambda (x y) (cnf-mux2 c s y x)) m (cnf-bv-negate c m))
+	  (cnf-and2 c top (cnf-or2 c (- s) rest)))))	; positive: below 2^(w-1); negative: at most 2^(w-1)
+(define-function cnf-bv-mul (c a b)	; |a| |b| in 2w bits, then the sign
+  (let* ((w (list-length a)) (f (- (cnf-true c))) (ma (concat-list (cnf-bv-abs c a) (map (lambda (x) f) a)))
+	 (mb (cnf-bv-abs c b)) (acc (map (lambda (x) f) ma)) (shift ma))
+    (list-do bit mb
+      (set acc (car (cnf-bv-adder c acc (map (lambda (x) (cnf-and2 c bit x)) shift) f)))
+      (set shift (cons f (cnf-bv-but-last shift))))
+    (let* ((low (let ((out ()) (l acc)) (for (i 0 w) (push out (car l)) (set l (cdr l))) (list-reverse! out)))
+	   (high (cnf-tail acc w)) (s (cnf-xor2 c (cnf-bv-last a) (cnf-bv-last b))) (r (cnf-bv-signed c s low)))
+      (cons (car r) (cnf-or2 c (cdr r) (cnf-or-list c high))))))
+(define-function cnf-bv-div (c a b)	; truncating, as Maru's /: |a| / |b| by restoring division, then the sign
+  (let* ((f (- (cnf-true c))) (ma (cnf-bv-abs c a)) (mb (concat-list (cnf-bv-abs c b) (list f))) (r (map (lambda (x) f) mb)) (q ()))
+    (list-do bit (let ((out ())) (list-do x ma (push out x)) out)	; most significant first
+      (set r (cons bit (cnf-bv-but-last r)))
+      (let* ((d (cnf-bv-adder c r (map - mb) (cnf-true c))) (ge (cdr d)))	; no borrow: r >= |b|
+	(push q ge)
+	(set r (map (lambda (x y) (cnf-mux2 c ge y x)) r (car d)))))
+    (let* ((s (cnf-xor2 c (cnf-bv-last a) (cnf-bv-last b))) (res (cnf-bv-signed c s q)) (zero (cnf-bv-eq c b (map (lambda (x) f) b))))
+      (cons (car res) (cnf-or2 c zero (cdr res))))))

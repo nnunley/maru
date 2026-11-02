@@ -117,8 +117,9 @@
 
 ;;; ---- the encoding [R-bmc-encoding]: states 0 .. k, one action per step, the goal at k
 ;;;
-;;; A value is (const . v), known when the formula is built, or (names (v . literal) ...) over
-;;; constants v (names, or the numbers a varying object holds), exactly one literal true.  An expression is encoded under a path, the literal under which
+;;; A value is (const . v), known when the formula is built; (names (v . literal) ...) over
+;;; constants v (names, or the numbers a varying object holds), exactly one literal true; or
+;;; (bv bit ...), a number that changes, sat-width bits in two's complement.  An expression is encoded under a path, the literal under which
 ;;; the evaluator would reach it; where the evaluator would stop with an error the literal
 ;;; (path and cause) goes in *sat-errs*, and the step or goal that read it is impossible.
 
@@ -145,7 +146,19 @@
 
 (define-function sat-const (v) (cons 'const v))
 (define-function sat-const? (x) (= 'const (car x)))
-(define-function sat-names (x) (if (sat-const? x) (list (cons (cdr x) *sat-t*)) (cdr x)))	; ((v . literal) ...)
+(define-function sat-bv? (x) (= 'bv (car x)))
+(define-function sat-names (x)	; ((v . literal) ...)
+  (cond ((sat-const? x) (list (cons (cdr x) *sat-t*)))
+	((sat-bv? x) (john-sat-refuse "a changing number where one of a few values is read"))
+	(else (cdr x))))
+(define-function sat-to-bv (x)	; (bits . literal): x's bits, and where x is a number at all
+  (let ((w (john-sat-width)) (f (- *sat-t*)))
+    (cond ((sat-bv? x) (cons (cdr x) *sat-t*))
+	  ((sat-const? x) (if (long? (cdr x)) (cons (cnf-bv-const *sat-c* (cdr x) w) *sat-t*) (cons (cnf-bv-const *sat-c* 0 w) f)))
+	  (else (let ((nums ())) (list-do e (cdr x) (and (long? (car e)) (push nums e)))
+		  (cons (map (lambda (i) (sat-or (let ((ls ())) (list-do e nums (and (= *sat-t* (car (john-sat-nth (cnf-bv-const *sat-c* (car e) w) i))) (push ls (cdr e)))) ls)))
+			     (let ((is ())) (for (i 0 w) (push is i)) (list-reverse! is)))
+			(sat-or (map cdr nums))))))))
 (define-function sat-entry (v alist) (let ((r ())) (list-do e alist (and (not r) (equal v (car e)) (set r e))) r))
 (define-function sat-lit-of (x n) (let ((e (sat-entry n (sat-names x)))) (if e (cdr e) (- *sat-t*))))
 (define-function sat-names-value (alist)	; false names dropped; one true name is a constant
@@ -154,21 +167,23 @@
 (define-function sat-union (xs)	; the names any of xs can be
   (let ((ns ())) (list-do x xs (list-do e (sat-names x) (or (sat-entry (car e) (map list ns)) (push ns (car e))))) (list-reverse! ns)))
 (define-function sat-truth (x)	; john-true?: neither no nor the empty list
-  (if (sat-const? x) (if (john-true? (cdr x)) *sat-t* (- *sat-t*))
-    (- (sat-or (let ((ls ())) (list-do e (cdr x) (or (john-true? (car e)) (push ls (cdr e)))) ls)))))
+  (cond ((sat-bv? x) *sat-t*) ((sat-const? x) (if (john-true? (cdr x)) *sat-t* (- *sat-t*)))
+    (else (- (sat-or (let ((ls ())) (list-do e (cdr x) (or (john-true? (car e)) (push ls (cdr e)))) ls))))))
 (define-function sat-bool (l)
   (cond ((= l *sat-t*) (sat-const 'yes)) ((= l (- *sat-t*)) (sat-const 'no)) (else (cons 'names (list (cons 'yes l) (cons 'no (- l)))))))
 (define-function sat-equal (a b)
   (cond ((and (sat-const? a) (sat-const? b)) (if (equal (cdr a) (cdr b)) *sat-t* (- *sat-t*)))
+	((or (sat-bv? a) (sat-bv? b)) (let ((x (sat-to-bv a)) (y (sat-to-bv b)))
+					(sat-and (list (cdr x) (cdr y) (cnf-bv-eq *sat-c* (car x) (car y))))))
 	(else (sat-or (map (lambda (e) (sat-and (list (cdr e) (sat-lit-of b (car e))))) (sat-names a))))))
-(define-function sat-mux-value (s a b)	; a where s holds, else b
-  (cond ((= s *sat-t*) a) ((= s (- *sat-t*)) b)
-	((and (sat-const? a) (sat-const? b) (equal (cdr a) (cdr b))) a)
-	(else (sat-names-value (map (lambda (n) (cons n (sat-mux s (sat-lit-of a n) (sat-lit-of b n)))) (sat-union (list a b)))))))
 (define-function sat-merge (choices)	; ((literal . value) ...), at most one literal true
   (let ((live ())) (list-do ch choices (or (= (car ch) (- *sat-t*)) (push live ch)))
     (set live (list-reverse! live))
     (cond ((not live) (sat-const 'no))	; no choice can be taken: an error is recorded for it
+	  ((let ((b ())) (list-do ch live (and (sat-bv? (cdr ch)) (set b 1))) b)	; a number that changes: bit by bit
+	   (let ((vs (map (lambda (ch) (car (sat-to-bv (cdr ch)))) live)))
+	     (cons 'bv (map (lambda (i) (sat-or (map (lambda (ch v) (sat-and (list (car ch) (car (john-sat-nth v i))))) live vs)))
+			    (let ((is ())) (for (i 0 (john-sat-width)) (push is i)) (list-reverse! is))))))
 	  ((let ((same 1)) (list-do ch live (or (and (sat-const? (cdr ch)) (sat-const? (cdr (car live))) (equal (cdr (cdr ch)) (cdr (cdr (car live))))) (set same ()))) same)
 	   (cdr (car live)))
 	  (else (sat-names-value (map (lambda (n) (cons n (sat-or (map (lambda (ch) (sat-and (list (car ch) (sat-lit-of (cdr ch) n)))) live))))
@@ -179,7 +194,7 @@
   (if (not cases) (list ())
     (let ((out ()) (rest (sat-combos (cdr cases)))) (list-do c (car cases) (list-do r rest (push out (cons c r)))) (list-reverse! out))))
 (define-function sat-split (xs f)	; f of every combination of xs' constants, merged
-  (let ((known 1)) (list-do x xs (or (sat-const? x) (set known ())))
+  (let ((known 1)) (list-do x xs (or (sat-const? x) (set known ())) (and (sat-bv? x) (sat-names x)))
     (if known (f (map cdr xs))
       (let ((choices ()))
 	(list-do combo (sat-combos (map sat-cases xs))
@@ -230,10 +245,22 @@
       (sat-bool (sat-truth (sat-eval (cadddr d) t (list (cons (cadr (cadr d)) a) (cons (cadr (caddr d)) b))))))))
 (define-function sat-known (x what)	; x's constant; a changing one isn't encoded yet
   (if (sat-const? x) (cdr x) (john-sat-refuse what)))
-(define-function sat-arith (op a b)	; on constants, as the evaluator; dividing by zero stops it
+(define-function sat-fits? (n) (let ((top 1)) (for (i 1 (john-sat-width)) (set top (* top 2))) (and (<= (- top) n) (< n top))))
+(define-function sat-arith (op a b)	; on constants, as the evaluator; dividing by zero, or a number past sat-width, stops it
   (cond ((member? op '(< > <= >=)) (john-bool (cond ((= op '<) (< a b)) ((= op '>) (> a b)) ((= op '<=) (<= a b)) (else (>= a b)))))
-	((and (= op '/) (= 0 b)) (sat-err *sat-t*) 0)
-	(else (john-arith op a b))))
+	((and (= op '/) (long? b) (= 0 b)) (sat-err *sat-t*) 0)
+	(else (let ((r (john-arith op a b))) (and (long? r) (not (sat-fits? r)) (sat-err *sat-t*)) r))))
+(define-function sat-bv-arith (op a b)	; a number that changes, by circuits; a result past sat-width stops the step
+  (let* ((x (sat-to-bv a)) (y (sat-to-bv b)) (c *sat-c*))
+    (sat-err (- (sat-and (list (cdr x) (cdr y)))))	; not a number: the evaluator's error
+    (cond ((= op '<) (sat-bool (cnf-bv-lt c (car x) (car y))))
+	  ((= op '>) (sat-bool (cnf-bv-lt c (car y) (car x))))
+	  ((= op '<=) (sat-bool (- (cnf-bv-lt c (car y) (car x)))))
+	  ((= op '>=) (sat-bool (- (cnf-bv-lt c (car x) (car y)))))
+	  (else (let ((r (cond ((= op '+) (cnf-bv-add c (car x) (car y))) ((= op '-) (cnf-bv-sub c (car x) (car y)))
+			       ((= op '*) (cnf-bv-mul c (car x) (car y))) (else (cnf-bv-div c (car x) (car y))))))
+		  (sat-err (cdr r))
+		  (cons 'bv (car r)))))))
 (define-function sat-eval (x t env)
   (cond ((symbol? x) (let ((b (assq x env))) (cond (b (cdr b)) ((= x 'time) (sat-const t)) (else (sat-const (john-name x *john-world* ()))))))
 	((not (pair? x)) (sat-const x))
@@ -245,7 +272,8 @@
 		 ((= op '=) (sat-bool (sat-equal (sat-eval (cadr x) t env) (sat-eval (caddr x) t env))))
 		 ((member? op '(< > <= >= + - * /))
 		  (let ((a (sat-eval (cadr x) t env)) (b (sat-eval (caddr x) t env)))
-		    (sat-split (list a b) (lambda (cs) (sat-const (sat-arith op (car cs) (cadr cs)))))))
+		    (if (or (sat-bv? a) (sat-bv? b)) (sat-bv-arith op a b)
+		      (sat-split (list a b) (lambda (cs) (sat-const (sat-arith op (car cs) (cadr cs))))))))
 		 ((= op 'and) (let ((a (sat-truth (sat-eval (cadr x) t env))))
 				(sat-bool (sat-and (list a (sat-under a (lambda () (sat-truth (sat-eval (caddr x) t env)))))))))
 		 ((= op 'or) (let ((a (sat-truth (sat-eval (cadr x) t env))))
@@ -281,7 +309,7 @@
 	      (or row (let () (push out (list o)) (set row (car out))))
 	      (or (member? (caddr e) (cdr row)) (set-cdr row (cons (caddr e) (cdr row)))))))))
     (list-do row out (list-do p (cdr row)
-		       (let ((s (john-sort-of (car row) p))) (and s (not (= s 'name)) (john-sat-refuse (concat-strings "a " (if (= s 'number) "number" "list") " that changes (" (symbol->string (car row)) " " (symbol->string p) ")"))))))
+		       (let ((s (john-sort-of (car row) p))) (and (pair? s) (john-sat-refuse (concat-strings "a list that changes (" (symbol->string (car row)) " " (symbol->string p) ")"))))))
     out))
 (define-function john-sat-allowed (o g t using)	; (action . literal): goal-optimizations narrowing step t (G13)
   (and (not using)
@@ -297,7 +325,7 @@
 (define-function sat-require (x l) (or (= l *sat-t*) (cnf-clause *sat-c* (list (- x) l))))
 
 (define-function sat-one-hot (x)	; x, its one name said outright: implied, and it lets the solver propagate
-  (or (sat-const? x)
+  (or (not (= 'names (car x)))
       (let ((ls (map cdr (cdr x))))
 	(cnf-clause *sat-c* ls)
 	(while ls (list-do l (cdr ls) (cnf-clause *sat-c* (list (- (car ls)) (- l)))) (set ls (cdr ls)))))

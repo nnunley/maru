@@ -104,4 +104,41 @@
 (let ((l (last (plan (john-read "check/john/hanoi3.john") '((set-opt planner sat) (set-opt sat-conflicts 1)) hanoi-win))))
   (expect "a conflict limit of 1 leaves Hanoi3 unknown"
 	  (and (= "unknown at " (string-copy l 0 11)) (has? l " steps (conflict limit 1)"))))
+;; the bit-vector gates on every pair of 4-bit numbers: inputs known, the gates fold to the answer
+(define-function bv-value (c bits)	; known bits as a number, or ()
+  (let ((n 0) (p 1) (last ()) (ok 1))
+    (list-do b bits (cond ((= b (cnf-true c)) (set n (+ n p)) (set last 1)) ((= b (- (cnf-true c))) (set last ())) (else (set ok ()))) (set p (* p 2)))
+    (and ok (if last (- n p) n))))
+(let ((c (cnf-new)) (good 1))
+  (for (a -8 8)
+    (for (b -8 8)
+      (let ((x (cnf-bv-const c a 4)) (y (cnf-bv-const c b 4)))
+	(list-do op (list (list cnf-bv-add +) (list cnf-bv-sub -) (list cnf-bv-mul *) (list cnf-bv-div /))
+	  (let* ((r ((car op) c x y)) (exact (if (and (= (cadr op) /) (= b 0)) () ((cadr op) a b))) (fits (and exact (<= -8 exact) (< exact 8))))
+	    (or (if fits (and (= (cdr r) (- (cnf-true c))) (= exact (bv-value c (car r)))) (= (cdr r) (cnf-true c)))
+		(let () (set good ()) (println "FAIL bits " a " " b " -> " (bv-value c (car r)))))))
+	(or (and (= (cnf-bv-lt c x y) (if (< a b) (cnf-true c) (- (cnf-true c)))) (= (cnf-bv-eq c x y) (if (= a b) (cnf-true c) (- (cnf-true c)))))
+	    (set good ())))))
+  (expect "add, sub, mul, div, lt, eq on every pair of 4-bit numbers, an overflow or a zero divisor flagged" good))
+;; numbers: two's complement circuits, a step whose result doesn't fit impossible
+(expect "the maze by sat in 6" (equal "satisfied at time: 6" (time-line (by-sat (john-read "check/john/maze.john") '(satisfy R reach () () ())))))
+(define nim "create Game pile turn. create Player opponent. make Player White Black. make Player Black White.
+  action Player take1 consequence G pile = G pile - 1 and G turn = its opponent.
+  rule Player take1 is G turn = it. rule Player take1 is G pile >= 1.
+  action Player take2 consequence G pile = G pile - 2 and G turn = its opponent.
+  rule Player take2 is G turn = it. rule Player take2 is G pile >= 2.
+  goal Player win try G pile = 0 and G turn = its opponent. ")
+(both-agree "Nim from 3" (john-read-text (concat-string nim "make Game G 3 White.")) '(satisfy White win () () ()))
+(both-agree "Nim from 4" (john-read-text (concat-string nim "make Game G 4 White.")) '(satisfy White win () () ()))
+(expect "Nim from 4 by sat at 3" (equal "satisfied at time: 3" (time-line (by-sat (john-read-text (concat-string nim "make Game G 4 White.")) '(satisfy White win () () ())))))
+(define counter "create C n. make C X 32760. action C up consequence it n = its n + 10. goal C done try its n > 32767. ")
+(expect "an add past sat-width is an impossible step, never a wrap"
+	(equal "unsatisfiable within 16 steps (width 16, lists 16, unroll 16)" (last (by-sat (john-read-text counter) '(satisfy X done () () ())))))
+(expect "the same add under sat-width 17"
+	(equal "satisfied at time: 1" (time-line (plan (john-read-text counter) '((set-opt planner sat) (set-opt sat-width 17)) '(satisfy X done () () ())))))
+(expect "division by zero is an impossible step"
+	(has? (last (by-sat (john-read-text "create C n d f. make C X 4 0 no. action C bump consequence it n = its n + 1.
+				  action C cut consequence it n = its n / its d and it f = yes. goal C done try its f = yes. ")
+			    '(satisfy X done () () ())))
+	      "unsatisfiable within 16 steps"))
 (and ok (println "sat john ok"))
