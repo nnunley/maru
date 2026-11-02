@@ -165,7 +165,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `sat_core` (`check/sat-core.l`): `sat.irl`, a CDCL solver behind IPASIR (`sat_init`,
   `sat_add`, `sat_assume`, `sat_solve` answering 10, 20 or 0, `sat_val`, `sat_failed`), in
   `build/sat.dylib`. `sat.l`'s `sat-decide` solves a formula on a fresh solver and checks
-  the model against every clause (`E_MODEL`). It answers satisfiable and unsatisfiable
+  the model against every clause as Maru wrote it (`sat_store_holds`, over the formula's
+  store, not the solver's clauses; `E_MODEL`). It answers satisfiable and unsatisfiable
   formulas, clauses added between solves, and assumptions with the ones a refutation used.
 - `sat_dimacs` (`check/sat-dimacs.l`): `dimacs.irl`'s grammar block `<cnf>`, built into
   `build/sat.dylib` (opened by `sat.l`), reads DIMACS CNF and names the first bad line: a

@@ -1,7 +1,7 @@
 # draft-ndn-maru-sat-00: A SAT Solver for Maru, with Checked Proofs and JOHN Planning
 
 **Status:** DRAFT
-**Corpus:** red (spec-first — evidence is the acceptance criteria)
+**Corpus:** green
 **Category:** Experimental
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 
@@ -126,7 +126,6 @@ rules.
 | `sat-width` | Integer | `16` | Bits in a number |
 | `sat-list-length` | Integer | `16` | The greatest length of a list |
 | `sat-unroll` | Integer | `16` | How deep a recursive qualification unrolls |
-| `sat-proof-dir` | Path | `/tmp/maru-sat` | Where proofs are written |
 | `sat-conflicts` | Integer | `1000000` | Conflicts before `sat_solve` answers `UNKNOWN` |
 
 The defaults have reasons:
@@ -137,6 +136,9 @@ The defaults have reasons:
 - `sat-unroll` 16 covers `repeatn:` to 12.
 - The plan length is bounded by the evaluator's existing time limit (16 steps), not by a new
   key.
+
+Formulas and proofs stay in memory. A check that fails writes both to `/tmp/maru-sat` and names
+them in its `E_MODEL` or `E_PROOF`; a check that passes writes nothing.
 
 **Resolution precedence** (highest first):
 
@@ -181,16 +183,22 @@ seconds.
 sat_core
 ```
 
-Every SAT answer MUST be checked, in Maru, against every clause of the formula as it was given,
-before any client sees it. An assignment that falsifies a clause is `E_MODEL`. [R-model-checked]
+Every SAT answer MUST be checked against every clause of the formula as Maru gave it, by code
+that shares nothing with the solver, before any client sees it. An assignment that falsifies a
+clause is `E_MODEL`. [R-model-checked]
+
+The clauses are kept, as Maru makes them, in a store outside Maru's heap (`dimacs.irl`); the
+solver's input, the checker's DIMACS text and this check all read the store. A formula of
+100,000 clauses held in Maru's heap made every collection slow.
 
 ```maru-check @R-model-checked
 sat_core
 ```
 
 The solver and the checker MUST be built from irl through `compile-irl.l` and ir2's C backend
-into one shared library, `sat.dylib` (or `sat.so`), in the tree. Untyped Maru loads it from that
-path through `dlopen.k`, never from a path a program supplies. [R-native]
+into one shared library, `build/sat.dylib` (or `build/sat.so`), which make builds. Untyped Maru
+opens it by that path in the tree, relative to the root Maru runs from, never from a path a
+program supplies. [R-native]
 
 Today the C backend is ir2's way to native code on arm64. When an arm64 backend exists, the
 same `.k` loads into a code region in-process (RFC 0001's region) without a change to the
@@ -214,8 +222,8 @@ of the failed assumptions' negations) is left to the laws document, which needs 
 sat_proof
 ```
 
-The checker MUST read the formula from its DIMACS file, never from the solver's memory. It
-MUST then read the proof forward, accepting it only if:
+The checker MUST read the formula from DIMACS text made from the clauses Maru wrote, never from
+the solver's memory. It MUST then read the proof forward, accepting it only if:
 - every added clause follows from the clauses present by unit propagation (reverse unit
   propagation, RUP), or else has a literal on which it is a resolution asymmetric tautology
   (RAT);
@@ -225,7 +233,8 @@ MUST then read the proof forward, accepting it only if:
 Anything else is `E_PROOF`. [R-checker]
 
 A forward check is simpler than DRAT-trim's backward check, and slower. Here the checker is the
-thing to trust, so simplicity wins.
+thing to trust, so simplicity wins. It propagates by two watched literals: by repeated passes
+over every clause, the 12-step Hanoi4 proof took 21 seconds to check, against 0.6 by watches.
 
 ```maru-check @R-checker
 sat_proof
@@ -590,15 +599,14 @@ solvers' agreement. Families generated with answers known by construction test t
 
 ## Security Considerations
 
-The solver adds three inputs that cross a boundary:
+The solver adds two inputs that cross a boundary, and one output:
 - **A DIMACS file.** The reader rejects malformed input, oversized counts and out-of-range
   literals before allocating for them ([R-dimacs]). So a crafted file can't make it write past
   its arrays.
 - **The shared library.** It is loaded only from its path in the tree ([R-native]), never from a
   path a program names. A JOHN program therefore can't load code.
-- **Proofs.** They are written under `sat-proof-dir`, which a program can set. A program could
-  therefore write proof files wherever the user can write. The directory MUST be created if
-  missing and MUST NOT be followed through a symbolic link at its last component.
+- **Evidence of a failed check.** A formula and its proof are written only when a check fails,
+  to `/tmp/maru-sat`, a fixed directory no program names, under the process's id.
 
 Solving time is bounded by `sat-conflicts`. A formula that doesn't finish within it answers
 `UNKNOWN`, which the planner reports and doesn't treat as UNSAT.
@@ -622,8 +630,8 @@ irl needs small extensions to build a shared library, each its own change:
   irl expression is a struct literal;
 - grammar blocks ([R-irl-grammar]), with a small typed matching runtime.
 
-The library is opened by its absolute path in the tree, not through `dlopen.k`'s directory
-search, so [R-native] holds. A `break` statement in irl would shorten the solver's loops, and
+The library is opened by its path in the tree (`build/sat.dylib`, a path with a slash, so
+`dlopen` searches no directory), so [R-native] holds. A `break` statement in irl would shorten the solver's loops, and
 MAY be added. ir2 needs nothing new.
 
 `john-eval.l` changes in two places to match [R-expression-circuits]: `at:` with an index below
