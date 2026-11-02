@@ -183,6 +183,21 @@
 		     hanoi-win))))
   (expect "a conflict limit of 1 leaves Hanoi3 unknown"
 	  (and (= "unknown at " (string-copy l 0 11)) (has? l " steps (conflict limit 1)"))))
+;; a number that changes is sat-width bits after a step, so its arithmetic is the circuits'
+;; with unknown inputs; an add that overflows in the circuit forbids its step
+(define climb "create C n. make C X 32750. action C up consequence it n = its n + 10. goal C done try its n > 32767. ")
+(john-run (john-read-text climb))
+(john-sat-check)	; the sorts the encoding reads
+(let ((enc (john-sat-begin 'X 'done () () ())))
+  (john-sat-step enc 0)
+  (expect "a changing number is bits after a step" (= 'bv (car (sat-cell 'X 'n 1))))
+  (set *sat-memo-on* ()))
+(expect "a circuit's overflow forbids its step"
+	(equal "unsatisfiable within 16 steps (width 16, lists 16, unroll 16)"
+	       (last (by-sat (john-read-text climb) '(satisfy X done () () ())))))
+(expect "the same climb in 17 bits"
+	(equal "satisfied at time: 2"
+	       (time-line (plan (john-read-text climb) '((set-opt planner sat) (set-opt sat-width 17)) '(satisfy X done () () ())))))
 ;; the bit-vector gates on every pair of 4-bit numbers: inputs known, the gates fold to the answer
 (define-function bv-value (c bits)	; known bits as a number, or ()
   (let ((n 0) (p 1) (last ()) (ok 1))
@@ -299,7 +314,13 @@
   (set-array-at *sat-states* 0 ())
   (set *sat-memo-on* ())
   (set *sat-groups* (array))
-  (let* ((env (map (lambda (b) (cons (car b) (pin (cdr b)))) bindings)) (v (sat-eval expr 0 env)))
+  (let* ((env (map (lambda (b)
+		     (cons (car b)
+			   (if (and (pair? (cdr b)) (= 'built (cadr b)))
+			       ((cddr b))	; (name built . maker): the term the maker builds
+			     (pin (cdr b)))))
+		   bindings))
+	 (v (sat-eval expr 0 env)))
     (list-do l *sat-errs* (cnf-assert *sat-c* (- l)))
     (let ((r (sat-decide-store (cnf-nvars *sat-c*) (<cnf>-store *sat-c*))))
       (if (= 'sat (car r)) (cons 'sat (decode v (cdr r))) (list (car r))))))
@@ -314,6 +335,10 @@
 	(equal '(unsat) (forced '(send L at: K) '((L 1 2 3) (K . 4)))))
 (expect "repeatn: 3, unrolled"
 	(equal '(sat empty empty empty) (forced '(send empty repeatn: N) '((N . 3)))))
+;; a changing list against a value that is a list in one case and a name in another
+(expect "a changing list equals a value that may be a list"
+	(equal '(sat . yes)
+	       (forced '(= L X) (list (cons 'L ()) (cons 'X (cons 'built (lambda () (pin-one () 'no))))))))
 ;; as a law: over generated lists, each expression's value through the encoder is the evaluator's
 (define seed 7)
 (define-function rand (n)
@@ -347,4 +372,19 @@
 		(set good ())
 		(println "FAIL law " expr " L=" l " M=" m " K=" k ": " got " not " want)))))))
   (expect "list expressions through the encoder equal the evaluator's, over generated lists" good))
+;; the memo and the unroll bound: a qualification built deep, where it stops, never answers a
+;; shallow call; one built shallow never answers a call that would pass the bound
+(define deep-and-shallow "qualify Word repeatn: N [ ] if N = 0. qualify Word repeatn: N (its repeatn: (N - 1)) + it.
+  create C f. make C X no. ")
+(define deep-action "action C deep consequence it f = yes. rule C deep is (empty repeatn: 3) size = 3. ")
+(define shallow-action "action C shallow consequence it f = yes. rule C shallow is (empty repeatn: 0) size = 0. ")
+(define-function unrolled (actions)
+  (let ((text (concat-strings deep-and-shallow actions "goal C done try its f = yes. ")))
+    (last (plan (john-read-text text)
+		'((set-opt planner sat) (set-opt sat-unroll 3))
+		'(satisfy X done () () ())))))
+(expect "a deep build doesn't stop a shallow call"
+	(equal "satisfied by: [ X shallow ]" (unrolled (concat-string deep-action shallow-action))))
+(expect "a shallow build doesn't let a call past the bound"
+	(equal "satisfied by: [ X shallow ]" (unrolled (concat-string shallow-action deep-action))))
 (and ok (println "sat john ok"))

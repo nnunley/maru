@@ -312,6 +312,16 @@
 	(else (cons 'names (list (cons 'yes l) (cons 'no (- l)))))))
 (define-function sat-equal (a b)
   (cond ((and (sat-const? a) (sat-const? b)) (if (equal (cdr a) (cdr b)) *sat-t* (- *sat-t*)))
+	;; a list against a value that is a list in some cases and not in others: case by case,
+	;; each a list compared as one, the rest never equal
+	((and (= 'lst (car a)) (= 'names (car b)) (not (sat-list-like? b)))
+	 (sat-or (map (lambda (e)
+			(if (or (pair? (car e)) (not (car e)))
+			    (sat-and (list (cdr e) (sat-equal a (sat-const (car e)))))
+			  (- *sat-t*)))
+		      (cdr b))))
+	((and (= 'lst (car b)) (= 'names (car a)) (not (sat-list-like? a)))
+	 (sat-equal b a))
 	((or (= 'lst (car a)) (= 'lst (car b)))
 	 (if (not (and (sat-list-like? a) (sat-list-like? b)))
 	     (- *sat-t*)
@@ -343,7 +353,12 @@
 	  ((let ((b ()))
 	     (list-do ch live (and (sat-bv? (cdr ch)) (set b 1)))
 	     b)	; a number that changes: bit by bit
-	   (let ((vs (map (lambda (ch) (car (sat-to-bv (cdr ch)))) live)))
+	   (let ((vs (map (lambda (ch)
+			    (let ((b (sat-to-bv (cdr ch))))
+			      ;; a branch whose value isn't a number can't be merged into one
+			      (sat-err (sat-and (list (car ch) (- (cdr b)))))
+			      (car b)))
+			  live)))
 	     (cons 'bv
 		   (map (lambda (i)
 			  (sat-or (map (lambda (ch v)
@@ -566,23 +581,46 @@
 ;; A piece of encoding asked again at one time, of equal terms, is the same formula: it is
 ;; built once (*sat-memo*), under the true literal, and each reader records its errors under
 ;; its own path.  Equal terms share literals, so a term rebuilt from the same parts still hits.
+(define *sat-deepest* 0)	; the deepest *sat-depth* a qualification was asked at, in the build under way
+;; (value span . errors): built under the true literal; span is how much deeper than where it
+;; began its build asked qualifications, so the same build elsewhere stops iff depth + span
+;; reaches sat-unroll
+(define-function sat-memo-build (thunk)
+  (let ((reach *sat-reach*)
+	(errs *sat-errs*)
+	(deepest *sat-deepest*)
+	(start *sat-depth*))
+    (set *sat-reach* *sat-t*)
+    (set *sat-errs* ())
+    (set *sat-deepest* start)
+    (let* ((v (thunk))
+	   (span (- *sat-deepest* start))
+	   (built *sat-errs*))
+      (set *sat-reach* reach)
+      (set *sat-errs* errs)
+      (and (> deepest *sat-deepest*) (set *sat-deepest* deepest))
+      (cons v (cons span built)))))
 (define-function sat-memo (t key thunk)
   (if (not *sat-memo-on*)
       (thunk)
-    (let ((hit ()))
+    (let ((hit ())
+	  (unroll (john-sat-unroll)))
+      ;; an entry answers only where its build would not have reached the bound either
       (list-do e (array-at *sat-memo* t)
-	(and (not hit) (equal key (car e)) (set hit e)))
+	(and (not hit)
+	     (equal key (car e))
+	     (< (+ *sat-depth* (caddr e)) unroll)
+	     (set hit e)))
       (or hit
-	  (let ((reach *sat-reach*)
-		(errs *sat-errs*))
-	    (set *sat-reach* *sat-t*)
-	    (set *sat-errs* ())
-	    (let ((v (thunk)))
-	      (set hit (cons key (cons v *sat-errs*)))
-	      (set *sat-reach* reach)
-	      (set *sat-errs* errs)
-	      (set-array-at *sat-memo* t (cons hit (array-at *sat-memo* t))))))
-      (list-do l (cddr hit) (sat-err l))
+	  (let ((built (sat-memo-build thunk)))
+	    (set hit (cons key built))
+	    ;; a build the bound stopped is not kept: shallower, the same terms go further
+	    (and (< (+ *sat-depth* (cadr built)) unroll)
+		 (set-array-at *sat-memo* t (cons hit (array-at *sat-memo* t))))))
+      ;; its depth counts in any build around this one
+      (and (> (+ *sat-depth* (caddr hit)) *sat-deepest*)
+	   (set *sat-deepest* (+ *sat-depth* (caddr hit))))
+      (list-do l (cdddr hit) (sat-err l))
       (cadr hit))))
 ;; r and args terms: constants, lists, changing numbers
 (define-function sat-send-1 (r sel args t)
@@ -614,6 +652,7 @@
 	  (else (sat-err *sat-t*) *sat-stop*))))
 ;; the first clause whose guard holds gives the value; an if-qualification is yes or no
 (define-function sat-qualify (r clauses args t)
+  (and (> *sat-depth* *sat-deepest*) (set *sat-deepest* *sat-depth*))
   (if (>= *sat-depth* (john-sat-unroll))
       (let ()
 	(sat-err *sat-t*)
@@ -828,6 +867,14 @@
 (define-function sat-require (x l) (or (= l *sat-t*) (cnf-clause *sat-c* (list (- x) l))))
 
 ;; x, its one name said outright: implied, and it lets the solver propagate
+;; a number property, once it varies, is sat-width bits (R-expression-circuits): its arithmetic
+;; and comparisons are then the circuits', over unknown inputs
+(define-function sat-number-bits (o p x)
+  (if (and (= 'names (car x)) (= 'number (john-sort-of o p)))
+      (let ((b (sat-to-bv x)))
+	(sat-err (- (cdr b)))	; a value that isn't a number
+	(cons 'bv (car b)))
+    x))
 (define-function sat-one-hot (x)
   (or (not (= 'names (car x)))
       (let ((ls (map cdr (cdr x))))
@@ -921,16 +968,21 @@
 	(list-do l *sat-errs* (sat-require x (- l)))))
     (if xs (cnf-exactly-one c xs) (cnf-assert c (- *sat-t*)))
     (set writes (list-reverse! writes))
+    (set *sat-errs* ())
     (set-array-at *sat-states*
 		  (+ t 1)
 		  (map (lambda (row)
 			 (cons (car row)
 			       (map (lambda (pv)
 				      (cons (car pv)
-					    (sat-one-hot
-					      (sat-next (car row) (car pv) (cdr pv) writes))))
+					    (sat-number-bits
+					      (car row)
+					      (car pv)
+					      (sat-one-hot
+						(sat-next (car row) (car pv) (cdr pv) writes)))))
 				    (cdr row))))
-		       (array-at *sat-states* t)))))
+		       (array-at *sat-states* t)))
+    (list-do l *sat-errs* (cnf-assert c (- l)))))	; a value no step can leave in a cell
 (define-function john-sat-goal (enc k)	; the goal at time k, asserted
   (let ((c (<john-sat>-cnf enc)) (goal (<john-sat>-goal enc)))
     (set *sat-errs* ())

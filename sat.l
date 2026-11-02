@@ -45,14 +45,6 @@
 (define-function sat-solve (s) ((sat-fn "sat_solve" "p>l") s))
 (define-function sat-val (s lit) ((sat-fn "sat_val" "pl>l") s lit))
 (define-function sat-failed (s lit) ((sat-fn "sat_failed" "pl>l") s lit))
-(define-function sat-model-holds? (clauses values)	; values: an array by variable, t or ()
-  (let ((ok 1))
-    (list-do c clauses
-      (let ((holds ()))
-	(list-do l c
-	  (and (if (< 0 l) (array-at values l) (not (array-at values (- l)))) (set holds 1)))
-	(or holds (set ok ()))))
-    ok))
 (define-function sat-c-string (p n)	; n bytes at p, as a Maru string
   (let ((s (string n)))
     (for (i 0 n) (set-string-at s i (byte-at p i)))

@@ -49,9 +49,25 @@
   (for (h 1 3) (for (i 1 4) (for (j (+ i 1) 4) (push cs (list (- (p i h)) (- (p j h)))))))
   (expect "three pigeons in two holes is UNSAT" (= 'unsat (car (sat-decide 6 cs)))))
 
-;; the model check catches a model that falsifies a clause
-(let* ((clauses '((1 2) (-1 2))) (r (sat-decide 2 clauses)) (vals (cdr r)))
-  (expect "the model holds" (sat-model-holds? clauses vals))
-  (set-array-at vals 2 (not (array-at vals 2)))
-  (expect "a corrupted model is caught" (not (sat-model-holds? clauses vals))))
+;; the model check sat-decide uses (sat_store_holds, over the formula as Maru wrote it) passes
+;; the solver's model, and catches a clause that model falsifies
+(let ((f ((sat-fn "store_new" ">p")))
+      (emit (sat-fn "store_lit" "pl"))
+      (holds (sat-fn "sat_store_holds" "pp>l"))
+      (s (sat-init)))
+  (list-do l '(1 2 0 -1 2 0) (emit f l))
+  ((sat-fn "sat_add_store" "pp") s f)
+  (expect "solved" (= 10 (sat-solve s)))
+  (expect "the model holds" (= 1 (holds s f)))
+  (list-do l (list (- (if (< 0 (sat-val s 2)) 2 -2)) 0) (emit f l))	; the negation of 2's value
+  (expect "a clause the model falsifies is caught" (= 0 (holds s f)))
+  (sat-release s)
+  ((sat-fn "store_free" "p") f))
+
+;; assumptions repeated or already implied each open a level: many of them stay in bounds
+(let ((s (sat-init)))
+  (sat-add-clause s '(1 2))
+  (for (i 0 100000) (sat-assume s 1))
+  (expect "100,000 repeated assumptions solve" (= 10 (sat-solve s)))
+  (sat-release s))
 (and ok (println "sat core ok"))

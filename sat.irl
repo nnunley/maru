@@ -23,6 +23,7 @@ struct Solver {
   long* abuf; long* assum; long* lbuf;
   double* activity; double inc;
   long proof, plen, pcap; char* pbuf;		// the DRAT proof as text, when proof is 1
+  long limcap;		// lim's length: levels, which assumptions already true open too, can pass the variables
 };
 
 long swords(long n) return n * cast(sizeof(long), long);
@@ -118,7 +119,6 @@ void reserve(struct Solver* s, long n) {
     s.heap := grow(s.heap, c);
     s.hpos := grow(s.hpos, c);
     s.trail := grow(s.trail, c);
-    s.lim := grow(s.lim, c + 1);
     s.activity := cast(realloc(s.activity, swords(c)), double*);
     s.wsize := grow(s.wsize, 2 * c);
     s.wcap := grow(s.wcap, 2 * c);
@@ -185,6 +185,10 @@ void enqueue(struct Solver* s, long l, long r) {
   s.tsize := s.tsize + 1;
 }
 void new_level(struct Solver* s) {
+  if s.nlevels == s.limcap then {
+    s.limcap := 2 * s.limcap + 16;
+    s.lim := grow(s.lim, s.limcap);
+  }
   s.lim[s.nlevels] := s.tsize;
   s.nlevels := s.nlevels + 1;
 }
@@ -472,6 +476,7 @@ struct Solver* sat_init() {
   s.hpos := cast(0, long*);
   s.trail := cast(0, long*);
   s.lim := cast(0, long*);
+  s.limcap := 0;
   s.arena := cast(0, long*);
   s.wsize := cast(0, long*);
   s.wcap := cast(0, long*);
