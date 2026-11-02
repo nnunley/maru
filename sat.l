@@ -52,11 +52,21 @@
   (set *sat-files* (+ *sat-files* 1))
   (concat-strings *sat-proof-dir* "/" (format "%d" ((subr "getpid" ">l"))) "-" (format "%d" *sat-files*) ext))
 
+;; a clause with a literal and its negation is dropped, and a repeated literal kept once, so the
+;; formula written for the checker is well formed DIMACS
+(define-function sat-clean (clauses)
+  (let ((out ()))
+    (list-do c clauses
+      (let ((kept ()) (taut ()))
+	(list-do l c (or (member? l kept) (let () (and (member? (- l) kept) (set taut 1)) (push kept l))))
+	(or taut (push out (list-reverse! kept)))))
+    (list-reverse! out)))
+
 ;; a fresh solver for one formula over n variables: (sat . values), (unsat . proof-path) or
 ;; (unknown).  A model is checked against the clauses (E_MODEL), and a refutation's proof by
 ;; drat-check.irl against the formula as written (E_PROOF).
-(define-function sat-decide (n clauses)
-  (let ((s (sat-init)) (out ()) (cnf (sat-file ".cnf")) (proof (sat-file ".drat")))
+(define-function sat-decide (n given)
+  (let ((s (sat-init)) (out ()) (cnf (sat-file ".cnf")) (proof (sat-file ".drat")) (clauses (sat-clean given)))
     (sat-write-dimacs cnf n clauses)
     ((sat-fn "sat_reserve" "pl") s n)
     ((sat-fn "sat_set_proof" "ps>l") s proof)

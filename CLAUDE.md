@@ -144,7 +144,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `sat_dimacs` (`check/sat-dimacs.l`): `dimacs.irl`'s grammar block `<cnf>`, built into
   `build/sat.dylib` (opened by `sat.l`), reads DIMACS CNF and names the first bad line: a
   literal above V or twice in a clause, too few or too many clauses, no header, a count over
-  2^30. `sat-write-dimacs` round-trips through `dimacs_load`.
+  2^30. `sat-write-dimacs` round-trips through `dimacs_load`. `sat-gen.l`'s formulas, their
+  answers known by construction: pigeonhole 2..7 UNSAT with checked proofs, n-queens 1..8
+  (UNSAT for 2 and 3, else a placement checked in Maru), planted 3-SAT at four ratios.
 - `irl_grammar` (`check/irl-grammar.l`): a tpeg grammar calls another grammar's rule as `p-r`
   (compiled by `compile-tpeg.l` to a parser of `<p>` on the same input). In irl,
   `grammar { <G> : <parent> (fields) rules }` is tpeg's own syntax, read through that foreign
