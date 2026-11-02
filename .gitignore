@@ -26,6 +26,7 @@ osdefs.k
 /test-main
 /test-pegen
 *.dylib
+/build/
 *.so
 *~
 .DS_Store

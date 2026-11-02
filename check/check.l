@@ -331,11 +331,20 @@
     (unit-assert (not (string-find (contents-of-file-named f) "(ir-")))))
 
 ;; irl, inheriting cexpr.g, compiles test.irl to a .k program for maru.k.
+;; make builds what a check opens (make check's CHECK_LIBS); a check asserts it is current, so
+;; a failed build never passes on old output
+(define *shlib* (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin")) "dylib" "so"))
+(define-function built (file) (run (concat-string "built-" file) (concat-string "make -q build/" file)))
+
 ;; grammars call each other's rules, and irl compiles grammar blocks to typed Maru (check/irl-grammar.l).
-(check "irl_grammar" (unit-assert (equal (last (run "irl_grammar" "./eval check/irl-grammar.l")) "irl grammar ok")))
+(check "irl_grammar"
+  (built "tpeg-foreign-a.g.l") (built "tpeg-foreign-b.g.l") (built (concat-string "irl-grammar." *shlib*))
+  (unit-assert (equal (last (run "irl_grammar" "./eval check/irl-grammar.l")) "irl grammar ok")))
 
 ;; compile-irl.l --library builds a shared library whose exported functions untyped Maru calls (check/irl-library.l).
-(check "irl_library" (unit-assert (equal (last (run "irl_library" "./eval check/irl-library.l")) "irl library ok")))
+(check "irl_library"
+  (built (concat-string "irl-lib." *shlib*))
+  (unit-assert (equal (last (run "irl_library" "./eval check/irl-library.l")) "irl library ok")))
 
 (check "irl"
   (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.k"))

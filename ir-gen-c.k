@@ -163,7 +163,7 @@
   (print "((")
   (print-c-declaration (car self.parameters) ())
   (print ")(")
-  (ir-gen-c (car self.operands) self)
+  (ir-gen-c (car self.operands) gen)
   (print "))"))
 
 (define-function ir-gen-c-unary (insn op gen)
@@ -302,7 +302,7 @@
 
 (define-method ir-gen-c <ir-call> (gen)
   (print "(")
-  (ir-gen-c (car self.operands) self)
+  (ir-gen-c (car self.operands) gen)
   (print ")(")
   (let ((args (cdr self.operands)))
     (while (pair? args)
@@ -312,7 +312,7 @@
 
 (define-method ir-gen-c <ir-return> (gen)
   (print "return ")
-  (ir-gen-c (car self.operands) self))
+  (ir-gen-c (car self.operands) gen))
 
 (define-method ir-gen-header <ir-gen-c> ()
   (println "#include <stdint.h>")

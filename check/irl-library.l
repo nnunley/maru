@@ -1,7 +1,7 @@
-;;; compile-irl.l --library builds one shared library from two irl files, its exported
+;;; compile-irl.l --library compiles two irl files into one shared library (built by make), its exported
 ;;; functions called by address from untyped Maru; a top-level statement in library mode
 ;;; is an error.  Prints "irl library ok".
-(define system (subr "system" "s"))
+(define system (subr "system" "s>i"))
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
 (define ok 1)
@@ -12,11 +12,9 @@
     (<= i n)))
 (define dir "/tmp/maru-check")
 (system (concat-strings "mkdir -p " dir))
-(system (concat-strings "rm -f " dir "/irl-lib.k " dir "/irl-lib.c " dir "/irl-lib.dylib"))	; a failed build mustn't pass on old output
-(system (concat-strings "./eval compile-irl.l --library check/irl-lib-a.irl check/irl-lib-b.irl > " dir "/irl-lib.k"
-			" && ./eval2 ir-gen-c.k maru.k " dir "/irl-lib.k > " dir "/irl-lib.c"
-			" && cc -shared -fPIC -fno-builtin -w -o " dir "/irl-lib.dylib " dir "/irl-lib.c"))
-(let ((lib (dlopen (concat-string dir "/irl-lib.dylib") 2)))	; RTLD_NOW
+;; make builds build/irl-lib.dylib (make check's CHECK_LIBS) from check/irl-lib-a.irl and -b.irl
+(define shlib (if (= 0 (system "test `uname` = Darwin")) "dylib" "so"))
+(let ((lib (dlopen (concat-string "build/irl-lib." shlib) 2)))	; RTLD_NOW
   (expect "the library opens by absolute path" (not (= 0 lib)))
   (or (= 0 lib)
       (let ((twice (dlsym lib "twice")) (add3 (dlsym lib "add3")))

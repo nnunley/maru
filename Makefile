@@ -56,8 +56,15 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
+# libraries the checks open; a library that fails to build fails only the checks that need it
+CHECK_LIBS = build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l
+
 check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
+	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/check.l $(CHECKS)
+
+# a target whose recipe fails is removed, so no check reads a half-written file
+.DELETE_ON_ERROR :
 
 maru-check : eval2 .force
 	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
@@ -133,11 +140,23 @@ cexpr.g.l : tpeg.l cexpr.g | eval
 law.g.l : tpeg.l law.g | eval
 	./eval compile-tpeg.l law.g > law.g.l
 
-# a typed program built as a shared library (compile-irl.l --library makes the .k)
-SHLIB = $(if $(filter Darwin,$(shell uname)),dylib,so)
-%.$(SHLIB) : %.k ir-gen-c.k maru.k | eval2
-	./eval2 ir-gen-c.k maru.k $< > $*.c
-	$(CC) -shared -fPIC -fno-builtin -w -o $@ $*.c
+# typed programs built as shared libraries, under build/: compile-irl.l --library makes
+# each .k from its irl files, and the pattern below the library from the .k
+build/%.$(SO) : build/%.k ir-gen-c.k maru.k | eval2
+	./eval2 ir-gen-c.k maru.k $< > build/$*.c
+	$(CC) -shared -fPIC -fno-builtin -w -o $@ build/$*.c
+
+build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
+	@mkdir -p build
+	./eval compile-tpeg.l $< > $@
+
+build/irl-lib.k : check/irl-lib-a.irl check/irl-lib-b.irl compile-irl.l irl.g.l | eval
+	@mkdir -p build
+	./eval compile-irl.l --library $(filter %.irl,$^) > $@
+
+build/irl-grammar.k : check/irl-grammar.irl compile-irl.l irl-grammar.l irl.g.l tpeg.l | eval
+	@mkdir -p build
+	./eval compile-irl.l --library $(filter %.irl,$^) > $@
 
 john.g.l : tpeg.l john.g | eval
 	./eval compile-tpeg.l john.g > john.g.l
@@ -236,7 +255,7 @@ clean : .force
 	rm -f eval eval2 eval32 gceval osdefs.k *.osdefs.k asm-x86.k *.g.l tpeg.l tpeg.lls
 	rm -f *.exe net/*.exe *.osdefs.c net/*.osdefs.c test test.c test.k *.o *.s a.out peg.n peg.m
 	rm -f maru-check test-main test-pegen *.$(SO) *~
-	rm -rf bin *.dSYM *.mshark
+	rm -rf bin build *.dSYM *.mshark
 
 #----------------------------------------------------------------
 

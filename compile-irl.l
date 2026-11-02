@@ -23,8 +23,10 @@
     ((= 'member (car place))	`(set-member ,@(cdr place) ,value))
     (else			(error "cannot assign to: "place))))
 
+(require "tpeg.l")		; grammar blocks are read with tpeg's own rules
 (require "cexpr.g.l")
 (require "irl.g.l")
+(require "irl-grammar.l")
 
 (define *irl-structs*   ())	; (name field...) for each struct so far
 (define *irl-functions* ())	; imported functions, already pointers
@@ -67,6 +69,7 @@
       (let ((head (and (pair? f) (car f))))
 	(cond
 	  ((= head 'export)		(push defs f))
+	  ((= head 'grammar-define)	(list-do g (irl-grammar-forms f) (push defs g)))
 	  ((= head 'define-struct)	(push *irl-structs* (cons (cadr f) (map car (caddr f))))
 					(push defs f))
 	  ((= head 'define-function)	(push defs `(define-function ,(cadr f) ,(caddr f) ,(cadddr f) ,@(irl-body (cddddr f)))))

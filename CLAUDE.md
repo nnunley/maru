@@ -40,8 +40,10 @@ sizes by definition.
 
 `check/check.l` (untyped Maru, built on boot.l's `unit-test`) runs each demo and
 asserts what it computes; `make check CHECKS="NAME…"` runs selected cases, after
-building what is stale. Run cases through make, not `./eval check/check.l`
-directly: no case names the derived files it needs (`law.g.l`, `cexpr.g.l` …), so a
+building what is stale. Libraries and grammars that checks open are built by make into
+`build/` (`CHECK_LIBS`, failures ignored so the other checks still run), and a check asserts
+`make -q` on what it opens; `make clean` removes `build/`. Run cases through make, not
+`./eval check/check.l` directly: no case names the derived files it needs (`law.g.l`, `cexpr.g.l` …), so a
 direct run in a fresh or stale tree fails on a missing or old grammar.
 Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 `maru-check.k` is.
@@ -125,8 +127,16 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   a type mismatch in the `if` (`check/irl-errors.l` records it in Maru).
 - `irl_library` (`check/irl-library.l`): `compile-irl.l --library A.irl B.irl` reads
   several irl files to one program with no `main` (a top-level statement is an error), and
-  `export f;` keeps a function visible; ir2's C, compiled with `cc -shared` (the Makefile's
-  `%.dylib` pattern), is a library untyped Maru opens by absolute path and calls by address.
+  `export f;` keeps a function visible; make builds the library (`build/irl-lib.dylib`), which
+  untyped Maru opens by its path in the tree and calls by address. `cast(e, type)` and
+  `sizeof(type)` read to maru.k's own forms.
+- `irl_grammar` (`check/irl-grammar.l`): a tpeg grammar calls another grammar's rule as `p-r`
+  (compiled by `compile-tpeg.l` to a parser of `<p>` on the same input). In irl,
+  `grammar { <G> : <parent> (fields) rules }` is tpeg's own syntax, read through that foreign
+  call; `irl-grammar.l` compiles it to a struct `G` (input, pos, end, result, the fields) and
+  one typed function per rule, `G_rule(p)`, its actions maru.k forms copied in unchanged. A
+  child's inherited rules call its overrides; a left-recursive rule, lists and strings are
+  errors naming the rule.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
   check; the `in`, `number` and `=` builtins work as specified; schemas, relation

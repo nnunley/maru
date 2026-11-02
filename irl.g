@@ -92,6 +92,7 @@ paramlist	= decl?:p (","_ decl)*:q					-> `(,@p ,@q) ;
 definition	= "struct" keyword xidentifier:i "{"_ mdecl*:d "}"_ ";"_	-> `(define-struct ,i ,(irl-concat d))
 		| "import" keyword decl:d ";"_					-> `(define ,d (extern ,(car d)))
 		| "export" keyword idlist:i ";"_				-> `(export ,@i)
+		| "grammar" keyword "{"_ tpeg-grammar:g "}"_			-> g	# tpeg's own syntax, its records compiled by irl-grammar.l
 		| type:t identifier:i ( ":="_ xexpression:e ";"_		-> `(define (,i ,@t) ,e)
 				      | "("_ paramlist:p ")"_ xstatement:e	-> `(define-function ,i ,t ,p ,e)
 				      )
