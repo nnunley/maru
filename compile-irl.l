@@ -31,6 +31,13 @@
 (define *irl-structs*   ())	; (name field...) for each struct so far
 (define *irl-functions* ())	; imported functions, already pointers
 (define *irl-imports* ())	; (name . declaration) for each import so far
+(define *irl-defined* ())	; each function defined so far: a second definition would replace the first silently
+(define-function irl-define (form)
+  (and (pair? form) (= 'define-function (car form))
+       (let ()
+	 (and (member? (cadr form) *irl-defined*) (error "irl: " (cadr form) " is defined twice"))
+	 (push *irl-defined* (cadr form))))
+  form)
 
 (define irl-expand)
 
@@ -70,10 +77,10 @@
       (let ((head (and (pair? f) (car f))))
 	(cond
 	  ((= head 'export)		(push defs f))
-	  ((= head 'grammar-define)	(list-do g (irl-grammar-forms f) (push defs g)))
+	  ((= head 'grammar-define)	(list-do g (irl-grammar-forms f) (push defs (irl-define g))))
 	  ((= head 'define-struct)	(push *irl-structs* (cons (cadr f) (map car (caddr f))))
 					(push defs f))
-	  ((= head 'define-function)	(push defs `(define-function ,(cadr f) ,(caddr f) ,(cadddr f) ,@(irl-body (cddddr f)))))
+	  ((= head 'define-function)	(push defs (irl-define `(define-function ,(cadr f) ,(caddr f) ,(cadddr f) ,@(irl-body (cddddr f))))))
 	  ((and (= head 'define) (pair? (caddr f)) (= 'extern (car (caddr f))))
 					(let ((decl (cadr f)) (seen (assq (car (cadr f)) *irl-imports*)))
 					  (when (pair? (irl-last decl))
@@ -83,6 +90,8 @@
 					  (if seen (or (equal (cdr seen) decl) (error "irl: " (car decl) " imported with two types"))
 					    (push *irl-imports* (cons (car decl) decl))
 					    (push defs `(define ,decl ,(caddr f))))))
+	  ((and (= head 'define) (= 0 (caddr f)))	; a global starts at zero (check zero_global), as ir2 can't initialise one
+					(push defs `(define ,(cadr f))))
 	  ((and (= head 'define) (irl-literal? (caddr f)))
 					(push defs f))
 	  ((= head 'define)		(push defs `(define ,(cadr f)))

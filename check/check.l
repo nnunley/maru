@@ -336,6 +336,11 @@
 (define *shlib* (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin")) "dylib" "so"))
 (define-function built (file) (run (concat-string "built-" file) (concat-string "make -q build/" file)))
 
+;; UNSAT answers carry DRAT proofs that drat-check.irl verifies, and bad proofs are rejected (check/sat-proof.l).
+(check "sat_proof"
+  (built (concat-string "sat." *shlib*))
+  (unit-assert (equal (last (run "sat_proof" "./eval check/sat-proof.l")) "sat proof ok")))
+
 ;; sat.irl's CDCL solver answers SAT and UNSAT through IPASIR, its models checked (check/sat-core.l).
 (check "sat_core"
   (built (concat-string "sat." *shlib*))

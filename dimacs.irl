@@ -117,3 +117,19 @@ long dimacs_count(struct Formula* f) return f.count;
 long* dimacs_clause(struct Formula* f, long i) return f.lits + words(f.starts[i]);	// ir2 offsets a pointer by bytes
 
 export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free;
+
+// ---- DRAT proofs (R-formats-grammars): a line adds a lemma, or after d deletes a clause, each
+// ending in 0.  The checker (drat-check.irl) owns the actions; a line's literals are gathered
+// afresh on each attempt (drat_begin), so a line that fails to match leaves none behind.  The
+// grammar is <proof>, so its rules' functions (proof_add ...) don't take the actions' names.
+grammar {
+  <proof> : <text-parser> (checker line)
+  blank   = [ \t\r] ;
+  eol     = "\n" | !. ;
+  literal = ("-"? [1-9] [0-9]*) @$#:n -> (drat_push self n) ;
+  lits    = (blank* literal)* blank* "0" blank* eol ;
+  del     = blank* "d" blank+ -> (drat_begin self) lits &-> (drat_delete self) ;
+  add     = -> (drat_begin self) lits &-> (drat_add self) ;
+  step    = (del | add) -> (drat_next self) ;
+  start   = step* !. ;
+}

@@ -11,6 +11,9 @@
 import void*(long) malloc;
 import void*(void*, long) realloc;
 import void(void*) free;
+import void*(char*, char*) fopen;
+import int(void*, char*, ...) fprintf;
+import int(void*) fclose;
 
 struct Solver {
   long nvars, cap, unsat, nlevels, tsize, qhead, hsize, asize, acap;
@@ -20,12 +23,13 @@ struct Solver {
   long* wsize; long* wcap; long* wlist;		// wlist[i]: the watch list of literal index i, a long*
   long* abuf; long* assum; long* lbuf;
   double* activity; double inc;
+  long proof;					// the DRAT proof's file, or 0
 };
 
-long words(long n) return n * cast(sizeof(long), long);
+long swords(long n) return n * cast(sizeof(long), long);
 long absl(long x) return x < 0 ? 0 - x : x;
 long lidx(long l) return 2 * absl(l) + cast(l < 0, long);	// a literal's index in the watch lists
-long* grow(long* a, long n) return cast(realloc(a, words(n)), long*);
+long* grow(long* a, long n) return cast(realloc(a, swords(n)), long*);
 
 // a literal's value: 1 true, -1 false, 0 unassigned
 long value(struct Solver* s, long l) { let long a := s.assign[absl(l)]; return l < 0 ? 0 - a : a; }
@@ -83,7 +87,7 @@ void reserve(struct Solver* s, long n) {
     s.phase := grow(s.phase, c); s.model := grow(s.model, c); s.seen := grow(s.seen, c);
     s.failed := grow(s.failed, c); s.heap := grow(s.heap, c); s.hpos := grow(s.hpos, c);
     s.trail := grow(s.trail, c); s.lim := grow(s.lim, c + 1);
-    s.activity := cast(realloc(s.activity, words(c)), double*);
+    s.activity := cast(realloc(s.activity, swords(c)), double*);
     s.wsize := grow(s.wsize, 2 * c); s.wcap := grow(s.wcap, 2 * c); s.wlist := grow(s.wlist, 2 * c);
     while i < c do {
       s.assign[i] := 0; s.level[i] := 0; s.reason[i] := -1; s.phase[i] := -1; s.model[i] := 0;
@@ -184,6 +188,18 @@ long propagate(struct Solver* s) {
   return confl;
 }
 
+ // ---- the DRAT proof: each learned clause as it is learned, and 0 when the formula is refuted
+void proof_clause(struct Solver* s, long* lits, long n) {
+  if s.proof != 0 then {
+    let long i := 0;
+    while i < n do { fprintf(cast(s.proof, void*), "%ld ", lits[i]); i := i + 1; }
+    fprintf(cast(s.proof, void*), "0\n");
+  }
+}
+void proof_refuted(struct Solver* s) {
+  if s.proof != 0 then { fprintf(cast(s.proof, void*), "0\n"); fclose(cast(s.proof, void*)); s.proof := 0; }
+}
+
 void push_learnt(struct Solver* s, long l) {
   if s.llen == s.lbcap then { s.lbcap := 2 * s.lbcap; s.lbuf := grow(s.lbuf, s.lbcap); }
   s.lbuf[s.llen] := l;
@@ -274,8 +290,8 @@ void add_clause(struct Solver* s) {
   }
   s.alen := 0;
   if keep then {
-    if n == 0 then s.unsat := 1;
-    else if n == 1 then { enqueue(s, s.abuf[0], -1); if propagate(s) >= 0 then s.unsat := 1; }
+    if n == 0 then { s.unsat := 1; proof_refuted(s); }
+    else if n == 1 then { enqueue(s, s.abuf[0], -1); if propagate(s) >= 0 then { s.unsat := 1; proof_refuted(s); } }
     else new_clause(s, s.abuf, n);
   }
 }
@@ -285,7 +301,7 @@ struct Solver* sat_init() {
   let struct Solver* s := cast(malloc(cast(sizeof(struct Solver), long)), struct Solver*);
   s.nvars := 0; s.cap := 0; s.unsat := 0; s.nlevels := 0; s.tsize := 0; s.qhead := 0; s.hsize := 0;
   s.asize := 0; s.acap := 0; s.alen := 0; s.abcap := 16; s.nassum := 0; s.ascap := 16; s.llen := 0;
-  s.lbcap := 16; s.conflicts := 0; s.budget := 1000000; s.inc := 1.0;
+  s.lbcap := 16; s.conflicts := 0; s.budget := 1000000; s.inc := 1.0; s.proof := 0;
   s.assign := cast(0, long*); s.level := cast(0, long*); s.reason := cast(0, long*); s.phase := cast(0, long*);
   s.model := cast(0, long*); s.seen := cast(0, long*); s.failed := cast(0, long*); s.heap := cast(0, long*);
   s.hpos := cast(0, long*); s.trail := cast(0, long*); s.lim := cast(0, long*); s.arena := cast(0, long*);
@@ -313,6 +329,11 @@ void sat_assume(struct Solver* s, long l) {
   s.nassum := s.nassum + 1;
 }
 void sat_set_conflicts(struct Solver* s, long n) s.budget := n;
+// the proof of the next refutation, for a solve without assumptions on a fresh solver (R-drat)
+long sat_set_proof(struct Solver* s, char* path) {
+  s.proof := cast(fopen(path, "w"), long);
+  return cast(s.proof != 0, long);
+}
 
 long sat_solve(struct Solver* s) {
   let long status := -1; let long i := 1;
@@ -321,15 +342,16 @@ long sat_solve(struct Solver* s) {
   if s.unsat then status := 20;
   else {
     backtrack(s, 0);
-    if propagate(s) >= 0 then { s.unsat := 1; status := 20; }
+    if propagate(s) >= 0 then { s.unsat := 1; status := 20; proof_refuted(s); }
   }
   while status < 0 do {
     let long confl := propagate(s);
     if confl >= 0 then {
       s.conflicts := s.conflicts + 1; since := since + 1; spent := spent + 1;
-      if s.nlevels == 0 then { s.unsat := 1; status := 20; }
+      if s.nlevels == 0 then { s.unsat := 1; status := 20; proof_refuted(s); }
       else {
         let long bt := analyze(s, confl);
+        proof_clause(s, s.lbuf, s.llen);
         backtrack(s, bt);
         if s.llen == 1 then enqueue(s, s.lbuf[0], -1);
         else enqueue(s, s.lbuf[0], new_clause(s, s.lbuf, s.llen));
@@ -373,7 +395,8 @@ void sat_release(struct Solver* s) {
   while i < 2 * s.cap do { if s.wcap[i] > 0 then free(cast(s.wlist[i], void*)); i := i + 1; }
   free(s.assign); free(s.level); free(s.reason); free(s.phase); free(s.model); free(s.seen); free(s.failed);
   free(s.heap); free(s.hpos); free(s.trail); free(s.lim); free(s.arena); free(s.wsize); free(s.wcap);
+  if s.proof != 0 then fclose(cast(s.proof, void*));
   free(s.wlist); free(s.activity); free(s.abuf); free(s.assum); free(s.lbuf); free(s);
 }
 
-export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_release;
+export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_set_proof, sat_release;
