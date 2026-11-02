@@ -130,6 +130,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `export f;` keeps a function visible; make builds the library (`build/irl-lib.dylib`), which
   untyped Maru opens by its path in the tree and calls by address. `cast(e, type)` and
   `sizeof(type)` read to maru.k's own forms.
+- `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
+  one) agree with their truth tables through the solver. Under `set-opt planner sat`,
+  `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
+  every property from the world's values and each effect, refusing a property with two
+  (`E_SORT`), a number outside `sat-width` bits (`E_BOUND`), and what the encoding doesn't
+  cover (`E_SAT_UNSUPPORTED`: two-player-game, max-time-ahead, at time, a time quantifier,
+  did). The search planner is unchanged otherwise.
 - `sat_proof` (`check/sat-proof.l`): every UNSAT answer from `sat-decide` carries a DRAT
   proof (`sat.irl` writes each learned clause, and `0` at the refutation), which
   `drat-check.irl` verifies forward (a lemma RUP, or else RAT on its first literal) against

@@ -64,6 +64,8 @@
 				    action P swap consequence it a = its b and it b = its a.
 				    goal P done try its a = 2 and its b = 1. X satisfy done.")
 			  '("looking 1 time unit ahead (1 possible worlds)" "satisfied at time: 1" "satisfied by: [ X swap ]")))
+  (expect "at: below 1 is an error" (has? (child "[ 1, 2 ] at: 0.") "at: 0 is below 1"))
+  (expect "to: a negative length is an error" (has? (child "[ 1 ] to: -1.") "to: -1 is a negative length"))
   (expect "an unknown name is an error" (has? (child "nosuch.") "unknown name: nosuch"))
   (expect "an unknown property is an error" (has? (child "create C. make C X. X colour.") "no property or qualification colour of X"))
   (expect "make gives every property a value" (has? (child "create C a b. make C X 1.") "make X: 2 properties, 1 values"))
