@@ -1,6 +1,9 @@
 ;;; compile-with-tpeg.l									-*- coke -*-
 ;;;
 ;;; ./eval compile-with-tpeg.l <filename>.g ... > tee <filename>.l
+;;;
+;;; Generated code returns 1 for a match, never a position or a set's value, so it means the
+;;; same where 0 is false: irl-grammar.l lowers value-pe's output to typed Maru.
 
 (require "tpeg.l")
 (require "record-case.l")
@@ -34,13 +37,16 @@
 					   (set self.result (array->list _list_))
 					   1))
     (match-one-more	(exp)		`(let ((_list_ (array)))
-					   (while ,(value-pe exp) (array-append _list_ self.result))
-					   (set self.result (array->list _list_))))
+					   (when ,(value-pe exp)
+					     (array-append _list_ self.result)
+					     (while ,(value-pe exp) (array-append _list_ self.result))
+					     (set self.result (array->list _list_))
+					     1)))
     (peek-for		(exp)		`(let ((pos self.position))
-					   (and ,(value-pe exp) (set self.position pos))))
+					   (and ,(value-pe exp) (let () (set self.position pos) 1))))
     (peek-expr		(exp)		exp)
     (peek-not		(exp)		`(not (let ((pos self.position))
-						(and ,(effect-pe exp) (set self.position pos)))))
+						(and ,(effect-pe exp) (let () (set self.position pos) 1)))))
     (match-class	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
@@ -66,7 +72,7 @@
 								   (when ,(effect-pe exp)
 								     (set self.result (string->symbol (text-parser-string-from-to self pos self.position))))))
 					  (else			`(and ,(value-pe exp) (set self.result (string->symbol (list->string self.result)))))))
-    (make-number	(r exp)		`(and ,(value-pe exp) (set self.result (string->number-base (list->string self.result) ,r))))
+    (make-number	(r exp)		`(and ,(value-pe exp) (let () (set self.result (string->number-base (list->string self.result) ,r)) 1)))
     (assign-result	(name exp)	`(when ,(value-pe exp) (set ,name self.result) 1))
     (result-expr	(exp)		`(let () (set self.result ,exp) 1))
     (else				(error "cannot generate value for: "pe))))
@@ -80,16 +86,16 @@
     (match-require	(exp alt)	`(or ,(effect-pe exp) (text-parser-expected self ,alt)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
-    (match-zero-one	(exp)		`(let () ,(effect-pe exp) 1))
+    (match-zero-one	(exp)		`(if ,(effect-pe exp) 1 1))	; its value used, where typed code warns of none
     (match-zero-more	(exp)		`(let () (while ,(effect-pe exp)) 1))
     (match-one-more	(exp)		`(let ((_ok_ ()))
 					   (while ,(effect-pe exp) (set _ok_ 1))
 					   _ok_))
     (peek-for		(exp)		`(let ((pos self.position))
-					   (and ,(effect-pe exp) (set self.position pos))))
+					   (and ,(effect-pe exp) (let () (set self.position pos) 1))))
     (peek-expr		(exp)		exp)
     (peek-not		(exp)		`(not (let ((pos self.position))
-						(and ,(effect-pe exp) (set self.position pos)))))
+						(and ,(effect-pe exp) (let () (set self.position pos) 1)))))
     (match-class	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)

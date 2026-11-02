@@ -25,13 +25,13 @@ grammar {
   blank   = [ \t\r] ;
   eol     = "\n" | !. ;
   count   = [0-9]+ @$#:n &-> (dimacs_small n) -> n ;
-  header  = blank* "p" blank+ "cnf" blank+ count:v blank+ count:c blank* eol &-> (dimacs_header p v c) ;
-  literal = ("-"? [1-9] [0-9]*) @$#:n &-> (dimacs_lit p n) ;
-  clause  = blank* (literal blank+)* "0" blank* eol &-> (dimacs_clause_end p) ;
+  header  = blank* "p" blank+ "cnf" blank+ count:v blank+ count:c blank* eol &-> (dimacs_header self v c) ;
+  literal = ("-"? [1-9] [0-9]*) @$#:n &-> (dimacs_lit self n) ;
+  clause  = blank* (literal blank+)* "0" blank* eol &-> (dimacs_clause_end self) ;
   comment = "c" (!"\n" .)* eol ;
-  line    = (comment | clause) -> (dimacs_next_line p) ;
-  start   = (comment -> (dimacs_next_line p))* header -> (dimacs_next_line p) line*
-            !. -> (dimacs_at_end p) &-> (dimacs_complete p) ;
+  line    = (comment | clause) -> (dimacs_next_line self) ;
+  start   = (comment -> (dimacs_next_line self))* header -> (dimacs_next_line self) line*
+            !. -> (dimacs_at_end self) &-> (dimacs_complete self) ;
 }
 
 struct Formula* dimacs_formula(struct cnf* p) return cast(p.formula, struct Formula*);
@@ -90,7 +90,7 @@ struct Formula* dimacs_read(char* path, long* bad) {
   let char* text := cast(malloc(n + cast(1, long)), char*);
   fread(text, cast(1, long), n, in);
   fclose(in);
-  p.input := text; p.pos := 0; p.end := n; p.formula := cast(f, long); p.line := 0; p.atend := 0;
+  p.string := text; p.position := 0; p.limit := n; p.formula := cast(f, long); p.line := 0; p.atend := 0;
   // the first line no whole-line rule matched; every line read but a count wrong: the last
   if cnf_start(p) then bad[0] := 0;
   else if p.atend then bad[0] := p.line > 0 ? p.line : 1;

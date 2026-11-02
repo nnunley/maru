@@ -1,103 +1,82 @@
-;;; irl-grammar.l -- an irl grammar block's tpeg records as typed Maru (draft-ndn-maru-sat-00
-;;; [R-irl-grammar]).
+;;; irl-grammar.l -- an irl grammar block as typed Maru (draft-ndn-maru-sat-00 [R-irl-grammar]).
 ;;;
 ;;;   (irl-grammar-forms record)	maru.k forms for one (grammar-define <G> <parent> (fields) rules...)
 ;;;
-;;; A grammar G becomes a struct G (input pos end result, then its fields, each a long) and
-;;; one function per rule, long G_rule(struct G* p): 1 with p.pos after the match and p.result
-;;; set, or 0 with p.pos as it was.  An action is a maru.k form, copied in unchanged; it sees p
-;;; and the rule's :x locals.  Rules the block doesn't define come from its parent, so an
-;;; inherited rule calls the child's override.  No memos, no left recursion, no lists.
+;;; The matching is tpeg's own: each rule's body is compile-tpeg.l's value-pe output, lowered
+;;; here to typed Maru over text-parser.k's runtime.  A grammar G becomes a struct G (string
+;;; limit position result span, then its fields, each a long) and one function per rule,
+;;; long G_rule(struct G* self).  Its actions are maru.k forms, copied in unchanged.  Rules the
+;;; block doesn't define come from its parent, so an inherited rule calls the child's
+;;; override.  Typed grammars have no memos, no left recursion and no lists or strings.
+
+(define compile-tpeg-definitions-only 1)
+(require "compile-tpeg.l")
 
 (define *irl-grammars* ())	; (G fields rules) for each block so far
-(define *irl-g* ())		; the grammar and rule being generated, for errors
+(define *irl-g* ())		; the grammar and rule being lowered, for errors
 (define *irl-r* ())
-(define *irl-temps* 0)
+(define *irl-runtime* ())	; text-parser.k is loaded once
 
 (define-function irl-grammar-name (sym)	; <sums> -> sums
   (let ((s (symbol->string sym))) (string->symbol (string-copy s 1 (- (string-length s) 2)))))
 (define-function irl-grammar-fail (what) (error "irl grammar: " *irl-g* "." *irl-r* ": " what))
-(define-function irl-temp () (set *irl-temps* (+ *irl-temps* 1)) (string->symbol (concat-string "_g" (format "%d" *irl-temps*))))
 (define-function irl-rule-fn (rule) (string->symbol (concat-strings (symbol->string *irl-g*) "_" (symbol->string rule))))
 
-;; the parser's state, and the input at a position, as longs
-(define irl-pos '(member p pos))
-(define-function irl-set-pos (v) `(set-member p pos ,v))
-(define-function irl-long (n) `(cast ,n long))
-(define-function irl-char-at (i) `(cast (indir (member p input) ,i) long))
-(define-function irl-advance (n) `(let () ,(irl-set-pos `(+ ,irl-pos ,(irl-long n))) 1))
-
-;; a character class's ranges, as tpeg's class strings write them: a-z or one character
-(define-function irl-class-ranges (s)
-  (let ((out ()) (i 0) (l (string-length s)))
-    (while (< i l)
-      (if (and (< (+ i 2) l) (= ?- (string-at s (+ i 1))))
-	  (let () (push out (cons (string-at s i) (string-at s (+ i 2)))) (set i (+ i 3)))
-	(push out (cons (string-at s i) (string-at s i)))
-	(set i (+ i 1))))
-    (list-reverse! out)))
-
-;; each record's generator, by its head: an expression that is 1 if it matched, else 0
-(define irl-pe)
-(define-function irl-pe-all (es)
-  (if (not (cdr es)) (irl-pe (car es))
-    (let ((s (irl-temp)))
-      `(let (((,s long) ,irl-pos)) (if (and ,@(map irl-pe es)) 1 (let () ,(irl-set-pos s) 0))))))
-(define-function irl-pe-number (r e)	; the digits a span matched, in base r, a leading - negating
-  (or (= 'make-span (car e)) (irl-grammar-fail "a number converts only a span"))
-  (let ((s (irl-temp)) (i (irl-temp)) (v (irl-temp)) (c (irl-temp)) (neg (irl-temp)))
-    `(let (((,s long) ,irl-pos))
-       (if ,(irl-pe (cadr e))
-	   (let (((,i long) ,s) ((,v long) ,(irl-long 0)) ((,neg long) ,(irl-long 0)) ((,c long) ,(irl-long 0)))
-	     (if (and (< ,i ,irl-pos) (= ,(irl-char-at i) ,(irl-long 45))) (let () (set ,neg ,(irl-long 1)) (set ,i (+ ,i ,(irl-long 1)))))
-	     (while (< ,i ,irl-pos)
-	       (set ,c ,(irl-char-at i))
-	       (set ,v (+ (* ,v ,(irl-long r)) (if (<= ,c ,(irl-long 57)) (- ,c ,(irl-long 48)) (- (| ,c ,(irl-long 32)) ,(irl-long 87)))))
-	       (set ,i (+ ,i ,(irl-long 1))))
-	     (set-member p result (if ,neg (- ,(irl-long 0) ,v) ,v))
-	     1)
-	 0))))
-(define-function irl-pe-string (str)
-  (let ((n (string-length str)) (conds ()))
-    (if (= 0 n) 1
-      (for (k 0 n)
-	(push conds `(< (+ ,irl-pos ,(irl-long k)) (member p end)))
-	(push conds `(= ,(irl-char-at `(+ ,irl-pos ,(irl-long k))) ,(irl-long (string-at str k)))))
-      `(if (and ,@(list-reverse! conds)) ,(irl-advance n) 0))))
-(define-function irl-pe-class (str)
-  (let ((c (irl-temp)))
-    `(if (< ,irl-pos (member p end))
-	 (let (((,c long) ,(irl-char-at irl-pos)))
-	   (if (or ,@(map (lambda (r) `(and (>= ,c ,(irl-long (car r))) (<= ,c ,(irl-long (cdr r))))) (irl-class-ranges str)))
-	       ,(irl-advance 1) 0))
-       0)))
-(define *irl-pe-table*
-  `((match-all		. ,(lambda (pe) (irl-pe-all (cdr pe))))
-    (match-first	. ,(lambda (pe) `(if (or ,@(map irl-pe (cdr pe))) 1 0)))
-    (match-string	. ,(lambda (pe) (irl-pe-string (cadr pe))))
-    (match-class	. ,(lambda (pe) (irl-pe-class (cadr pe))))
-    (match-any		. ,(lambda (pe) `(if (< ,irl-pos (member p end)) ,(irl-advance 1) 0)))
-    (match-rule		. ,(lambda (pe) (if (cddr pe) (irl-grammar-fail "a rule with arguments has no typed form")
-					  `(if (!= (,(irl-rule-fn (cadr pe)) p) ,(irl-long 0)) 1 0))))
-    (match-zero-one	. ,(lambda (pe) `(if ,(irl-pe (cadr pe)) 1 1)))	; its value used, so ir2 sees an effect
-    (match-zero-more	. ,(lambda (pe) `(let () (while ,(irl-pe (cadr pe))) 1)))
-    (match-one-more	. ,(lambda (pe) `(if ,(irl-pe (cadr pe)) (let () (while ,(irl-pe (cadr pe))) 1) 0)))
-    (peek-for		. ,(lambda (pe) (let ((s (irl-temp))) `(let (((,s long) ,irl-pos)) (if ,(irl-pe (cadr pe)) (let () ,(irl-set-pos s) 1) 0)))))
-    (peek-not		. ,(lambda (pe) (let ((s (irl-temp))) `(let (((,s long) ,irl-pos)) (if ,(irl-pe (cadr pe)) (let () ,(irl-set-pos s) 0) 1)))))
-    (peek-expr		. ,(lambda (pe) `(if ,(cadr pe) 1 0)))
-    (assign-result	. ,(lambda (pe) `(if ,(irl-pe (caddr pe)) (let () (set ,(cadr pe) (member p result)) 1) 0)))
-    (result-expr	. ,(lambda (pe) `(let () (set-member p result (cast ,(cadr pe) long)) 1)))
-    (make-number	. ,(lambda (pe) (irl-pe-number (cadr pe) (caddr pe))))))
-(define-function irl-pe (pe)
-  (let ((g (cdr (assq (car pe) *irl-pe-table*))))
-    (if g (g pe) (irl-grammar-fail (concat-string (symbol->string (car pe)) " has no typed value")))))
-
-;; the :x locals a rule binds
-(define-function irl-pe-vars (pe out)
-  (and (pair? pe) (= 'assign-result (car pe)) (not (member? (cadr pe) out)) (push out (cadr pe)))
+;; what typed Maru can't hold: a string, a symbol, a list, an object, another grammar's rule
+(define-function irl-refuse (pe)
   (and (pair? pe) (not (member? (car pe) '(result-expr peek-expr)))
-       (list-do x (cdr pe) (set out (irl-pe-vars x out))))
-  out)
+       (let ()
+	 (and (member? (car pe) '(make-string make-symbol match-list match-object match-rule-in))
+	      (irl-grammar-fail (concat-string (symbol->string (car pe)) " has no typed value")))
+	 (list-do x (cdr pe) (irl-refuse x)))))
+
+;; actions are typed already: marked before generation so lowering leaves them alone
+(define-function irl-mark-actions (pe)
+  (cond ((not (pair? pe)) pe)
+	((member? (car pe) '(result-expr peek-expr)) (list (car pe) (list 'tp-action (cadr pe))))
+	(else (cons (car pe) (map irl-mark-actions (cdr pe))))))
+
+;; value-pe's output as typed Maru: self.x is a member, a binding a long, a rule a direct call,
+;; when and unless their and/or, () false, and list building nothing
+(define irl-lower)
+(define-function irl-field (sym)	; self.position -> position, or ()
+  (let ((s (symbol->string sym)))
+    (and (< 5 (string-length s)) (= "self." (string-copy s 0 5)) (string->symbol (string-copy s 5 (- (string-length s) 5))))))
+(define-function irl-lower-binding (b)
+  (if (symbol? b) `((,b long) 0) `((,(car b) long) ,(irl-lower (cadr b)))))
+(define *irl-lower-renames*	; text-parser.l's runtime -> text-parser.k's
+  '((text-parser-match-object . tp-match-char) (text-parser-match-char . tp-match-char)
+    (text-parser-match-string . tp-match-string) (text-parser-match-class . tp-match-class)
+    (text-parser-match-any . tp-match-any) (text-parser-list-from-to . tp-span)))
+(define-function irl-lower (x)
+  (cond
+    ((not x) 0)
+    ((symbol? x) (let ((f (irl-field x))) (if f `(member self ,f) x)))
+    ((not (pair? x)) x)
+    (else
+     (let ((h (car x)))
+       (cond
+	 ((= h 'tp-action) (cadr x))
+	 ((= h 'set) (let ((f (and (symbol? (cadr x)) (irl-field (cadr x)))) (v (caddr x)))
+		       (if (and (= f 'result) (pair? v) (= 'tp-action (car v))) `(set-member self result (cast ,(cadr v) long))
+			 (if f `(set-member self ,f ,(irl-lower v)) `(set ,(cadr x) ,(irl-lower v))))))
+	 ((= h 'let) `(let ,(map irl-lower-binding (cadr x)) ,@(map irl-lower (cddr x))))
+	 ((and (= h 'and) (= 3 (list-length x)) (pair? (caddr x)) (= 'array-append (car (caddr x))))	; x?, in statement position
+	  `(if ,(irl-lower (cadr x)) (tp-nothing self) (tp-nothing self)))
+	 ((= h 'when) `(and ,(irl-lower (cadr x)) (let () ,@(map irl-lower (cddr x)))))
+	 ((= h 'unless) `(or ,(irl-lower (cadr x)) (let () ,@(map irl-lower (cddr x)))))
+	 ((= h 'text-parser-invoke-rule) `(!= (,(irl-rule-fn (cadr (cadr x))) self) 0))
+	 ((member? h '(text-parser-invoke-rule-simply text-parser-invoke-rule-in))
+	  (irl-grammar-fail "a rule with arguments, or another grammar's, has no typed call"))
+	 ((member? h '(text-parser-string-from-to string->symbol)) (irl-grammar-fail "make-string has no typed value"))
+	 ((= h 'array) 0)
+	 ((= h 'array-append) '(tp-nothing self))
+	 ((= h 'array->list) 0)
+	 ((= h 'list->string) (irl-lower (cadr x)))
+	 ((= h 'string->number-base) `(tp-number self ,(irl-lower (cadr x)) ,(caddr x)))
+	 ((= h 'text-parser-expected) 0)
+	 (else (let ((r (assq h *irl-lower-renames*)))
+		 (cons (if r (cdr r) h) (map irl-lower (cdr x))))))))))
 
 ;; left recursion: the rules a rule can call before it consumes anything
 (define-function irl-nullable? (pe)
@@ -136,16 +115,21 @@
 	 (base (if (= parent '<text-parser>) (list () ())
 		 (or (cdr (assq (irl-grammar-name parent) *irl-grammars*)) (error "irl grammar: " g ": no grammar block " parent))))
 	 (fields (concat-list (car base) (cadddr record)))
-	 (rules ()))
+	 (rules ())
+	 (runtime (and (not *irl-runtime*) (set *irl-runtime* 1) '((load "text-parser.k")))))
     (list-do r (cadr base) (or (assq (car r) own) (push rules r)))
     (set rules (concat-list (list-reverse! rules) own))
     (push *irl-grammars* (list g fields rules))
     (set *irl-g* g)
-    (cons `(define-struct ,g ((input char *) (pos long) (end long) (result long) ,@(map (lambda (f) (list f 'long)) fields)))
-	  (map (lambda (r)
-		 (set *irl-r* (car r))
-		 (and (irl-left-recursive? (car r) rules) (error "irl grammar: " g "." (car r) " is left-recursive"))
-		 `(define-function ,(irl-rule-fn (car r)) (long) ((p struct ,g *))
-		    (let ,(map (lambda (v) `((,v long) ,(irl-long 0))) (irl-pe-vars (cadr r) ()))
-		      (return (cast ,(irl-pe (cadr r)) long)))))
-	       rules))))
+    (concat-list runtime
+      (cons `(define-struct ,g ((string char *) (limit long) (position long) (result long) (span long)
+				,@(map (lambda (f) (list f 'long)) fields)))
+	    (map (lambda (r)
+		   (set *irl-r* (car r))
+		   (and (irl-left-recursive? (car r) rules) (error "irl grammar: " g "." (car r) " is left-recursive"))
+		   (irl-refuse (cadr r))
+		   (let ((body (irl-mark-actions (cadr r))))
+		     `(define-function ,(irl-rule-fn (car r)) (long) ((self struct ,g *))
+			(let ,(map irl-lower-binding (find-vars body))
+			  (return (cast ,(irl-lower (value-pe body)) long))))))
+		 rules)))))

@@ -175,9 +175,9 @@
     (ir-gen-c opd gen)
     (print ")))")))
 
-(define-method ir-gen-c <ir-neg>    (gen)	(ir-gen-c-unary self '- (car self.operands)))
-(define-method ir-gen-c <ir-com>    (gen)	(ir-gen-c-unary self '~ (car self.operands)))
-(define-method ir-gen-c <ir-not>    (gen)	(ir-gen-c-unary self '! (car self.operands)))
+(define-method ir-gen-c <ir-neg>    (gen)	(ir-gen-c-unary self '- gen))
+(define-method ir-gen-c <ir-com>    (gen)	(ir-gen-c-unary self '~ gen))
+(define-method ir-gen-c <ir-not>    (gen)	(ir-gen-c-unary self '! gen))
 
 (define-function ir-gen-c-binary (insn op gen)
   (let* ((type (<ir-insn>-type insn))

@@ -137,10 +137,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `irl_grammar` (`check/irl-grammar.l`): a tpeg grammar calls another grammar's rule as `p-r`
   (compiled by `compile-tpeg.l` to a parser of `<p>` on the same input). In irl,
   `grammar { <G> : <parent> (fields) rules }` is tpeg's own syntax, read through that foreign
-  call; `irl-grammar.l` compiles it to a struct `G` (input, pos, end, result, the fields) and
-  one typed function per rule, `G_rule(p)`, its actions maru.k forms copied in unchanged. A
-  child's inherited rules call its overrides; a left-recursive rule, lists and strings are
-  errors naming the rule.
+  call. Its matching is tpeg's own: `irl-grammar.l` lowers `compile-tpeg.l`'s `value-pe`
+  output to typed Maru over `text-parser.k`, a struct `G` (string, limit, position, result,
+  span, the fields) and one function per rule, `G_rule(self)`, actions maru.k forms copied in
+  unchanged. A child's inherited rules call its overrides; a left-recursive rule, lists and
+  strings are errors naming the rule.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
   check; the `in`, `number` and `=` builtins work as specified; schemas, relation

@@ -4,35 +4,35 @@ import void*(long) malloc;
 
 grammar {
   <sums> : <text-parser> (digits total)
-  num = [0-9]+ @$#:n -> (let () (set-member p digits (+ (member p digits) 1)) n) ;
-  sum = num:a -> (set-member p total a)
-        ("+" num:b -> (set-member p total (+ (member p total) b)))* -> (member p total) ;
+  num = [0-9]+ @$#:n -> (let () (set-member self digits (+ (member self digits) 1)) n) ;
+  sum = num:a -> (set-member self total a)
+        ("+" num:b -> (set-member self total (+ (member self total) b)))* -> (member self total) ;
 }
 
 // a child reads hexadecimal numbers, and inherits sum, which calls its num
 grammar {
   <hexsums> : <sums> ()
-  num = [0-9a-f]+ @$#16:n -> (let () (set-member p digits (+ (member p digits) 1)) n) ;
+  num = [0-9a-f]+ @$#16:n -> (let () (set-member self digits (+ (member self digits) 1)) n) ;
 }
 
 // the sum of a whole input, or -1 if it isn't one
 long add(char* s, long n) {
   let struct sums* p := cast(malloc(cast(sizeof(struct sums), long)), struct sums*);
-  p.input := s; p.pos := 0; p.end := n; p.digits := 0; p.total := 0;
-  if sums_sum(p) && p.pos == n then return p.result;
+  p.string := s; p.position := 0; p.limit := n; p.digits := 0; p.total := 0;
+  if sums_sum(p) && p.position == n then return p.result;
   return -1;
 }
 // how many numbers the parse of s read
 long count(char* s, long n) {
   let struct sums* p := cast(malloc(cast(sizeof(struct sums), long)), struct sums*);
-  p.input := s; p.pos := 0; p.end := n; p.digits := 0; p.total := 0;
+  p.string := s; p.position := 0; p.limit := n; p.digits := 0; p.total := 0;
   sums_sum(p);
   return p.digits;
 }
 long hexadd(char* s, long n) {
   let struct hexsums* p := cast(malloc(cast(sizeof(struct hexsums), long)), struct hexsums*);
-  p.input := s; p.pos := 0; p.end := n; p.digits := 0; p.total := 0;
-  if hexsums_sum(p) && p.pos == n then return p.result;
+  p.string := s; p.position := 0; p.limit := n; p.digits := 0; p.total := 0;
+  if hexsums_sum(p) && p.position == n then return p.result;
   return -1;
 }
 export add, count, hexadd;
