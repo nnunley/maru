@@ -336,6 +336,11 @@
 (define *shlib* (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin")) "dylib" "so"))
 (define-function built (file) (run (concat-string "built-" file) (concat-string "make -q build/" file)))
 
+;; sat.irl's CDCL solver answers SAT and UNSAT through IPASIR, its models checked (check/sat-core.l).
+(check "sat_core"
+  (built (concat-string "sat." *shlib*))
+  (unit-assert (equal (last (run "sat_core" "./eval check/sat-core.l")) "sat core ok")))
+
 ;; dimacs.irl's grammar reads DIMACS formulas, rejecting a malformed file by line (check/sat-dimacs.l).
 (check "sat_dimacs"
   (built (concat-string "sat." *shlib*))

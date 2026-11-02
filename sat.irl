@@ -1,0 +1,379 @@
+// sat.irl -- a CDCL SAT solver behind the IPASIR interface (draft-ndn-maru-sat-00 [R-ipasir],
+// [R-cdcl]): two watched literals, a clause learned at the first unique implication point of
+// each conflict, backjumping, decisions by decaying variable activity, phase saving and Luby
+// restarts.  Assumptions are decided first; when one is refuted, the assumptions the
+// refutation used are its failed ones.
+//
+// A literal is a nonzero long, v or -v.  Clauses live in one arena as [size, lits...], the
+// implied literal of a reason clause first; each literal's watch list holds the clauses
+// watching it.  Arrays are indexed, never offset: ir2 offsets a pointer by bytes.
+
+import void*(long) malloc;
+import void*(void*, long) realloc;
+import void(void*) free;
+
+struct Solver {
+  long nvars, cap, unsat, nlevels, tsize, qhead, hsize, asize, acap;
+  long alen, abcap, nassum, ascap, llen, lbcap, conflicts, budget;
+  long* assign; long* level; long* reason; long* phase; long* model; long* seen; long* failed;
+  long* heap; long* hpos; long* trail; long* lim; long* arena;
+  long* wsize; long* wcap; long* wlist;		// wlist[i]: the watch list of literal index i, a long*
+  long* abuf; long* assum; long* lbuf;
+  double* activity; double inc;
+};
+
+long words(long n) return n * cast(sizeof(long), long);
+long absl(long x) return x < 0 ? 0 - x : x;
+long lidx(long l) return 2 * absl(l) + cast(l < 0, long);	// a literal's index in the watch lists
+long* grow(long* a, long n) return cast(realloc(a, words(n)), long*);
+
+// a literal's value: 1 true, -1 false, 0 unassigned
+long value(struct Solver* s, long l) { let long a := s.assign[absl(l)]; return l < 0 ? 0 - a : a; }
+
+// ---- the variable heap, greatest activity first
+void heap_swap(struct Solver* s, long i, long j) {
+  let long a := s.heap[i]; let long b := s.heap[j];
+  s.heap[i] := b; s.heap[j] := a; s.hpos[b] := i; s.hpos[a] := j;
+}
+void heap_up(struct Solver* s, long i) {
+  let long go := 1;
+  while go && i > 0 do {
+    let long parent := (i - 1) / 2;
+    if s.activity[s.heap[i]] > s.activity[s.heap[parent]] then { heap_swap(s, i, parent); i := parent; } else go := 0;
+  }
+}
+void heap_down(struct Solver* s, long i) {
+  let long go := 1;
+  while go do {
+    let long l := 2 * i + 1; let long r := l + 1; let long best := i;
+    if l < s.hsize && s.activity[s.heap[l]] > s.activity[s.heap[best]] then best := l;
+    if r < s.hsize && s.activity[s.heap[r]] > s.activity[s.heap[best]] then best := r;
+    if best == i then go := 0; else { heap_swap(s, i, best); i := best; }
+  }
+}
+void heap_insert(struct Solver* s, long v) {
+  if s.hpos[v] < 0 then {
+    s.heap[s.hsize] := v; s.hpos[v] := s.hsize; s.hsize := s.hsize + 1;
+    heap_up(s, s.hsize - 1);
+  }
+}
+long heap_pop(struct Solver* s) {
+  let long v := s.heap[0];
+  s.hsize := s.hsize - 1;
+  if s.hsize > 0 then { s.heap[0] := s.heap[s.hsize]; s.hpos[s.heap[0]] := 0; heap_down(s, 0); }
+  s.hpos[v] := -1;
+  return v;
+}
+void bump(struct Solver* s, long v) {
+  s.activity[v] := s.activity[v] + s.inc;
+  if s.activity[v] > 1.0e100 then {
+    let long i := 1;
+    while i <= s.nvars do { s.activity[i] := s.activity[i] / 1.0e100; i := i + 1; }
+    s.inc := s.inc / 1.0e100;
+  }
+  if s.hpos[v] >= 0 then heap_up(s, s.hpos[v]);
+}
+
+// ---- variables, grown as literals arrive
+void reserve(struct Solver* s, long n) {
+  if n >= s.cap then {
+    let long c := s.cap * 2 > n + 1 ? s.cap * 2 : n + 1;
+    let long i := s.cap;
+    s.assign := grow(s.assign, c); s.level := grow(s.level, c); s.reason := grow(s.reason, c);
+    s.phase := grow(s.phase, c); s.model := grow(s.model, c); s.seen := grow(s.seen, c);
+    s.failed := grow(s.failed, c); s.heap := grow(s.heap, c); s.hpos := grow(s.hpos, c);
+    s.trail := grow(s.trail, c); s.lim := grow(s.lim, c + 1);
+    s.activity := cast(realloc(s.activity, words(c)), double*);
+    s.wsize := grow(s.wsize, 2 * c); s.wcap := grow(s.wcap, 2 * c); s.wlist := grow(s.wlist, 2 * c);
+    while i < c do {
+      s.assign[i] := 0; s.level[i] := 0; s.reason[i] := -1; s.phase[i] := -1; s.model[i] := 0;
+      s.seen[i] := 0; s.failed[i] := 0; s.hpos[i] := -1; s.activity[i] := 0.0;
+      s.wsize[2 * i] := 0; s.wcap[2 * i] := 0; s.wlist[2 * i] := 0;
+      s.wsize[2 * i + 1] := 0; s.wcap[2 * i + 1] := 0; s.wlist[2 * i + 1] := 0;
+      i := i + 1;
+    }
+    s.cap := c;
+  }
+  while s.nvars < n do { s.nvars := s.nvars + 1; heap_insert(s, s.nvars); }
+}
+
+// ---- watches and clauses
+void watch(struct Solver* s, long l, long c) {
+  let long i := lidx(l);
+  if s.wsize[i] == s.wcap[i] then {
+    s.wcap[i] := s.wcap[i] == 0 ? cast(4, long) : 2 * s.wcap[i];
+    s.wlist[i] := cast(grow(cast(s.wlist[i], long*), s.wcap[i]), long);
+  }
+  cast(s.wlist[i], long*)[s.wsize[i]] := c;
+  s.wsize[i] := s.wsize[i] + 1;
+}
+long new_clause(struct Solver* s, long* lits, long n) {	// the clause's offset in the arena
+  let long c := s.asize;
+  let long i := 0;
+  if s.asize + n + 1 > s.acap then {
+    s.acap := 2 * (s.asize + n + 1);
+    s.arena := grow(s.arena, s.acap);
+  }
+  s.arena[c] := n;
+  while i < n do { s.arena[c + 1 + i] := lits[i]; i := i + 1; }
+  s.asize := s.asize + n + 1;
+  watch(s, lits[0], c); watch(s, lits[1], c);
+  return c;
+}
+void enqueue(struct Solver* s, long l, long r) {
+  let long v := absl(l);
+  s.assign[v] := l > 0 ? cast(1, long) : cast(-1, long);
+  s.level[v] := s.nlevels;
+  s.reason[v] := r;
+  s.trail[s.tsize] := l;
+  s.tsize := s.tsize + 1;
+}
+void new_level(struct Solver* s) { s.lim[s.nlevels] := s.tsize; s.nlevels := s.nlevels + 1; }
+void backtrack(struct Solver* s, long lvl) {
+  if s.nlevels > lvl then {
+    let long i := s.tsize - 1;
+    while i >= s.lim[lvl] do {
+      let long v := absl(s.trail[i]);
+      s.phase[v] := s.assign[v]; s.assign[v] := 0; s.reason[v] := -1;
+      heap_insert(s, v);
+      i := i - 1;
+    }
+    s.tsize := s.lim[lvl]; s.qhead := s.tsize; s.nlevels := lvl;
+  }
+}
+
+// unit propagation: the conflicting clause, or -1
+long propagate(struct Solver* s) {
+  let long confl := -1;
+  while confl < 0 && s.qhead < s.tsize do {
+    let long f := 0 - s.trail[s.qhead];		// the literal just made false
+    let long wi := lidx(f);
+    let long* ws := cast(s.wlist[wi], long*);
+    let long n := s.wsize[wi];
+    let long i := 0; let long j := 0;
+    s.qhead := s.qhead + 1;
+    while i < n do {
+      let long c := ws[i];
+      let long size := s.arena[c];
+      i := i + 1;
+      if confl >= 0 then { ws[j] := c; j := j + 1; }
+      else {
+        // keep the false literal second
+        if s.arena[c + 1] == f then { s.arena[c + 1] := s.arena[c + 2]; s.arena[c + 2] := f; }
+        if value(s, s.arena[c + 1]) == 1 then { ws[j] := c; j := j + 1; }
+        else {
+          let long k := 3; let long moved := 0;
+          while !moved && k <= size do {
+            if value(s, s.arena[c + k]) != -1 then {
+              s.arena[c + 2] := s.arena[c + k]; s.arena[c + k] := f;
+              watch(s, s.arena[c + 2], c);
+              moved := 1;
+            }
+            k := k + 1;
+          }
+          if !moved then {
+            ws[j] := c; j := j + 1;
+            if value(s, s.arena[c + 1]) == -1 then { confl := c; s.qhead := s.tsize; }
+            else enqueue(s, s.arena[c + 1], c);
+          }
+        }
+      }
+    }
+    s.wsize[wi] := j;
+  }
+  return confl;
+}
+
+void push_learnt(struct Solver* s, long l) {
+  if s.llen == s.lbcap then { s.lbcap := 2 * s.lbcap; s.lbuf := grow(s.lbuf, s.lbcap); }
+  s.lbuf[s.llen] := l;
+  s.llen := s.llen + 1;
+}
+// the clause learned at the first unique implication point, in lbuf (asserting literal first,
+// the literal of the next highest level second); the level to jump back to
+long analyze(struct Solver* s, long confl) {
+  let long path := 0; let long p := 0; let long i := s.tsize - 1; let long first := 1;
+  let long bt := 0;
+  s.llen := 1;
+  while first || path > 0 do {
+    let long size := s.arena[confl];
+    let long k := first ? cast(1, long) : cast(2, long);
+    first := 0;
+    while k <= size do {
+      let long q := s.arena[confl + k];
+      let long v := absl(q);
+      if !s.seen[v] && s.level[v] > 0 then {
+        bump(s, v);
+        s.seen[v] := 1;
+        if s.level[v] >= s.nlevels then path := path + 1; else push_learnt(s, q);
+      }
+      k := k + 1;
+    }
+    while !s.seen[absl(s.trail[i])] do i := i - 1;
+    p := s.trail[i];
+    i := i - 1;
+    confl := s.reason[absl(p)];
+    s.seen[absl(p)] := 0;
+    path := path - 1;
+  }
+  s.lbuf[0] := 0 - p;
+  if s.llen > 1 then {
+    let long best := 1; let long k := 2;
+    while k < s.llen do { if s.level[absl(s.lbuf[k])] > s.level[absl(s.lbuf[best])] then best := k; k := k + 1; }
+    let long t := s.lbuf[1]; s.lbuf[1] := s.lbuf[best]; s.lbuf[best] := t;
+    bt := s.level[absl(s.lbuf[1])];
+  }
+  let long k := 1;
+  while k < s.llen do { s.seen[absl(s.lbuf[k])] := 0; k := k + 1; }
+  return bt;
+}
+
+// a refuted assumption a: the assumptions its refutation used are the failed ones
+void analyze_final(struct Solver* s, long a) {
+  let long i := s.tsize - 1;
+  s.failed[absl(a)] := a;
+  if s.nlevels > 0 then {
+    s.seen[absl(a)] := 1;
+    while i >= s.lim[0] do {
+      let long x := absl(s.trail[i]);
+      if s.seen[x] then {
+        let long r := s.reason[x];
+        if r < 0 then s.failed[x] := s.trail[i];
+        else {
+          let long k := 2;
+          while k <= s.arena[r] do { if s.level[absl(s.arena[r + k])] > 0 then s.seen[absl(s.arena[r + k])] := 1; k := k + 1; }
+        }
+        s.seen[x] := 0;
+      }
+      i := i - 1;
+    }
+    s.seen[absl(a)] := 0;
+  }
+}
+
+// the restart unit's multiplier, 1 1 2 1 1 2 4 ... (Luby et al.)
+long luby(long x) {
+  let long size := 1; let long seq := 0; let long p := 1;
+  while size < x + 1 do { seq := seq + 1; size := 2 * size + 1; }
+  while size - 1 != x do { size := (size - 1) / 2; seq := seq - 1; x := x % size; }
+  while seq > 0 do { p := p * 2; seq := seq - 1; }
+  return p;
+}
+
+// a clause from sat_add, at level 0: repeats dropped, a tautology or a clause true at level 0
+// kept out, false literals removed
+void add_clause(struct Solver* s) {
+  let long n := 0; let long i := 0; let long keep := 1;
+  while i < s.alen do {
+    let long l := s.abuf[i];
+    let long j := 0; let long dup := 0;
+    while j < n do { if s.abuf[j] == l then dup := 1; if s.abuf[j] == 0 - l then keep := 0; j := j + 1; }
+    if value(s, l) == 1 then keep := 0;
+    if !dup && value(s, l) != -1 then { s.abuf[n] := l; n := n + 1; }
+    i := i + 1;
+  }
+  s.alen := 0;
+  if keep then {
+    if n == 0 then s.unsat := 1;
+    else if n == 1 then { enqueue(s, s.abuf[0], -1); if propagate(s) >= 0 then s.unsat := 1; }
+    else new_clause(s, s.abuf, n);
+  }
+}
+
+// ---- IPASIR
+struct Solver* sat_init() {
+  let struct Solver* s := cast(malloc(cast(sizeof(struct Solver), long)), struct Solver*);
+  s.nvars := 0; s.cap := 0; s.unsat := 0; s.nlevels := 0; s.tsize := 0; s.qhead := 0; s.hsize := 0;
+  s.asize := 0; s.acap := 0; s.alen := 0; s.abcap := 16; s.nassum := 0; s.ascap := 16; s.llen := 0;
+  s.lbcap := 16; s.conflicts := 0; s.budget := 1000000; s.inc := 1.0;
+  s.assign := cast(0, long*); s.level := cast(0, long*); s.reason := cast(0, long*); s.phase := cast(0, long*);
+  s.model := cast(0, long*); s.seen := cast(0, long*); s.failed := cast(0, long*); s.heap := cast(0, long*);
+  s.hpos := cast(0, long*); s.trail := cast(0, long*); s.lim := cast(0, long*); s.arena := cast(0, long*);
+  s.wsize := cast(0, long*); s.wcap := cast(0, long*); s.wlist := cast(0, long*);
+  s.activity := cast(0, double*);
+  s.abuf := grow(cast(0, long*), 16); s.assum := grow(cast(0, long*), 16); s.lbuf := grow(cast(0, long*), 16);
+  reserve(s, 1);
+  return s;
+}
+void sat_reserve(struct Solver* s, long n) reserve(s, n);
+void sat_add(struct Solver* s, long l) {
+  backtrack(s, 0);
+  if l == 0 then add_clause(s);
+  else {
+    reserve(s, absl(l));
+    if s.alen == s.abcap then { s.abcap := 2 * s.abcap; s.abuf := grow(s.abuf, s.abcap); }
+    s.abuf[s.alen] := l;
+    s.alen := s.alen + 1;
+  }
+}
+void sat_assume(struct Solver* s, long l) {
+  reserve(s, absl(l));
+  if s.nassum == s.ascap then { s.ascap := 2 * s.ascap; s.assum := grow(s.assum, s.ascap); }
+  s.assum[s.nassum] := l;
+  s.nassum := s.nassum + 1;
+}
+void sat_set_conflicts(struct Solver* s, long n) s.budget := n;
+
+long sat_solve(struct Solver* s) {
+  let long status := -1; let long i := 1;
+  let long restart := 1; let long since := 0; let long spent := 0;
+  while i <= s.nvars do { s.failed[i] := 0; i := i + 1; }
+  if s.unsat then status := 20;
+  else {
+    backtrack(s, 0);
+    if propagate(s) >= 0 then { s.unsat := 1; status := 20; }
+  }
+  while status < 0 do {
+    let long confl := propagate(s);
+    if confl >= 0 then {
+      s.conflicts := s.conflicts + 1; since := since + 1; spent := spent + 1;
+      if s.nlevels == 0 then { s.unsat := 1; status := 20; }
+      else {
+        let long bt := analyze(s, confl);
+        backtrack(s, bt);
+        if s.llen == 1 then enqueue(s, s.lbuf[0], -1);
+        else enqueue(s, s.lbuf[0], new_clause(s, s.lbuf, s.llen));
+        s.inc := s.inc * 1.0526315789473684;			// activity decays by 0.95
+        if spent >= s.budget then status := 0;
+        else if since >= 100 * luby(restart) then { backtrack(s, 0); since := 0; restart := restart + 1; }
+      }
+    }
+    else if s.nlevels < s.nassum then {
+      let long a := s.assum[s.nlevels];
+      if value(s, a) == 1 then new_level(s);
+      else if value(s, a) == -1 then { analyze_final(s, a); status := 20; }
+      else { new_level(s); enqueue(s, a, -1); }
+    }
+    else {
+      let long v := 0;
+      while v == 0 && s.hsize > 0 do { let long u := heap_pop(s); if s.assign[u] == 0 then v := u; }
+      if v == 0 then {
+        let long k := 1;
+        while k <= s.nvars do { s.model[k] := s.assign[k]; k := k + 1; }
+        status := 10;
+      }
+      else { new_level(s); enqueue(s, s.phase[v] > 0 ? v : 0 - v, -1); }
+    }
+  }
+  backtrack(s, 0);
+  s.nassum := 0;
+  return status;
+}
+long sat_val(struct Solver* s, long l) {
+  let long v := absl(l);
+  if v > s.nvars || s.model[v] == 0 then return 0 - l;
+  return (s.model[v] > 0) == (l > 0) ? l : 0 - l;
+}
+long sat_failed(struct Solver* s, long l) {
+  let long v := absl(l);
+  return cast(v <= s.nvars && s.failed[v] == l, long);
+}
+void sat_release(struct Solver* s) {
+  let long i := 0;
+  while i < 2 * s.cap do { if s.wcap[i] > 0 then free(cast(s.wlist[i], void*)); i := i + 1; }
+  free(s.assign); free(s.level); free(s.reason); free(s.phase); free(s.model); free(s.seen); free(s.failed);
+  free(s.heap); free(s.hpos); free(s.trail); free(s.lim); free(s.arena); free(s.wsize); free(s.wcap);
+  free(s.wlist); free(s.activity); free(s.abuf); free(s.assum); free(s.lbuf); free(s);
+}
+
+export sat_init, sat_reserve, sat_add, sat_assume, sat_solve, sat_val, sat_failed, sat_set_conflicts, sat_release;

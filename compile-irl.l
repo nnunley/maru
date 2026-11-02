@@ -30,6 +30,7 @@
 
 (define *irl-structs*   ())	; (name field...) for each struct so far
 (define *irl-functions* ())	; imported functions, already pointers
+(define *irl-imports* ())	; (name . declaration) for each import so far
 
 (define irl-expand)
 
@@ -74,11 +75,14 @@
 					(push defs f))
 	  ((= head 'define-function)	(push defs `(define-function ,(cadr f) ,(caddr f) ,(cadddr f) ,@(irl-body (cddddr f)))))
 	  ((and (= head 'define) (pair? (caddr f)) (= 'extern (car (caddr f))))
-					(let ((decl (cadr f)))
+					(let ((decl (cadr f)) (seen (assq (car (cadr f)) *irl-imports*)))
 					  (when (pair? (irl-last decl))
 					    (push *irl-functions* (car decl))
 					    (set decl (concat-list decl '(*))))
-					  (push defs `(define ,decl ,(caddr f)))))
+					  ;; files of one library may import a name alike once each
+					  (if seen (or (equal (cdr seen) decl) (error "irl: " (car decl) " imported with two types"))
+					    (push *irl-imports* (cons (car decl) decl))
+					    (push defs `(define ,decl ,(caddr f))))))
 	  ((and (= head 'define) (irl-literal? (caddr f)))
 					(push defs f))
 	  ((= head 'define)		(push defs `(define ,(cadr f)))
