@@ -101,11 +101,22 @@
       (concat-list (list-reverse! defs)
 		   `((define-function main int () ,@(irl-body (list-reverse! main)) (return 0)))))))
 
+(define-function irl-file-forms (file library)	; a file's maru.k forms; library: definitions only
+  (let ((parser (text-parser-for-on <irl> (contents-of-file-named file))))
+    (or ($program parser) (error "syntax error"))
+    (and library (set *irl-library* file))
+    (irl-program (<irl>-result parser))))
+(define-function irl-library-forms (files)	; one library's forms, from all its files, in memory
+  (let ((out ()))
+    (list-do file files
+      (list-do form (irl-file-forms file 1) (push out form)))
+    (list-reverse! out)))
+
+;; as a command, the forms of each file named, printed; required, with no arguments left, it
+;; only defines the functions above (compile-irl-library.l)
 (define irl-library-mode ())
 (while *arguments*
   (let ((file (next-argument)))
-    (if (= file "--library") (set irl-library-mode 1)
-      (let ((parser (text-parser-for-on <irl> (contents-of-file-named file))))
-	(or ($program parser) (error "syntax error"))
-	(and irl-library-mode (set *irl-library* file))
-	(list-do form (irl-program (<irl>-result parser)) (dumpln form))))))
+    (if (= file "--library")
+	(set irl-library-mode 1)
+      (list-do form (irl-file-forms file irl-library-mode) (dumpln form)))))

@@ -293,9 +293,11 @@
       `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
     `(let () ,@body)))
 
-(compile-begin)
-
-(while *arguments*
-  (load (next-argument)))
-
-(compile-end)
+;; as a command, the files named compiled as one program; loaded with no arguments left, it
+;; only defines the compiler (compile-irl-library.l compiles forms it already holds)
+(and *arguments*
+     (let ()
+       (compile-begin)
+       (while *arguments*
+	 (load (next-argument)))
+       (compile-end)))

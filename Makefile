@@ -140,11 +140,13 @@ cexpr.g.l : tpeg.l cexpr.g | eval
 law.g.l : tpeg.l law.g | eval
 	./eval compile-tpeg.l law.g > law.g.l
 
-# typed programs built as shared libraries, under build/: compile-irl.l --library makes
-# each .k from its irl files, and the pattern below the library from the .k
-build/%.$(SO) : build/%.k ir-gen-c.k maru.k | eval2
-	./eval2 ir-gen-c.k maru.k $< > build/$*.c
-	$(CC) -shared -fPIC -fno-builtin -w -o $@ build/$*.c
+# typed programs built as shared libraries, under build/: compile-irl-library.l reads a
+# library's irl files and compiles them to C in one process, the forms never written out;
+# only the C compiler runs after it
+IRL_LIBRARY = compile-irl-library.l compile-irl.l irl-grammar.l irl.g.l cexpr.g.l tpeg.l \
+	      text-parser.k ir-gen-c.k maru.k
+build/%.$(SO) : build/%.c
+	$(CC) -shared -fPIC -fno-builtin -w -o $@ $<
 
 build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
 	@mkdir -p build
@@ -152,17 +154,17 @@ build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
 
 # the SAT solver, its checker and the format grammars, one library (draft-ndn-maru-sat-00)
 SAT_IRL = dimacs.irl $(wildcard sat.irl drat-check.irl)
-build/sat.k : $(SAT_IRL) compile-irl.l irl-grammar.l irl.g.l tpeg.l | eval
+build/sat.c : $(SAT_IRL) $(IRL_LIBRARY) | eval2
 	@mkdir -p build
-	./eval compile-irl.l --library $(SAT_IRL) > $@
+	./eval2 compile-irl-library.l $(SAT_IRL) > $@
 
-build/irl-lib.k : check/irl-lib-a.irl check/irl-lib-b.irl compile-irl.l irl.g.l | eval
+build/irl-lib.c : check/irl-lib-a.irl check/irl-lib-b.irl $(IRL_LIBRARY) | eval2
 	@mkdir -p build
-	./eval compile-irl.l --library $(filter %.irl,$^) > $@
+	./eval2 compile-irl-library.l $(filter %.irl,$^) > $@
 
-build/irl-grammar.k : check/irl-grammar.irl compile-irl.l irl-grammar.l irl.g.l tpeg.l | eval
+build/irl-grammar.c : check/irl-grammar.irl $(IRL_LIBRARY) | eval2
 	@mkdir -p build
-	./eval compile-irl.l --library $(filter %.irl,$^) > $@
+	./eval2 compile-irl-library.l $(filter %.irl,$^) > $@
 
 john.g.l : tpeg.l john.g | eval
 	./eval compile-tpeg.l john.g > john.g.l

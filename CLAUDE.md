@@ -128,7 +128,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `irl_library` (`check/irl-library.l`): `compile-irl.l --library A.irl B.irl` reads
   several irl files to one program with no `main` (a top-level statement is an error), and
   `export f;` keeps a function visible; make builds the library (`build/irl-lib.dylib`), which
-  untyped Maru opens by its path in the tree and calls by address. `cast(e, type)` and
+  untyped Maru opens by its path in the tree and calls by address. A library is compiled in
+  one process, `./eval2 compile-irl-library.l A.irl B.irl > build/lib.c`: the irl is read to
+  forms that stay in memory, then ir-gen-c.k and maru.k compile them; only `cc` runs after. `cast(e, type)` and
   `sizeof(type)` read to maru.k's own forms.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
