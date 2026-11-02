@@ -25,67 +25,123 @@ long drat_bad := 0;	// the line drat_check last rejected, or 0
 
 long* dgrow(long* a, long n) return cast(realloc(a, words(n)), long*);
 long dabs(long x) return x < 0 ? 0 - x : x;
-long dval(struct Checker* k, long l) { let long a := k.assign[dabs(l)]; return l < 0 ? 0 - a : a; }
+long dval(struct Checker* k, long l) {
+  let long a := k.assign[dabs(l)];
+  return l < 0 ? 0 - a : a;
+}
 void dvars(struct Checker* k, long v) {
   if v > k.nvars then {
     let long i := k.nvars + 1;
-    k.assign := dgrow(k.assign, v + 1); k.trail := dgrow(k.trail, v + 1); k.tmp := dgrow(k.tmp, 2 * v + 2);
+    k.assign := dgrow(k.assign, v + 1);
+    k.trail := dgrow(k.trail, v + 1);
+    k.tmp := dgrow(k.tmp, 2 * v + 2);
     k.whead := dgrow(k.whead, 2 * v + 2);
-    while i <= v do { k.assign[i] := 0; k.whead[2 * i] := -1; k.whead[2 * i + 1] := -1; i := i + 1; }
+    while i <= v do {
+      k.assign[i] := 0;
+      k.whead[2 * i] := -1;
+      k.whead[2 * i + 1] := -1;
+      i := i + 1;
+    }
     k.nvars := v;
   }
 }
 long widx(long l) return l < 0 ? 2 * (0 - l) + 1 : 2 * l;	// a literal's watch list
 void dwatch(struct Checker* k, long c, long l) {
-  if k.wn == k.wcap then { k.wcap := 2 * k.wcap; k.wnode := dgrow(k.wnode, 2 * k.wcap); }
-  k.wnode[2 * k.wn] := c; k.wnode[2 * k.wn + 1] := k.whead[widx(l)]; k.whead[widx(l)] := k.wn;
+  if k.wn == k.wcap then {
+    k.wcap := 2 * k.wcap;
+    k.wnode := dgrow(k.wnode, 2 * k.wcap);
+  }
+  k.wnode[2 * k.wn] := c;
+  k.wnode[2 * k.wn + 1] := k.whead[widx(l)];
+  k.whead[widx(l)] := k.wn;
   k.wn := k.wn + 1;
 }
 void dkeep(struct Checker* k, long* lits, long n) {	// a clause, active
   let long i := 0;
-  while i < n do { dvars(k, dabs(lits[i])); i := i + 1; }
-  if k.asize + n + 2 > k.acap then { k.acap := 2 * (k.asize + n + 2); k.arena := dgrow(k.arena, k.acap); }
-  if k.n == k.scap then { k.scap := 2 * k.scap; k.starts := dgrow(k.starts, k.scap); }
-  k.starts[k.n] := k.asize; k.n := k.n + 1;
-  k.arena[k.asize] := n; k.arena[k.asize + 1] := 1;
+  while i < n do {
+    dvars(k, dabs(lits[i]));
+    i := i + 1;
+  }
+  if k.asize + n + 2 > k.acap then {
+    k.acap := 2 * (k.asize + n + 2);
+    k.arena := dgrow(k.arena, k.acap);
+  }
+  if k.n == k.scap then {
+    k.scap := 2 * k.scap;
+    k.starts := dgrow(k.starts, k.scap);
+  }
+  k.starts[k.n] := k.asize;
+  k.n := k.n + 1;
+  k.arena[k.asize] := n;
+  k.arena[k.asize + 1] := 1;
   i := 0;
-  while i < n do { k.arena[k.asize + 2 + i] := lits[i]; i := i + 1; }
+  while i < n do {
+    k.arena[k.asize + 2 + i] := lits[i];
+    i := i + 1;
+  }
   k.asize := k.asize + n + 2;
   if n == 0 then k.empty := 1;
   else if n == 1 then {
-    if k.nunits == k.ucap then { k.ucap := 2 * k.ucap; k.units := dgrow(k.units, k.ucap); }
-    k.units[k.nunits] := k.n - 1; k.nunits := k.nunits + 1;
-  } else { dwatch(k, k.n - 1, lits[0]); dwatch(k, k.n - 1, lits[1]); }
+    if k.nunits == k.ucap then {
+      k.ucap := 2 * k.ucap;
+      k.units := dgrow(k.units, k.ucap);
+    }
+    k.units[k.nunits] := k.n - 1;
+    k.nunits := k.nunits + 1;
+  } else {
+    dwatch(k, k.n - 1, lits[0]);
+    dwatch(k, k.n - 1, lits[1]);
+  }
 }
-void dset(struct Checker* k, long l) { k.assign[dabs(l)] := l > 0 ? cast(1, long) : cast(-1, long); k.trail[k.tsize] := l; k.tsize := k.tsize + 1; }
-void dundo(struct Checker* k) { while k.tsize > 0 do { k.tsize := k.tsize - 1; k.assign[dabs(k.trail[k.tsize])] := 0; } k.qhead := 0; }
+void dset(struct Checker* k, long l) {
+  k.assign[dabs(l)] := l > 0 ? cast(1, long) : cast(-1, long);
+  k.trail[k.tsize] := l;
+  k.tsize := k.tsize + 1;
+}
+void dundo(struct Checker* k) {
+  while k.tsize > 0 do {
+    k.tsize := k.tsize - 1;
+    k.assign[dabs(k.trail[k.tsize])] := 0;
+  }
+  k.qhead := 0;
+}
 // unit propagation from the trail: each literal made false visits the clauses watching it, which
 // watch another literal not false, or else propagate their other watch, or conflict: 1
 long dpropagate(struct Checker* k) {
   let long conflict := 0;
   while k.qhead < k.tsize && !conflict do {
     let long f := 0 - k.trail[k.qhead];
-    let long prev := -1; let long node := k.whead[widx(f)];
+    let long prev := -1;
+    let long node := k.whead[widx(f)];
     k.qhead := k.qhead + 1;
     while node >= 0 && !conflict do {
-      let long next := k.wnode[2 * node + 1]; let long at := k.starts[k.wnode[2 * node]];
+      let long next := k.wnode[2 * node + 1];
+      let long at := k.starts[k.wnode[2 * node]];
       let long moved := 0;
       if k.arena[at + 1] then {
-        if k.arena[at + 2] == f then { k.arena[at + 2] := k.arena[at + 3]; k.arena[at + 3] := f; }
+        if k.arena[at + 2] == f then {
+          k.arena[at + 2] := k.arena[at + 3];
+          k.arena[at + 3] := f;
+        }
         if dval(k, k.arena[at + 2]) != 1 then {
-          let long size := k.arena[at]; let long j := 2;
+          let long size := k.arena[at];
+          let long j := 2;
           while j < size && dval(k, k.arena[at + 2 + j]) == -1 do j := j + 1;
           if j < size then {	// watch that literal instead
             let long l := k.arena[at + 2 + j];
-            k.arena[at + 2 + j] := f; k.arena[at + 3] := l;
-            if prev < 0 then k.whead[widx(f)] := next; else k.wnode[2 * prev + 1] := next;
-            k.wnode[2 * node + 1] := k.whead[widx(l)]; k.whead[widx(l)] := node;
+            k.arena[at + 2 + j] := f;
+            k.arena[at + 3] := l;
+            if prev < 0 then k.whead[widx(f)] := next;
+            else k.wnode[2 * prev + 1] := next;
+            k.wnode[2 * node + 1] := k.whead[widx(l)];
+            k.whead[widx(l)] := node;
             moved := 1;
           } else if dval(k, k.arena[at + 2]) == 0 then dset(k, k.arena[at + 2]);
           else conflict := 1;
         }
       } else {			// a deleted clause leaves the list
-        if prev < 0 then k.whead[widx(f)] := next; else k.wnode[2 * prev + 1] := next;
+        if prev < 0 then k.whead[widx(f)] := next;
+        else k.wnode[2 * prev + 1] := next;
         moved := 1;
       }
       if !moved then prev := node;
@@ -96,16 +152,22 @@ long dpropagate(struct Checker* k) {
 }
 // RUP: the negation of every literal, propagated, conflicts
 long drup(struct Checker* k, long* lits, long n) {
-  let long i := 0; let long conflict := k.empty;
+  let long i := 0;
+  let long conflict := k.empty;
   while i < n do {
     dvars(k, dabs(lits[i]));
-    if dval(k, lits[i]) == 1 then conflict := 1; else if dval(k, lits[i]) == 0 then dset(k, 0 - lits[i]);
+    if dval(k, lits[i]) == 1 then conflict := 1;
+    else if dval(k, lits[i]) == 0 then dset(k, 0 - lits[i]);
     i := i + 1;
   }
   i := 0;
   while i < k.nunits && !conflict do {	// the unit clauses, still active
     let long at := k.starts[k.units[i]];
-    if k.arena[at + 1] then { let long l := k.arena[at + 2]; if dval(k, l) == -1 then conflict := 1; else if dval(k, l) == 0 then dset(k, l); }
+    if k.arena[at + 1] then {
+      let long l := k.arena[at + 2];
+      if dval(k, l) == -1 then conflict := 1;
+      else if dval(k, l) == 0 then dset(k, l);
+    }
     i := i + 1;
   }
   if !conflict then conflict := dpropagate(k);
@@ -114,17 +176,36 @@ long drup(struct Checker* k, long* lits, long n) {
 }
 // RAT on the lemma's first literal p: every clause holding -p, resolved with the lemma, is RUP
 long drat(struct Checker* k, long* lits, long n) {
-  let long p := lits[0]; let long c := 0; let long ok := 1;
+  let long p := lits[0];
+  let long c := 0;
+  let long ok := 1;
   while c < k.n && ok do {
     let long at := k.starts[c];
     if k.arena[at + 1] then {
-      let long size := k.arena[at]; let long i := 0; let long has := 0;
-      while i < size do { if k.arena[at + 2 + i] == 0 - p then has := 1; i := i + 1; }
+      let long size := k.arena[at];
+      let long i := 0;
+      let long has := 0;
+      while i < size do {
+        if k.arena[at + 2 + i] == 0 - p then has := 1;
+        i := i + 1;
+      }
       if has then {
         let long m := 0;
         k.tmp := dgrow(k.tmp, n + size + 1);
-        i := 0; while i < n do { k.tmp[m] := lits[i]; m := m + 1; i := i + 1; }
-        i := 0; while i < size do { if k.arena[at + 2 + i] != 0 - p then { k.tmp[m] := k.arena[at + 2 + i]; m := m + 1; } i := i + 1; }
+        i := 0;
+        while i < n do {
+          k.tmp[m] := lits[i];
+          m := m + 1;
+          i := i + 1;
+        }
+        i := 0;
+        while i < size do {
+          if k.arena[at + 2 + i] != 0 - p then {
+            k.tmp[m] := k.arena[at + 2 + i];
+            m := m + 1;
+          }
+          i := i + 1;
+        }
         if !drup(k, k.tmp, m) then ok := 0;
       }
     }
@@ -132,12 +213,19 @@ long drat(struct Checker* k, long* lits, long n) {
   }
   return ok;
 }
-long dsame(struct Checker* k, long at, long* lits, long n) {	// the clause at at holds exactly lits
-  let long size := k.arena[at]; let long i := 0; let long all := 1;
+// the clause at at holds exactly lits
+long dsame(struct Checker* k, long at, long* lits, long n) {
+  let long size := k.arena[at];
+  let long i := 0;
+  let long all := 1;
   if size != n then return 0;
   while i < n && all do {
-    let long j := 0; let long found := 0;
-    while j < size do { if k.arena[at + 2 + j] == lits[i] then found := 1; j := j + 1; }
+    let long j := 0;
+    let long found := 0;
+    while j < size do {
+      if k.arena[at + 2 + j] == lits[i] then found := 1;
+      j := j + 1;
+    }
     if !found then all := 0;
     i := i + 1;
   }
@@ -146,33 +234,48 @@ long dsame(struct Checker* k, long at, long* lits, long n) {	// the clause at at
 
 // the <drat> grammar's actions (dimacs.irl)
 struct Checker* dchecker(struct proof* p) return cast(p.checker, struct Checker*);
-long drat_begin(struct proof* p) { dchecker(p).blen := 0; return 1; }
+long drat_begin(struct proof* p) {
+  dchecker(p).blen := 0;
+  return 1;
+}
 long drat_push(struct proof* p, long l) {
   let struct Checker* k := dchecker(p);
-  if k.blen == k.bcap then { k.bcap := 2 * k.bcap; k.buf := dgrow(k.buf, k.bcap); }
-  k.buf[k.blen] := l; k.blen := k.blen + 1;
+  if k.blen == k.bcap then {
+    k.bcap := 2 * k.bcap;
+    k.buf := dgrow(k.buf, k.bcap);
+  }
+  k.buf[k.blen] := l;
+  k.blen := k.blen + 1;
   return 1;
 }
 long drat_add(struct proof* p) {
   let struct Checker* k := dchecker(p);
-  if k.derived then return 1;				// after the empty clause, nothing more is needed
+  if k.derived then return 1;	// after the empty clause, nothing more is needed
   if drup(k, k.buf, k.blen) || (k.blen > 0 && drat(k, k.buf, k.blen)) then {
-    if k.blen == 0 then k.derived := 1; else dkeep(k, k.buf, k.blen);
+    if k.blen == 0 then k.derived := 1;
+    else dkeep(k, k.buf, k.blen);
     return 1;
   }
   return 0;
 }
 long drat_delete(struct proof* p) {
   let struct Checker* k := dchecker(p);
-  let long c := 0; let long done := 0;
+  let long c := 0;
+  let long done := 0;
   while c < k.n && !done do {
     let long at := k.starts[c];
-    if k.arena[at + 1] && dsame(k, at, k.buf, k.blen) then { k.arena[at + 1] := 0; done := 1; }
+    if k.arena[at + 1] && dsame(k, at, k.buf, k.blen) then {
+      k.arena[at + 1] := 0;
+      done := 1;
+    }
     c := c + 1;
   }
-  return 1;						// a clause not found is ignored, as DRAT-trim does
+  return 1;	// a clause not found is ignored, as DRAT-trim does
 }
-long drat_next(struct proof* p) { p.line := p.line + 1; return p.line; }
+long drat_next(struct proof* p) {
+  p.line := p.line + 1;
+  return p.line;
+}
 
 // 1 if the proof's text shows the formula's DIMACS text UNSAT, else 0 (drat_failed_line says
 // where).  The formula is the text Maru wrote, never the solver's memory.
@@ -182,13 +285,37 @@ long drat_check_text(char* cnf, long cn, char* proof, long pn) {
   let struct Checker* k := cast(malloc(cast(sizeof(struct Checker), long)), struct Checker*);
   let long accepted := 0;
   drat_bad := 1;
-  if bad then { dimacs_free(f); return 0; }
-  k.nvars := 0; k.n := 0; k.asize := 0; k.acap := 64; k.tsize := 0; k.blen := 0; k.bcap := 16; k.derived := 0; k.scap := 16;
-  k.arena := dgrow(cast(0, long*), 64); k.starts := dgrow(cast(0, long*), 16); k.buf := dgrow(cast(0, long*), 16);
-  k.assign := dgrow(cast(0, long*), 1); k.trail := dgrow(cast(0, long*), 1); k.tmp := dgrow(cast(0, long*), 2);
-  k.whead := dgrow(cast(0, long*), 2); k.wcap := 64; k.wn := 0; k.wnode := dgrow(cast(0, long*), 128);
-  k.ucap := 16; k.nunits := 0; k.units := dgrow(cast(0, long*), 16); k.empty := 0; k.qhead := 0;
-  k.assign[0] := 0; k.whead[0] := -1; k.whead[1] := -1;
+  if bad then {
+    dimacs_free(f);
+    return 0;
+  }
+  k.nvars := 0;
+  k.n := 0;
+  k.asize := 0;
+  k.acap := 64;
+  k.tsize := 0;
+  k.blen := 0;
+  k.bcap := 16;
+  k.derived := 0;
+  k.scap := 16;
+  k.arena := dgrow(cast(0, long*), 64);
+  k.starts := dgrow(cast(0, long*), 16);
+  k.buf := dgrow(cast(0, long*), 16);
+  k.assign := dgrow(cast(0, long*), 1);
+  k.trail := dgrow(cast(0, long*), 1);
+  k.tmp := dgrow(cast(0, long*), 2);
+  k.whead := dgrow(cast(0, long*), 2);
+  k.wcap := 64;
+  k.wn := 0;
+  k.wnode := dgrow(cast(0, long*), 128);
+  k.ucap := 16;
+  k.nunits := 0;
+  k.units := dgrow(cast(0, long*), 16);
+  k.empty := 0;
+  k.qhead := 0;
+  k.assign[0] := 0;
+  k.whead[0] := -1;
+  k.whead[1] := -1;
   dvars(k, dimacs_vars(f));
   let long c := 0;
   while c < dimacs_count(f) do {
@@ -200,20 +327,38 @@ long drat_check_text(char* cnf, long cn, char* proof, long pn) {
   }
   dimacs_free(f);
   let struct proof* p := cast(malloc(cast(sizeof(struct proof), long)), struct proof*);
-  p.string := proof; p.position := 0; p.limit := pn; p.checker := cast(k, long); p.line := 0;
-  if proof_start(p) && k.derived then { accepted := 1; drat_bad := 0; }
+  p.string := proof;
+  p.position := 0;
+  p.limit := pn;
+  p.checker := cast(k, long);
+  p.line := 0;
+  if proof_start(p) && k.derived then {
+    accepted := 1;
+    drat_bad := 0;
+  }
   else drat_bad := p.line + 1;
   free(p);
-  free(k.arena); free(k.starts); free(k.buf); free(k.assign); free(k.trail); free(k.tmp); free(k.whead); free(k.wnode); free(k.units); free(k);
+  free(k.arena);
+  free(k.starts);
+  free(k.buf);
+  free(k.assign);
+  free(k.trail);
+  free(k.tmp);
+  free(k.whead);
+  free(k.wnode);
+  free(k.units);
+  free(k);
   return accepted;
 }
 // the same, for a formula and a proof in files
 long drat_check(char* cnf_path, char* proof_path) {
-  let long cn := 0; let long pn := 0;
+  let long cn := 0;
+  let long pn := 0;
   let char* cnf := dimacs_file(cnf_path, &cn);
   let char* proof := dimacs_file(proof_path, &pn);
   let long accepted := 0;
-  if cast(cnf, long) != 0 && cast(proof, long) != 0 then accepted := drat_check_text(cnf, cn, proof, pn);
+  if cast(cnf, long) != 0 && cast(proof, long) != 0 then
+    accepted := drat_check_text(cnf, cn, proof, pn);
   if cast(cnf, long) != 0 then free(cnf);
   if cast(proof, long) != 0 then free(proof);
   return accepted;

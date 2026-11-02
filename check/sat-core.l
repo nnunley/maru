@@ -5,7 +5,11 @@
 (require "sat.l")
 
 (define ok 1)
-(define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
+(define-function expect (what c)
+  (or c
+      (let ()
+	(set ok ())
+	(println "FAIL " what))))
 (define-function value (vals v) (array-at vals v))
 
 (let ((r (sat-decide 2 '((1 2) (-1 2) (1 -2)))))

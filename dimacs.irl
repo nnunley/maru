@@ -35,12 +35,19 @@ grammar {
 }
 
 struct Formula* dimacs_formula(struct cnf* p) return cast(p.formula, struct Formula*);
-long dimacs_next_line(struct cnf* p) { p.line := p.line + cast(1, long); return p.line; }
-long dimacs_at_end(struct cnf* p) { p.atend := cast(1, long); return p.atend; }
+long dimacs_next_line(struct cnf* p) {
+  p.line := p.line + cast(1, long);
+  return p.line;
+}
+long dimacs_at_end(struct cnf* p) {
+  p.atend := cast(1, long);
+  return p.atend;
+}
 long dimacs_small(long n) return cast(n <= cast(1073741824, long), long);
 long dimacs_header(struct cnf* p, long v, long c) {
   let struct Formula* f := dimacs_formula(p);
-  f.vars := v; f.count := c;
+  f.vars := v;
+  f.count := c;
   free(f.starts);
   f.starts := cast(malloc(words(c + cast(1, long))), long*);
   f.starts[0] := f.nlits;
@@ -59,7 +66,10 @@ long dimacs_lit(struct cnf* p, long n) {
   let struct Formula* f := dimacs_formula(p);
   if f.clauses == f.count || n > f.vars || cast(0, long) - n > f.vars then return cast(0, long);
   let long j := f.starts[f.clauses];
-  while j < f.nlits do { if f.lits[j] == n then return cast(0, long); j := j + cast(1, long); }
+  while j < f.nlits do {
+    if f.lits[j] == n then return cast(0, long);
+    j := j + cast(1, long);
+  }
   dimacs_push(f, n);
   return cast(1, long);
 }
@@ -71,17 +81,27 @@ long dimacs_clause_end(struct cnf* p) {
   if f.clauses < f.count then f.starts[f.clauses] := f.nlits;
   return cast(1, long);
 }
-long dimacs_complete(struct cnf* p) return cast(dimacs_formula(p).clauses == dimacs_formula(p).count, long);
+long dimacs_complete(struct cnf* p)
+  return cast(dimacs_formula(p).clauses == dimacs_formula(p).count, long);
 
 // a formula's DIMACS text, parsed; bad is 0, or the first bad line's number
 struct Formula* dimacs_parse(char* text, long n, long* bad) {
   let struct Formula* f := cast(malloc(cast(sizeof(struct Formula), long)), struct Formula*);
   let struct cnf* p := cast(malloc(cast(sizeof(struct cnf), long)), struct cnf*);
-  f.vars := 0; f.count := 0; f.clauses := 0; f.nlits := 0; f.cap := 64;
+  f.vars := 0;
+  f.count := 0;
+  f.clauses := 0;
+  f.nlits := 0;
+  f.cap := 64;
   f.lits := cast(malloc(words(cast(64, long))), long*);
   f.starts := cast(malloc(words(cast(1, long))), long*);
   f.starts[0] := 0;
-  p.string := text; p.position := 0; p.limit := n; p.formula := cast(f, long); p.line := 0; p.atend := 0;
+  p.string := text;
+  p.position := 0;
+  p.limit := n;
+  p.formula := cast(f, long);
+  p.line := 0;
+  p.atend := 0;
   // the first line no whole-line rule matched; every line read but a count wrong: the last
   if cnf_start(p) then bad[0] := 0;
   else if p.atend then bad[0] := p.line > 0 ? p.line : 1;
@@ -111,7 +131,11 @@ struct Formula* dimacs_read(char* path, long* bad) {
   return f;
 }
 
-void dimacs_free(struct Formula* f) { free(f.starts); free(f.lits); free(f); }
+void dimacs_free(struct Formula* f) {
+  free(f.starts);
+  free(f.lits);
+  free(f);
+}
 long dimacs_check(char* path) {
   let long bad := 0;
   dimacs_free(dimacs_read(path, &bad));
@@ -120,12 +144,16 @@ long dimacs_check(char* path) {
 struct Formula* dimacs_load(char* path) {
   let long bad := 0;
   let struct Formula* f := dimacs_read(path, &bad);
-  if bad then { dimacs_free(f); return cast(0, struct Formula*); }
+  if bad then {
+    dimacs_free(f);
+    return cast(0, struct Formula*);
+  }
   return f;
 }
 long dimacs_vars(struct Formula* f) return f.vars;
 long dimacs_count(struct Formula* f) return f.count;
-long* dimacs_clause(struct Formula* f, long i) return f.lits + words(f.starts[i]);	// ir2 offsets a pointer by bytes
+// ir2 offsets a pointer by bytes
+long* dimacs_clause(struct Formula* f, long i) return f.lits + words(f.starts[i]);
 
 // a formula's DIMACS text as Maru writes it, literal by literal from its own clauses (sat.l),
 // into a growing buffer: the checker's input, written without copying a Maru string per part
@@ -133,18 +161,25 @@ struct Text { long n, cap; char* p; };
 import int(char*, long, char*, ...) snprintf;
 struct Text* text_new(long vars, long count) {
   let struct Text* t := cast(malloc(cast(sizeof(struct Text), long)), struct Text*);
-  t.cap := 4096; t.p := cast(malloc(t.cap), char*);
+  t.cap := 4096;
+  t.p := cast(malloc(t.cap), char*);
   t.n := cast(snprintf(t.p, 64, "p cnf %ld %ld\n", vars, count), long);
   return t;
 }
 void text_lit(struct Text* t, long l) {	// a literal and a space, or 0 and a newline
-  if t.n + 32 > t.cap then { t.cap := 2 * t.cap; t.p := cast(realloc(t.p, t.cap), char*); }
+  if t.n + 32 > t.cap then {
+    t.cap := 2 * t.cap;
+    t.p := cast(realloc(t.p, t.cap), char*);
+  }
   if l == 0 then t.n := t.n + cast(snprintf(t.p + t.n, 32, "0\n"), long);
   else t.n := t.n + cast(snprintf(t.p + t.n, 32, "%ld ", l), long);
 }
 char* text_chars(struct Text* t) return t.p;
 long text_length(struct Text* t) return t.n;
-void text_free(struct Text* t) { free(t.p); free(t); }
+void text_free(struct Text* t) {
+  free(t.p);
+  free(t);
+}
 
 // a formula as Maru builds it (cnf.l), literal by literal, each clause ending in 0, kept out of
 // Maru's heap, where a long formula would make every collection slow.  The solver's input, the
@@ -183,10 +218,15 @@ struct Text* store_text(struct Store* f, long vars) {
   }
   return t;
 }
-void store_free(struct Store* f) { free(f.lits); free(f); }
+void store_free(struct Store* f) {
+  free(f.lits);
+  free(f);
+}
 
-export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free, text_new, text_lit, text_chars, text_length, text_free,
-       store_new, store_lit, store_length, store_count, store_at, store_truncate, store_text, store_free;
+export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free,
+       text_new, text_lit, text_chars, text_length, text_free,
+       store_new, store_lit, store_length, store_count, store_at, store_truncate, store_text,
+       store_free;
 
 // ---- DRAT proofs (R-formats-grammars): a line adds a lemma, or after d deletes a clause, each
 // ending in 0.  The checker (drat-check.irl) owns the actions; a line's literals are gathered

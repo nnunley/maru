@@ -5,13 +5,18 @@
 (require "text-parser.l")
 (define system (subr "system" "s"))
 (define ok 1)
-(define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
+(define-function expect (what c)
+  (or c
+      (let ()
+	(set ok ())
+	(println "FAIL " what))))
 (define dir "/tmp/maru-check")
 ;; make builds both grammars and the irl library below (make check's CHECK_LIBS)
 (system (concat-strings "mkdir -p " dir))
 (load "build/tpeg-foreign-a.g.l")
 (load "build/tpeg-foreign-b.g.l")
-(define-function try (rule s) (let ((p (text-parser-for-on <fb> s))) (and (rule p) (<text-parser>-result p))))
+(define-function try (rule s)
+  (let ((p (text-parser-for-on <fb> s))) (and (rule p) (<text-parser>-result p))))
 (expect "fb.sum of 12+30 is 42, through fa.num" (= 42 (try $sum "12+30")))
 (expect "fb.sum of 12+ fails" (not (try $sum "12+")))
 ;; grammar blocks in irl, built as a library
@@ -34,10 +39,21 @@
 (define-function compile-text (name text)
   (let ((f ((subr "fopen" "ss>p") (concat-strings dir "/" name ".irl") "w")))
     ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f))
-  (system (concat-strings "./eval compile-irl.l --library " dir "/" name ".irl > " dir "/" name ".out 2>&1"))
+  (system (concat-strings "./eval compile-irl.l --library "
+			  dir
+			  "/"
+			  name
+			  ".irl > "
+			  dir
+			  "/"
+			  name
+			  ".out 2>&1"))
   (contents-of-file-named (concat-strings dir "/" name ".out")))
 (expect "a left-recursive rule is an error naming it"
-	(has? (compile-text "irl-grammar-lr" "grammar { <lr> : <text-parser> () e = e \"+\" [0-9] | [0-9] ; }") "lr.e is left-recursive"))
+	(has? (compile-text "irl-grammar-lr"
+			    "grammar { <lr> : <text-parser> () e = e \"+\" [0-9] | [0-9] ; }")
+	      "lr.e is left-recursive"))
 (expect "make-string is an error naming the rule"
-	(has? (compile-text "irl-grammar-str" "grammar { <st> : <text-parser> () s = [a-z]+ $ ; }") "st.s: make-string has no typed value"))
+	(has? (compile-text "irl-grammar-str" "grammar { <st> : <text-parser> () s = [a-z]+ $ ; }")
+	      "st.s: make-string has no typed value"))
 (and ok (println "irl grammar ok"))

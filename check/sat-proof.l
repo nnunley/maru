@@ -5,11 +5,17 @@
 (require "sat.l")
 
 (define ok 1)
-(define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
+(define-function expect (what c)
+  (or c
+      (let ()
+	(set ok ())
+	(println "FAIL " what))))
 (define dir "/tmp/maru-check")
 ((subr "system" "s>i") (concat-strings "mkdir -p " dir))
 (define-function write-file (path text)
-  (let ((f ((subr "fopen" "ss>p") path "w"))) ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f)))
+  (let ((f ((subr "fopen" "ss>p") path "w")))
+    ((subr "fputs" "sp>i") text f)
+    ((subr "fclose" "p>i") f)))
 (define drat-check (sat-fn "drat_check" "ss>l"))
 (define drat-failed-line (sat-fn "drat_failed_line" ">l"))
 (define-function check-proof (clauses n proof)	; drat_check over a formula and a proof's text
@@ -30,7 +36,8 @@
 	 (n (string-length text)))
     (expect "the real proof checks again" (= 1 (check-proof pigeons 6 text)))
     ;; the final 0 dropped: the empty clause is never derived
-    (expect "a proof without its final 0 is rejected" (= 0 (check-proof pigeons 6 (string-copy text 0 (- n 2)))))))
+    (expect "a proof without its final 0 is rejected"
+	    (= 0 (check-proof pigeons 6 (string-copy text 0 (- n 2)))))))
 (expect "an empty proof is rejected" (= 0 (check-proof pigeons 6 "")))
 ;; a formula holding the empty clause: its proof is just 0
 (expect "the empty clause's proof is 0" (= 'unsat (car (sat-decide 1 '((1) ())))))
@@ -39,12 +46,14 @@
 (expect "a lemma that doesn't follow is rejected" (= 0 (check-proof '((1 2)) 2 "-1 0\n-2 0\n0\n")))
 (expect "at its line" (= 1 (drat-failed-line)))
 ;; deleting the clause the refutation needs leaves nothing to derive the empty clause from
-(expect "a proof that deletes what it needs is rejected" (= 0 (check-proof '((1) (-1)) 1 "d 1 0\n0\n")))
+(expect "a proof that deletes what it needs is rejected"
+	(= 0 (check-proof '((1) (-1)) 1 "d 1 0\n0\n")))
 (expect "and with it kept, accepted" (= 1 (check-proof '((1) (-1)) 1 "0\n")))
 ;; RAT: a clause over a fresh variable follows
 (expect "a RAT addition is accepted" (= 1 (check-proof '((1) (-1)) 1 "2 0\n0\n")))
 ;; a passing check writes nothing to disk
 ((subr "system" "s>i") "rm -rf /tmp/maru-sat")
 (sat-decide 6 pigeons)
-(expect "a refutation that checks leaves no files" (not (= 0 ((subr "system" "s>i") "test -e /tmp/maru-sat"))))
+(expect "a refutation that checks leaves no files"
+	(not (= 0 ((subr "system" "s>i") "test -e /tmp/maru-sat"))))
 (and ok (println "sat proof ok"))

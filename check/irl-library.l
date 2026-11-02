@@ -5,7 +5,11 @@
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
 (define ok 1)
-(define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
+(define-function expect (what c)
+  (or c
+      (let ()
+	(set ok ())
+	(println "FAIL " what))))
 (define-function has? (str sub)
   (let ((i 0) (n (- (string-length str) (string-length sub))))
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
@@ -25,10 +29,16 @@
 	;; cast(e, type) and sizeof(type)
 	(let ((size (dlsym lib "pair_size")) (view (dlsym lib "view")))
 	  (expect "sizeof a two-long struct is 16" (and (not (= 0 size)) (= 16 ((subr size ">l")))))
-	  (expect "a cast view of malloc's memory" (and (not (= 0 view)) (= 13 ((subr view "l>l") 5))))))))
+	  (expect "a cast view of malloc's memory"
+		  (and (not (= 0 view)) (= 13 ((subr view "l>l") 5))))))))
 ;; a library has no main, so a statement at its top level would never run
 (system (concat-strings "printf 'printf(\"x\");\\n' > " dir "/irl-lib-bad.irl"))
-(system (concat-strings "./eval compile-irl.l --library " dir "/irl-lib-bad.irl > " dir "/irl-lib-bad.out 2>&1"))
+(system (concat-strings "./eval compile-irl.l --library "
+			dir
+			"/irl-lib-bad.irl > "
+			dir
+			"/irl-lib-bad.out 2>&1"))
 (expect "a top-level statement in library mode is an error"
-	(has? (contents-of-file-named (concat-string dir "/irl-lib-bad.out")) "irl library: top-level statement in"))
+	(has? (contents-of-file-named (concat-string dir "/irl-lib-bad.out"))
+	      "irl library: top-level statement in"))
 (and ok (println "irl library ok"))
