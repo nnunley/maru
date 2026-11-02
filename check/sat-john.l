@@ -60,4 +60,48 @@
 	(has? (child "create P x. make P A 1. make P B 1. goal P done try its x = 1. set-opt two-player-game [ A, B ]. set-opt planner sat. A satisfy done.") "E_SAT_UNSUPPORTED: two-player-game"))
 (expect "a time-reading expression under planner sat is E_SAT_UNSUPPORTED"
 	(has? (child "create P x. make P A 1. goal P done try at time 0 its x = 1. set-opt planner sat. A satisfy done.") "E_SAT_UNSUPPORTED: at time"))
+;; planning over names: the least length, replayed by the evaluator, the same as the search's
+(define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
+(define-function no-satisfy (fs) (let ((out ())) (list-do f fs (or (= 'satisfy (car f)) (push out f))) (list-reverse! out)))
+(define-function plan (fs opts goal) (john-run (concat-list (no-satisfy fs) (concat-list opts (list goal)))))
+(define-function by-sat (fs goal) (plan fs '((set-opt planner sat)) goal))
+(define-function time-line (out) (let ((r ())) (list-do l out (and (has? l "satisfied at time: ") (set r l))) r))
+(define-function tries (out) (let ((n 0)) (list-do l out (and (has? l "trying ") (incr n))) n))
+(define-function tried-in-order? (out)	; trying 0, 1, ... each line in turn
+  (let ((k 0) (good 1))
+    (list-do l out (and (has? l "trying ") (let () (or (= (string-copy l 0 (+ 15 (string-length (format "%d" k)))) (concat-strings "trying " (format "%d" k) " steps (")) (set good ())) (incr k))))
+    good))
+(define hanoi-win '(satisfy Hanoi win () () ()))
+(let ((out (by-sat (john-read "check/john/hanoi2.john") hanoi-win)))
+  (expect "Hanoi2 by sat at time 3" (equal "satisfied at time: 3" (time-line out)))
+  (expect "Hanoi2 tries 0 to 3 steps" (and (= 4 (tries out)) (tried-in-order? out)))
+  (expect "Hanoi2's last try satisfiable" (has? (car (john-sat-nth out 3)) "): satisfiable")))
+(let ((out (by-sat (john-read "check/john/hanoi3.john") hanoi-win)))
+  (expect "Hanoi3 by sat at time 7" (equal "satisfied at time: 7" (time-line out)))
+  (expect "Hanoi3 tries 0 to 7 steps" (and (= 8 (tries out)) (tried-in-order? out))))
+(define trap-text "create Square near blocked. create Robot position.
+  make Square S 2 yes. make Square D 1 no. make Square M 2 no. make Square G 0 no. make Robot R S.
+  rel-qualify Square:A next Square:B if (A = S and (B = D or B = M)) or (A = M and B = G).
+  action Robot move Square consequence its position = Square and Square blocked = yes.
+  rule Robot move is Square blocked = no. rule Robot move is its position next Square.
+  goal Robot reach try its position = G. heuristic Robot reach 1 minimize its position near. ")
+(define-function both-agree (what fs goal)	; the two planners' least lengths
+  (let ((s (time-line (plan fs () goal))) (b (time-line (by-sat fs goal))))
+    (expect (concat-strings what ": the search and sat agree (" (or s "none") ")") (and s (equal s b)))))
+(both-agree "Hanoi2" (john-read "check/john/hanoi2.john") hanoi-win)
+(both-agree "Hanoi3" (john-read "check/john/hanoi3.john") hanoi-win)
+(both-agree "the trap breadth-first" (john-read-text trap-text) '(satisfy R reach () () ()))
+(expect "the trap in 2" (equal "satisfied at time: 2" (time-line (by-sat (john-read-text trap-text) '(satisfy R reach () () ())))))
+(both-agree "the maze" (john-read "check/john/maze.john") '(satisfy R reach () () ()))
+(expect "the consistent Hanoi4 by sat at time 15"
+	(equal "satisfied at time: 15" (time-line (by-sat (john-read "check/john/hanoi4-ours.john") hanoi-win))))
+(let ((out (john-run (john-read-text "create C a. make C X 1. goal C done try its a = 1. set-opt planner sat. X satisfy done."))))
+  (expect "a goal true now is satisfied at time 0" (equal (cdr out) '("satisfied at time: 0" "satisfied by: [  ]"))))
+(let ((out (by-sat (concat-list (john-read "check/john/hanoi2.john") (john-read-text "goal Towers under try A supporter = Peg1 and B supporter = A."))
+		   '(satisfy Hanoi under () () ()))))
+  (expect "no plan reaches A on Peg1 under B" (equal (last out) "unsatisfiable within 16 steps (width 16, lists 16, unroll 16)"))
+  (expect "each length 0 to 16 tried" (= 17 (tries out))))
+(let ((l (last (plan (john-read "check/john/hanoi3.john") '((set-opt planner sat) (set-opt sat-conflicts 1)) hanoi-win))))
+  (expect "a conflict limit of 1 leaves Hanoi3 unknown"
+	  (and (= "unknown at " (string-copy l 0 11)) (has? l " steps (conflict limit 1)"))))
 (and ok (println "sat john ok"))

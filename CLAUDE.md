@@ -136,11 +136,17 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   every property from the world's values and each effect, refusing a property with two
   (`E_SORT`), a number outside `sat-width` bits (`E_BOUND`), and what the encoding doesn't
   cover (`E_SAT_UNSUPPORTED`: two-player-game, max-time-ahead, at time, a time quantifier,
-  did). The search planner is unchanged otherwise.
+  did). The encoding is a bounded model over states 0 … k: one action a step (exactly one),
+  rules and optimizations as constraints, effects writing t + 1 and the rest carried over,
+  the goal at k, each length on a fresh solver with every refutation's proof checked. Hanoi2,
+  3 and the consistent Hanoi4 come out at 3, 7 and 15, the trap and the maze at the search's
+  lengths, every plan replayed by the evaluator (`E_ENCODING` otherwise); a goal no plan
+  reaches is `unsatisfiable within 16 steps (width 16, lists 16, unroll 16)`, and
+  `sat-conflicts 1` leaves Hanoi3 `unknown`. The search planner is unchanged otherwise.
 - `sat_proof` (`check/sat-proof.l`): every UNSAT answer from `sat-decide` carries a DRAT
   proof (`sat.irl` writes each learned clause, and `0` at the refutation), which
-  `drat-check.irl` verifies forward (a lemma RUP, or else RAT on its first literal) against
-  the formula it reads itself through `dimacs.irl`'s grammars, else `E_PROOF`. It rejects a
+  `drat-check.irl` verifies forward (a lemma RUP, or else RAT on its first literal, propagating
+  by two watched literals) against the formula it reads itself through `dimacs.irl`'s grammars, else `E_PROOF`. It rejects a
   proof without its final `0`, an empty one, a lemma that doesn't follow (naming its line), and
   one that deletes what it needs. Formula and proof stay in memory; a check that fails writes
   both to `/tmp/maru-sat` and names them in its error. `make clean` removes `/tmp/maru-check`

@@ -127,7 +127,26 @@ long dimacs_vars(struct Formula* f) return f.vars;
 long dimacs_count(struct Formula* f) return f.count;
 long* dimacs_clause(struct Formula* f, long i) return f.lits + words(f.starts[i]);	// ir2 offsets a pointer by bytes
 
-export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free;
+// a formula's DIMACS text as Maru writes it, literal by literal from its own clauses (sat.l),
+// into a growing buffer: the checker's input, written without copying a Maru string per part
+struct Text { long n, cap; char* p; };
+import int(char*, long, char*, ...) snprintf;
+struct Text* text_new(long vars, long count) {
+  let struct Text* t := cast(malloc(cast(sizeof(struct Text), long)), struct Text*);
+  t.cap := 4096; t.p := cast(malloc(t.cap), char*);
+  t.n := cast(snprintf(t.p, 64, "p cnf %ld %ld\n", vars, count), long);
+  return t;
+}
+void text_lit(struct Text* t, long l) {	// a literal and a space, or 0 and a newline
+  if t.n + 32 > t.cap then { t.cap := 2 * t.cap; t.p := cast(realloc(t.p, t.cap), char*); }
+  if l == 0 then t.n := t.n + cast(snprintf(t.p + t.n, 32, "0\n"), long);
+  else t.n := t.n + cast(snprintf(t.p + t.n, 32, "%ld ", l), long);
+}
+char* text_chars(struct Text* t) return t.p;
+long text_length(struct Text* t) return t.n;
+void text_free(struct Text* t) { free(t.p); free(t); }
+
+export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free, text_new, text_lit, text_chars, text_length, text_free;
 
 // ---- DRAT proofs (R-formats-grammars): a line adds a lemma, or after d deletes a clause, each
 // ending in 0.  The checker (drat-check.irl) owns the actions; a line's literals are gathered

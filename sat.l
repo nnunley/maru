@@ -12,10 +12,13 @@
       (let ((lib ((subr "dlopen" "si>p") *sat-path* 2)))
 	(and (= 0 lib) (error "E_LIBRARY: " *sat-path* " not built; run make " *sat-path*))
 	(set *sat-library* lib))))
+(define *sat-fns* ())	; (name . subr), looked up once each
 (define-function sat-fn (name signature)
-  (let ((addr ((subr "dlsym" "ps>p") (sat-library) name)))
-    (and (= 0 addr) (error "E_LIBRARY: " *sat-path* " has no " name))
-    (subr addr signature)))
+  (let ((hit (assq name *sat-fns*)))
+    (if hit (cdr hit)
+      (let ((addr ((subr "dlsym" "ps>p") (sat-library) name)))
+	(and (= 0 addr) (error "E_LIBRARY: " *sat-path* " has no " name))
+	(let ((f (subr addr signature))) (push *sat-fns* (cons name f)) f)))))
 (define-function sat-write-dimacs (path n clauses)
   (let ((f ((subr "fopen" "ss>p") path "w")) (puts (subr "fputs" "sp>i")))
     (puts (concat-strings "p cnf " (format "%d" n) " " (format "%d" (list-length clauses)) "\n") f)
@@ -40,11 +43,17 @@
 	(or holds (set ok ()))))
     ok))
 ;; a formula as DIMACS text, built once and joined: the checker parses this, never the solver's memory
+(define-function sat-join (parts)	; one string, copied once: concat-strings copies its result at each part
+  (let ((n 0) (j 0)) (list-do p parts (set n (+ n (string-length p))))
+    (let ((s (string n))) (list-do p parts (for (i 0 (string-length p)) (set-string-at s j (string-at p i)) (set j (+ j 1)))) s)))
+(define-function sat-dimacs-buffer (n clauses)	; the same text, in a C buffer (text_new): (chars . length) and the buffer
+  (let ((t ((sat-fn "text_new" "ll>p") n (list-length clauses))) (lit (sat-fn "text_lit" "pl")))
+    (list-do c clauses (list-do l c (lit t l)) (lit t 0))
+    t))
 (define-function sat-dimacs-text (n clauses)
   (let ((parts (list (concat-strings "p cnf " (format "%d" n) " " (format "%d" (list-length clauses)) "\n"))))
-    (list-do c clauses
-      (let ((line "")) (list-do l c (set line (concat-strings line (format "%d" l) " "))) (push parts (concat-string line "0\n"))))
-    (apply concat-strings (list-reverse! parts))))
+    (list-do c clauses (list-do l c (push parts (format "%d " l))) (push parts "0\n"))
+    (sat-join (list-reverse! parts))))
 (define-function sat-c-string (p n)	; n bytes at p, as a Maru string
   (let ((s (string n))) (for (i 0 n) (set-string-at s i (byte-at p i))) s))
 ;; a check that fails keeps its evidence: the formula and the proof, written to the scratch
@@ -68,10 +77,12 @@
 ;; a fresh solver for one formula over n variables: (sat . values), (unsat) or (unknown); with
 ;; keep, (unsat . proof-text).  A model is checked against the clauses (E_MODEL), and a
 ;; refutation's proof by drat-check.irl against the formula's DIMACS text (E_PROOF), in memory.
-(define-function sat-decide (n given . keep)
-  (let ((s (sat-init)) (out ()) (clauses (sat-clean given)))
+(define *sat-conflicts* ())	; a solve gives up, unknown, after this many conflicts; () is the solver's own limit
+(define-function sat-decide-clean (n clauses . keep)	; the same, for clauses already as sat-clean leaves them
+  (let ((s (sat-init)) (out ()))
     ((sat-fn "sat_reserve" "pl") s n)
     ((sat-fn "sat_proof_on" "p") s)
+    (and *sat-conflicts* ((sat-fn "sat_set_conflicts" "pl") s *sat-conflicts*))
     (list-do c clauses (sat-add-clause s c))
     (let ((r (sat-solve s)))
       (cond ((= r 10) (let ((vals (array (+ n 1))))
@@ -80,13 +91,16 @@
 			    (error "E_MODEL: a clause is false in the solver's model; the formula is "
 				   (sat-keep (sat-dimacs-text n clauses) ".cnf")))
 			(set out (cons 'sat vals))))
-	    ((= r 20) (let* ((cnf (sat-dimacs-text n clauses))
+	    ((= r 20) (let* ((cnf (sat-dimacs-buffer n clauses))
+			     (chars ((sat-fn "text_chars" "p>p") cnf)) (clen ((sat-fn "text_length" "p>l") cnf))
 			     (text ((sat-fn "sat_proof_text" "p>p") s))
 			     (len ((sat-fn "sat_proof_length" "p>l") s)))
-			(or (= 1 ((sat-fn "drat_check_text" "slpl>l") cnf (string-length cnf) text len))
+			(or (= 1 ((sat-fn "drat_check_text" "plpl>l") chars clen text len))
 			    (error "E_PROOF: the refutation's proof fails at line " ((sat-fn "drat_failed_line" ">l"))
-				   "; the formula is " (sat-keep cnf ".cnf") " and the proof " (sat-keep (sat-c-string text len) ".drat")))
+				   "; the formula is " (sat-keep (sat-c-string chars clen) ".cnf") " and the proof " (sat-keep (sat-c-string text len) ".drat")))
+			((sat-fn "text_free" "p") cnf)
 			(set out (if keep (cons 'unsat (sat-c-string text len)) (list 'unsat)))))
 	    (else (set out (list 'unknown)))))
     (sat-release s)
     out))
+(define-function sat-decide (n given . keep) (apply sat-decide-clean (cons n (cons (sat-clean given) keep))))

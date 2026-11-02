@@ -312,15 +312,24 @@
 (define john-search)
 (define-function john-satisfy (o g args using by)	; planner sat: john-sat.l, loaded when first asked for
   (if (= 'sat (cdr (assq 'planner *john-options*)))
-      (let () (require "john-sat.l") (john-sat-satisfy o g args))
+      (let () (require "john-sat.l") (john-sat-satisfy o g args using by))
     (john-search o g args using by)))
+(define-function john-goal-of (o g)	; o's goal g, its class's or a group's
+  (let ((goal ()) (c (john-object-class o)))
+    (list-do d *john-goals* (and (= g (cadr d)) (john-isa? c (car d)) (set goal d)))
+    (or goal (john-fail "no goal " g " for " o))
+    goal))
+(define-function john-satisfied (found)	; the world a plan reaches, now the current one
+  (set *john-world* found)
+  (john-say (concat-string "satisfied at time: " (format "%d" (<john-world>-time found))))
+  (let ((s "satisfied by: [ ") (first 1))
+    (list-do st (john-path found) (set s (concat-strings s (if first "" " , ") (john-step-text st))) (set first ()))
+    (john-say (concat-string s " ]"))))
 (define-function john-search (o g args using by)
-  (let* ((c (john-object-class o)) (goal ()) (frontier (list *john-world*)) (found ()) (k 0)
+  (let* ((goal (john-goal-of o g)) (frontier (list *john-world*)) (found ()) (k 0)
 	 (ahead (cdr (assq 'max-time-ahead *john-options*))) (horizon ahead) (committed *john-world*)
 	 (merge (john-true? (cdr (assq 'merge-worlds *john-options*)))) (seen (and merge (array 4093))))
     (and merge (john-new-state? seen *john-world*))
-    (list-do d *john-goals* (and (= g (cadr d)) (john-isa? c (car d)) (set goal d)))
-    (or goal (john-fail "no goal " g " for " o))
     (let ((env (john-bind (caddr goal) args (list (cons 'it o)))))
       (while (and frontier (not found) (<= k *john-limit*))
 	(list-do w frontier (and (not found) (john-true? (john-eval (cadddr goal) w env)) (set found w)))
@@ -340,12 +349,7 @@
 	      (set k (+ k 1))
 	      (set frontier next)
 	      (and next (john-say (concat-strings "looking " (format "%d" k) " time unit ahead (" (format "%d" (list-length next)) " possible worlds)")))))))
-    (if (not found) (john-say (if frontier "not satisfied within the time limit" "unsatisfiable"))
-      (set *john-world* found)
-      (john-say (concat-string "satisfied at time: " (format "%d" (<john-world>-time found))))
-      (let ((s "satisfied by: [ ") (first 1))
-	(list-do st (john-path found) (set s (concat-strings s (if first "" " , ") (john-step-text st))) (set first ()))
-	(john-say (concat-string s " ]"))))))
+    (if found (john-satisfied found) (john-say (if frontier "not satisfied within the time limit" "unsatisfiable")))))
 
 ;;; ---- statements
 

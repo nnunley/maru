@@ -13,7 +13,10 @@
 (define-structure <cnf> (nvars clauses true))
 (define-function cnf-new () (new <cnf> 0 () ()))
 (define-function cnf-var (c) (set (<cnf>-nvars c) (+ 1 (<cnf>-nvars c))) (<cnf>-nvars c))
-(define-function cnf-clause (c lits) (set (<cnf>-clauses c) (cons lits (<cnf>-clauses c))))
+(define-function cnf-clause (c lits)	; kept as sat-clean leaves it: a repeat once, a tautology not at all
+  (let ((kept ()) (taut ()))
+    (list-do l lits (or (member? l kept) (let () (and (member? (- l) kept) (set taut 1)) (push kept l))))
+    (or taut (set (<cnf>-clauses c) (cons (list-reverse! kept) (<cnf>-clauses c))))))
 (define-function cnf-clauses (c) (let ((out ())) (list-do k (<cnf>-clauses c) (push out k)) out))
 (define-function cnf-nvars (c) (<cnf>-nvars c))
 (define-function cnf-assert (c x) (cnf-clause c (list x)))
