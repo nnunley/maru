@@ -1,0 +1,119 @@
+// dimacs.irl -- DIMACS CNF read by a grammar block (draft-ndn-maru-sat-00 [R-dimacs],
+// [R-formats-grammars]): a header "p cnf V C", comment lines starting with c, and one clause
+// per line ending in 0.  The grammar reads every character; its actions keep the formula and
+// refuse what the format forbids (a literal above V or twice in a clause, a count other than
+// C, a count too large), failing the rule.  The checker reads formulas with it, and shares
+// nothing else with the solver.
+
+import void*(long) malloc;
+import void*(void*, long) realloc;
+import void(void*) free;
+import void*(char*, char*) fopen;
+import long(void*, long, long, void*) fread;
+import int(void*, long, int) fseek;
+import long(void*) ftell;
+import int(void*) fclose;
+
+struct Formula { long vars, count, clauses, nlits, cap; long* lits; long* starts; };
+
+long words(long n) return n * cast(sizeof(long), long);	// bytes in n longs
+
+// the grammar is <cnf>, so its rules' functions (cnf_clause, cnf_count ...) don't take the
+// API's names (dimacs_clause, dimacs_count)
+grammar {
+  <cnf> : <text-parser> (formula line atend)
+  blank   = [ \t\r] ;
+  eol     = "\n" | !. ;
+  count   = [0-9]+ @$#:n &-> (dimacs_small n) -> n ;
+  header  = blank* "p" blank+ "cnf" blank+ count:v blank+ count:c blank* eol &-> (dimacs_header p v c) ;
+  literal = ("-"? [1-9] [0-9]*) @$#:n &-> (dimacs_lit p n) ;
+  clause  = blank* (literal blank+)* "0" blank* eol &-> (dimacs_clause_end p) ;
+  comment = "c" (!"\n" .)* eol ;
+  line    = (comment | clause) -> (dimacs_next_line p) ;
+  start   = (comment -> (dimacs_next_line p))* header -> (dimacs_next_line p) line*
+            !. -> (dimacs_at_end p) &-> (dimacs_complete p) ;
+}
+
+struct Formula* dimacs_formula(struct cnf* p) return cast(p.formula, struct Formula*);
+long dimacs_next_line(struct cnf* p) { p.line := p.line + cast(1, long); return p.line; }
+long dimacs_at_end(struct cnf* p) { p.atend := cast(1, long); return p.atend; }
+long dimacs_small(long n) return cast(n <= cast(1073741824, long), long);
+long dimacs_header(struct cnf* p, long v, long c) {
+  let struct Formula* f := dimacs_formula(p);
+  f.vars := v; f.count := c;
+  free(f.starts);
+  f.starts := cast(malloc(words(c + cast(1, long))), long*);
+  f.starts[0] := f.nlits;
+  return cast(1, long);
+}
+void dimacs_push(struct Formula* f, long lit) {
+  if f.nlits == f.cap then {
+    f.cap := f.cap * cast(2, long);
+    f.lits := cast(realloc(f.lits, words(f.cap)), long*);
+  }
+  f.lits[f.nlits] := lit;
+  f.nlits := f.nlits + cast(1, long);
+}
+// a literal: in range, and not already in this clause
+long dimacs_lit(struct cnf* p, long n) {
+  let struct Formula* f := dimacs_formula(p);
+  if f.clauses == f.count || n > f.vars || cast(0, long) - n > f.vars then return cast(0, long);
+  let long j := f.starts[f.clauses];
+  while j < f.nlits do { if f.lits[j] == n then return cast(0, long); j := j + cast(1, long); }
+  dimacs_push(f, n);
+  return cast(1, long);
+}
+long dimacs_clause_end(struct cnf* p) {
+  let struct Formula* f := dimacs_formula(p);
+  if f.clauses == f.count then return cast(0, long);
+  dimacs_push(f, cast(0, long));
+  f.clauses := f.clauses + cast(1, long);
+  if f.clauses < f.count then f.starts[f.clauses] := f.nlits;
+  return cast(1, long);
+}
+long dimacs_complete(struct cnf* p) return cast(dimacs_formula(p).clauses == dimacs_formula(p).count, long);
+
+// the whole file, parsed; bad is 0, or the first bad line's number
+struct Formula* dimacs_read(char* path, long* bad) {
+  let struct Formula* f := cast(malloc(cast(sizeof(struct Formula), long)), struct Formula*);
+  let struct cnf* p := cast(malloc(cast(sizeof(struct cnf), long)), struct cnf*);
+  let void* in := fopen(path, "r");
+  f.vars := 0; f.count := 0; f.clauses := 0; f.nlits := 0; f.cap := 64;
+  f.lits := cast(malloc(words(cast(64, long))), long*);
+  f.starts := cast(malloc(words(cast(1, long))), long*);
+  f.starts[0] := 0;
+  bad[0] := 1;
+  if cast(in, long) == cast(0, long) then { free(p); return f; }
+  fseek(in, cast(0, long), 2);
+  let long n := ftell(in);
+  fseek(in, cast(0, long), 0);
+  let char* text := cast(malloc(n + cast(1, long)), char*);
+  fread(text, cast(1, long), n, in);
+  fclose(in);
+  p.input := text; p.pos := 0; p.end := n; p.formula := cast(f, long); p.line := 0; p.atend := 0;
+  // the first line no whole-line rule matched; every line read but a count wrong: the last
+  if cnf_start(p) then bad[0] := 0;
+  else if p.atend then bad[0] := p.line > 0 ? p.line : 1;
+  else bad[0] := p.line + cast(1, long);
+  free(text);
+  free(p);
+  return f;
+}
+
+void dimacs_free(struct Formula* f) { free(f.starts); free(f.lits); free(f); }
+long dimacs_check(char* path) {
+  let long bad := 0;
+  dimacs_free(dimacs_read(path, &bad));
+  return bad;
+}
+struct Formula* dimacs_load(char* path) {
+  let long bad := 0;
+  let struct Formula* f := dimacs_read(path, &bad);
+  if bad then { dimacs_free(f); return cast(0, struct Formula*); }
+  return f;
+}
+long dimacs_vars(struct Formula* f) return f.vars;
+long dimacs_count(struct Formula* f) return f.count;
+long* dimacs_clause(struct Formula* f, long i) return f.lits + words(f.starts[i]);	// ir2 offsets a pointer by bytes
+
+export dimacs_check, dimacs_load, dimacs_vars, dimacs_count, dimacs_clause, dimacs_free;

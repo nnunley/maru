@@ -79,7 +79,7 @@
     (match-any		. ,(lambda (pe) `(if (< ,irl-pos (member p end)) ,(irl-advance 1) 0)))
     (match-rule		. ,(lambda (pe) (if (cddr pe) (irl-grammar-fail "a rule with arguments has no typed form")
 					  `(if (!= (,(irl-rule-fn (cadr pe)) p) ,(irl-long 0)) 1 0))))
-    (match-zero-one	. ,(lambda (pe) `(let () ,(irl-pe (cadr pe)) 1)))
+    (match-zero-one	. ,(lambda (pe) `(if ,(irl-pe (cadr pe)) 1 1)))	; its value used, so ir2 sees an effect
     (match-zero-more	. ,(lambda (pe) `(let () (while ,(irl-pe (cadr pe))) 1)))
     (match-one-more	. ,(lambda (pe) `(if ,(irl-pe (cadr pe)) (let () (while ,(irl-pe (cadr pe))) 1) 0)))
     (peek-for		. ,(lambda (pe) (let ((s (irl-temp))) `(let (((,s long) ,irl-pos)) (if ,(irl-pe (cadr pe)) (let () ,(irl-set-pos s) 1) 0)))))

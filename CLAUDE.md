@@ -130,6 +130,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `export f;` keeps a function visible; make builds the library (`build/irl-lib.dylib`), which
   untyped Maru opens by its path in the tree and calls by address. `cast(e, type)` and
   `sizeof(type)` read to maru.k's own forms.
+- `sat_dimacs` (`check/sat-dimacs.l`): `dimacs.irl`'s grammar block `<cnf>`, built into
+  `build/sat.dylib` (opened by `sat.l`), reads DIMACS CNF and names the first bad line: a
+  literal above V or twice in a clause, too few or too many clauses, no header, a count over
+  2^30. `sat-write-dimacs` round-trips through `dimacs_load`.
 - `irl_grammar` (`check/irl-grammar.l`): a tpeg grammar calls another grammar's rule as `p-r`
   (compiled by `compile-tpeg.l` to a parser of `<p>` on the same input). In irl,
   `grammar { <G> : <parent> (fields) rules }` is tpeg's own syntax, read through that foreign

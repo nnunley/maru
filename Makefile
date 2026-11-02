@@ -57,7 +57,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
-CHECK_LIBS = build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l
+CHECK_LIBS = build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l
 
 check : eval eval2 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
@@ -149,6 +149,12 @@ build/%.$(SO) : build/%.k ir-gen-c.k maru.k | eval2
 build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
 	@mkdir -p build
 	./eval compile-tpeg.l $< > $@
+
+# the SAT solver, its checker and the format grammars, one library (draft-ndn-maru-sat-00)
+SAT_IRL = dimacs.irl $(wildcard sat.irl drat-check.irl)
+build/sat.k : $(SAT_IRL) compile-irl.l irl-grammar.l irl.g.l tpeg.l | eval
+	@mkdir -p build
+	./eval compile-irl.l --library $(SAT_IRL) > $@
 
 build/irl-lib.k : check/irl-lib-a.irl check/irl-lib-b.irl compile-irl.l irl.g.l | eval
 	@mkdir -p build
