@@ -38,6 +38,11 @@
   (or (tp-source?)
       (error "rule " *tp-rule* " calls " name " with arguments, which needs a grammar on <source-parser>")))
 
+;; An object literal, 'x, matches an element by in-same, which only a grammar on <source-parser> has.
+(define-function tp-object-literal ()
+  (or (tp-source?)
+      (error "rule " *tp-rule* " has an object literal, which needs a grammar on <source-parser>")))
+
 ;; A rule's parameters are the first elements of its input: `rule :a :b` is `.:a .:b` at its start.
 (define-function tp-parameters (params body)
   (cond
@@ -68,7 +73,7 @@
 (define-function value-pe (pe)
   (record-case pe
     (match-list		(exp)		(tp-list-pattern exp value-pe 1))
-    (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
+    (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
     (match-rule		(name . args)	(if args
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args))
@@ -129,7 +134,7 @@
 (define-function effect-pe (pe)
   (record-case pe
     (match-list		(exp)		(tp-list-pattern exp effect-pe ()))
-    (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
+    (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
     (match-rule		(name . args)	(if args
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args))
@@ -249,23 +254,51 @@
 	    (error "stopped parsing "path" before its end")))
       spec)))
 
+;; The forms that define a grammar's rules on class: a selector for each rule's match and its effect, then the methods.
+(define-function tp-definition-forms (class rules)
+  (let ((names (map car rules)))
+    `(,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
+      ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
+      ,@(map-with compile-value  rules class)
+      ,@(map-with compile-effect rules class))))
+
 (define-function parse-and-compile-grammar (path)
   (let* ((spec   (tpeg-parse-whole-file path))
 	 (decl   (caar spec))
 	 (rules  (cdr  spec))
-	 (names  (map car rules))
 	 (class  (or (car decl) "<text-parser>")))
     (set *tpeg-source* (= '<source-parser> (cadr decl)))
     ;;(print "DEFINITION: ") (map dumpln decl)
     ;;(print "RULES: ") (map dumpln rules)
-    ;;(print "NAMES: ") (dumpln names)
     `((require ,(if (tp-source?) "source-parser.l" "text-parser.l"))
       ,(and decl (list 'define-class (car decl) (cadr decl) (caddr decl)))
-      ,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
-      ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
-      ,@(map-with compile-value  rules class)
-      ,@(map-with compile-effect rules class)
+      ,@(tp-definition-forms class rules)
       )))
+
+;; In process, a grammar's parser type is its class's ancestry, so a child of <source-parser> runs on source.
+;; The base chain comes from boot's %structure-bases; <source-parser> is absent until its file is loaded.
+(define-function tp-derives? (type base)
+  (and type (or (= type base) (tp-derives? (array-at %structure-bases type) base))))
+
+(define-function tp-source-type ()
+  (and (defined? '<source-parser>) (eval '<source-parser>)))
+
+;; Compiles rules onto class, a grammar already defined, and evaluates the forms it compiles to.
+(define-function tpeg-define-rules (class rules)
+  (set *tpeg-source* (tp-derives? (eval class) (tp-source-type)))
+  (list-do form (tp-definition-forms class rules) (eval form))
+  class)
+
+;; Defines a grammar from its declaration, (name parent fields), and its rules.
+(define-function tpeg-define (decl rules)
+  (or decl (error "a grammar needs a declaration, <name> : <parent> ()"))
+  (eval `(define-class ,(car decl) ,(cadr decl) ,(caddr decl)))
+  (tpeg-define-rules (car decl) rules))
+
+;; tpeg-load compiles a .g file in process; its parent must already be loaded.
+(define-function tpeg-load (path)
+  (let ((spec (tpeg-parse-whole-file path)))
+    (tpeg-define (caar spec) (cdr spec))))
 
 (or (defined? 'compile-tpeg-definitions-only)
     (while *arguments*

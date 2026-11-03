@@ -163,3 +163,40 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
     check/tpeg-interleave.l`, which needs the block forms `{ <x> : … }`, `{ rules }` and `{ rules expression }` from `tpeg.g`
     and a REPL reader that hands back its position; none of that is in the tree yet. Apply after it, and it needs `{apply x}`
     and `{super r x}`, which `tpeg.g` doesn't parse yet.
+- Iteration 6 (Args and Interleave, stage 1 Task 4's refusal and the block forms). Scoreboard after it, from the record run:
+  **Selectors, Source, Lists, Args, Interleave and Speed green**; Apply, Memos, Literals, Calc and Suite red. Speed:
+  `main 323 ms, here 309 ms` (an earlier run in this iteration read `main 277 ms, here 303 ms`, so the spread is load, not code).
+  `make tpeg.l` (forced with `make -B tpeg.l`, no diff), `lines`, `text_parser`, `peg_compose`, `irl`, `irl_grammar`, `john_forms`,
+  `law_cexpr`, `cexpr_forms`, `sat_dimacs` pass.
+- What landed:
+  - Args: `literal.g` (`start = 'x ;` on `<text-parser>`) compiled silently, because `value-pe` and `effect-pe`'s `match-object`
+    clause had no guard. `tp-object-literal` (compile-tpeg.l) errors naming the rule, the same wording as the other refusals. The
+    `match-class` and `match-string` one-character branches still emit `match-object` on text, and must.
+  - Interleave: `tpeg-repl.l` (new, 68 lines) is the reader. It requires `compile-tpeg.l` with `compile-tpeg-definitions-only`
+    set, so the argument loop doesn't run, reads with a `<tpeg>` parser over the file, and evals each form at once, as repl.l
+    does. `grammar-define`, `grammar-extend`, `grammar-eval` are `define-form`s there. A `{ rules expr }` block's expression
+    becomes `start` on a fresh child `<tpeg-block>` of the running grammar, and `tpeg-match-rest` runs it on a `text-parser-for-on`
+    sharing the reader's string, copying the position in and out. So the hand-back is a position copy, not a shared object.
+  - compile-tpeg.l (+33): `tp-definition-forms` (selectors and methods for a class), `tp-derives?` (walks `%structure-bases`,
+    which ends at nil for `<text-parser>`), `tp-source-type`, `tpeg-define-rules` (sets `*tpeg-source*` from the class's
+    ancestry and evals the forms), `tpeg-define` and `tpeg-load` (a `.g` file in process). `parse-and-compile-grammar` still
+    decides source-ness by the parent's symbol, and its output is byte-identical to HEAD's (checked with cmp on
+    `check/tpeg-mini.g`, `check/tpeg-lists.g` and `tpeg.g`).
+  - `check/lines`: +101 for the new file and the compile-tpeg.l delta (the lines check named 101).
+- Decisions the RFC doesn't spell out (a human may want to look):
+  - The running grammar is the last one a block defined or extended (`*tpeg-running*`); a file starts on `<tpeg-running>`, a
+    `<text-parser>` child. Rules-only blocks enrich it, so a later block overrides `word` and `_` stays, as the check expects.
+  - A block's expression is a child class per block, so it doesn't replace a `start` rule on the running grammar.
+  - `tpeg-load` lives in compile-tpeg.l, not tpeg-repl.l, because `check/tpeg-apply.l` loads only compile-tpeg.l.
+- Gotchas for the next iteration:
+  - `defined?` takes the symbol's value (`(defined? parent)`), not a quoted symbol inside a variable.
+  - `tp-derives?` needs `(tp-source-type)`, which is nil until source-parser.l is loaded. tpeg-repl.l requires it; the file path
+    (`./eval compile-tpeg.l X.g`) doesn't, and still uses the symbol compare.
+  - Redefining `<tpeg-block>` each time is deliberate: a new type per expression block, so no method from an old block survives.
+  - `peg.g` is refused by `compile-tpeg.l` (it calls a rule with arguments). That predates this iteration: it's peg syntax,
+    compiled by compile-peg.l, not a tpeg grammar.
+  - Next: Apply (`check/tpeg-apply.l`). It fails at `undefined variable: $apply`, because tpeg.g has no `apply` or `super`:
+    `{apply t}` parses as `(match-rule apply t)`. `tpeg-load` already exists. Then Literals: `check/tpeg-literals.l` fails at
+    `undefined variable: $x10`, so the action's `0x10` isn't read as hex (the RFC's "Grammar features" says this is the current
+    behaviour, but the check expects 16). `tree_parse_complete` runs in the same Literals record, after `tree_literals`, so it hasn't
+    been seen green yet. Log: `/tmp/maru-plan-Apply.log` and `/tmp/maru-plan-Literals.log`.
