@@ -16,16 +16,37 @@
 	(cons (fn1 (car list)) (mapN1 fnN fn1 (cdr list))))
     list))
 
+;;; --on source: the same rules for <source-parser> (source-parser.l). Text is the default and is unchanged.
+(define *tpeg-target* "text")
+
+(define-function tp-source? ()		(equal *tpeg-target* "source"))
+
+;; the runtime operation a template calls: text-parser-match-any, or source-parser-match-any on source
+(define-function tp-op (name)
+  (concat-symbol (if (tp-source?) 'source-parser- 'text-parser-) name))
+
+;; a grammar's class on source is <X/source>, and <text-parser> there is <source-parser>
+(define-function tp-source-class (name)
+  (cond ((not name)			'<source-parser>)
+	((= name '<text-parser>)	'<source-parser>)
+	(else (let ((s (symbol->string name)))
+		(string->symbol (concat-strings (string-copy s 0 (- (string-length s) 1)) "/source>"))))))
+
+;; a foreign rule call, p-r, is not generated on source yet
+(define-function tp-foreign-on-source (name)
+  (and (tp-source?)
+       (error "foreign rule call to "name" is not generated with --on source yet")))
+
 (define value-pe)
 (define effect-pe)
 
 (define-function value-pe (pe)
   (record-case pe
     (match-rule		(name . args)	(if args
-					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$ name) self ,@args)
-					  `(text-parser-invoke-rule ',name ,(concat-symbol '$ name) self)))
-    (match-rule-in	(grammar name)	`(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name)))
-    (match-require	(exp alt)	`(or ,(value-pe exp) (text-parser-expected self ,alt)))
+					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args)
+					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self)))
+    (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name))))
+    (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map value-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(mapN1 effect-pe value-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(let ((_list_ (array)))
@@ -50,27 +71,27 @@
     (match-class	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
-					    ((= len 1)	`(text-parser-match-object self ,(string-at str 0)))
-					    (else	`(text-parser-match-class  self ,(text-parser-make-class str))))))
+					    ((= len 1)	`(,(tp-op 'match-object) self ,(string-at str 0)))
+					    (else	`(,(tp-op 'match-class)  self ,(text-parser-make-class str))))))
     (match-string	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
-					    ((= len 1)	`(text-parser-match-char   self ,(string-at str 0)))
-					    (else	`(text-parser-match-string self ,str ,(string-length str))))))
-    (match-any		()		'(text-parser-match-any self))
+					    ((= len 1)	`(,(tp-op 'match-char)   self ,(string-at str 0)))
+					    (else	`(,(tp-op 'match-string) self ,str ,(string-length str))))))
+    (match-any		()		`(,(tp-op 'match-any) self))
     (make-span		(exp)		`(let ((pos self.position))
 					   (when ,(effect-pe exp)
-					     (set self.result (text-parser-list-from-to self pos self.position))
+					     (set self.result (,(tp-op 'list-from-to) self pos self.position))
 					     1)))
     (make-string	(exp)		(record-case exp
 					  (make-span (exp)	`(let ((pos self.position))
 								   (when ,(effect-pe exp)
-								     (set self.result (text-parser-string-from-to self pos self.position)))))
+								     (set self.result (,(tp-op 'string-from-to) self pos self.position)))))
 					  (else			`(and ,(value-pe exp) (set self.result (list->string self.result))))))
     (make-symbol	(exp)		(record-case exp
 					  (make-span (exp)	`(let ((pos self.position))
 								   (when ,(effect-pe exp)
-								     (set self.result (string->symbol (text-parser-string-from-to self pos self.position))))))
+								     (set self.result (string->symbol (,(tp-op 'string-from-to) self pos self.position))))))
 					  (else			`(and ,(value-pe exp) (set self.result (string->symbol (list->string self.result)))))))
     (make-number	(r exp)		`(and ,(value-pe exp) (let () (set self.result (string->number-base (list->string self.result) ,r)) 1)))
     (assign-result	(name exp)	`(when ,(value-pe exp) (set ,name self.result) 1))
@@ -80,10 +101,10 @@
 (define-function effect-pe (pe)
   (record-case pe
     (match-rule		(name . args)	(if args
-					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$$ name) self ,@args)
-					  `(text-parser-invoke-rule ',name ,(concat-symbol '$$ name) self)))
-    (match-rule-in	(grammar name)	`(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name)))
-    (match-require	(exp alt)	`(or ,(effect-pe exp) (text-parser-expected self ,alt)))
+					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args)
+					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self)))
+    (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name))))
+    (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(if ,(effect-pe exp) 1 1))	; its value used, where typed code warns of none
@@ -99,14 +120,14 @@
     (match-class	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
-					    ((= len 1)	`(text-parser-match-object self ,(string-at str 0)))
-					    (else	`(text-parser-match-class  self ,(text-parser-make-class str))))))
+					    ((= len 1)	`(,(tp-op 'match-object) self ,(string-at str 0)))
+					    (else	`(,(tp-op 'match-class)  self ,(text-parser-make-class str))))))
     (match-string	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
-					    ((= len 1)	`(text-parser-match-object self ,(string-at str 0)))
-					    (else	`(text-parser-match-string self ,str ,(string-length str))))))
-    (match-any		()		'(text-parser-match-any self))
+					    ((= len 1)	`(,(tp-op 'match-object) self ,(string-at str 0)))
+					    (else	`(,(tp-op 'match-string) self ,str ,(string-length str))))))
+    (match-any		()		`(,(tp-op 'match-any) self))
     (make-span		(exp)		(effect-pe exp))
     (make-string	(exp)		(effect-pe exp))
     (make-symbol	(exp)		(effect-pe exp))
@@ -187,12 +208,14 @@
 	 (decl   (caar spec))
 	 (rules  (cdr  spec))
 	 (names  (map car rules))
-	 (class  (or (car decl) "<text-parser>")))
+	 (class  (if (tp-source?) (tp-source-class (car decl)) (or (car decl) "<text-parser>"))))
     ;;(print "DEFINITION: ") (map dumpln decl)
     ;;(print "RULES: ") (map dumpln rules)
     ;;(print "NAMES: ") (dumpln names)
-    `((require "text-parser.l")
-      ,(and decl (list 'define-class (car decl) (cadr decl) (caddr decl)))
+    `((require ,(if (tp-source?) "source-parser.l" "text-parser.l"))
+      ,(and decl (if (tp-source?)
+		     (list 'define-class (tp-source-class (car decl)) (tp-source-class (cadr decl)) (caddr decl))
+		   (list 'define-class (car decl) (cadr decl) (caddr decl))))
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
       ,@(map-with compile-value  rules class)
@@ -201,4 +224,7 @@
 
 (or (defined? 'compile-tpeg-definitions-only)
     (while *arguments*
-      (map dumpln (parse-and-compile-grammar (next-argument)))))
+      (let ((arg (next-argument)))
+	(if (equal arg "--on")
+	    (set *tpeg-target* (next-argument))
+	  (map dumpln (parse-and-compile-grammar arg))))))

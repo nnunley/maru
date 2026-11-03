@@ -9,29 +9,12 @@
 ;; the first position in a source
 (define-selector in-start (source) 0)
 
-;; the length of a source that has one, for the text path's limit
-(define-selector in-limit (source) ())
-
 (define-selector in-at-end)
 (define-selector in-head)
 (define-selector in-tail)
 
-;; is position b later than position a in this source
-(define-selector in-after (source a b) (< a b))
-
-;; the elements from position from up to, not including, position to
-(define-selector in-span (source from to)
-  (let ((pos from) (out ()))
-    (while (in-after source pos to)
-      (push out (in-head source pos))
-      (set pos (in-tail source pos)))
-    (list-reverse! out)))
-
-;; are two values the same, as a match on them needs
+;; are two elements the same, as a match on them needs
 (define-selector in-same (a b) (= a b))
-
-;; is element a member of the class string
-(define-selector in-class (element class) ())
 
 (define-method in-enter <undefined> ()		1)
 (define-method in-enter <pair> ()		1)
@@ -40,8 +23,6 @@
 (define-method in-start <undefined> ()		self)
 (define-method in-start <pair> ()		self)
 (define-method in-start <string> ()		0)
-
-(define-method in-limit <string> ()		(string-length self))
 
 (define-method in-at-end <undefined> (pos)	1)
 (define-method in-at-end <pair> (pos)		(not pos))
@@ -55,15 +36,35 @@
 (define-method in-tail <pair> (pos)		(cdr pos))
 (define-method in-tail <string> (pos)		(+ pos 1))
 
-;; a list's positions are its pairs: b is later if walking the tails from a reaches b, the end included
-(define-method in-after <undefined> (a b)	())
-
-(define-method in-after <pair> (a b)
-  (let ((p (and a (cdr a))))
-    (while (and p (not (= p b)))
-      (set p (cdr p)))
-    (and a (= p b))))
-
 (define-method in-same <string> (b)		(equal self b))
 
-(define-method in-class <long> (class)		(and (string-search class self) 1))
+;;; Streams: a cell holds one element of a source, built when it is entered. Its tail is built the
+;;; first time it is asked for, and kept. Its memo table is what the rules have answered here.
+
+(define-structure <cell> (source position end head next memo))
+
+(define-function stream-at (source pos)
+  (let ((end (in-at-end source pos)))
+    (new <cell> source pos end (and (not end) (in-head source pos)) () ())))
+
+(define-function stream-of (source)
+  (stream-at source (in-start source)))
+
+(define-function stream-end? (c)	(<cell>-end c))
+(define-function stream-head (c)	(<cell>-head c))
+
+(define-function stream-tail (c)
+  (or (<cell>-next c)
+      (let ((next (stream-at (<cell>-source c) (in-tail (<cell>-source c) (<cell>-position c)))))
+	(set (<cell>-next c) next)
+	next)))
+
+(define-function stream-memo (c)	(<cell>-memo c))
+
+;; the elements from cell from up to, not including, cell to, in a list
+(define-function stream-span (from to)
+  (let ((c from) (out ()))
+    (while (and (not (= c to)) (not (stream-end? c)))
+      (push out (stream-head c))
+      (set c (stream-tail c)))
+    (list-reverse! out)))

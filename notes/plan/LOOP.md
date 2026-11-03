@@ -72,3 +72,32 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
     a list source will hit a string error instead of its message. Not needed by Source; Task 3 or a later iteration should guard it.
   - `tree_input` isn't registered in `check/check.l`; the selectors case is `tree_selectors`.
   - Next: Lists (Task 3, `match-list` and object literals). The Lists log is `/tmp/maru-plan-Lists.log`.
+- Iteration 3 (Selectors and Source, stage 1 Tasks 1 and 2 under the new design). Scoreboard after it: **Source green**,
+  Speed green (485 ms main, 510 ms here, +5%); **Selectors red, and it is a check bug, not code** (stop and report):
+  - `check/tpeg-selectors.l` line 28: `(expect "a tail is kept" (= d (stream-tail c)) 1)`. `=` returns `t` on all three
+    evaluators (`(= 1 1)` prints `t`), so the check can't pass whatever the code does. Wrapping that one expression as
+    `(and (= d (stream-tail c)) 1)` makes the whole file print `tpeg selectors ok` on `./eval`, `./eval2 -b boot2.l` and
+    `./eval3 -b boot2.l` (a scratch copy in the scratchpad; the check itself is unedited). A human should make that fix.
+  - Everything else in `tpeg-selectors.l` already passes with the code as committed.
+- What landed: `input.l` is the in-enter/start/at-end/head/tail/same selectors (in-after, in-span, in-limit, in-class gone),
+  plus stream cells: `<cell>` (source position end head next memo), `stream-of`, `stream-tail` (built once, then kept),
+  `stream-end?`, `stream-head`, `stream-memo`, and `stream-span` (the elements between two cells, for `@`).
+  `source-parser.l` (new, requires input.l) defines `<source-parser>` (source position result foreign), `source-parser-for`,
+  the match operations over cells, `source-parser-invoke-rule`, and `parse-source`. `compile-tpeg.l --on source` writes
+  `(require "source-parser.l")`, `<X/source>` with parent `<P/source>` (or `<source-parser>` for `<text-parser>`), and the
+  same templates through `tp-op`, which picks `text-parser-` or `source-parser-`. Text output is byte-identical to HEAD's
+  for `check/tpeg-mini.g` (checked with cmp), and `make tpeg.l` passes.
+- Gotchas for the next iteration:
+  - `define-selector` on an existing selector returns the existing one, so the text and source files can both define `$sum`
+    in one process (`tpeg-source.l` loads both). No guard is needed.
+  - Foreign calls (`p-r`) on `--on source` stop compilation naming the rule (`tp-foreign-on-source`); the text path is unchanged.
+  - Calls with arguments on source are NOT the RFC's semantics yet: `source-parser-invoke-rule-simply` is an alias of
+    `source-parser-invoke-rule`, which just applies the rule. Args (stage 1 Task 4) must replace it with the arguments-on-input
+    cells, and must also make the text path refuse arguments as R-instances says. That text refusal is not done.
+  - `stream-memo` returns `()` and nothing fills it; memos on source are the Memos iteration's work, with
+    `text-parser-invoke-rule-with-memo` and `-with-recursion` still text-only. `peg-enable-recursion` doesn't apply to source yet.
+  - `stream-tail` of an end cell asks the selector for a position past the end; nothing relies on it, but a later
+    iteration should decide what an end cell's tail is.
+  - In zsh an unquoted `$ev` holding `./eval2 -b boot2.l` is one word, so loops over evaluators need the commands spelled out.
+  - `check/lines` has a +112 entry for this iteration's new and changed lines.
+  - Next: Selectors (once the check is fixed), then Lists (stage 1 Task 3, `match-list` and object literals), whose log is `/tmp/maru-plan-Lists.log`.
