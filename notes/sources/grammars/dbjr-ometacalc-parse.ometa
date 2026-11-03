@@ -1,0 +1,28 @@
+// Title: "OMeta Can Make Symbol Transformers": a left-recursive calculator that builds a tree
+// Author: Alex Warth's OMeta/Squeak 2, as used in a DBjr document
+// Source: https://tinlizzie.org/dbjr/ometaCalc-parse.lbox/index.siss (2013-12-02); local copy
+//         ~/pkm/raw/vpri/ometa2/. ometaCalc-tree.lbox (2012-06-13) has the same rules.
+// Extracted from the document's text spans, so it is verbatim; not transcribed from an image.
+
+OMeta2 subclass: OMeta2Calculator ()
+
+start = addExpr:e spaces				[e].
+
+addExpr = 
+	addExpr:x ("+" | "-"):op mulExpr:y	[{op. x. y}]
+|	mulExpr.
+
+mulExpr = 
+	mulExpr:x ("*" | "/"):op primExpr:y	[{op. x. y}]
+|	primExpr.
+
+primExpr = 
+	"(" addExpr:x ")"					[x]
+|	number
+|	identifier.
+
+number =
+	spaces <digit+>.
+
+identifier =
+	spaces <letter (letter | digit)*>.

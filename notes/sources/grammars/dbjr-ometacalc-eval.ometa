@@ -1,0 +1,17 @@
+// Title: "OMeta Can Make Symbol Transformers": an evaluator over the calculator's tree
+// Author: Alex Warth's OMeta/Squeak 2, as used in a DBjr document
+// Source: https://tinlizzie.org/dbjr/ometaCalc-eval.lbox/index.siss; local copy ~/pkm/raw/vpri/ometa2/.
+// Extracted from the document's text spans, so it is verbatim. In OMeta2 `{ }` is a list pattern and
+// `_` is anything. The document's environment is {'a' -> 5. 'b' -> 10}.
+
+OMeta2 subclass: OMeta2Evaluator (env)
+
+start :env = calc.
+
+calc =
+	{('+' | '-' | '*' | '/'):op calc:l calc:r}
+				-> [l perform: op asSymbol with: r]
+|	_:n ?[n first isDigit]	
+				-> [n asNumber]
+|	_:n ?[n first isLetter] 
+				-> [env at: n ifAbsent: [Float nan]].

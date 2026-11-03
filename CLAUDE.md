@@ -15,6 +15,13 @@ merged in, from attila-lendvai/maru's `piumarta` branch. A replace ref grafts
 The layout is flat, as upstream intended: `require` and `load` resolve
 relative to the current directory, so run everything from the repo root.
 
+## The goal, and its core reference
+
+The end goal is to synthesize the rest of VPRI's work into something that runs on modern
+machines. [tinlizzie.org](https://tinlizzie.org/), the archived VPRI site, is a core reference
+for that: the papers (`/VPRIPapers/`) and the top-down system's own dump (`/dbjr/`, including
+the KSWorld `.pp` bundles). Keep third-party texts in `~/pkm`, not in this tree.
+
 ## Other history (tags)
 
 `refactor-main` (the 2025 reorganization, with unfinished ARM64 experiments
