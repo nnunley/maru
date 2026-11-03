@@ -427,8 +427,7 @@ output to typed Maru. Each is one the optimizers below need. [R-grammar-features
 - `tpeg` keeps the source position of a list it builds, as `peg` does, and a pass carries it from a node to
   that node's rewrite, so errors still name the original text. [R-source-positions] `text-parser.l`'s
   `set-list-source` does nothing today.
-- Actions read hexadecimal literals, as `peg` does. `tpeg` reads `0x10` as `0` followed by a call to a rule
-  `x10`.
+- Actions read hexadecimal literals, as `peg` does.
 - An action is whatever forms its target compiles, and calls to named functions. A grammar compiles
   for a target when its actions and return values do. `<cnf>`'s actions are typed functions and `long`s,
   so it compiles natively.
