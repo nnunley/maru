@@ -9,5 +9,5 @@ primExpr = spaces "(" addExpr:x spaces ")" -> x
 	| number
 	| identifier ;
 number = spaces [0-9]+ $:n -> n ;
-identifier = spaces [a-zA-Z] [a-zA-Z0-9]* @$:n -> n ;
+identifier = spaces ([a-zA-Z] [a-zA-Z0-9]*) @$:n -> n ;
 spaces = [ \t]* ;

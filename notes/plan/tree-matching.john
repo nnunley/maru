@@ -12,10 +12,11 @@ make Req Args Lists None no.
 make Req Interleave Source None no.
 make Req Apply Args Interleave no.
 make Req Memos Lists None no.
+make Req Foreign Memos None no.
 make Req Literals Source None no.
 make Req Calc Memos Args no.
 make Req Speed Source None no.
-make Req Suite Calc Apply no.
+make Req Suite Calc Foreign no.
 make Team T.
 action Req passed.
 action Req failed.

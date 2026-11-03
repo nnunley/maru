@@ -265,14 +265,24 @@
 (check "tree_args" (on-each-evaluator "tree_args" "check/tpeg-args.l"))
 (check "tree_apply" (on-each-evaluator "tree_apply" "check/tpeg-apply.l"))
 (check "tree_memo" (on-each-evaluator "tree_memo" "check/tpeg-memo.l"))
+(check "tree_foreign" (on-each-evaluator "tree_foreign" "check/tpeg-foreign.l"))
 (check "tree_literals" (on-each-evaluator "tree_literals" "check/tpeg-literals.l"))
-;; list patterns, object literals, arguments and parameters need a grammar on <source-parser>: on text they stop, naming the rule
+;; what a grammar can't do stops compilation, saying why
+(define-function output-has (text word)
+  (let ((i 0) (n (- (string-length text) (string-length word))) (found ()))
+    (while (and (not found) (<= i n))
+      (and (= word (string-copy text i (string-length word))) (set found 1))
+      (incr i))
+    found))
+(define-function refuses (name word)
+  (let ((out (concat-strings tmp "/refused-" name ".out")))
+    (and (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; ./eval compile-tpeg.l check/tpeg-refused/" name ".g"))))
+	 (output-has (contents-of-file-named out) word))))
 (check "tree_text_refuses"
-  (list-do f '("args" "params" "list" "literal")
-    (let ((out (concat-strings tmp "/refused-" f ".out")))
-      (unit-assert (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; ./eval compile-tpeg.l check/tpeg-refused/" f ".g")))))
-      ;; the error names what's needed, and its first line says so
-      (unit-assert (= 0 (run-status 10 (concat-strings "exec >/dev/null 2>&1; grep -q 'needs a grammar on <source-parser>' " out)))))))
+  (list-do f '("args" "params" "list" "literal" "apply" "super")
+    (unit-assert (refuses f "needs a grammar on <source-parser>")))
+  (unit-assert (refuses "reserved" "reserved"))
+  (unit-assert (refuses "param-lr" "left-recursive")))
 
 ;; a grammar that stops parsing partway is an error, and doesn't quietly lose its remaining rules
 (check "tree_parse_complete"

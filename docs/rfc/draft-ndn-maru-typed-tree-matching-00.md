@@ -388,8 +388,7 @@ tree_args
 ```
 
 ```maru-check @R-foreign-proxy
-peg_compose
-tree_memo
+tree_foreign
 ```
 
 ### Grammar features
@@ -499,8 +498,8 @@ tree_agree
 
 ### Memoization and left recursion
 
-Each parser type MUST memoize, and grow left-recursive rules as OMeta/Squeak 2's `apply:` does: repeat until a pass fails or doesn't advance. `<text-parser>` judges that with `<`, as it does today, and
-`<source-parser>` by cell identity. A left-recursive grammar
+Each parser type MUST memoize, and grow left-recursive rules as OMeta/Squeak 2's `apply:` does: repeat until a pass fails or doesn't advance. `<text-parser>` judges that with `<`, as it does today. `<source-parser>` compares cells, and a pass that ends where the previous answer ended, or where the rule's first answer ended, stops the growth,
+as OMeta/Squeak 2's sentinel does: without that, `sum = sum 'plus . | .` loops forever, since the base alternative's pass ends at an earlier cell. A left-recursive grammar
 then compiles natively, which is what stops the JOHN, irl, law and KScript grammars from doing so
 today. [R-typed-left-recursion] Refusing this was a limit in the matching machinery, not in a
 grammar's actions.
@@ -535,7 +534,7 @@ opt_inline
 ```
 
 ```maru-check @R-param-left-recursion
-tree_memo
+tree_text_refuses
 ```
 
 ### Optimizing passes
