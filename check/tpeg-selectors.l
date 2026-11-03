@@ -18,21 +18,20 @@
 (expect "an empty list is at its end" (and (in-at-end () (in-start ())) 1) 1)
 (expect "a string can be entered" (and (in-enter "ab") 1) 1)
 
-(expect "text after" (and (in-after "ab" 0 1) 1) 1)
-(expect "text not after itself" (in-after "ab" 1 1) ())
-(define l '(1 2 3))
-(expect "list after" (and (in-after l l (cdr l)) 1) 1)
-(expect "list not before" (in-after l (cdr l) l) ())
-(expect "the end is after" (and (in-after l l ()) 1) 1)
-
 (expect "same string" (and (in-same "x" "x") 1) 1)
 (expect "different symbols" (in-same 'x 'y) ())
 (expect "same number" (and (in-same 0 0) 1) 1)
-(expect "in a class" (and (in-class ?5 "0123456789") 1) 1)
-(expect "a symbol isn't in a class" (in-class 'a "0123456789") ())
-
-(expect "span of text" (in-span "abc" 0 2) '(97 98))
-(expect "span of a list" (in-span l l (cddr l)) '(1 2))
-(expect "span of a user's type" (in-span (new <countdown> '(5 6 7)) 1 3) '(6 7))
+;; streams: a tail is built once, a cell has a memo table, and the end is a cell
+(let* ((c (stream-of '(1 2)))
+       (d (stream-tail c)))
+  (expect "head" (stream-head c) 1)
+  (expect "a tail is kept" (= d (stream-tail c)) 1)
+  (expect "next head" (stream-head d) 2)
+  (expect "not the end" (stream-end? d) ())
+  (expect "the end" (and (stream-end? (stream-tail d)) 1) 1))
+(expect "an empty stream" (and (stream-end? (stream-of ())) 1) 1)
+(expect "a stream over text" (stream-head (stream-of "ab")) 97)
+(expect "a stream over a user's type" (stream-head (stream-tail (stream-of (new <countdown> '(5 6))))) 6)
+(and has-bytes (expect "a stream over bytes" (stream-head (stream-of (bytes-of "ab"))) 97))
 
 (finish "tpeg selectors")

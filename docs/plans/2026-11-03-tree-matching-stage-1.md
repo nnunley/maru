@@ -4,7 +4,7 @@
 
 **Goal:** `compile-tpeg.l` grammars match any iterable data on `eval`, `eval2` and `eval3`, with list patterns, object literals, arguments on the input, `{apply}` and `{super}`, and memoization and left recursion on every source.
 
-**Architecture:** A new `input.l` defines the input selectors, with methods for text, binary (`<data-stream>`) and list sources. `<text-parser>` keeps its fields: `string` holds any source and `position` any position. Its runtime functions keep their direct path when the source is a `<string>` at an integer position, and go through the selectors otherwise. `compile-tpeg.l` gains the new forms.
+**Architecture:** `<text-parser>` stays as it is, for text. `<source-parser>` in `source-parser.l` matches any source through stream cells built from the `in-*` selectors in `input.l`, and `compile-tpeg.l --on source` targets it. **The tasks below predate this: their order and pitfalls are useful, but where they name functions or say `<text-parser>` holds any source, the RFC decides.**
 
 **Tech Stack:** untyped Maru (`boot.l`, `boot2.l`), `tpeg.g`, `compile-tpeg.l`, `text-parser.l`, `check/check.l`.
 

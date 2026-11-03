@@ -9,7 +9,7 @@
 
 This document specifies how tree-matching grammars, in the style of OMeta and Piumarta's PEG
 transformer, compile through `maru.k` and ir2 to native code. It defines objects and selectors
-in typed Maru, a uniform input interface over any data that can be iterated on, the grammar features Warth's
+in typed Maru, a parser over any data that can be iterated on, the grammar features Warth's
 optimizers need, and those optimizers as grammars. It also specifies replacing hand-written tree
 walks across the tree with such grammars. It is written for whoever implements the grammar
 compilers and whoever writes a pass over Maru forms.
@@ -64,6 +64,9 @@ shown here.
 - **host description** — the typed Maru file that says how one host represents objects.
 - **selector** — a function that dispatches on its first argument's type, with one method per type.
 - **source** — the value being matched; **position** — where in it, in the source's own terms.
+- **stream** — a chain of cells over a source. A **cell** holds an element, a lazily built tail, and a memo table.
+- **parser type** — `<text-parser>` for text, or `<source-parser>` for any source, through streams.
+- **instance** — a grammar's rules compiled for one parser type.
 - **pass** — a grammar that rewrites a tree. A **null pass** rewrites every node to an equal node.
 - **PE tree** — the parsing-expression forms `tpeg.g` produces (`match-all`, `match-first` …).
 
@@ -77,8 +80,8 @@ back end exists. It does NOT change `peg.g`, `peg-compile.l` or `parser.l`.
 
 The sections below go by topic. The work goes in this order, and each stage is useful alone:
 
-1. On the evaluators: the input selectors, list patterns, arguments on the input and the other grammar
-   features in `compile-tpeg.l`, with memos as they are today.
+1. On the evaluators: `<source-parser>` and streams, list patterns, arguments on the input and the other grammar
+   features in `compile-tpeg.l`.
 2. On the evaluators: the passes, written in those grammars, and `compile-tpeg.l`'s generator rewritten
    as rules, since `tpeg` then has what `peg.g`'s generator uses.
 3. In typed Maru: objects, host descriptions and selectors.
@@ -96,7 +99,14 @@ slow path is never a semantic commitment and a fast path is never the only path.
 
 **A stream is a memoizable table of data.** Each position holds an element and can hold what rules
 have answered there. OMeta/JS keeps a `memo` on each `OMInputStream`, `parser.l` keeps `notes` on each
-`<token>`, and `text-parser.l` keeps an array of memos indexed by position: one rule, three layouts.
+`<token>`, and `text-parser.l` keeps an array of memos indexed by position: one rule, three layouts, and each parser type keeps its own.
+
+**Memos are on the stream.** A rule's answer belongs to a position, so it lives in that position's cell, as in OMeta. Grammars keep theirs apart because a foreign rule
+sees the input through a proxy with fresh memos, not because a parser owns them.
+
+**One grammar object, and a stack of who has the input.** A grammar's fields stay on one object, and `self` stays that object throughout a match. What changes is the input: a list
+pattern swaps it and restores it, as OMeta2's `form:` does; a call with arguments prepends to it, as `apply:withArgs:` does; and a foreign rule lends it to another
+grammar's object and takes it back, as `foreign` does.
 
 **Parse data is separate from parse state.** Whether a match succeeded is state; what it produced is data, kept in
 `self.result`. No generated code and no runtime function decides success from a value, so a match can produce 0, nil
@@ -126,7 +136,7 @@ RECORD HostDescription:          -- a typed Maru file; one for each host
     type-of(word)   : long       -- the grounding of dispatch: tag test, then header read
     long-value(word): long       -- a long object's number
         make-long(long) : word
-    
+
 
         alloc(type, n)  : word       -- n bytes under a header for a type; may collect
     alloc-atom(n)   : word       -- bytes the collector doesn't trace
@@ -254,81 +264,106 @@ tree_selector
 tree_host
 ```
 
-### The input interface
+### Parser types and instances
 
-Every source MUST be matched through one set of selectors, modelled on OMeta/JS's `OMInputStream`
-and its `toOMInputStream` methods: [R-input-selectors]
+There MUST be two parser types. [R-parser-types]
+
+| Parser type | Source | Position | Memos |
+|---|---|---|---|
+| `<text-parser>` | a string | an integer | an array indexed by position, per parser, as today |
+| `<source-parser>` | any value with input methods | a cell | in the cell |
+
+`<text-parser>` and what `compile-tpeg.l` generates for it MUST stay as they are, with no test for the kind of source. Text pays nothing for the other. [R-text-unchanged] A grammar that
+only reads text stays on it, and direct code for lists or binary is an optimization for later, through [R-opt-specialize], if evidence asks for it.
+
+An instance is chosen when a grammar is compiled: `compile-tpeg.l --on source mini.g` generates its rules for `<source-parser>` as class `<mini/source>`, and the default is text, as class `<mini>`.
+Inheritance follows: `<X> : <P>` on source is `<X/source> : <P/source>`, and `<text-parser>` on source is `<source-parser>`. A list pattern, an object literal or a call with arguments in a
+grammar compiled for text MUST stop compilation, naming the rule and saying to use `--on source`. [R-instances]
+
+A grammar's rules MUST read one input to equal results on either parser type, and on `<source-parser>` from text, a list of characters, a `<data-stream>`, and a user's type that
+generates its elements on demand. [R-any-source] `<cnf>`'s rules are the typed test of this in stage 4. Its actions are `struct cnf*` functions and `tp-number` reads a `char*`, so number handling moves into an action
+that doesn't assume text.
+
+### Streams
+
+Each source MUST be read through these selectors, modelled on OMeta/JS's `toOMInputStream` and the `head` and `tail` of its streams. They carry no `$`, because `compile-tpeg.l` makes each rule `r` the
+selectors `$r` and `$$r`, and grammars have rules called `start`. [R-input-selectors]
 
 ```
-SELECTORS dispatching on a source; a position is a word whose meaning is the source's:
-        in-enter(value)          : boolean          -- can a list pattern go inside this value
-    in-start(source)         : position         -- where it begins; an empty list's is its end
-        in-after(source, a, b) : boolean          -- is position b later in the source than a
-
-
+SELECTORS on a source:
+    in-enter(value)          : boolean     -- can a list pattern go inside this value
+    in-start(source)         : position    -- where it begins
     in-at-end(source, pos)   : boolean
-    in-head(source, pos)     : word             -- the element at this position
-    in-tail(source, pos)     : position         -- the next position
-    in-span(source, a, b)    : word             -- the elements from position a to b, as a value
-    in-memos(source, pos)    : table            -- what rules have answered at this position
-    in-same(a, b)            : boolean          -- does element a match literal b
-    in-class(a, class)    : boolean          -- does element a fall in a character class
+    in-head(source, pos)     : word        -- the element at this position
+    in-tail(source, pos)     : position    -- the next position
+    in-same(a, b)            : boolean     -- does element a match literal b
+
+STREAMS, built on them:
+    stream-of(value)         : cell        -- the first cell, or an end cell
+    stream-end?(cell)        : boolean
+    stream-head(cell)        : word
+    stream-tail(cell)        : cell        -- built the first time, then kept
+    stream-memo(cell)        : table       -- what rules have answered at this position
 ```
 
 **Behavior:**
 
-- These names carry no `$`, because `compile-tpeg.l` makes each rule `r` the selectors `$r` and `$$r`, and grammars have
-  rules called `start`.
-- A parser holds a source and a position. Moving along allocates nothing: a list's position is its
-  current pair (nil is the end), and a string's is an integer index. `in-enter` is separate from `in-start` because
-nil and 0 are valid positions, and 0 is false in typed Maru. Pushing an argument allocates a cell, unless
-specialization removes it. A cell is a position on any instance: one wrapper around these selectors handles
-it, so an instance's methods never see one, and it holds its own memos, as an `OM2Stream` cell does.
-- A parser owns its memos, keyed by rule, so grammars that call each other keep theirs apart, as `peg_compose`
-  checks. `in-memos` gives the table for a position: indexed for text, keyed by pair for a list.
+- A cell's selectors run only when it is built, so revisiting a position costs a field read, and backtracking restores a saved cell, which is the whole state. One small allocation per element visited is the cost
+  `<text-parser>` doesn't pay.
+- `in-*` has methods for `<string>`, `<pair>` and nil, and for `<data-stream>` in `input-binary.l`, which loads `data-stream.k` only for binary parsing. The parser keeps the position, so a match doesn't move
+  `<data-stream>`'s own `position`. `net/structure-diagram.k` reads a packet's diagram to field accessors, so a binary rule's actions read fields by name. At the time of writing, `net/*.k` reads packets by `byte-at` and
+  doesn't use `<data-stream>`.
+- A user's type becomes matchable by adding these methods. This is the generalization the thesis proposes after Wadler's views: list patterns that match "objects that are not actually lists". The 2008 report's
+  `svc`/`syn`/`req`/`ack` rules run over a stream whose elements are whole packets, a user's type.
+- `[0-9]` tests one element and fails on an element that isn't a character. `"abc"` matches consecutive elements `a`, `b`, `c`, as Warth's `seq` does. `'x` matches one element through `in-same`, which compares longs by value,
+  symbols by identity and strings by contents.
+- `@` gives a list of the elements between two cells, and `$` makes a string of a list of characters, as they do on text today.
 
-- Backtracking restores a saved position, so `value-pe`'s existing save and restore of
-  `self.position` works unchanged. Entering a list pattern also saves and restores the source.
-- The tree has three instances of this interface: **text** (characters, `<text-parser>` and
-  `text-parser.k` as they are today), **binary** (`data-stream.k`'s `<data-stream>`, whose elements are
-  bytes) and **list** (elements of a list). Each is methods on these selectors, and a user's type makes
-  a fourth. The parser keeps the position, so a binary match doesn't move `<data-stream>`'s own
-  `position`; `data-stream.k` isn't typed yet, and this part gives it its typed definition.
-  `net/structure-diagram.k` reads a packet's diagram to field accessors, so a binary rule's actions
-  read fields by name.
-- Roadmap item 3 uses two of these. Rules over a packet's bytes run on the binary instance. The 2008
-  report's `svc`/`syn`/`req`/`ack` rules run over a stream whose elements are whole packets, which is a
-  user's type. At the time of writing, `net/*.k` reads packets by `byte-at` and doesn't use
-  `<data-stream>`.
-- A list pattern can enter a string, because the thesis counts a string as list-like. Entering a value
-  takes the instance for that value, so matching can cross from a tree into text.
-- A user's type becomes matchable by adding `in-enter`, `in-start` and the others. This is the generalization the
-  thesis proposes after Wadler's views: list patterns that match "objects that are not actually
-  lists".
-- `in-same` compares longs by value, and symbols by identity. Other types add methods.
-- `[0-9]` tests one element and fails on an element that isn't a character. `"abc"` matches consecutive
-  elements `a`, `b`, `c`, as Warth's `seq` does, whatever holds them. `'x` matches one element.
-- A grammar names `<text-parser>` as its parent today. That parent supplies rules, and the instance a
-  match runs on comes from what the grammar is entered with, so `<cnf>` can also run on the others.
+### The input stack
 
-A list pattern MUST match only if `in-enter` holds for the current element, its nested pattern matches from
-`in-start`, so `` `() `` matches an empty list, and that match ends with `in-at-end` true. Its value is the element, and the outer position
-moves past it. [R-list-pattern] This is the thesis's `List-Success` rule and OMeta/JS's `_form`.
-`peg-compile.l`'s `match-list` doesn't require the end; see Compatibility.
+A list pattern MUST match only if `in-enter` holds for the current element, its nested pattern matches from the stream of that element, so `` `() `` matches an empty list, and that match ends at an end cell. Its value is the
+element, and the input moves past it. On failure, the input is as it was. [R-list-pattern] This is the thesis's `List-Success` rule and OMeta/Squeak 2's `form:`. Its body compiles inline in its rule, so its bindings are ordinary
+bindings of that rule. `peg-compile.l`'s `match-list` doesn't require the end; see Compatibility.
 
-Each grammar MUST match over any source with the input selectors. `<cnf>`'s rules, compiled natively and on an evaluator, MUST read one formula to equal clauses from the text instance, the binary instance, the list instance over a list of
-characters, and a user's type that generates its elements on demand. [R-any-source]
+A call's arguments MUST be elements its rule reads from the input, first argument first: new cells whose tail is the current input. [R-args-on-input] `:a` is shorthand for `.:a`, and a rule can match its arguments with any
+pattern. `tpeg`'s function arguments go; its `rule :a` syntax stays. Failure restores the saved cell, so no cell stays behind.
 
-```maru-check @R-input-selectors
-tree_input
+Within one parser, entering the same value twice MUST reuse its stream and so its memos, as OMeta/Squeak 2's `om2streams` does for each matcher. [R-stream-per-value] A foreign rule `p-r` MUST run on an object of `<p>`, sees the
+input through a proxy cell with fresh memos, and hands back where it got to, as OMeta's `foreign` does. [R-foreign-proxy] Its fields are its own: it is a different grammar.
+
+**Worlds.** A world is one more thing the stack can hold ([R-worlds-shadow]): shadowed state that commits, or is discarded when popped.
+
+```maru-check @R-parser-types
+tree_source
+```
+
+```maru-check @R-text-unchanged
+tree_source
+```
+
+```maru-check @R-instances
+tree_source
 ```
 
 ```maru-check @R-any-source
-tree_input
+tree_source
+```
+
+```maru-check @R-input-selectors
+tree_selectors
 ```
 
 ```maru-check @R-list-pattern
-tree_input
+tree_lists
+```
+
+```maru-check @R-args-on-input
+tree_args
+```
+
+```maru-check @R-foreign-proxy
+peg_compose
+tree_memo
 ```
 
 ### Grammar features
@@ -354,20 +389,15 @@ output to typed Maru. Each is one the optimizers below need. [R-grammar-features
   override in a child is the one called. `apply` and `super` become reserved in `{ }`. A name with no rule fails the match; it doesn't stop the program. Warth's `trans` guards
   the same case with a predicate.
 - `{super r x}` calls `r` as the parent grammar defines it.
-- A call's arguments are prepended to the input as elements, as OMeta/Squeak 2's `apply:withArgs:` does
-  and `parser.l`'s `parser-stream-push` does. [R-args-on-input] A position can be such a cell, which holds
-  an argument and the position after it, on any instance. So `:a` is shorthand for `.:a`, and a rule can
-  match its arguments with any pattern. `tpeg`'s function arguments go; its `rule :a` syntax stays.
+
 - A rule's parameters and bindings are words, and generated rules root them ([R-native-roots]).
-- `@` gives a list of the elements on every source, through `in-span`, and `$` makes a string of a list of characters, as they
-  do on text today. OMeta/Squeak 2's `<…>` answers the input's own species instead; Maru's grammars rely on `@` and `$` as they are.
+- OMeta/Squeak 2's `<…>` answers the input's own species instead; Maru's grammars rely on `@` and `$` as they are.
   Positions are values, so a rule can keep a start and end as `@<…>`
   does without building the span. OMeta's operator came from Piumarta's COLA framework, so this is
   Maru's own idea coming back.
-- Within one parser, list patterns over the same value share one source and its memos, as OMeta/Squeak 2's
-  `om2streams` does for each matcher. [R-stream-per-value]
-- A typed grammar's parser is a struct whose fields are words, its parent's first, as `irl-grammar.l` lays them
-  out today, and `self` is a pointer to it. `define-class`'s accessors map to `member`.
+
+- A typed grammar's object is a struct whose fields are words, its parent's first, as `irl-grammar.l` lays them out today, and `self` is a pointer to it throughout a match. `define-class`'s accessors map to `member`. A typed
+  `<source-parser>`'s position is a cell object, whose methods are typed selectors. A typed `<text-parser>` keeps its raw integer position, and so is not a traced object.
 - `tpeg` keeps the source position of a list it builds, as `peg` does, and a pass carries it from a node to
   that node's rewrite, so errors still name the original text. [R-source-positions] `text-parser.l`'s
   `set-list-source` does nothing today.
@@ -407,11 +437,10 @@ calculator reads an expression to a tree, and `ometaCalc-eval`'s `OMeta2Evaluato
 with `{('+' | '-' | '*' | '/'):op calc:l calc:r}`) evaluates that tree, on each target. [R-dbjr-calc]
 
 ```maru-check @R-grammar-features
-tree_grammar
-```
-
-```maru-check @R-args-on-input
-tree_grammar
+tree_lists
+tree_args
+tree_apply
+tree_literals
 ```
 
 ```maru-check @R-stream-per-value
@@ -419,11 +448,11 @@ tree_memo
 ```
 
 ```maru-check @R-source-positions
-tree_grammar
+tree_literals
 ```
 
 ```maru-check @R-dbjr-calc
-tree_grammar
+tree_calc
 ```
 
 ```maru-check @R-action-target
@@ -445,22 +474,19 @@ tree_agree
 
 ### Memoization and left recursion
 
-Typed grammars MUST memoize through `in-memos`, and grow left-recursive rules as OMeta/Squeak 2's `apply:` does:
-repeat until a pass fails or doesn't advance, judged by `in-after`, on every instance. `text-parser.l` compares positions
-with `<`, which a pair doesn't support; `in-after` is `<` on an integer position and a walk along the tails on a list. A left-recursive grammar
+Each parser type MUST memoize, and grow left-recursive rules as OMeta/Squeak 2's `apply:` does: repeat until a pass fails or doesn't advance. `<text-parser>` judges that with `<`, as it does today, and
+`<source-parser>` by cell identity. A left-recursive grammar
 then compiles natively, which is what stops the JOHN, irl, law and KScript grammars from doing so
 today. [R-typed-left-recursion] Refusing this was a limit in the matching machinery, not in a
 grammar's actions.
 
-A rule with arguments is not memoized by default. Warth's reason is memory footprint, and with arguments as cells
-a position key is still correct; OMeta/JS's `memoizeParameterizedRules` does it. A copy that [R-opt-specialize]
-makes for known arguments has none left and pushes no cells, so it is eligible like any other rule: `{two 1 2}`
+A rule with arguments is not memoized by default. Warth's reason is memory footprint, and OMeta/JS's `memoizeParameterizedRules` shows it can be done. A copy
+that [R-opt-specialize] makes for known arguments has none left and pushes no cells, so it is eligible like any other rule: `{two 1 2}`
 can share one memo. [R-memo-specialized]
 
 With no memo a rule can't detect its own recursion, so a left-recursive rule with arguments MUST stop at compile
 time naming the rule, unless every call has known arguments and so reaches a specialized copy. It would otherwise
-overflow the stack with no error. [R-param-left-recursion] A rule that no
-left-recursive rule reaches through its left calls has no memo unless `memo-all` is set, because Warth
+overflow the stack with no error. [R-param-left-recursion] In typed Maru, a rule that no left-recursive rule reaches through its left calls has no memo unless `memo-all` is set, because Warth
 reports that the overhead can outweigh the benefit where backtracking is limited; so `<cnf>`, which
 has no left recursion, stays free of memo tables. [R-memo-selective]
 
@@ -545,8 +571,7 @@ These passes MUST exist:
 - **Jump tables.** Consecutive alternatives of a `match-first` that start with distinct literals
   become a `match-table`, which dispatches on the head of the input and tries only the alternatives
   for it. Alternatives with the same literal stay in their order. [R-opt-jump-table] Warth's keys on a literal at
-the head of an alternative. Looking inside a list pattern at a node's head symbol is ours, and needs `in-enter`
-and `in-head` on the element.
+the head of an alternative. Looking inside a list pattern at a node's head symbol is ours.
 - **Left factoring.** Alternatives with a common prefix share it, preserving ordered choice. A prefix containing an
   action or predicate isn't shared, because factoring changes how often it runs. [R-opt-left-factor] This is a
   TODO in Warth's source, and the thesis reports doing it.
@@ -592,11 +617,9 @@ with a type test, the inlined body, and a fallback to the table where a type is 
 known. [R-opt-method-inline] Forms need their own null pass, which treats `quote` and quasiquote as data and knows
 how `let` and `lambda` bind.
 
-A rule MUST compile generically, and a pass MUST specialize it for arguments known at a call and for
-a source type known at an entry point: where a program enters `<cnf>` with the text instance, the rules reached from there get a copy
-whose input selectors are inlined. `text-parser.k`'s direct forms are what those selectors inline to. The same pass removes paired conversions and folds `in-span` into what
-consumes it, so reading a number from a known source allocates nothing. [R-opt-specialize] This is
-the one route to fast matching, for any source and on either target.
+A pass MUST specialize a rule for arguments known at a call, so it pushes no cells, and for a source type known at an entry point, inlining `in-*` and removing cells
+where nothing backtracks or memoizes. The same pass removes paired conversions and folds a span into what consumes it, so reading a number
+from a known source allocates nothing. [R-opt-specialize]
 
 A pass MUST NOT expand a rule or method that an inheriting grammar or a later `define-method` in the
 program being compiled overrides. A call that an override can reach stays a call: `{apply r}` and an
@@ -607,13 +630,9 @@ A method redefined after a program is compiled takes effect only when that progr
 type test notices a new type, not a new method; this is a stated limit, with no check, and Out of
 Scope names what would lift it.
 
-The rules specialized from `dimacs_load` MUST contain no selector call and no allocation for each
-element. [R-known-source-direct]
+`<cnf>`'s text instance MUST contain no selector call and no allocation for each element. [R-known-source-direct]
 
-`text-parser.k`'s direct forms MUST remain the text instance's implementation, reached through its
-methods, so a grammar never names them. [R-instance-methods] The binary and list instances have their
-own in the same way. `irl-grammar.l`'s hard-wired renames to those forms go once specialization
-reaches them.
+`text-parser.k`'s direct forms MUST remain `<text-parser>`'s implementation in typed Maru. [R-instance-methods]
 
 Every optimized grammar MUST match the same inputs to equal results as the same grammar with
 `*grammar-optimize*` off, and fail at the same position, over: `cexpr.g`, `john.g`, `kscript.g` and
@@ -643,7 +662,8 @@ sat_dimacs
 ```
 
 ```maru-check @R-instance-methods
-tree_input
+irl_grammar
+sat_dimacs
 opt_inline
 ```
 
@@ -727,6 +747,7 @@ tree_worlds
 | Error | Example | Recovery |
 |---|---|---|
 | `E_NO_METHOD` | `in-head` on a type with no input method and no default | Stop, naming the selector and the type. Add a method, or write a default. |
+
 | `E_OPT_DIVERGED` | Two passes undoing each other past `opt-pass-limit` | Stop, naming the rule and the last pass. Fix the pass; a grammar can build with `*grammar-optimize*` off meanwhile. |
 | `E_HOST_MISMATCH` | A library compiled for one evaluator's description opened by the other | Stop when the library loads, naming both. Rebuild for this evaluator. |
 
@@ -768,9 +789,8 @@ Extension point: [R-typed-selector], whose table would gain a dimension.
 **Retiring `peg.g`, `peg-compile.l` and `parser.l`.** `tpeg` began on 2012-08-13 as Piumarta's "text-only
 peg" ("scaffold", in his commit), derived from `peg.g`, which had matched structures since 2011 and
 memoized since February 2012. They never converged. This document converges them in capability: `tpeg`
-gains what `peg` has, and text becomes one instance. Excluded is moving the remaining `peg` users, such as
-inline `{ … }` grammar blocks like `net/structure-diagram.k`'s. Extension point: [R-input-selectors], whose
-`parser.l` streams become instances.
+gains what `peg` has, and text becomes one parser type. Excluded is moving the remaining `peg` users, such as
+inline `{ … }` grammar blocks like `net/structure-diagram.k`'s. Extension point: [R-input-selectors], since `parser.l`'s streams are the same idea.
 
 ## Alternatives Considered
 
@@ -779,11 +799,19 @@ truth difference in draft-ndn-maru-forms-as-neutral-tree-00, but it fixes the wr
 parse data was coupled to parse state, and [R-success-not-value] removes that. Tried on all three evaluators, it makes
 `compile-peg.l` hang on a grammar containing `-> 0`, and it would change every evaluator program's meaning.
 
+**Why not stretch `<text-parser>` over every source?** An earlier version of this design did: its `string` field held any source, with a branch in each operation, and it was built. That cost text about 4%.
+
+**Why not a separate parser object per frame, with direct code per source type?** Also tried on paper. Each class has its own slots, so `self.env` set on one frame isn't there on the next, and a list pattern's body as a separate rule can't share bindings with the
+rule around it, which typed Maru has no closures to fix. One grammar object and a swapped input, as in OMeta, have neither problem.
+
+**Why not keep a memo table on the parser, keyed by position?** It reads against the sources and the principle above, and pairs make poor keys. Text keeps its array only because an integer position has no cell to hold one.
+
+**Why not choose instances at load time?** Building them from stored rules suits a live system, but doesn't carry over to native code directly.
+
 **Why not treat text grammars and typed grammars as kinds of grammar?** An earlier version of this
 design did: grammars under `<text-parser>` meant characters, and `<cnf>` was a typed-only grammar. That
 made a property of its actions into a property of grammars. `<cnf>` is expected
-tokens and calls, and streams were never only text, in Maru or OMeta. Text stays, as one instance among
-others ([R-instance-methods]), and speed belongs to [R-opt-specialize].
+tokens and calls, and streams were never only text, in Maru or OMeta. Text stays, as one parser type among others.
 
 **Why not keep `tpeg`'s function arguments?** They compile directly, but a parameter could then only be
 bound, never matched, and OMeta/Squeak 2, OMeta/JS and `peg` all put arguments on the input. Specializing
@@ -837,9 +865,8 @@ later typed runtime has to treat them as untrusted input, and this document does
 ## Compatibility
 
 Existing irl grammar blocks keep their syntax and their actions, and `dimacs.irl`
-keeps its direct code throughout, first by name and then through [R-instance-methods]. `peg.g`, `peg-compile.l`
-and `parser.l` don't change. Grammars on the evaluators go through selectors too, so building them may
-slow until [R-opt-specialize] reaches them; each stage measures that with hyperfine.
+keeps its direct code throughout. `peg.g`, `peg-compile.l` and `parser.l` don't change. Text grammars generate what they generate today, so building them doesn't slow; each stage measures that with hyperfine. The `make tpeg.l` byte comparison retires at stage 2, when `compile-tpeg.l`'s generator
+becomes rules, since `peg` and `tpeg` differ on list patterns.
 
 A list pattern in `tpeg` requires the whole list to match, where one in `peg` matches a prefix. Both
 syntaxes look the same, so moving a grammar from `peg` to `tpeg` can make a pattern fail until it ends

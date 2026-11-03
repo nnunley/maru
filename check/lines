@@ -104,3 +104,4 @@
 +6 stage 1's checks: <countdown> walks its own list, and binary cases run only where byte buffers exist, since eval2's Data type is a stub
 +2 stage 1's checks: helpers that run rules move to check/tpeg-run.l, so the selector check can run before they exist
 +78 tpeg runtime over any source, stage 1 Task 2: text-parser.l (+70) gives text-parser-for-source, parse-source (parse-string calls it) and the selector paths of the match functions, which run only where the source isn't a string, so the text path keeps its direct forms; input-binary.l (+10, new) holds the <data-stream> selector methods, moved out of input.l (-3) so text parsing doesn't load data-stream.k, and tpeg-try.l (+1) requires it for the binary cases
+-59 the design moved to two parser types: text-parser.l goes back to pure text, and the checks name their instance

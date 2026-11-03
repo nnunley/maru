@@ -5,14 +5,14 @@
 (define-function calc-digits? (n) (and (string? n) (<= ?0 (string-at n 0)) (<= (string-at n 0) ?9)))
 (define-function calc-letters? (n) (and (string? n) (not (calc-digits? n))))
 (load "build/tpeg-calc.g.l")
-(load "build/tpeg-calceval.g.l")
+(load "build/tpeg-calceval-source.g.l")
 (peg-enable-recursion)
 
 (define env '((a . 5) (b . 10)))
 (define-function run-calc (text)
-  (let ((p (text-parser-for-source <calceval> (list (parse-string <calc> $start text)))))
-    (and (text-parser-invoke-args 'start $start p env)
-	 (<text-parser>-result p))))
+  (let ((p (source-parser-for <calceval/source> (list (parse-string <calc> $start text)))))
+    (and (source-parser-invoke-args 'start $start p env)
+	 (<source-parser>-result p))))
 
 (expect "a tree, left-associated" (parse-string <calc> $start "a+b*2") '("+" "a" ("*" "b" "2")))
 (expect "left to right" (parse-string <calc> $start "1-2-3") '("-" ("-" "1" "2") "3"))

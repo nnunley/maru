@@ -2,7 +2,7 @@
 
 Goal: `notes/plan/tree-matching.john`'s goal is green, which is stage 1 of
 `docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`. Background on approach and pitfalls, not a task list:
-`docs/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind.
+`docs/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC's "Parser types and instances", "Streams" and "The input stack" decide.
 
 Each iteration, with fresh eyes:
 
@@ -20,7 +20,7 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
 - A check looks wrong, or could only pass by changing it. The checks and the expected values were fixed before the code. Never
   weaken, delete or edit a `check/tpeg-*` file or `tree-matching.john`; report what you think is wrong and why.
 - The evidence seems to say a decision in the RFC is wrong: arguments on the input, whole-list matching, data separate from
-  state, `in-*` over `<text-parser>`'s fields. Report it; don't reopen it.
+  state, two parser types, memos on the stream, one grammar object with a swapped input. Report it; don't reopen it.
 - `Speed` fails and you can't see how to fix it without changing what's specified.
 - Something outside the plan's Global Constraints has to change.
 
@@ -33,6 +33,9 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
 - Commits carry no attribution lines.
 
 ## Notes from iterations
+
+**The design changed after iteration 2.** `text-parser.l` is back to `main`'s, pure text. `<source-parser>` in a new `source-parser.l` matches any source through stream cells, with `self.position` holding a cell, so
+`value-pe`'s save and restore carry over. `compile-tpeg.l --on source` targets it. `input.l`'s `in-after`, `in-span` and `in-class` go. Notes below from iterations 1 and 2 describe the old shape; their lessons on Maru still hold.
 
 Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which only `boot2.l` has and which is 1-based there; and the binary cases run where `data` exists, which isn't `eval2`, whose Data type is a stub.
 - Iteration 1 (Selectors): `input.l` is written (the `in-*` selectors, with methods for nil, pairs, strings, `<data-stream>`, longs), and `text-parser.l` requires it. Scoreboard after the change: Speed green (484 ms main, 522 ms here); Selectors, Source, Lists, Args, Apply, Memos, Literals, Calc and Suite red. Nothing else is green.
