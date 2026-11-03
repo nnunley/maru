@@ -89,6 +89,27 @@
 
 (define source-parser-invoke-rule-simply source-parser-invoke-rule)
 
+;; the method a rule name finds on a type: its own, or the nearest parent's (what a call by name reaches)
+(define-function source-parser-method-of (sel type)
+  (or (array-at (<selector>-methods sel) type)
+      (<selector>-inherit (<selector>-methods sel) type)))
+
+;; {apply x args}: the rule named x on this object's type, so an override is the one called. A name with
+;; no rule fails the match. prefix is $ for a value and $$ for an effect, as the rule's selectors are.
+(define-function source-parser-apply (self prefix name . args)
+  (let* ((sym  (concat-symbol prefix name))
+	 (sel  (and (defined? sym) (eval sym)))
+	 (rule (and (selector? sel) (source-parser-method-of sel (type-of self)))))
+    (and rule (apply source-parser-invoke-rule (cons name (cons rule (cons self args)))))))
+
+;; {super r args}: r as the parent defines it, whatever the object's type is. parent is the base of the class
+;; the calling rule is defined in, so an override reaches the rule it overrides, or what that inherits.
+(define-function source-parser-super (self prefix parent name . args)
+  (let* ((sel  (eval (concat-symbol prefix name)))
+	 (rule (or (source-parser-method-of sel parent)
+		   (error "no rule " name " in " (name-of-type parent)))))
+    (apply source-parser-invoke-rule (cons name (cons rule (cons self args))))))
+
 (define-function parse-source (grammar rule source)
   (let ((p (source-parser-for grammar source)))
     (or (source-parser-invoke-rule (<selector>-name rule) rule p)

@@ -200,3 +200,38 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
     `undefined variable: $x10`, so the action's `0x10` isn't read as hex (the RFC's "Grammar features" says this is the current
     behaviour, but the check expects 16). `tree_parse_complete` runs in the same Literals record, after `tree_literals`, so it hasn't
     been seen green yet. Log: `/tmp/maru-plan-Apply.log` and `/tmp/maru-plan-Literals.log`.
+- Iteration 7 (Apply: `{apply x}` and `{super r x}`, then Literals). Scoreboard from the record run:
+  **Selectors, Source, Lists, Args, Interleave, Apply, Literals and Speed green**; Memos, Calc and Suite red. Speed:
+  `main 292 ms, here 299 ms` (the earlier run read `main 279 ms, here 303 ms`). `make -B tpeg.l` passes (no diff),
+  `lines`, `text_parser`, `peg_compose`, `irl`, `irl_grammar`, `john_forms`, `law_cexpr`, `cexpr_forms`, `sat_dimacs` and
+  `tree_text_refuses` pass.
+- What landed:
+  - `source-parser.l` (+21): `source-parser-apply self prefix name . args` runs the rule the name finds on the object's type
+    (its own method, or the nearest parent's, through `<selector>-inherit`); a name with no selector, or no rule, fails the
+    match. `source-parser-super self prefix parent name . args` runs the rule as `parent` defines it. Both call
+    `source-parser-invoke-rule`, so arguments are cells on the input as for any call.
+  - `compile-tpeg.l` (+22): `tp-named-call` turns `(match-rule apply x …)` and `(match-rule super r …)` into those calls, in
+    value mode (prefix `$`) and effect mode (`$$`). `super`'s parent is `(array-at %structure-bases *tp-class*)`, evaluated at
+    run time, where `*tp-class*` is the class the rule is defined in (set in compile-value and compile-effect). A rule named
+    `apply` or `super` is an error at compile time. On text, both are refused by rule name (`tp-by-name`), as calls with
+    arguments are, and a bare `{apply}` or `{super}` with no name is refused too.
+  - `tpeg.g` (+3): `sexpr` reads `sinteger` as peg.g does, so `0x10` is 16 and `-0x10` is -16 (`tpeg.l`'s fixed point holds).
+    The RFC's "Actions read hexadecimal literals" paragraph still describes the old reading (`0x10` as `0` then a call);
+    I did not edit the RFC. A human should update that sentence.
+  - `text-parser.l` (+11): `set-list-source` copies each pair's source from the source list, as `parser.l`'s does. It was a
+    no-op `define-form`, so the `<pair>-source` checks failed.
+  - `check/lines`: +43 (Apply) and +14 (Literals) entries.
+- Checked by hand, not by a case: a grammar with `apply = …` stops with `rule name apply is reserved by {apply} and {super}`;
+  a text grammar with `{apply x}` stops with `rule start calls by apply, which needs a grammar on <source-parser>`. No check
+  file covers either, and I did not edit `check/tpeg-*`; a human may want cases for them.
+- Gotchas for the next iteration:
+  - `(array-at %structure-bases X)` is the parent of X; `super` relies on it being defined for the class at run time, so a
+    grammar's class must be defined before its rules are called (it always is through `tpeg-load` or the file path).
+  - `<selector>-methods`, `<selector>-inherit` and `selector?` are used by `source-parser.l`; they come from boot2.l's
+    selector structure, but `tpeg-try.l` already uses `<selector>-name` under `./eval`, and the Apply check passes under all
+    three evaluators.
+  - `make -B tpeg.l` prints the `diff`, which is silent on success; check its exit status, not the output.
+  - Next: Memos (`tree_memo`, `check/tpeg-memo.l`, which exits 35584 under `./eval`; log `/tmp/maru-plan-Memos.log`) and Calc
+    (`tree_calc`, `check/tpeg-calc.l`, exits 256; log `/tmp/maru-plan-Calc.log`). The record log doesn't show the cause of
+    either yet; read the case itself before the log. Memos is the RFC's "memos are on the stream" design, so it is the one
+    most likely to meet a decision in the RFC; Calc needs Memos per the plan (`Calc Memos Args`).

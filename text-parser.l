@@ -123,7 +123,17 @@
 ;; 	   (cdr where)
 ;; 	 (cons (car where) (%del (cdr where) key)))))
 
-(define-form set-list-source (list source)	list)
+;; each pair of a list built from another takes that pair's source, as parser.l's set-list-source does
+(define-function %set-list-source (x y)
+  (and (pair? x)
+       (let ()
+	 (and (pair? y) (set (<pair>-source x) (<pair>-source y)))
+	 (%set-list-source (cdr x) (cdr y))))
+  x)
+
+(define-function set-list-source (list source)
+  (%set-list-source list source)
+  list)
 
 (define-structure <memo> (state result position))
 

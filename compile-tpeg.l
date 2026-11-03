@@ -30,8 +30,9 @@
   (and (tp-source?)
        (error "foreign rule call to "name" is not generated on <source-parser> yet")))
 
-;; the rule being compiled, for the errors a list pattern or arguments give on text
+;; the rule and class being compiled, for the errors a list pattern or arguments give on text, and for super
 (define *tp-rule* "")
+(define *tp-class* ())
 
 ;; A call with arguments is generated on source only: its arguments are cells on the input.
 (define-function tp-call-args (name)
@@ -42,6 +43,21 @@
 (define-function tp-object-literal ()
   (or (tp-source?)
       (error "rule " *tp-rule* " has an object literal, which needs a grammar on <source-parser>")))
+
+;; {apply x args} and {super r args} call by name, which only a grammar on <source-parser> does
+(define-function tp-by-name (what args)
+  (or (tp-source?)
+      (error "rule " *tp-rule* " calls by " what ", which needs a grammar on <source-parser>"))
+  (or args (error "rule " *tp-rule* " has {" what "} with no rule name")))
+
+;; apply runs the rule its first argument names, on this object; super runs the rule as the class's parent defines it
+(define-function tp-named-call (name args prefix)
+  (cond
+    ((= name 'apply)	(let () (tp-by-name name args)
+			   `(,(tp-op 'apply) self ',prefix ,@args)))
+    ((= name 'super)	(let () (tp-by-name name args)
+			   `(,(tp-op 'super) self ',prefix (array-at %structure-bases ,*tp-class*) ',(car args) ,@(cdr args))))
+    (else		())))
 
 ;; A rule's parameters are the first elements of its input: `rule :a :b` is `.:a .:b` at its start.
 (define-function tp-parameters (params body)
@@ -74,10 +90,11 @@
   (record-case pe
     (match-list		(exp)		(tp-list-pattern exp value-pe 1))
     (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
-    (match-rule		(name . args)	(if args
+    (match-rule		(name . args)	(or (tp-named-call name args '$)
+					    (if args
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args))
-					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self)))
+					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self))))
     (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name))))
     (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map value-pe exps)))
@@ -135,10 +152,11 @@
   (record-case pe
     (match-list		(exp)		(tp-list-pattern exp effect-pe ()))
     (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
-    (match-rule		(name . args)	(if args
+    (match-rule		(name . args)	(or (tp-named-call name args '$$)
+					    (if args
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args))
-					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self)))
+					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self))))
     (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name))))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
@@ -209,7 +227,10 @@
 
 (define-function compile-value (rule class)
   (let ((name (car rule)))
+    (when (member? name '(apply super))
+      (error "rule name " name " is reserved by {apply} and {super}"))
     (set *tp-rule* name)
+    (set *tp-class* class)
     (let* ((body (tp-parameters (caddr rule) (cadr rule)))
 	   (vars (find-vars body)))
       `(define-method ,(concat-symbol '$ name) ,class ()
@@ -219,6 +240,7 @@
 (define-function compile-effect (rule class)
   (let ((name (car rule)))
     (set *tp-rule* name)
+    (set *tp-class* class)
     (let* ((body (tp-parameters (caddr rule) (cadr rule)))
 	   (vars (find-vars body)))
       `(define-method ,(concat-symbol '$$ name) ,class ()
