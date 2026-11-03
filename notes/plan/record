@@ -20,7 +20,7 @@ one Literals tree_literals
 one Calc tree_calc
 # the text path stays within 15% of main's, measured together so load is shared
 root=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
-if hyperfine --runs 5 --export-json /tmp/maru-plan-speed.json "cd $root && ./eval compile-tpeg.l tpeg.g" './eval compile-tpeg.l tpeg.g' > /tmp/maru-plan-Speed.log 2>&1 &&
+if hyperfine --shell=default --runs 5 --export-json /tmp/maru-plan-speed.json "cd $root && ./eval compile-tpeg.l tpeg.g" './eval compile-tpeg.l tpeg.g' > /tmp/maru-plan-Speed.log 2>&1 &&
    python3 -c "import json;r=json.load(open('/tmp/maru-plan-speed.json'))['results'];m,n=r[0]['mean'],r[1]['mean'];print('main %.0f ms, here %.0f ms'%(m*1e3,n*1e3));raise SystemExit(0 if n<=m*1.15 else 1)"; then
   echo "Speed do passed." >> notes/plan/evidence.john; echo "PASS Speed"
 else
