@@ -1,7 +1,7 @@
-;;; input.l: the selectors tpeg reads its source through, over text, lists, binary data and a user's type.
+;;; input.l: the selectors tpeg reads its source through, over text, lists and a user's type.
+;;; The binary instance (<data-stream>) is in input-binary.l, so text parsing doesn't load data-stream.k.
 ;;; A list is read from its current pair, so its position is a pair; nil, which has type <undefined>, is an empty list.
-;;; A position is an integer on text and binary data, and a pair on a list.
-(require "data-stream.k")
+;;; A position is an integer on text, and a pair on a list.
 
 ;; can a list pattern go inside this value?
 (define-selector in-enter (value) ())
@@ -36,31 +36,28 @@
 (define-method in-enter <undefined> ()		1)
 (define-method in-enter <pair> ()		1)
 (define-method in-enter <string> ()		1)
-(define-method in-enter <data-stream> ()	1)
 
 (define-method in-start <undefined> ()		self)
 (define-method in-start <pair> ()		self)
 (define-method in-start <string> ()		0)
-(define-method in-start <data-stream> ()	0)
 
 (define-method in-limit <string> ()		(string-length self))
 
 (define-method in-at-end <undefined> (pos)	1)
 (define-method in-at-end <pair> (pos)		(not pos))
 (define-method in-at-end <string> (pos)		(>= pos (string-length self)))
-(define-method in-at-end <data-stream> (pos)	(>= pos self.limit))
 
 (define-method in-head <undefined> (pos)	())
 (define-method in-head <pair> (pos)		(car pos))
 (define-method in-head <string> (pos)		(string-at self pos))
-(define-method in-head <data-stream> (pos)	(byte-at self.data pos))
 
 (define-method in-tail <undefined> (pos)	())
 (define-method in-tail <pair> (pos)		(cdr pos))
 (define-method in-tail <string> (pos)		(+ pos 1))
-(define-method in-tail <data-stream> (pos)	(+ pos 1))
 
 ;; a list's positions are its pairs: b is later if walking the tails from a reaches b, the end included
+(define-method in-after <undefined> (a b)	())
+
 (define-method in-after <pair> (a b)
   (let ((p (and a (cdr a))))
     (while (and p (not (= p b)))

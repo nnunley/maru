@@ -8,11 +8,29 @@
 (define-function text-parser-for-on (class str)
   (new class str (string-length str) 0 (array) text-parser-refill-default))
 
+;; a parser on any source, positioned at the source's start. A string keeps the direct path below.
+(define-function text-parser-for-source (class source)
+  (new class source (in-limit source) (in-start source) (array) text-parser-refill-default))
+
+;; through the input selectors, for a source that isn't a string
+(define-function text-parser-at-end (self)
+  (in-at-end (<text-parser>-string self) (<text-parser>-position self)))
+(define-function text-parser-head (self)
+  (in-head (<text-parser>-string self) (<text-parser>-position self)))
+(define-function text-parser-tail (self)
+  (in-tail (<text-parser>-string self) (<text-parser>-position self)))
+
 (define text-parser-match-any
   (define-method parser-match-any <text-parser> ()
-    (when (or (< self.position self.limit) (self.refill self 1))
-      (set self.result (string-at self.string self.position))
-      (incr self.position))))
+    (if (string? self.string)
+	(when (or (< self.position self.limit) (self.refill self 1))
+	  (set self.result (string-at self.string self.position))
+	  (incr self.position))
+      (when (not (text-parser-at-end self))
+	(let ()
+	  (set self.result (text-parser-head self))
+	  (set self.position (text-parser-tail self))
+	  1)))))
 
 (define text-parser-make-class
   (define-function parser-make-class (s)
@@ -41,46 +59,93 @@
 
 (define text-parser-match-class
   (define-method parser-match-class <text-parser> (class)
-    (when (or (< self.position self.limit) (self.refill self 1))
-      (let ((c (string-at self.string self.position)))
-	(and c
-	     (let ((i (string-search class c)))
-	       (and i
-		    (<= 0 i)
-		    (set self.result c)
-		    (incr self.position))))))))
+    (if (string? self.string)
+	(when (or (< self.position self.limit) (self.refill self 1))
+	  (let ((c (string-at self.string self.position)))
+	    (and c
+		 (let ((i (string-search class c)))
+		   (and i
+			(<= 0 i)
+			(set self.result c)
+			(incr self.position))))))
+      (when (not (text-parser-at-end self))
+	(let ((c (text-parser-head self)))
+	  (when (in-class c class)
+	    (let ()
+	      (set self.result c)
+	      (set self.position (text-parser-tail self))
+	      1)))))))
 
 (define text-parser-match-object
   (define-method parser-match-object <text-parser> (obj)
-    (when (and (or (< self.position self.limit) (self.refill self 1))
-	       (= obj (string-at self.string self.position)))
-      (set self.result obj)
-      (incr self.position))))
+    (if (string? self.string)
+	(when (and (or (< self.position self.limit) (self.refill self 1))
+		   (= obj (string-at self.string self.position)))
+	  (set self.result obj)
+	  (incr self.position))
+      (when (and (not (text-parser-at-end self))
+		 (in-same (text-parser-head self) obj))
+	(let ()
+	  (set self.result (text-parser-head self))
+	  (set self.position (text-parser-tail self))
+	  1)))))
 
 (define text-parser-match-char
   (define-method parser-match-object <text-parser> (obj)
-    (when (and (or (< self.position self.limit) (self.refill self 1))
-	       (= obj (string-at self.string self.position)))
-      (set self.result (string-copy self.string self.position 1))
-      (incr self.position))))
+    (if (string? self.string)
+	(when (and (or (< self.position self.limit) (self.refill self 1))
+		   (= obj (string-at self.string self.position)))
+	  (set self.result (string-copy self.string self.position 1))
+	  (incr self.position))
+      (when (and (not (text-parser-at-end self))
+		 (in-same (text-parser-head self) obj))
+	(let ()
+	  (set self.result (list->string (list (text-parser-head self))))
+	  (set self.position (text-parser-tail self))
+	  1)))))
+
+;; consecutive elements from a non-string source, matched all or nothing: the position moves only on success
+(define-function text-parser-match-elements (self string len)
+  (let* ((source (<text-parser>-string self))
+	 (pos    (<text-parser>-position self))
+	 (i      0)
+	 (ok     1))
+    (while (and ok (< i len))
+      (if (and (not (in-at-end source pos))
+	       (in-same (in-head source pos) (string-at string i)))
+	  (let ()
+	    (set pos (in-tail source pos))
+	    (incr i))
+	(set ok ())))
+    (when ok
+      (let ()
+	(set (<text-parser>-result self) string)
+	(set (<text-parser>-position self) pos)
+	1))))
 
 (define text-parser-match-string
   (define-method parser-match-string <text-parser> (string len)
-    (when (and (or (<= (+ self.position len) self.limit) (self.refill self len))
-	       (= 0 (string-compare self.string string self.position len)))
-      (set self.result string)
-      (incr self.position len))))
+    (if (string? self.string)
+	(when (and (or (<= (+ self.position len) self.limit) (self.refill self len))
+		   (= 0 (string-compare self.string string self.position len)))
+	  (set self.result string)
+	  (incr self.position len))
+      (text-parser-match-elements self string len))))
 
 (define text-parser-list-from-to
   (define-method parser-list-from-to <text-parser> (from to)
-    (let ((result (array)))
-      (for (i from to)
-	(array-append result (string-at self.string i)))
-      (array->list result))))
+    (if (string? self.string)
+	(let ((result (array)))
+	  (for (i from to)
+	    (array-append result (string-at self.string i)))
+	  (array->list result))
+      (in-span self.string from to))))
 
 (define text-parser-string-from-to
   (define-method parser-string-from-to <text-parser> (from to)
-    (string-copy self.string from (- to from))))
+    (if (string? self.string)
+	(string-copy self.string from (- to from))
+      (list->string (in-span self.string from to)))))
 
 (define text-parser-current-line-number
   (define-method parser-current-line-number <text-parser> ()
@@ -213,6 +278,8 @@
     (or sub (let ()
 	      (set sub (new type (<text-parser>-string self) (<text-parser>-limit self) 0 (array) (<text-parser>-refill self)))
 	      (set (<text-parser>-foreign self) (cons (cons type sub) (<text-parser>-foreign self)))))
+    (set (<text-parser>-string sub) (<text-parser>-string self))	;; the source can change between calls
+    (set (<text-parser>-limit sub) (<text-parser>-limit self))
     (set (<text-parser>-position sub) (<text-parser>-position self))
     (and (text-parser-invoke-rule name rule sub)
 	 (let ()
@@ -226,14 +293,17 @@
 (define-function peg-enable-memoisation ()	(println "; PEG memoisation enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-memo))
 (define-function peg-enable-recursion ()	(println "; PEG recursion enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-recursion))
 
-(define-function parse-string (grammar rule source)
-  (let* ((p (text-parser-for-on grammar source)))
+(define-function parse-source (grammar rule source)
+  (let ((p (text-parser-for-source grammar source)))
     (or (text-parser-invoke-rule (<selector>-name rule) rule p)	; so a left-recursive entry rule grows
 	(let ()
 	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
-	  (parser-context p)
+	  (and (string? source) (parser-context p))	; the context only reads a string
 	  (error "abort")))
     (<text-parser>-result p)))
+
+(define-function parse-string (grammar rule source)
+  (parse-source grammar rule source))
 
 (define-function parse-file (grammar rule path)
   (let* ((source (contents-of-file-named path))

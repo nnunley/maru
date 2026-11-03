@@ -44,3 +44,28 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
 - `input.l` details the next iteration should know: `in-span` and `in-after` are defined in that order, since `eval` resolves names when a selector's default body is defined. `in-after` on a list walks tails from `a` and counts the end as after. `arg-cell` is not in `input.l` yet; it belongs with Task 4 (arguments), where it is used.
 - `text-parser.l` now loads `input.l` and so `data-stream.k` at every `compile-tpeg.l` run. The measured text-path cost was about 8% (Speed, 484 vs 522 ms in the final record), inside the 15% budget. The first record run read 1515 ms during load from other agents.
 - `check/lines` has a +73 entry for `input.l` (72 lines) and the `require` in `text-parser.l`.
+- Iteration 2 (Source, stage 1 Task 2): the runtime over any source. `text-parser.l` gets `text-parser-for-source`,
+  `text-parser-at-end`/`-head`/`-tail` (through the selectors, on `<text-parser>`'s fields), `parse-source` (`parse-string`
+  calls it), and a selector path in each match function (`-match-any`, `-match-class`, `-match-object`, `-match-char`,
+  `-match-string` through the new `text-parser-match-elements`, `-list-from-to`, `-string-from-to` through `in-span`). The text
+  path is the old code under `(string? self.string)`, so a string source keeps its direct forms. `text-parser-invoke-rule-in`
+  copies `string` and `limit` to the sub-parser on each call.
+- The `<data-stream>` selector methods moved out of `input.l` into `input-binary.l` (new), which requires `data-stream.k`, so
+  text parsing doesn't load it (checked: `defined? 'data-stream` is nil after `(require "text-parser.l")`). Only
+  `check/tpeg-try.l` gained `(require "input-binary.l")`, as the coordinator allowed; no other check file changed.
+- Speed, before the move (`input.l` loaded data-stream): main 486 ms, here 523 ms (+7.6%). After the move: main 494 ms,
+  here 513 ms (+3.8%). The record run: main 464 ms, here 485 ms (+4.5%). All inside the 15% budget.
+- Scoreboard after this iteration: Selectors and Source green, Speed green; Lists, Args, Apply, Memos, Literals, Calc and
+  Suite red. `make tpeg.l` passes, and `peg_compose`, `john_forms`, `law_cexpr`, `irl`, `irl_grammar`, `text_parser` pass.
+- Gotchas for the next iteration:
+  - In a `define-function`, `self.field` isn't resolved (`undefined variable: self.string`). Use `(<text-parser>-string self)`,
+    as `text-parser-invoke-rule-in` does. `self.field` works only in `define-method` on `<text-parser>`.
+  - In Maru, `unless` is `(or test body)`: it returns the test when true. Use `(when (not ...) ...)` for "do this if not".
+  - `make check CHECKS=lines` is what names the delta; a new file needs its own `check/lines` entry, as `input-binary.l` has.
+  - The Makefile builds `build/tpeg-lists.g.l`, `tpeg-args.g.l`, `tpeg-apply.g.l`, `tpeg-memo.g.l` and `tpeg-calceval.g.l`,
+    which use forms Task 3 onward implement (`match-list`, arguments, memos). Their build failures are ignored (`make -k`), so they
+    show only in the record logs, as `Error 1`, not as failures of Source.
+  - `text-parser-expected` and `text-parser-context-with` still read the source with `string-at`, so a `match-require` failing on
+    a list source will hit a string error instead of its message. Not needed by Source; Task 3 or a later iteration should guard it.
+  - `tree_input` isn't registered in `check/check.l`; the selectors case is `tree_selectors`.
+  - Next: Lists (Task 3, `match-list` and object literals). The Lists log is `/tmp/maru-plan-Lists.log`.

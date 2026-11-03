@@ -1,5 +1,6 @@
 ;;; Helpers for the tpeg checks: a user's type as a source, and running a rule on any source.
 (require "text-parser.l")
+(require "input-binary.l")
 
 (define ok 1)
 (define-function expect (what got want)
