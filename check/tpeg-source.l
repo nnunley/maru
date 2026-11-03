@@ -1,5 +1,5 @@
 ;;; A grammar matches over any source, and a match's value doesn't decide its success.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-mini.g.l")
 
 (expect "text" (try <mini> $sum "2+3") '(5))

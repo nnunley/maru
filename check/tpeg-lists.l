@@ -1,5 +1,5 @@
 ;;; A list pattern matches inside an element, and all of it, and leaves things as they were if it fails.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-lists.g.l")
 
 (expect "a node" (try <trees> $node '((add 1 2))) '((1 2)))

@@ -1,5 +1,5 @@
 ;;; {apply x} calls a rule by name on this grammar; {super r} calls r as the parent defines it.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-apply.g.l")
 (load "build/tpeg-apply-child.g.l")
 

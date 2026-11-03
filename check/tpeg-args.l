@@ -1,5 +1,5 @@
 ;;; A call's arguments are elements its rule reads from the input, first argument first.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-args.g.l")
 
 (expect "parameters" (try <argp> $callp "xy") '((1 2)))

@@ -1,5 +1,5 @@
 ;;; Memoization and growth work on every source, and a value entered twice shares its memos.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-memo.g.l")
 (peg-enable-recursion)
 

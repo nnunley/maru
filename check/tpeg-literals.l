@@ -1,5 +1,5 @@
 ;;; tpeg reads hexadecimal in actions, and set-list-source copies sources as parser.l's does.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (load "build/tpeg-literals.g.l")
 
 (expect "hex" (try <lit> $hexv "") '(16))

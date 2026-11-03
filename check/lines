@@ -102,3 +102,4 @@
 +299 checks for stage 1 of tree matching, written before the code: check/tpeg-*.l and .g state what tpeg over any data must do, under each evaluator, and the Makefile builds their grammars
 +73 tpeg input selectors, stage 1 Task 1: input.l (+72, new) holds the selectors tpeg reads its source through, over text, lists, data streams and a user's type (in-enter, in-start, in-limit, in-at-end, in-head, in-tail, in-after, in-span, in-same, in-class), and text-parser.l (+1) requires it; check tree_selectors runs them (check/tpeg-selectors.l)
 +6 stage 1's checks: <countdown> walks its own list, and binary cases run only where byte buffers exist, since eval2's Data type is a stub
++2 stage 1's checks: helpers that run rules move to check/tpeg-run.l, so the selector check can run before they exist

@@ -1,5 +1,5 @@
 ;;; The DBjr documents' calculator: left recursion over text to a tree, then an evaluator over the tree.
-(require "check/tpeg-try.l")
+(require "check/tpeg-run.l")
 (define-function calc-apply (op l r)
   (cond ((= op "+") (+ l r)) ((= op "-") (- l r)) ((= op "*") (* l r)) (else (/ l r))))
 (define-function calc-digits? (n) (and (string? n) (<= ?0 (string-at n 0)) (<= (string-at n 0) ?9)))
