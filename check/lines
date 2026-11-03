@@ -100,3 +100,4 @@
 -6 the SAT performance entry above counted 6 lines more than its two commits added (75e70f7 and 307bbad net +60, entered as +66)
 +34 eval3 as eval2's successor: eval3.c (+33) gains eval2's subr (call by address, a return letter after >, variadic calls through ffi_prep_cif_var), and eval2_subr runs under it too (+1)
 +299 checks for stage 1 of tree matching, written before the code: check/tpeg-*.l and .g state what tpeg over any data must do, under each evaluator, and the Makefile builds their grammars
++73 tpeg input selectors, stage 1 Task 1: input.l (+72, new) holds the selectors tpeg reads its source through, over text, lists, data streams and a user's type (in-enter, in-start, in-limit, in-at-end, in-head, in-tail, in-after, in-span, in-same, in-class), and text-parser.l (+1) requires it; check tree_selectors runs them (check/tpeg-selectors.l)

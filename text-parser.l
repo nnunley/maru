@@ -1,4 +1,5 @@
 (require "ansiterm.l")
+(require "input.l")
 
 (define-structure <text-parser> (string limit position memos refill result foreign))	; foreign: ((type . parser)...)
 
