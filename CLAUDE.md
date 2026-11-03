@@ -33,8 +33,9 @@ in `core/compiler/ir-gen-arm64*.k`), `amelang-nile` (Dan's repo for Nile),
 
     make    # eval, eval2, eval3, osdefs.k, and eval32 where -m32 links (not macOS)
 
-`eval3` (Piumarta, 2013) is kept beside `eval2` for comparison: it boots
-`boot2.l` too, and calls C through libffi where `eval2` uses `subr`.
+`eval3` (Piumarta, 2013) is the third iteration of the bootstrap and `eval2`'s successor: it boots
+`boot2.l` too. Piumarta's `eval2` had `subr` commented out, and `eval3` restored it through libffi;
+both now share one `subr`.
 
 On arm64 macOS with Rosetta, `make check` also builds `bin/x86_64/eval` and
 `bin/x86_64/eval2` (`-arch x86_64`) to run x86-64 code in-process.
@@ -93,7 +94,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `goto`, plain, computed from an `if`, and through a label held in a variable.
 - `eval3`: `eval3` runs `boot2.l` with the `boot2_strings` and `asm_interface`
   cases, and `dlextern` (`check/dlextern.l`, as `libsdl2.k` uses it) calls libc
-  through libffi in `eval3` and through `subr` in `eval2` alike.
+  through `subr` in `eval3` and `eval2` alike.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
@@ -240,7 +241,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   69 mutants of the expr rules fails sound or agree.
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
-- `eval2_subr` (`check/eval2-subr.l`): both evaluators call C through `subr`,
+- `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
   by name or address, with typed results (`"dd>d"`), variadic calls and raw
   byte access.
 - `asm_interface` (`check/asm-interface.l`): the one encoder interface
@@ -304,7 +305,6 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - Gezira/GL demos need `libnile` and `libglfw` built from `../nile`.
 - The SDL2 example (`./eval3 libsdl2.k`, a window to draw lines in) needs
   SDL2 and SDL2_gfx; without SDL2_gfx it stops at `could not load: libSDL2_gfx`.
-- `eval3`'s `subr` predates the typed signatures (`"s>l"`) `eval2_subr` checks.
 
 ## Roadmap
 
