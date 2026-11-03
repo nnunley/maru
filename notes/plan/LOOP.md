@@ -101,3 +101,30 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
   - In zsh an unquoted `$ev` holding `./eval2 -b boot2.l` is one word, so loops over evaluators need the commands spelled out.
   - `check/lines` has a +112 entry for this iteration's new and changed lines.
   - Next: Selectors (once the check is fixed), then Lists (stage 1 Task 3, `match-list` and object literals), whose log is `/tmp/maru-plan-Lists.log`.
+- Iteration 4 (Lists, stage 1 Task 3 under the design). Scoreboard after it: **Selectors, Source, Lists and Speed green**
+  (Speed: main 464 ms, here 488 ms, +5%). Args, Apply, Memos, Literals, Calc and Suite red. `make tpeg.l`, `lines`,
+  `tree_selectors`, `tree_source`, `tree_lists`, `text_parser`, `peg_compose`, `irl`, `irl_grammar`, `john_forms`, `law_cexpr`
+  and `sat_dimacs` pass. `tree_memo` is red, as before (Memos).
+- What landed: `compile-tpeg.l` (+28) has `tp-list-pattern`, which generates a list pattern inline for source. It enters the
+  current element when `in-enter` holds, runs the nested pattern from `stream-of` of that element, requires `stream-end?` at its
+  end, sets the element as the value on success (value mode only) and always restores the outer cell. On text it errors with
+  the rule's name and "needs --on source" (`*tp-rule*`, set by `compile-value` and `compile-effect`). `find-vars-in` recurses
+  into `match-list` and accepts `match-object`. `value-pe` and `effect-pe` had no `match-object` clause before, so `'sym`,
+  `'0` and `'"str"` didn't compile on either path; they do now, quoted as `',obj`. `tpeg.g` (+1) adds `lparen rparen ->
+  (match-all)` to `llist`, so `` `( ) `` parses; `make tpeg.l` still passes.
+- Finding for a human: `parse-file` of a grammar stops silently at the first rule it can't parse. Before the `llist` fix,
+  `empty = `( ) -> 'none ;` made `compile-tpeg.l --on source` emit only the rules before it, with no error, and the check then
+  failed later with `undefined variable: $empty`. Any grammar that doesn't parse all of its text can lose rules this way. A
+  parse that doesn't reach the end of the input should be an error; that is a change to `parser.l`/`tpeg.l`'s parse driver,
+  which this iteration didn't make (`peg.g`, `parser.l` are outside the plan's constraints to change).
+- Gotchas for the next iteration:
+  - BSD `sed -i` needs a suffix argument (`sed -i ''`); use the Edit tool for source edits.
+  - A generated grammar's selectors are only as current as its `build/*.g.l`. `./eval check/tpeg-lists.l` run by hand reads the
+    stale build file (`undefined variable: $empty`); run `make build/tpeg-NAME-source.g.l` first, or go through `make check`.
+  - In a `match-list` the nested pattern's `_c_`, `_v_` and `_ok_` are let-bound inside the generated form, so nested lists
+    shadow lexically and don't clash; `find-vars` doesn't see them.
+  - `tree_memo` (Memos) runs `check/tpeg-memo.l` and exits 35584 under `./eval` today; it stops `make check CHECKS="..."` at
+    the first failing case, so run cases that must pass in a separate make call.
+  - Next: Args (stage 1 Task 4, arguments on the input). `source-parser-invoke-rule-simply` is still an alias of
+    `source-parser-invoke-rule`, which drops arguments; Args must replace it with the arguments-on-input cells, and the text
+    path must refuse arguments as R-instances says. Log: `/tmp/maru-plan-Args.log`.

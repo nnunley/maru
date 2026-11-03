@@ -78,7 +78,8 @@ scomment	= ";" (!eol .)* ;
 sspace		= (blank | eol | scomment)* ;
 sexpression	= sspace sexpr ;
 
-llist		= lparen expression:e rparen			-> e ;
+llist		= lparen expression:e rparen			-> e
+		| lparen rparen					-> `(match-all) ;
 atom		= lparen expression:e rparen			-> e
 		| quotesgl sexpression:e space			-> `(match-object ,e)
 		| string:e					-> `(match-string ,e)

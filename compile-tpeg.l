@@ -37,11 +37,33 @@
   (and (tp-source?)
        (error "foreign rule call to "name" is not generated with --on source yet")))
 
+;; the rule being compiled, for the error a list pattern gives on text
+(define *tp-rule* "")
+
+;; A list pattern enters the current element, when in-enter holds for it, and its nested pattern must
+;; reach the end of that element's stream. The element is the value, and the input moves past it.
+;; The nested pattern is inline, so its bindings are the rule's, and on failure the input is restored.
+(define-function tp-list-pattern (exp pe-fn value?)
+  (if (tp-source?)
+      `(let ((_c_ self.position))
+	 (when (and (not (stream-end? _c_)) (in-enter (stream-head _c_)))
+	   (let ((_v_ (stream-head _c_)))
+	     (set self.position (stream-of _v_))
+	     (let ((_ok_ (and ,(pe-fn exp) (stream-end? self.position))))
+	       (set self.position _c_)
+	       (when _ok_
+		 (set self.position (stream-tail _c_))
+		 ,@(if value? '((set self.result _v_)) ())
+		 1)))))
+      (error "rule " *tp-rule* " has a list pattern, which needs --on source")))
+
 (define value-pe)
 (define effect-pe)
 
 (define-function value-pe (pe)
   (record-case pe
+    (match-list		(exp)		(tp-list-pattern exp value-pe 1))
+    (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
     (match-rule		(name . args)	(if args
 					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args)
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self)))
@@ -100,6 +122,8 @@
 
 (define-function effect-pe (pe)
   (record-case pe
+    (match-list		(exp)		(tp-list-pattern exp effect-pe ()))
+    (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
     (match-rule		(name . args)	(if args
 					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args)
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self)))
@@ -153,8 +177,10 @@
       ((or (= op 'make-number))		(find-vars-in (caddr pe) arr))
       ((or (= op 'assign-result))	(array-append arr (cadr pe))
 					(find-vars-in (caddr pe) arr))
+      ((or (= op 'match-list))		(find-vars-in (cadr pe) arr))
       ((or (= op 'match-class)
 	   (= op 'match-string)
+	   (= op 'match-object)
 	   (= op 'match-any)
 	   (= op 'match-rule)
 	   (= op 'match-rule-in)
@@ -175,6 +201,7 @@
 	 (args (caddr rule))
 	 (vars (find-vars body)))
     ;;(print ";; ") (dumpln rule)
+    (set *tp-rule* name)
     `(define-method ,(concat-symbol '$ name) ,class ,args
        (let ,vars
 	 ,(value-pe body)))))
@@ -185,6 +212,7 @@
 	 (args (caddr rule))
 	 (vars (find-vars body)))
     ;;(print ";; ") (dumpln rule)
+    (set *tp-rule* name)
     `(define-method ,(concat-symbol '$$ name) ,class ,args
        (let ,vars
 	 ,(effect-pe body)))))
