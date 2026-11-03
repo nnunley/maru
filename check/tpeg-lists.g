@@ -1,5 +1,5 @@
 # List patterns and object literals (thesis section 2.4.3).
-<trees> : <text-parser> ()
+<trees> : <source-parser> ()
 node = `( 'add .:x .:y ) -> (list x y) ;
 deep = `( 'add .:x `( 'mul .:y ) ) -> (list x y) ;
 empty = `( ) -> 'none ;

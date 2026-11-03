@@ -2,7 +2,7 @@
 (require "john-eval.l")
 (define plan     (john-read "notes/plan/tree-matching.john"))
 (define evidence (john-read "notes/plan/evidence.john"))
-(define reqs '(Selectors Source Lists Args Apply Memos Literals Calc Speed Suite))
+(define reqs '(Selectors Source Lists Args Interleave Apply Memos Literals Calc Speed Suite))
 ;; the answers come back in the order they were asked
 (define answers
   (john-run (concat-list plan (concat-list evidence (map (lambda (r) (list 'query (list 'send r 'green))) reqs)))))

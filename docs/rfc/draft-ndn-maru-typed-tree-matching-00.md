@@ -66,7 +66,7 @@ shown here.
 - **source** — the value being matched; **position** — where in it, in the source's own terms.
 - **stream** — a chain of cells over a source. A **cell** holds an element, a lazily built tail, and a memo table.
 - **parser type** — `<text-parser>` for text, or `<source-parser>` for any source, through streams.
-- **instance** — a grammar's rules compiled for one parser type.
+
 - **pass** — a grammar that rewrites a tree. A **null pass** rewrites every node to an equal node.
 - **PE tree** — the parsing-expression forms `tpeg.g` produces (`match-all`, `match-first` …).
 
@@ -80,7 +80,7 @@ back end exists. It does NOT change `peg.g`, `peg-compile.l` or `parser.l`.
 
 The sections below go by topic. The work goes in this order, and each stage is useful alone:
 
-1. On the evaluators: `<source-parser>` and streams, list patterns, arguments on the input and the other grammar
+1. On the evaluators: `<source-parser>` and streams, live grammars, list patterns, arguments on the input and the other grammar
    features in `compile-tpeg.l`.
 2. On the evaluators: the passes, written in those grammars, and `compile-tpeg.l`'s generator rewritten
    as rules, since `tpeg` then has what `peg.g`'s generator uses.
@@ -276,13 +276,11 @@ There MUST be two parser types. [R-parser-types]
 `<text-parser>` and what `compile-tpeg.l` generates for it MUST stay as they are, with no test for the kind of source. Text pays nothing for the other. [R-text-unchanged] A grammar that
 only reads text stays on it, and direct code for lists or binary is an optimization for later, through [R-opt-specialize], if evidence asks for it.
 
-An instance is chosen when a grammar is compiled: `compile-tpeg.l --on source mini.g` generates its rules for `<source-parser>` as class `<mini/source>`, and the default is text, as class `<mini>`.
-Inheritance follows: `<X> : <P>` on source is `<X/source> : <P/source>`, and `<text-parser>` on source is `<source-parser>`. A list pattern, an object literal or a call with arguments in a
-grammar compiled for text MUST stop compilation, naming the rule and saying to use `--on source`. [R-instances]
+A grammar MUST name its parser type by its parent, as `<dc> : <parser> ()` does in `test-dc.g`: `<trees> : <source-parser> ()` runs on `<source-parser>`, and a child runs on what its parent runs on. No flag or build step
+chooses it. A list pattern, an object literal or a call with arguments in a grammar on `<text-parser>` MUST stop with an error naming the rule. [R-instances]
 
-A grammar's rules MUST read one input to equal results on either parser type, and on `<source-parser>` from text, a list of characters, a `<data-stream>`, and a user's type that
-generates its elements on demand. [R-any-source] `<cnf>`'s rules are the typed test of this in stage 4. Its actions are `struct cnf*` functions and `tp-number` reads a `char*`, so number handling moves into an action
-that doesn't assume text.
+A grammar on `<source-parser>` MUST read one input to equal results from text, a list of characters, a `<data-stream>`, and a user's type that generates its elements on demand. [R-any-source] A grammar that wants any source
+declares `<source-parser>`, which reads text too; one that only reads text and wants its speed stays on `<text-parser>`.
 
 ### Streams
 
@@ -318,6 +316,33 @@ STREAMS, built on them:
 - `[0-9]` tests one element and fails on an element that isn't a character. `"abc"` matches consecutive elements `a`, `b`, `c`, as Warth's `seq` does. `'x` matches one element through `in-same`, which compares longs by value,
   symbols by identity and strings by contents.
 - `@` gives a list of the elements between two cells, and `$` makes a string of a list of characters, as they do on text today.
+
+### Live grammars
+
+Grammars are live, as in `repl.l` and `test-pepsi.l`. Rules MUST compile in-process, and a grammar comes into use by importing it: `(require "x.g.l")`, or inline in a program. A `.g.l` file is a cache of the same forms. [R-live-grammars]
+
+A program MUST be able to interleave code and grammars on one input, with `tpeg-repl.l` as `repl.l` is for `peg`, through `tpeg.g`'s existing `{ … }` blocks: [R-interleave]
+
+- `{ <x> : <parent> (fields) rules }` defines a grammar, and `{ <x> + rules }` adds to one.
+- `{ rules }` enriches the running grammar: a later block's rule overrides an earlier one, and other rules stay.
+- `{ rules expression }` also matches the rest of the input against the expression, as `repl.l`'s comment says. The grammar has the input while it matches. When it stops matching, the reader carries on from that position, reading code.
+
+So the reader takes part in the stack below: code, a grammar that takes the input, then code again, on one stream.
+
+A grammar that doesn't parse to its end MUST be an error naming the file and position, because a grammar otherwise loses every rule after the one that stopped it, and nothing says so until a rule is missing. [R-parse-complete]
+
+```maru-check @R-live-grammars
+tree_interleave
+tree_apply
+```
+
+```maru-check @R-interleave
+tree_interleave
+```
+
+```maru-check @R-parse-complete
+tree_parse_complete
+```
 
 ### The input stack
 
@@ -786,11 +811,12 @@ and OMeta/Squeak 2's `apply:` use the simpler growth, and this document follows 
 **Dispatch on more than the receiver.** TR-2011-002's `<generic>`. Streams need one receiver.
 Extension point: [R-typed-selector], whose table would gain a dimension.
 
+**Live grammars in native code.** Compiling a rule in-process needs a compiler in the running program. On the evaluators that is `compile-tpeg.l`; natively it needs a JIT or a native evaluator. Excluded until those exist: typed grammars compile ahead of time. This is where the distinction between interpreted and compiled has to disappear. Extension point: [R-live-grammars].
+
 **Retiring `peg.g`, `peg-compile.l` and `parser.l`.** `tpeg` began on 2012-08-13 as Piumarta's "text-only
 peg" ("scaffold", in his commit), derived from `peg.g`, which had matched structures since 2011 and
 memoized since February 2012. They never converged. This document converges them in capability: `tpeg`
-gains what `peg` has, and text becomes one parser type. Excluded is moving the remaining `peg` users, such as
-inline `{ … }` grammar blocks like `net/structure-diagram.k`'s. Extension point: [R-input-selectors], since `parser.l`'s streams are the same idea.
+gains what `peg` has, and text becomes one parser type. Excluded is moving the remaining `peg` users, such as `net/structure-diagram.k`'s inline block, and `test-pepsi.l`. Extension point: [R-input-selectors], since `parser.l`'s streams are the same idea.
 
 ## Alternatives Considered
 
@@ -800,6 +826,8 @@ parse data was coupled to parse state, and [R-success-not-value] removes that. T
 `compile-peg.l` hang on a grammar containing `-> 0`, and it would change every evaluator program's meaning.
 
 **Why not stretch `<text-parser>` over every source?** An earlier version of this design did: its `string` field held any source, with a branch in each operation, and it was built. That cost text about 4%.
+
+**Why not a compile-time flag choosing the parser type?** `--on source` did, for a while. It made a grammar a batch artifact, compiled by another process and pointed at data afterwards, which isn't how Maru's grammars work. A grammar states its parent, and it is live.
 
 **Why not a separate parser object per frame, with direct code per source type?** Also tried on paper. Each class has its own slots, so `self.env` set on one frame isn't there on the next, and a list pattern's body as a separate rule can't share bindings with the
 rule around it, which typed Maru has no closures to fix. One grammar object and a swapped input, as in OMeta, have neither problem.

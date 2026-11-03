@@ -1,5 +1,5 @@
 # Arguments on the input: a parameter is a pattern over what the caller pushed.
-<argp> : <text-parser> ()
+<argp> : <source-parser> ()
 pair :a :b = "y" -> (list a b) ;
 callp = "x" {pair 1 2}:r -> r ;
 picky = 'yes "y" -> 'matched ;

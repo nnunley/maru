@@ -266,6 +266,14 @@
 (check "tree_apply" (on-each-evaluator "tree_apply" "check/tpeg-apply.l"))
 (check "tree_memo" (on-each-evaluator "tree_memo" "check/tpeg-memo.l"))
 (check "tree_literals" (on-each-evaluator "tree_literals" "check/tpeg-literals.l"))
+;; a grammar that stops parsing partway is an error, and doesn't quietly lose its remaining rules
+(check "tree_parse_complete"
+  (unit-assert (not (= 0 (run-status 60 "exec </dev/null >/dev/null 2>&1; ./eval compile-tpeg.l check/tpeg-broken.g")))))
+;; tpeg-repl.l reads a file of code and grammars interleaved, as repl.l reads test-pepsi.l (check/tpeg-interleave.l).
+(check "tree_interleave"
+  (unit-assert (equal (last (run "tree_interleave" "./eval tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))
+  (unit-assert (equal (last (run "tree_interleave2" "./eval2 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))
+  (unit-assert (equal (last (run "tree_interleave3" "./eval3 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok")))
 (check "tree_calc" (on-each-evaluator "tree_calc" "check/tpeg-calc.l"))
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).

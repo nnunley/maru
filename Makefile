@@ -58,8 +58,8 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
 CHECK_LIBS = build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
-	     build/tpeg-mini.g.l build/tpeg-mini-source.g.l build/tpeg-lists-source.g.l build/tpeg-args-source.g.l build/tpeg-apply-source.g.l build/tpeg-apply-child-source.g.l \
-	     build/tpeg-memo-source.g.l build/tpeg-literals.g.l build/tpeg-literals-source.g.l build/tpeg-calc.g.l build/tpeg-calceval-source.g.l
+	     build/tpeg-mini.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
+	     build/tpeg-memo.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
 
 check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
@@ -153,10 +153,6 @@ IRL_LIBRARY = compile-irl-library.l compile-irl.l irl-grammar.l irl.g.l cexpr.g.
 	      text-parser.k ir-gen-c.k maru.k
 build/%.$(SO) : build/%.c
 	$(CC) $(OFLAGS) -shared -fPIC -fno-builtin -w -o $@ $<
-
-build/%-source.g.l : check/%.g tpeg.l compile-tpeg.l | eval
-	@mkdir -p build
-	./eval compile-tpeg.l --on source $< > $@
 
 build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
 	@mkdir -p build

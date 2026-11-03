@@ -1,5 +1,5 @@
 # Warth's trans: a node's head picks the rule, by name.
-<nullp> : <text-parser> ()
+<nullp> : <source-parser> ()
 trans = `( .:t {apply t}:a ) -> a ;
 add = trans:x trans:y -> `(add ,x ,y) ;
 one = -> '(one) ;

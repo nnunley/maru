@@ -34,6 +34,9 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
 
 ## Notes from iterations
 
+**Grammars are live; `--on` is gone (after iteration 4).** A grammar names its parser type by its parent, `<trees> : <source-parser> ()`, and is brought in by importing it. Rules compile in-process, with `.g.l` files as a cache. Read `repl.l` and `test-pepsi.l`:
+`tpeg-repl.l` does the same with `compile-tpeg.l`'s generator. `tpeg.g` already reads `{ … }` blocks to `grammar-define`, `grammar-extend` and `grammar-eval`; those forms are what's missing. `tpeg-load` loads a `.g` file in-process, so a child's parent is already known. Notes below that mention `--on` or `<X/source>` are out of date.
+
 **The design changed after iteration 2.** `text-parser.l` is back to `main`'s, pure text. `<source-parser>` in a new `source-parser.l` matches any source through stream cells, with `self.position` holding a cell, so
 `value-pe`'s save and restore carry over. `compile-tpeg.l --on source` targets it. `input.l`'s `in-after`, `in-span` and `in-class` go. Notes below from iterations 1 and 2 describe the old shape; their lessons on Maru still hold.
 

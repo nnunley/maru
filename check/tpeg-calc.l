@@ -5,12 +5,12 @@
 (define-function calc-digits? (n) (and (string? n) (<= ?0 (string-at n 0)) (<= (string-at n 0) ?9)))
 (define-function calc-letters? (n) (and (string? n) (not (calc-digits? n))))
 (load "build/tpeg-calc.g.l")
-(load "build/tpeg-calceval-source.g.l")
+(load "build/tpeg-calceval.g.l")
 (peg-enable-recursion)
 
 (define env '((a . 5) (b . 10)))
 (define-function run-calc (text)
-  (let ((p (source-parser-for <calceval/source> (list (parse-string <calc> $start text)))))
+  (let ((p (source-parser-for <calceval> (list (parse-string <calc> $start text)))))
     (and (source-parser-invoke-args 'start $start p env)
 	 (<source-parser>-result p))))
 

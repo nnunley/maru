@@ -14,9 +14,10 @@ one Selectors tree_selectors
 one Source tree_source
 one Lists tree_lists
 one Args tree_args
+one Interleave tree_interleave
 one Apply tree_apply
 one Memos tree_memo
-one Literals tree_literals
+one Literals tree_literals tree_parse_complete
 one Calc tree_calc
 # the text path stays within 15% of main's, measured together so load is shared
 root=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)

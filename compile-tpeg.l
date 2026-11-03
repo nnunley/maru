@@ -16,26 +16,19 @@
 	(cons (fn1 (car list)) (mapN1 fnN fn1 (cdr list))))
     list))
 
-;;; --on source: the same rules for <source-parser> (source-parser.l). Text is the default and is unchanged.
-(define *tpeg-target* "text")
+;;; A grammar's rules run on the parser type its parent is. <text-parser> is the default, and is unchanged.
+(define *tpeg-source* ())
 
-(define-function tp-source? ()		(equal *tpeg-target* "source"))
+(define-function tp-source? ()		*tpeg-source*)
 
 ;; the runtime operation a template calls: text-parser-match-any, or source-parser-match-any on source
 (define-function tp-op (name)
   (concat-symbol (if (tp-source?) 'source-parser- 'text-parser-) name))
 
-;; a grammar's class on source is <X/source>, and <text-parser> there is <source-parser>
-(define-function tp-source-class (name)
-  (cond ((not name)			'<source-parser>)
-	((= name '<text-parser>)	'<source-parser>)
-	(else (let ((s (symbol->string name)))
-		(string->symbol (concat-strings (string-copy s 0 (- (string-length s) 1)) "/source>"))))))
-
 ;; a foreign rule call, p-r, is not generated on source yet
 (define-function tp-foreign-on-source (name)
   (and (tp-source?)
-       (error "foreign rule call to "name" is not generated with --on source yet")))
+       (error "foreign rule call to "name" is not generated on <source-parser> yet")))
 
 ;; the rule being compiled, for the error a list pattern gives on text
 (define *tp-rule* "")
@@ -55,7 +48,7 @@
 		 (set self.position (stream-tail _c_))
 		 ,@(if value? '((set self.result _v_)) ())
 		 1)))))
-      (error "rule " *tp-rule* " has a list pattern, which needs --on source")))
+      (error "rule " *tp-rule* " has a list pattern, which needs a grammar on <source-parser>")))
 
 (define value-pe)
 (define effect-pe)
@@ -231,19 +224,33 @@
 ;;     (list-do name names (println "(define-selector $"name") (define-selector $$"name")"))
 ;;     (map-with compile-rule rules class)))
 
+;; a grammar that stops parsing partway is an error, not a grammar that lost its remaining rules
+(define-function tpeg-parse-whole-file (path)
+  (let* ((source (contents-of-file-named path))
+	 (p (text-parser-for-on <tpeg> source)))
+    (or (text-parser-invoke-rule 'parser_spec $parser_spec p)
+	(error "no grammar in "path))
+    (let ((spec (<text-parser>-result p)))
+      ($space p)
+      (or (= (<text-parser>-position p) (<text-parser>-limit p))
+	  (let ()
+	    (print "\n"path": can't parse the grammar near: ")
+	    (parser-context p)
+	    (error "stopped parsing "path" before its end")))
+      spec)))
+
 (define-function parse-and-compile-grammar (path)
-  (let* ((spec   (parse-file <tpeg> $parser_spec path))
+  (let* ((spec   (tpeg-parse-whole-file path))
 	 (decl   (caar spec))
 	 (rules  (cdr  spec))
 	 (names  (map car rules))
-	 (class  (if (tp-source?) (tp-source-class (car decl)) (or (car decl) "<text-parser>"))))
+	 (class  (or (car decl) "<text-parser>")))
+    (set *tpeg-source* (= '<source-parser> (cadr decl)))
     ;;(print "DEFINITION: ") (map dumpln decl)
     ;;(print "RULES: ") (map dumpln rules)
     ;;(print "NAMES: ") (dumpln names)
     `((require ,(if (tp-source?) "source-parser.l" "text-parser.l"))
-      ,(and decl (if (tp-source?)
-		     (list 'define-class (tp-source-class (car decl)) (tp-source-class (cadr decl)) (caddr decl))
-		   (list 'define-class (car decl) (cadr decl) (caddr decl))))
+      ,(and decl (list 'define-class (car decl) (cadr decl) (caddr decl)))
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
       ,@(map-with compile-value  rules class)
@@ -252,7 +259,4 @@
 
 (or (defined? 'compile-tpeg-definitions-only)
     (while *arguments*
-      (let ((arg (next-argument)))
-	(if (equal arg "--on")
-	    (set *tpeg-target* (next-argument))
-	  (map dumpln (parse-and-compile-grammar arg))))))
+      (map dumpln (parse-and-compile-grammar (next-argument)))))
