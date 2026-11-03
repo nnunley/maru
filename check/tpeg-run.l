@@ -12,7 +12,7 @@
   (let* ((p (source-parser-for grammar source))
 	 (start (<source-parser>-position p)))
     (source-parser-invoke-rule (<selector>-name rule) rule p)
-    (= start (<source-parser>-position p))))
+    (and (= start (<source-parser>-position p)) 1)))
 
 ;; did a rule reach the end of its source
 (define-function reaches-end (grammar rule source)

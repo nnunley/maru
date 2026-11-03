@@ -25,7 +25,7 @@
 (let* ((c (stream-of '(1 2)))
        (d (stream-tail c)))
   (expect "head" (stream-head c) 1)
-  (expect "a tail is kept" (= d (stream-tail c)) 1)
+  (expect "a tail is kept" (and (= d (stream-tail c)) 1) 1)
   (expect "next head" (stream-head d) 2)
   (expect "not the end" (stream-end? d) ())
   (expect "the end" (and (stream-end? (stream-tail d)) 1) 1))
