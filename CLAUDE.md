@@ -157,6 +157,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   one process, `./eval2 compile-irl-library.l A.irl B.irl > build/lib.c`: the irl is read to
   forms that stay in memory, then ir-gen-c.k and maru.k compile them; only `cc` runs after. `cast(e, type)` and
   `sizeof(type)` read to maru.k's own forms.
+- `kscript` (`check/kscript.l`): `kscript.g` (inheriting `cexpr.g`) reads the 39 KScript listings
+  transcribed from TR-2012-001, and `kscript.l` runs streams tick by tick, as the report says: a
+  stream recomputes when a stream it depends on fires, a primed name isn't a dependency (so
+  `nat <- 0 fby nat' + 1` never updates), and undefined keeps the value and stops the change. `timerE`
+  is the only source. Untyped, so it runs on `eval`, not through ir2; `anyE` and `switchColE` still
+  read held values, and layout and rendering don't exist yet.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

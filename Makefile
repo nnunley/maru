@@ -61,7 +61,7 @@ CHECK_LIBS = build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/t
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
 
-check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l $(CROSS) .force
+check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l kscript.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/check.l $(CHECKS)
 
@@ -174,6 +174,9 @@ build/irl-grammar.c : check/irl-grammar.irl $(IRL_LIBRARY) | eval2
 
 john.g.l : tpeg.l john.g | eval
 	./eval compile-tpeg.l john.g > john.g.l
+
+kscript.g.l : tpeg.l kscript.g | eval
+	./eval compile-tpeg.l kscript.g > kscript.g.l
 
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l | eval

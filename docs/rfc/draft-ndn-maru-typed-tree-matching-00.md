@@ -897,9 +897,8 @@ A list pattern in `tpeg` requires the whole list to match, where one in `peg` ma
 syntaxes look the same, so moving a grammar from `peg` to `tpeg` can make a pattern fail until it ends
 in `.*`. This follows Warth; no `tpeg` grammar has list patterns yet, so none is affected.
 
-The `kscript` branch (at the time of writing, unmerged) keeps its grammar and check, and its `ks-eval`
-is replaced under [R-kscript-native]. Its `kscript.l` isn't merged to `main` in the meantime as if it
-were the design.
+`kscript.g` and `check/kscript.l` stay, and `kscript.l`'s `ks-eval` is replaced under [R-kscript-native].
+`kscript.l` is on `main` as a starting point, not as the design.
 
 Every step needs its `check/lines` entry, and the budget stays soft. Changing `eval.c` and `eval2.c`
 ([R-object-subr]) touches evaluators that the bootstrap is meant to retire; `eval.l` needs the same

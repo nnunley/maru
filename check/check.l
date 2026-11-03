@@ -300,6 +300,8 @@
   (unit-assert (equal (last (run "tree_interleave2" "./eval2 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))
   (unit-assert (equal (last (run "tree_interleave3" "./eval3 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok")))
 (check "tree_calc" (on-each-evaluator "tree_calc" "check/tpeg-calc.l"))
+;; kscript.g reads the report's KScript listings, and kscript.l runs streams tick by tick (check/kscript.l).
+(check "kscript" (unit-assert (equal (last (run "kscript" "./eval check/kscript.l notes/sources/grammars/*.kscript")) "kscript ok")))
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
