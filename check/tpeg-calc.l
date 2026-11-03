@@ -1,0 +1,22 @@
+;;; The DBjr documents' calculator: left recursion over text to a tree, then an evaluator over the tree.
+(require "check/tpeg-try.l")
+(define-function calc-apply (op l r)
+  (cond ((= op "+") (+ l r)) ((= op "-") (- l r)) ((= op "*") (* l r)) (else (/ l r))))
+(define-function calc-digits? (n) (and (string? n) (<= ?0 (string-at n 0)) (<= (string-at n 0) ?9)))
+(define-function calc-letters? (n) (and (string? n) (not (calc-digits? n))))
+(load "build/tpeg-calc.g.l")
+(load "build/tpeg-calceval.g.l")
+(peg-enable-recursion)
+
+(define env '((a . 5) (b . 10)))
+(define-function run-calc (text)
+  (let ((p (text-parser-for-source <calceval> (list (parse-string <calc> $start text)))))
+    (and (text-parser-invoke-args 'start $start p env)
+	 (<text-parser>-result p))))
+
+(expect "a tree, left-associated" (parse-string <calc> $start "a+b*2") '("+" "a" ("*" "b" "2")))
+(expect "left to right" (parse-string <calc> $start "1-2-3") '("-" ("-" "1" "2") "3"))
+(expect "evaluated" (run-calc "a+b*2") 25)
+(expect "parentheses" (run-calc "(a+b)*2") 30)
+(expect "an unknown name" (run-calc "z") ())
+(finish "tpeg calc")

@@ -99,3 +99,4 @@
 +235 KSWorld .pp deserializer and object model: ksworld-pp.l (+235) reads KSWorld/Frank .pp s-expression bundles (local paths or URLs) into <ks-object>, <ks-point>, <ks-rect>, <ks-matrix> and <ks-color> instances, resolves :valueId/:ref/:__homeObject__ object references and indexed collections, parses all 15 Squeak/KSWorld primitive value classes, and decodes Base64 big-endian FloatArray, ShortPointArray and ByteArray payloads into Maru data buffers
 -6 the SAT performance entry above counted 6 lines more than its two commits added (75e70f7 and 307bbad net +60, entered as +66)
 +34 eval3 as eval2's successor: eval3.c (+33) gains eval2's subr (call by address, a return letter after >, variadic calls through ffi_prep_cif_var), and eval2_subr runs under it too (+1)
++299 checks for stage 1 of tree matching, written before the code: check/tpeg-*.l and .g state what tpeg over any data must do, under each evaluator, and the Makefile builds their grammars

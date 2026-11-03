@@ -1,0 +1,28 @@
+; Stage 1 of draft-ndn-maru-typed-tree-matching-00: intent as requirements and a goal.
+; Evidence is events in evidence.john, appended by notes/plan/record from real check runs.
+; A requirement is green if it passed and hasn't failed since (after McCarthy's Elephant).
+start-world plan.
+create Req needs also done.
+create Team.
+make Req None None None yes.
+make Req Selectors None None no.
+make Req Source Selectors None no.
+make Req Lists Source None no.
+make Req Args Lists None no.
+make Req Apply Args None no.
+make Req Memos Lists None no.
+make Req Literals Source None no.
+make Req Calc Memos Args no.
+make Req Speed Source None no.
+make Req Suite Calc Apply no.
+make Team T.
+action Req passed.
+action Req failed.
+qualify Req green if
+  for some time K up to time do ((at time K it did passed) and
+                                 not for some time U after K up to time do (at time U it did failed)).
+action Team finish Req consequence Req done = yes.
+rule Team finish is Req done = no.
+rule Team finish is Req needs done = yes.
+rule Team finish is Req also done = yes.
+goal Team ship try Suite done = yes and Speed done = yes and Literals done = yes.

@@ -1,0 +1,36 @@
+#!/bin/sh
+# notes/plan/record: runs the checks behind each requirement and appends what happened.
+# Only this script writes evidence.john. Case names are the requirements' evidence.
+cd "$(dirname "$0")/../.."
+one() { # Req case...
+  req=$1; shift
+  if nice make check CHECKS="$*" > /tmp/maru-plan-$req.log 2>&1; then
+    echo "$req do passed." >> notes/plan/evidence.john; echo "PASS $req"
+  else
+    echo "$req do failed." >> notes/plan/evidence.john; echo "FAIL $req (/tmp/maru-plan-$req.log)"
+  fi
+}
+one Selectors tree_selectors
+one Source tree_source
+one Lists tree_lists
+one Args tree_args
+one Apply tree_apply
+one Memos tree_memo
+one Literals tree_literals
+one Calc tree_calc
+# the text path stays within 15% of main's, measured together so load is shared
+root=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
+if hyperfine --runs 5 --export-json /tmp/maru-plan-speed.json "cd $root && ./eval compile-tpeg.l tpeg.g" './eval compile-tpeg.l tpeg.g' > /tmp/maru-plan-Speed.log 2>&1 &&
+   python3 -c "import json;r=json.load(open('/tmp/maru-plan-speed.json'))['results'];m,n=r[0]['mean'],r[1]['mean'];print('main %.0f ms, here %.0f ms'%(m*1e3,n*1e3));raise SystemExit(0 if n<=m*1.15 else 1)"; then
+  echo "Speed do passed." >> notes/plan/evidence.john; echo "PASS Speed"
+else
+  echo "Speed do failed." >> notes/plan/evidence.john; echo "FAIL Speed"
+fi
+if [ "$1" = full ]; then
+  if nice make check > /tmp/maru-plan-Suite.log 2>&1; then
+    echo "Suite do passed." >> notes/plan/evidence.john; echo "PASS Suite"
+  else
+    echo "Suite do failed." >> notes/plan/evidence.john; echo "FAIL Suite (/tmp/maru-plan-Suite.log)"
+  fi
+fi
+./eval notes/plan/next.l

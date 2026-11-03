@@ -49,6 +49,10 @@
 
 ;; Run a shell command with no input and a 120 s limit (or SECS); keep its
 ;; output in tmp/NAME.out.  Returns the output's lines, or fails the case.
+;; tree_lists prints "tpeg lists ok"
+(define-function subst-underscore (name)
+  (concat-string "tpeg " (string-copy name 5 (- (string-length name) 5))))
+
 (define-function run (name cmd . secs)
   (let ((status (run-status (or (car secs) 120) (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; " cmd))))
     (or (= 0 status) (error "FAIL " name ": exit status " status " running: " cmd))
@@ -248,6 +252,22 @@
 
 ;; john.g reads the three complete JOHN programs to forms, with the precedence and relations the reconstruction gives (check/john-forms.l).
 (check "john_forms" (unit-assert (equal (last (run "john_forms" "./eval check/john-forms.l")) "john forms ok")))
+;; tpeg over any data, under each evaluator (draft-ndn-maru-typed-tree-matching-00).
+(define-form on-each-evaluator (name file)
+  (let ((want (concat-strings (subst-underscore name) " ok")))
+    `(let ()
+       (unit-assert (equal (last (run ,name (concat-strings "./eval " ,file))) ,want))
+       (unit-assert (equal (last (run (concat-string ,name "2") (concat-strings "./eval2 -b boot2.l " ,file))) ,want))
+       (unit-assert (equal (last (run (concat-string ,name "3") (concat-strings "./eval3 -b boot2.l " ,file))) ,want)))))
+(check "tree_selectors" (on-each-evaluator "tree_selectors" "check/tpeg-selectors.l"))
+(check "tree_source" (on-each-evaluator "tree_source" "check/tpeg-source.l"))
+(check "tree_lists" (on-each-evaluator "tree_lists" "check/tpeg-lists.l"))
+(check "tree_args" (on-each-evaluator "tree_args" "check/tpeg-args.l"))
+(check "tree_apply" (on-each-evaluator "tree_apply" "check/tpeg-apply.l"))
+(check "tree_memo" (on-each-evaluator "tree_memo" "check/tpeg-memo.l"))
+(check "tree_literals" (on-each-evaluator "tree_literals" "check/tpeg-literals.l"))
+(check "tree_calc" (on-each-evaluator "tree_calc" "check/tpeg-calc.l"))
+
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
 
