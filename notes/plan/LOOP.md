@@ -235,3 +235,63 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
     (`tree_calc`, `check/tpeg-calc.l`, exits 256; log `/tmp/maru-plan-Calc.log`). The record log doesn't show the cause of
     either yet; read the case itself before the log. Memos is the RFC's "memos are on the stream" design, so it is the one
     most likely to meet a decision in the RFC; Calc needs Memos per the plan (`Calc Memos Args`).
+- Iteration 8 (Memos, stage 1 Memos under the design; Calc stopped on its check). Scoreboard from the record run:
+  `Selectors yes`, `Source yes`, `Lists yes`, `Args yes`, `Interleave yes`, `Apply yes`, `Memos yes`, `Literals yes`,
+  `Calc no`, `Speed yes`, `Suite no`. The Speed line: `main 280 ms, here 300 ms` (the `hyperfine` summary read `+7.1%`).
+  `tree_memo` passes on all three evaluators. `make -B tpeg.l` exits 0 with no diff; `lines` passes with the +108 entry;
+  `peg_compose`, `text_parser`, `irl_grammar`, `john_forms`, `law_cexpr`, `cexpr_forms`, `irl`, `sat_dimacs`,
+  `tree_text_refuses` and `tree_parse_complete` pass.
+- What landed:
+  - `source-parser.l` (+103 net) requires `text-parser.l` for `<memo>`, `put`, `get` and the states. `<source-parser>` gained
+    a `streams` field, and `source-parser-stream-of` keeps one stream per value on the parser (an alist, looked up by identity);
+    `source-parser-for` and the list pattern (compile-tpeg.l, one line) both go through it.
+  - `source-parser-invoke-rule-plain` is the call with no memo, and `source-parser-invoke-rule-simply` and
+    `source-parser-invoke-args` are aliases of it. Generated calls with arguments use the plain call, so arguments are never memoized.
+  - `source-parser-invoke-rule-with-memo` and `-with-recursion` answer a no-argument call from the cell's memo (`<cell>-memo`,
+    an alist keyed by the rule's base name, `source-parser-memo-key`: its selector name without `$` or `$$`).
+  - `source-parser-choose` sets `source-parser-invoke-rule` to one of the three. `text-parser.l`'s `peg-enable-memoisation`,
+    `peg-enable-recursion` and `peg-disable-memoisation` call it through `peg-choose-source`, by name, so text-parser.l doesn't
+    need source-parser.l loaded, and the source switch follows the text one. The default is plain, as text's default is simple.
+- Decisions the RFC doesn't spell out (a human may want to look at these):
+  - **Left-recursion sentinel.** The RFC says a growth pass stops when it "fails or doesn't advance, by cell identity". Pure
+    identity isn't enough: in `sum = sum:a 'plus .:b | .:n` on `1 plus 2 plus 3`, the pass that falls back to the base
+    alternative ends at the first cell, which is not the current answer's cell, so identity alone grows forever. OMeta2's
+    `apply:` stops also when a pass ends where the seed pass ended (`sentinel`), and that is what is implemented, with the
+    identity test as well. The RFC text should say so. This is the one place where the RFC's wording is short of the evidence.
+  - **Memo key and effects.** `sum` in value mode and `counted` in effect mode are different selectors, but one rule. The memo
+    is keyed by the base name, and holds the value's answer. An effect call (`$$r`) runs the value selector (`$r`) in memo mode,
+    because an effect's answer has no result, and `twice = &counted counted` must run `counted` once. So under memoisation an
+    effect builds results it would not build otherwise; the matching is the same. Check `tree_memo` requires one run, not a
+    particular result, so this is a choice, not something the check forces.
+  - **Calls by name aren't memoized.** `{apply x}` and `{super r}` pass a method, not a selector, and `super`'s rule has the
+    same name as the override, so a name key would collide. They run plain. A left-recursive rule reached only through `apply`
+    or `super` therefore has no growth; no check covers this.
+  - **Argument cells and memos.** A no-argument rule's answer depends only on the suffix from its cell, so a memo on the caller's
+    cell stays valid when a callee reads the caller's input through argument cells. The argument cells are new cells with no
+    memo, so they start empty on every call. A rule with arguments writes no memo at all.
+  - **Lookup cost.** Both the per-value streams and the cell memos are alists, looked up with `assq` (identity). That's linear in
+    the number of values or rules at one cell. Speed doesn't measure the source path, but a big source with many distinct
+    sublists will pay for it. A table would fix it if there's a hash primitive in boot.l/boot2.l (none found).
+- Calc: **stopped on its check, not a code failure.** `check/tpeg-calc.g` (a `check/tpeg-*` file, so not edited) has
+  `identifier = spaces [a-zA-Z] [a-zA-Z0-9]* @$:n -> n`. In `tpeg.g`, `@` and `$` are postfix conversions on the repetition before
+  them, so `@$:n` takes the span of `[a-zA-Z0-9]*` only, and the first letter is dropped: on text `parse-string <calc> $identifier
+  "abc"` gives `"bc"`. The check expects `(+ a (* b 2))` and gets `(+ "" (* "" 2))`. The text path is unchanged by this
+  iteration, so the grammar is the cause. Evidence that the rest of Calc is right: a scratch copy in the scratchpad with
+  `identifier = spaces ([a-zA-Z] [a-zA-Z0-9]*) @$:n -> n` (`tpeg-calc-fixed.g`), and `calc-fixed.l` (the check with its
+  grammar load pointed at the copy) prints `tpeg calc ok` under `./eval`, `./eval2 -b boot2.l` and `./eval3 -b boot2.l`.
+  A human should fix `check/tpeg-calc.g` (or confirm the intended reading) before Calc can go green.
+- Also a stop-and-report: the Calc check calls `source-parser-invoke-args`, which didn't exist. I added it as the name for the
+  plain call with arguments (see above). That is a new name, not a check edit, but a human may want the check to use the
+  name the RFC gives.
+- Not done this iteration: foreign rules on `<source-parser>` (`[R-foreign-proxy]`; `p-r` still stops compilation on source with
+  "not generated on <source-parser> yet"); a compile-time refusal of left recursion with arguments (`[R-param-left-recursion]`,
+  no check covers it); `memo-all`. `stream-memo` returns the cell's memo alist, not a table as the RFC's signature says.
+  `tree_memo` covers memo hits, growth, and one stream per value, but not `{apply}`/`{super}` memo behaviour, nor the
+  argument-cell case.
+- Gotchas for the next iteration:
+  - `(= a b)` on structs is identity (checked: `(= x y)` on two distinct `<s>` is nil). `assq` is identity too.
+  - `(string-at "$" 0)` against a symbol's first character works. A `?$` char literal didn't compare equal to 36 here, so don't use it.
+  - `peg-choose-source` finds `source-parser-choose` by name at run time, so a text-only program has no source switch to set.
+    `source-parser.l`'s `source-parser-invoke-rule` default is plain until one of the three peg-* functions runs, as on text.
+  - Next: Calc once `check/tpeg-calc.g` is fixed by a human (the grammar, not the code, is the cause). Then `notes/plan/record full`
+    for Suite, which needs Calc and Speed too. Logs: `/tmp/maru-plan-Memos.log` and `/tmp/maru-plan-Calc.log`.

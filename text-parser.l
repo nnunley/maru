@@ -231,9 +231,14 @@
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-memo)
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
-(define-function peg-disable-memoisation ()	(println "; PEG memoisation disabled")	(set text-parser-invoke-rule text-parser-invoke-rule-simply))
-(define-function peg-enable-memoisation ()	(println "; PEG memoisation enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-memo))
-(define-function peg-enable-recursion ()	(println "; PEG recursion enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-recursion))
+;; the same choice for <source-parser>, when source-parser.l is loaded: it defines source-parser-choose,
+;; which is looked up by name here, because this file can't name what it doesn't load
+(define-function peg-choose-source (kind)
+  (and (defined? 'source-parser-choose) ((eval 'source-parser-choose) kind)))
+
+(define-function peg-disable-memoisation ()	(println "; PEG memoisation disabled")	(set text-parser-invoke-rule text-parser-invoke-rule-simply)	(peg-choose-source 'plain))
+(define-function peg-enable-memoisation ()	(println "; PEG memoisation enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-memo)	(peg-choose-source 'with-memo))
+(define-function peg-enable-recursion ()	(println "; PEG recursion enabled")	(set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)	(peg-choose-source 'with-recursion))
 
 (define-function parse-string (grammar rule source)
   (let* ((p (text-parser-for-on grammar source)))

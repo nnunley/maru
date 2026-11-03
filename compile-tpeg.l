@@ -74,7 +74,7 @@
       `(let ((_c_ self.position))
 	 (when (and (not (stream-end? _c_)) (in-enter (stream-head _c_)))
 	   (let ((_v_ (stream-head _c_)))
-	     (set self.position (stream-of _v_))
+	     (set self.position (source-parser-stream-of self _v_))
 	     (let ((_ok_ (and ,(pe-fn exp) (stream-end? self.position))))
 	       (set self.position _c_)
 	       (when _ok_
