@@ -1,7 +1,9 @@
 # Frank's source and the tinlizzie.org document formats (surveyed 2026-11-03)
 
-Local copies are in `~/pkm/raw/vpri/frank/`. **Frank's code has no license that I could find**, so it stays out of
-this repository: read it, describe it, and write our own. In February 2020 Yoshiki Ohshima wrote on squeak-dev, "As for
+Local copies are in `~/pkm/raw/vpri/frank/`. **License:** the Viewpoints Intelligent Archive wiki at `tinlizzie.org/IA/` has a footer, "Content is available under Creative
+Commons Attribution unless otherwise noted", linking CC BY 4.0. The pages for `/dbjr/`, `/ometa/`, `/updates/` and the Frank zip carry no
+statement that I found, and it isn't clear the footer reaches beyond the wiki. So Frank's code stays out of this repository for now:
+read it, describe it, and write our own. In February 2020 Yoshiki Ohshima wrote on squeak-dev, "As for
 Frank, we don't necessarily hide it", linking the two sources below, and "It's just not a in a good shape". The Squeak
 board had asked in 2017 about permission to republish; I found no answer. Licensing is an open question to settle.
 
