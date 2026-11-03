@@ -150,14 +150,15 @@ void reserve(struct Solver* s, long n) {
 }
 
 // ---- watches and clauses
-void watch(struct Solver* s, long l, long c) {
+void watch(struct Solver* s, long l, long c, long b) {
   let long i := lidx(l);
-  if s.wsize[i] == s.wcap[i] then {
-    s.wcap[i] := s.wcap[i] == 0 ? cast(4, long) : 2 * s.wcap[i];
+  if s.wsize[i] + 2 > s.wcap[i] then {
+    s.wcap[i] := s.wcap[i] == 0 ? cast(8, long) : 2 * s.wcap[i];
     s.wlist[i] := cast(grow(cast(s.wlist[i], long*), s.wcap[i]), long);
   }
   cast(s.wlist[i], long*)[s.wsize[i]] := c;
-  s.wsize[i] := s.wsize[i] + 1;
+  cast(s.wlist[i], long*)[s.wsize[i] + 1] := b;
+  s.wsize[i] := s.wsize[i] + 2;
 }
 long new_clause(struct Solver* s, long* lits, long n) {	// the clause's offset in the arena
   let long c := s.asize;
@@ -172,8 +173,8 @@ long new_clause(struct Solver* s, long* lits, long n) {	// the clause's offset i
     i := i + 1;
   }
   s.asize := s.asize + n + 1;
-  watch(s, lits[0], c);
-  watch(s, lits[1], c);
+  watch(s, lits[0], c, lits[1]);
+  watch(s, lits[1], c, lits[0]);
   return c;
 }
 void enqueue(struct Solver* s, long l, long r) {
@@ -222,21 +223,25 @@ long propagate(struct Solver* s) {
     s.qhead := s.qhead + 1;
     while i < n do {
       let long c := ws[i];
-      let long size := s.arena[c];
-      i := i + 1;
-      if confl >= 0 then {
+      let long b := ws[i + 1];
+      i := i + 2;
+      if confl >= 0 || value(s, b) == 1 then {
         ws[j] := c;
-        j := j + 1;
+        ws[j + 1] := b;
+        j := j + 2;
       }
       else {
+        let long size := s.arena[c];
         // keep the false literal second
         if s.arena[c + 1] == f then {
           s.arena[c + 1] := s.arena[c + 2];
           s.arena[c + 2] := f;
         }
-        if value(s, s.arena[c + 1]) == 1 then {
+        let long first := s.arena[c + 1];
+        if value(s, first) == 1 then {
           ws[j] := c;
-          j := j + 1;
+          ws[j + 1] := first;
+          j := j + 2;
         }
         else {
           let long k := 3;
@@ -245,19 +250,20 @@ long propagate(struct Solver* s) {
             if value(s, s.arena[c + k]) != -1 then {
               s.arena[c + 2] := s.arena[c + k];
               s.arena[c + k] := f;
-              watch(s, s.arena[c + 2], c);
+              watch(s, s.arena[c + 2], c, first);
               moved := 1;
             }
             k := k + 1;
           }
           if !moved then {
             ws[j] := c;
-            j := j + 1;
-            if value(s, s.arena[c + 1]) == -1 then {
+            ws[j + 1] := first;
+            j := j + 2;
+            if value(s, first) == -1 then {
               confl := c;
               s.qhead := s.tsize;
             }
-            else enqueue(s, s.arena[c + 1], c);
+            else enqueue(s, first, c);
           }
         }
       }
@@ -274,8 +280,7 @@ void proof_write(struct Solver* s, long l) {	// a literal and a space, or 0 and 
     s.pcap := 2 * s.pcap + 64;
     s.pbuf := cast(realloc(s.pbuf, s.pcap), char*);
   }
-  if l == 0 then s.plen := s.plen + cast(snprintf(s.pbuf + s.plen, 32, "0\n"), long);
-  else s.plen := s.plen + cast(snprintf(s.pbuf + s.plen, 32, "%ld ", l), long);
+  s.plen := put_lit(s.pbuf, s.plen, l);
 }
 void proof_clause(struct Solver* s, long* lits, long n) {
   if s.proof then {

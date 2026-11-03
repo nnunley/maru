@@ -150,7 +150,7 @@ law.g.l : tpeg.l law.g | eval
 IRL_LIBRARY = compile-irl-library.l compile-irl.l irl-grammar.l irl.g.l cexpr.g.l tpeg.l \
 	      text-parser.k ir-gen-c.k maru.k
 build/%.$(SO) : build/%.c
-	$(CC) -shared -fPIC -fno-builtin -w -o $@ $<
+	$(CC) $(OFLAGS) -shared -fPIC -fno-builtin -w -o $@ $<
 
 build/%.g.l : check/%.g tpeg.l compile-tpeg.l | eval
 	@mkdir -p build

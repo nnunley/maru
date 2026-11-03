@@ -166,13 +166,38 @@ struct Text* text_new(long vars, long count) {
   t.n := cast(snprintf(t.p, 64, "p cnf %ld %ld\n", vars, count), long);
   return t;
 }
-void text_lit(struct Text* t, long l) {	// a literal and a space, or 0 and a newline
+long put_lit(char* p, long n, long l) {	// a literal and a space, or 0 and a newline
+  if l == 0 then {
+    p[n] := 48;
+    p[n + 1] := 10;
+    return n + 2;
+  }
+  if l < 0 then {
+    p[n] := 45;
+    n := n + 1;
+    l := 0 - l;
+  }
+  let long end := n;
+  let long m := l;
+  while m > 0 do {
+    end := end + 1;
+    m := m / 10;
+  }
+  let long i := end;
+  while l > 0 do {
+    i := i - 1;
+    p[i] := cast(48 + (l % 10), char);
+    l := l / 10;
+  }
+  p[end] := 32;
+  return end + 1;
+}
+void text_lit(struct Text* t, long l) {
   if t.n + 32 > t.cap then {
     t.cap := 2 * t.cap;
     t.p := cast(realloc(t.p, t.cap), char*);
   }
-  if l == 0 then t.n := t.n + cast(snprintf(t.p + t.n, 32, "0\n"), long);
-  else t.n := t.n + cast(snprintf(t.p + t.n, 32, "%ld ", l), long);
+  t.n := put_lit(t.p, t.n, l);
 }
 char* text_chars(struct Text* t) return t.p;
 long text_length(struct Text* t) return t.n;
