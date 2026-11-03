@@ -10,7 +10,7 @@
 
 (expect "text" (walk "ab") '(97 98))
 (expect "list" (walk '(97 98)) '(97 98))
-(expect "binary" (walk (bytes-of "ab")) '(97 98))
+(and has-bytes (expect "binary" (walk (bytes-of "ab")) '(97 98)))
 (expect "a user's type" (walk (new <countdown> '(97 98))) '(97 98))
 
 (expect "a long has no contents" (in-enter 3) ())

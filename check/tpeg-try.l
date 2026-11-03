@@ -11,8 +11,14 @@
 (define-method in-enter    <countdown> ()		1)
 (define-method in-start    <countdown> ()		0)
 (define-method in-at-end   <countdown> (pos)		(>= pos (list-length self.elements)))
-(define-method in-head     <countdown> (pos)		(nth self.elements pos))
+(define-method in-head     <countdown> (pos)
+  (let ((l self.elements))
+    (for (i 0 pos) (set l (cdr l)))
+    (car l)))
 (define-method in-tail     <countdown> (pos)		(+ pos 1))
+
+;; eval2 has no byte buffers: its Data type is a stub.  eval3, its successor, has them.
+(define has-bytes (defined? 'data))
 
 (define-function bytes-of (string)
   (let ((s (data-stream 8)))

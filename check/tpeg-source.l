@@ -4,7 +4,7 @@
 
 (expect "text" (try <mini> $sum "2+3") '(5))
 (expect "a list of characters" (try <mini> $sum '(?2 ?+ ?3)) '(5))
-(expect "binary" (try <mini> $sum (bytes-of "2+3")) '(5))
+(and has-bytes (expect "binary" (try <mini> $sum (bytes-of "2+3")) '(5)))
 (expect "a user's type" (try <mini> $sum (new <countdown> (list ?2 ?+ ?3))) '(5))
 (expect "parse-source" (parse-source <mini> $sum '(?2 ?+ ?3)) 5)
 (expect "parse-string still works" (parse-string <mini> $sum "2+3") 5)

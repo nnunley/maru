@@ -33,6 +33,8 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
 - Commits carry no attribution lines.
 
 ## Notes from iterations
+
+Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which only `boot2.l` has and which is 1-based there; and the binary cases run where `data` exists, which isn't `eval2`, whose Data type is a stub.
 - Iteration 1 (Selectors): `input.l` is written (the `in-*` selectors, with methods for nil, pairs, strings, `<data-stream>`, longs), and `text-parser.l` requires it. Scoreboard after the change: Speed green (484 ms main, 522 ms here); Selectors, Source, Lists, Args, Apply, Memos, Literals, Calc and Suite red. Nothing else is green.
 - Selectors is blocked by the checks, not by `input.l`, so this is a stop-and-report:
   1. `check/tpeg-try.l` defines `<countdown>`'s `in-head` with `nth`, which only `boot2.l` defines. `./eval` fails loading it ("undefined variable: nth"), and every `tree_*` case loads it, so they all fail under `eval`.
