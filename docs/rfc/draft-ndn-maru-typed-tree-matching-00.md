@@ -368,6 +368,7 @@ tree_source
 
 ```maru-check @R-instances
 tree_source
+tree_text_refuses
 ```
 
 ```maru-check @R-any-source
