@@ -27,4 +27,7 @@ action Team finish Req consequence Req done = yes.
 rule Team finish is Req done = no.
 rule Team finish is Req needs done = yes.
 rule Team finish is Req also done = yes.
-goal Team ship try Suite done = yes and Speed done = yes and Literals done = yes.
+; every requirement is named, so one going red again comes back into the plan
+goal Team ship try Selectors done = yes and Source done = yes and Lists done = yes and Args done = yes and
+  Interleave done = yes and Apply done = yes and Memos done = yes and Foreign done = yes and
+  Literals done = yes and Calc done = yes and Speed done = yes and Suite done = yes.
