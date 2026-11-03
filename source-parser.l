@@ -73,8 +73,19 @@
   (define-method parser-expected <source-parser> (what)
     (error what " expected")))
 
+;; the cells of a call's arguments, first argument first, whose tail is the caller's input
+(define-function source-parser-arguments (source args tail)
+  (if (pair? args)
+      (new <cell> source () () (car args) (source-parser-arguments source (cdr args) tail) ())
+      tail))
+
+;; A rule takes no parameters: its arguments are the first elements of its input. On failure the
+;; saved cell is restored, so no argument cell stays behind.
 (define-function source-parser-invoke-rule (name rule self . args)
-  (apply rule (cons self args)))
+  (let ((saved (<source-parser>-position self)))
+    (set (<source-parser>-position self) (source-parser-arguments (<source-parser>-source self) args saved))
+    (or (rule self)
+	(let () (set (<source-parser>-position self) saved) ()))))
 
 (define source-parser-invoke-rule-simply source-parser-invoke-rule)
 

@@ -131,3 +131,35 @@ Checks corrected after iteration 1: `<countdown>` no longer uses `nth`, which on
   - Next: Args (stage 1 Task 4, arguments on the input). `source-parser-invoke-rule-simply` is still an alias of
     `source-parser-invoke-rule`, which drops arguments; Args must replace it with the arguments-on-input cells, and the text
     path must refuse arguments as R-instances says. Log: `/tmp/maru-plan-Args.log`.
+- Iteration 5 (Args, stage 1 Task 4 under the design). Scoreboard after it: **Selectors, Source, Lists, Args and Speed
+  green**; Interleave, Apply, Memos, Literals, Calc and Suite red. Speed from the record run: `main 329 ms, here 323 ms`.
+  `make tpeg.l` (forced with `make -B tpeg.l`, output unchanged in git), `lines`, and the text-side checks `text_parser`,
+  `peg_compose`, `irl_grammar`, `john_forms`, `law_cexpr`, `cexpr_forms`, `irl` and `sat_dimacs` pass.
+- What landed:
+  - `compile-tpeg.l`: `tp-parameters` turns a rule's `:a :b` into `(match-all (assign-result a (match-any)) …)` at its
+    start, so the parameters are `.:a` reads of the input; the method takes no arguments (`compile-value` and
+    `compile-effect` both changed). A call with arguments goes through `tp-call-args`, which is an error on text.
+  - `source-parser.l`: `source-parser-arguments` builds one cell per argument (`new <cell>` with its tail already set to the
+    next argument, the last one to the caller's current cell). `source-parser-invoke-rule` sets the position to that chain,
+    calls the rule with `self` alone, and restores the saved cell on failure, for every call, args or not.
+    `source-parser-invoke-rule-simply` is still an alias of it, so it no longer drops arguments.
+  - `check/lines` +21 for this delta.
+- Decisions made here, which the RFC doesn't spell out (a human may want to look at them):
+  - On success, the caller continues from the callee's final cell. If the callee leaves argument cells unread, they stay in
+    front of the caller's input. No check covers this; `tree_args` only has calls whose arguments are all consumed.
+  - Parameters on `<text-parser>` are an error naming the rule, not only calls with arguments. The RFC names calls. A
+    parameter on text has no argument to receive, so it was refused rather than left to fail at run time. No text grammar
+    in the tree declares parameters, so nothing changed.
+  - Argument cells have `end` nil, so a nil argument (`{nilarg ()}`) is an ordinary element, as the check expects.
+- Not covered by a check: the text refusal of calls with arguments (and of parameters) has no case. I confirmed it by hand
+  with scratch grammars through `./eval compile-tpeg.l`: it stops with `rule start calls other with arguments, which needs
+  a grammar on <source-parser>` and `rule other has parameters, which needs a grammar on <source-parser>`. The RFC asks
+  for it under R-instances, which maps to `tree_source`, and `tree_source` doesn't exercise it. A human may want a case.
+- Gotchas for the next iteration:
+  - `make tpeg.l` says "up to date" when only compile-tpeg.l changed; `make -B tpeg.l` forces it.
+  - Maru has no `begin` here; use `(let () …)` (the first attempt failed for that reason).
+  - `compile-value` now sets `*tp-rule*` before it computes the body, so the errors name the right rule.
+  - Next: Interleave (`tree_interleave`, log `/tmp/maru-plan-Interleave.log`). Its check runs `./eval tpeg-repl.l
+    check/tpeg-interleave.l`, which needs the block forms `{ <x> : … }`, `{ rules }` and `{ rules expression }` from `tpeg.g`
+    and a REPL reader that hands back its position; none of that is in the tree yet. Apply after it, and it needs `{apply x}`
+    and `{super r x}`, which `tpeg.g` doesn't parse yet.

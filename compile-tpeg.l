@@ -30,8 +30,20 @@
   (and (tp-source?)
        (error "foreign rule call to "name" is not generated on <source-parser> yet")))
 
-;; the rule being compiled, for the error a list pattern gives on text
+;; the rule being compiled, for the errors a list pattern or arguments give on text
 (define *tp-rule* "")
+
+;; A call with arguments is generated on source only: its arguments are cells on the input.
+(define-function tp-call-args (name)
+  (or (tp-source?)
+      (error "rule " *tp-rule* " calls " name " with arguments, which needs a grammar on <source-parser>")))
+
+;; A rule's parameters are the first elements of its input: `rule :a :b` is `.:a .:b` at its start.
+(define-function tp-parameters (params body)
+  (cond
+    ((not params)	body)
+    ((tp-source?)	`(match-all ,@(map (lambda (p) `(assign-result ,p (match-any))) params) ,body))
+    (else		(error "rule " *tp-rule* " has parameters, which needs a grammar on <source-parser>"))))
 
 ;; A list pattern enters the current element, when in-enter holds for it, and its nested pattern must
 ;; reach the end of that element's stream. The element is the value, and the input moves past it.
@@ -58,7 +70,8 @@
     (match-list		(exp)		(tp-list-pattern exp value-pe 1))
     (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
     (match-rule		(name . args)	(if args
-					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args)
+					    (let () (tp-call-args name)
+						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args))
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self)))
     (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name))))
     (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
@@ -118,7 +131,8 @@
     (match-list		(exp)		(tp-list-pattern exp effect-pe ()))
     (match-object	(obj)		`(,(tp-op 'match-object) self ',obj))
     (match-rule		(name . args)	(if args
-					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args)
+					    (let () (tp-call-args name)
+						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args))
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self)))
     (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name))))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
@@ -189,26 +203,22 @@
     vars))
 
 (define-function compile-value (rule class)
-  (let* ((name (car   rule))
-	 (body (cadr  rule))
-	 (args (caddr rule))
-	 (vars (find-vars body)))
-    ;;(print ";; ") (dumpln rule)
+  (let ((name (car rule)))
     (set *tp-rule* name)
-    `(define-method ,(concat-symbol '$ name) ,class ,args
-       (let ,vars
-	 ,(value-pe body)))))
+    (let* ((body (tp-parameters (caddr rule) (cadr rule)))
+	   (vars (find-vars body)))
+      `(define-method ,(concat-symbol '$ name) ,class ()
+	 (let ,vars
+	   ,(value-pe body))))))
 
 (define-function compile-effect (rule class)
-  (let* ((name (car   rule))
-	 (body (cadr  rule))
-	 (args (caddr rule))
-	 (vars (find-vars body)))
-    ;;(print ";; ") (dumpln rule)
+  (let ((name (car rule)))
     (set *tp-rule* name)
-    `(define-method ,(concat-symbol '$$ name) ,class ,args
-       (let ,vars
-	 ,(effect-pe body)))))
+    (let* ((body (tp-parameters (caddr rule) (cadr rule)))
+	   (vars (find-vars body)))
+      `(define-method ,(concat-symbol '$$ name) ,class ()
+	 (let ,vars
+	   ,(effect-pe body))))))
 
 ;; (while *arguments*
 ;;   (let* ((spec   (parse-file <tpeg> $parser_spec (next-argument)))
