@@ -30,6 +30,7 @@
 (define-function john-sort-text (s)
   (cond ((= s 'number) "a number")
 	((= s 'name) "a name")
+	((= s 'fields) "a value with fields")
 	(else "a list")))
 (define-function john-sort-unify (a b)	; the sort agreeing with both, or clash
   (cond ((not a) b)
@@ -38,9 +39,18 @@
 	 (let ((e (john-sort-unify (cadr a) (cadr b)))) (if (= e 'clash) e (list 'list e))))
 	((= a b) a)
 	(else 'clash)))
+;; only what `using` names can happen in this satisfy: the rest needn't be encodable, and writes nothing
+(define *sat-using* ())
+(define-function john-sat-in-use (table action-of)
+  (let ((out ()))
+    (list-do x table
+      (and (or (not *sat-using*) (member? (action-of x) *sat-using*)) (push out x)))
+    (list-reverse! out)))
+(define-function john-sat-actions () (john-sat-in-use *john-actions* cadr))
 (define-selector john-value-sort (v) 'name)
 (define-method john-value-sort <long> () 'number)
 (define-method john-value-sort <undefined> () '(list ()))
+(define-method john-value-sort <john-variant> () 'fields)
 (define-method john-value-sort <john-class-ref> () '(list name))
 (define-method john-value-sort <pair> ()
   (let ((e ()))
@@ -73,7 +83,7 @@
 (define-function john-static-sort (x env)	; env: (name . class)
   (cond ((symbol? x)
 	 (cond ((assq x env) 'name)
-	       ((member? x '(yes no empty)) 'name)
+	       ((john-member x) 'name)
 	       ((john-object? x) 'name)
 	       ((john-class x) '(list name))
 	       ((= x 'time) 'number)
@@ -105,7 +115,7 @@
 ;; one pass over every action's effects; true when a sort changed
 (define-function john-effect-sorts ()
   (let ((changed ()))
-    (list-do a *john-actions*
+    (list-do a (john-sat-actions)
       (let ((env (cons (cons 'it (car a)) (map (lambda (p) (cons (cadr p) (car p))) (caddr a)))))
 	(list-do e (cadddr a)	; (set X p v guard?)
 	  (let ((s (john-static-sort (cadddr e) env)))
@@ -164,16 +174,25 @@
 	 reached)
 	(else reached)))
 ;; only what the goals can reach has to be encodable: a program may keep other questions, about its history say
+(define john-sat-mutable)
 (define-function john-sat-check (goals)
   (list-do opt '(two-player-game max-time-ahead)
     (and (cdr (assq opt *john-options*)) (john-sat-refuse (symbol->string opt))))
-  (let* ((roots (list goals *john-actions* *john-rules* *john-aopts* *john-gopts* *john-heuristics*))
+  (let* ((roots (list goals
+		      (john-sat-actions)
+		      (john-sat-in-use *john-rules* cadr)
+		      (john-sat-in-use *john-aopts* cadr)
+		      *john-gopts*
+		      *john-heuristics*))
 	 (reached (john-sat-reach roots ())))
     (list-do table (cons reached roots)
       (john-sat-scan table)
       (john-bound-check table (john-sat-width))))
   (list-do e (john-sorts)
     (let ((v (john-lookup *john-world* (car (car e)) (cadr (car e)))))
+      (and (= 'fields (cdr e))
+	   (member? (cadr (car e)) (cdr (assq (car (car e)) (john-sat-mutable))))
+	   (john-sat-refuse "an enumerated value with fields that changes"))
       (john-bound-check v (john-sat-width))
       (john-list-bound-check v (john-sat-option 'sat-list-length 16)))))
 
@@ -318,7 +337,7 @@
 	((= l (- *sat-t*)) (sat-const 'no))
 	(else (cons 'names (list (cons 'yes l) (cons 'no (- l)))))))
 (define-function sat-equal (a b)
-  (cond ((and (sat-const? a) (sat-const? b)) (if (equal (cdr a) (cdr b)) *sat-t* (- *sat-t*)))
+  (cond ((and (sat-const? a) (sat-const? b)) (if (john-same (cdr a) (cdr b)) *sat-t* (- *sat-t*)))
 	;; a list against a value that is a list in some cases and not in others: case by case,
 	;; each a list compared as one, the rest never equal
 	((and (= 'lst (car a)) (= 'names (car b)) (not (sat-list-like? b)))
@@ -597,6 +616,8 @@
   (let ((found ()))
     (list-do q *john-quals* (and (= sel (cadr q)) (set found 1)))
     (list-do c *john-classes* (and (member? sel (john-props (car c))) (set found 1)))
+    (list-do e *john-enumerations*
+      (list-do m (cdr e) (and (member? sel (cdr m)) (set found 1))))
     found))
 (define sat-eval)
 (define sat-qualify)
@@ -653,6 +674,8 @@
     (list-do a args (or (sat-const? a) (set known ())))
     (cond ((and (sat-const? r) (john-object? (cdr r)) (not args) (member? sel (john-props c)))
 	   (sat-cell (cdr r) sel t))
+	  ((and (sat-const? r) (not args) (john-field (cdr r) sel))
+	   (sat-const (cdr (john-field (cdr r) sel))))
 	  ((john-quals c sel)
 	   (sat-memo t (cons sel (cons r args))
 		     (lambda () (sat-qualify r (john-quals c sel) args t))))
@@ -809,6 +832,21 @@
 						   (lambda ()
 						     (sat-truth (sat-eval (caddr x) t env)))))))))
 		      ((= op 'not) (sat-bool (- (sat-truth (sat-eval (cadr x) t env)))))
+		      ((= op 'is)
+		       (let ((b (caddr x)))
+			 (if (john-kind-name? b env)
+			     (sat-split (list (sat-eval (cadr x) t env))
+					(lambda (cs)
+					  (let ((v (car cs)))
+					    (sat-const
+					      (john-bool
+						(cond ((sat-const? v) (john-is-a (cdr v) b))
+						      ((= 'lst (car v)) (john-isa? 'List b))
+						      (else (john-isa? 'Number b))))))))
+			   (let ((v (sat-eval (cadr x) t env)) (w (sat-eval b t env)))
+			     (if (and (sat-const? v) (sat-const? w))
+				 (sat-const (john-bool (john-equivalent (cdr v) (cdr w))))
+			       (sat-bool (sat-equal v w)))))))
 		      ((= op 'rel)
 		       (sat-holds (cadr x)
 				  (sat-eval (caddr x) t env)
@@ -863,7 +901,7 @@
 ;; ((object prop ...) ...): what some effect may write, by john-holders
 (define-function john-sat-mutable ()
   (let ((out ()))
-    (list-do a *john-actions*
+    (list-do a (john-sat-actions)
       (let ((env (cons (cons 'it (car a)) (map (lambda (p) (cons (cadr p) (car p))) (caddr a)))))
 	(list-do e (cadddr a)
 	  (list-do o (john-holders (john-static-class (cadr e) env) (caddr e))
@@ -1094,6 +1132,7 @@
 	((= 'unsat (car r)) "unsatisfiable")
 	(else "unknown")))
 (define-function john-sat-satisfy (o g args using by)
+  (set *sat-using* using)
   (john-sat-check (john-goal-of o g))
   (set *sat-conflicts* (cdr (assq 'sat-conflicts *john-options*)))
   (let ((k 0)

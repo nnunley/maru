@@ -1,63 +1,74 @@
 ; Stage 1 of docs/rfc/draft-ndn-maru-typed-tree-matching-00.md: what we're building, how each piece relates to
 ; the others, and what would show it works.
 ;
-; A Check is something the system can be asked.  notes/plan/record.l asks every one with `observe`, and writes what
-; it answered to evidence.john as an event naming the code it ran against, `tree_lists do passed "1f3a...".`  Replaying
-; those events gives the chain of worlds, so `green` is the latest answer, and `at time` reads earlier ones.  An answer
-; counts only for the code it ran against: plan-world.l makes `Now`, this tree, so a capability is proven only if its
-; checks hold now.  Plans never run a check: rules read what's recorded.
+; A Check is something the system can be asked.  notes/plan/observe.l asks every one with `observe`, whose answer is an
+; Evidence value naming the code it ran against, and prints it as an event, `tree_lists do observed passed(tree: "1f3a...").`
+; notes/plan/record appends those to evidence.john.  Replaying the events gives the chain of worlds, so `evidence` is the
+; latest answer, and `at time` reads earlier ones.  An answer counts only for the code it ran against: plan-world.l makes
+; `Now`, this tree, so a capability is proven only if its checks hold now.  Plans never run a check: rules read what's recorded.
 
 start-world plan.
 load "notes/plan/probes.l".
 
-group Check Case Measure Grammar.
-create Case green tested-on.                                 ; a case in check/check.l
-create Measure green tested-on command cadence.              ; a program; its exit status is the answer
-create Grammar green tested-on file class rule host inherits samples.  ; compiled live, reading its own language
+; what a check can answer: a law's verdict says more than yes or no
+set Evidence = untested | passed(tree) | failed(tree)
+  | tested(tree, trials) | proved(tree, cases) | refuted(tree, counterexample) | starved(tree, met, drawn)
+  | vacuous(tree) | inconclusive(tree, input).
+group Good passed tested proved.
+
+group Check Case Measure Grammar Law.
+create Case evidence.                                 ; a case in check/check.l
+create Measure evidence command cadence.              ; a program; its exit status is the answer
+create Grammar evidence file class rule host inherits samples.  ; compiled live, reading its own language
+create Law evidence file support.                     ; one law, by name, of a law file
 
 qualify Case observe is it case-passes.
 qualify Measure observe is it command-succeeds.
 qualify Grammar observe is it compiles-and-reads.
+qualify Law observe is it law-verdict.
 
 ; which checks a plain `record` asks; `record full` asks them all
 qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
 ; first, because what a whole run shows counts for the cases below, and they then needn't run again
-make Measure WholeSuite untested none "nice make check" "full".
+make Measure WholeSuite untested "nice make check" "full".
 
-make Case tree_selectors untested none.
-make Case tree_source untested none.
-make Case tree_lists untested none.
-make Case tree_args untested none.
-make Case tree_args_unread untested none.
-make Case tree_text_refuses untested none.
-make Case tree_interleave untested none.
-make Case tree_apply untested none.
-make Case tree_memo untested none.
-make Case tree_foreign untested none.
-make Case tree_literals untested none.
-make Case tree_parse_complete untested none.
-make Case tree_calc untested none.
+make Case tree_selectors untested.
+make Case tree_source untested.
+make Case tree_lists untested.
+make Case tree_args untested.
+make Case tree_args_unread untested.
+make Case tree_text_refuses untested.
+make Case tree_interleave untested.
+make Case tree_apply untested.
+make Case tree_memo untested.
+make Case tree_foreign untested.
+make Case tree_literals untested.
+make Case tree_parse_complete untested.
+make Case tree_calc untested.
 
-make Measure TextMatchingSpeed untested none "notes/plan/speed" "routine".
+make Measure TextMatchingSpeed untested "notes/plan/speed" "routine".
 
-make Grammar CExpressions untested none "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
-make Grammar JohnPrograms untested none "john.g" "<john>" "program" "john.l" [ CExpressions ]
+make Grammar CExpressions untested "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
+make Grammar JohnPrograms untested "john.g" "<john>" "program" "john.l" [ CExpressions ]
   [ "check/john/hanoi2.john", "check/john/x86-allocator.john", "check/john/airline.john" ].
-make Grammar LawFiles untested none "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
-make Grammar IrlPrograms untested none "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
-make Grammar Arm64Table untested none "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
-make Grammar X86Table untested none "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
-make Grammar OsDefinitions untested none "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
-make Grammar TpegItself untested none "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
+make Grammar LawFiles untested "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
+make Grammar IrlPrograms untested "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
+make Grammar Arm64Table untested "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
+make Grammar X86Table untested "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
+make Grammar OsDefinitions untested "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
+make Grammar TpegItself untested "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
+
+make Law conditional_right untested "check/laws/cexpr.law" "".
+make Law minus_left untested "check/laws/cexpr.law" "".
+make Law comment_blank untested "check/laws/cexpr.law" "".
 
 ; an answer says which code gave it, and it's only good for that code
 create Code tree.
-action Check passed Tree consequence its green = yes and its tested-on = Tree.
-action Check failed Tree consequence its green = no and its tested-on = Tree.
-qualify Check holds if its green = yes and its tested-on = Now tree.
-qualify Check stale if its green = yes and not its tested-on = Now tree.
+action Check observed Answer consequence its evidence = Answer.
+qualify Check holds if its evidence is Good and its evidence tree = Now tree.
+qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
 
 ; ---- what we're building
 create Capability what where shown-by builds-on planned.
@@ -71,7 +82,7 @@ make Capability ListPatterns "a rule can descend into a list and match inside it
 make Capability ArgsOnInput "a rule's arguments are cells prepended to the stream on a source; on text they stay method arguments"
   "compile-tpeg.l" [ tree_args, tree_args_unread, tree_text_refuses ] [ ListPatterns ] no.
 make Capability LiveGrammars "grammars compile in process, so code and grammar blocks can interleave on one input, and every grammar in the tree still compiles live and reads its language"
-  "tpeg-repl.l, compile-tpeg.l" [ tree_interleave, CExpressions, JohnPrograms, LawFiles, IrlPrograms, Arm64Table, X86Table, OsDefinitions, TpegItself ] [ AnySource ] no.
+  "tpeg-repl.l, compile-tpeg.l" [ tree_interleave, conditional_right, minus_left, comment_blank, CExpressions, JohnPrograms, LawFiles, IrlPrograms, Arm64Table, X86Table, OsDefinitions, TpegItself ] [ AnySource ] no.
 make Capability ApplyAndSuper "a rule named at run time can be applied, and an override can call its parent's rule"
   "compile-tpeg.l" [ tree_apply ] [ ArgsOnInput, LiveGrammars ] no.
 make Capability MemosOnStream "the memo table lives on the stream, so a rule's answer is shared by whoever reads that cell"
@@ -96,9 +107,10 @@ rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
 rel-qualify Check:C supports Capability:K if C in K shown-by.
 
 ; ---- what the history says, for reading, never for planning
-qualify Check regressed if it green = no and for some time A up to time do (at time A it green = yes).
+qualify Check regressed if not its evidence is Good and not its evidence is untested
+  and for some time A up to time do (at time A its evidence is Good).
 qualify Check observed-within: N if
-  for some time A after (time - N) up to time do ((at time A it did passed) or (at time A it did failed)).
+  for some time A after (time - N) up to time do (at time A it did observed).
 
 ; ---- the goal
 create Team.
@@ -107,6 +119,5 @@ action Team build Capability consequence Capability planned = yes.
 rule Team build is Capability done = no.
 rule Team build is Capability ready = yes.
 goal Team deliver try for every all Capability do each done = yes.
-goal-optimization Team deliver use build if 1 = 1.
 ; every capability, in some order that respects builds-on: no choice to search among
 goal-strategy Team deliver sat.

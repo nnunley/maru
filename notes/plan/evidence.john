@@ -1,116 +1,141 @@
-; Appended by notes/plan/record.l, one event per check it asked, naming the code it asked about. Never edited by hand.
-WholeSuite do passed "504c17079996".
-tree_selectors do passed "504c17079996".
-tree_source do passed "504c17079996".
-tree_lists do passed "504c17079996".
-tree_args do passed "504c17079996".
-tree_args_unread do passed "504c17079996".
-tree_text_refuses do passed "504c17079996".
-tree_interleave do passed "504c17079996".
-tree_apply do passed "504c17079996".
-tree_memo do passed "504c17079996".
-tree_foreign do passed "504c17079996".
-tree_literals do passed "504c17079996".
-tree_parse_complete do passed "504c17079996".
-tree_calc do passed "504c17079996".
-TextMatchingSpeed do passed "504c17079996".
-CExpressions do passed "504c17079996".
-JohnPrograms do passed "504c17079996".
-LawFiles do passed "504c17079996".
-IrlPrograms do passed "504c17079996".
-Arm64Table do passed "504c17079996".
-X86Table do passed "504c17079996".
-OsDefinitions do passed "504c17079996".
-TpegItself do passed "504c17079996".
-WholeSuite do passed "bf4e9b900ba5".
-tree_selectors do passed "bf4e9b900ba5".
-tree_source do passed "bf4e9b900ba5".
-tree_lists do passed "bf4e9b900ba5".
-tree_args do passed "bf4e9b900ba5".
-tree_args_unread do passed "bf4e9b900ba5".
-tree_text_refuses do passed "bf4e9b900ba5".
-tree_interleave do passed "bf4e9b900ba5".
-tree_apply do passed "bf4e9b900ba5".
-tree_memo do passed "bf4e9b900ba5".
-tree_foreign do passed "bf4e9b900ba5".
-tree_literals do passed "bf4e9b900ba5".
-tree_parse_complete do passed "bf4e9b900ba5".
-tree_calc do passed "bf4e9b900ba5".
-TextMatchingSpeed do passed "bf4e9b900ba5".
-CExpressions do passed "bf4e9b900ba5".
-JohnPrograms do passed "bf4e9b900ba5".
-LawFiles do passed "bf4e9b900ba5".
-IrlPrograms do passed "bf4e9b900ba5".
-Arm64Table do passed "bf4e9b900ba5".
-X86Table do passed "bf4e9b900ba5".
-OsDefinitions do passed "bf4e9b900ba5".
-TpegItself do passed "bf4e9b900ba5".
-WholeSuite do passed "d025fabd2715".
-tree_selectors do passed "d025fabd2715".
-tree_source do passed "d025fabd2715".
-tree_lists do passed "d025fabd2715".
-tree_args do passed "d025fabd2715".
-tree_args_unread do passed "d025fabd2715".
-tree_text_refuses do passed "d025fabd2715".
-tree_interleave do passed "d025fabd2715".
-tree_apply do passed "d025fabd2715".
-tree_memo do passed "d025fabd2715".
-tree_foreign do passed "d025fabd2715".
-tree_literals do passed "d025fabd2715".
-tree_parse_complete do passed "d025fabd2715".
-tree_calc do passed "d025fabd2715".
-TextMatchingSpeed do passed "d025fabd2715".
-CExpressions do passed "d025fabd2715".
-JohnPrograms do passed "d025fabd2715".
-LawFiles do passed "d025fabd2715".
-IrlPrograms do passed "d025fabd2715".
-Arm64Table do passed "d025fabd2715".
-X86Table do passed "d025fabd2715".
-OsDefinitions do passed "d025fabd2715".
-TpegItself do passed "d025fabd2715".
-WholeSuite do passed "5b284afa7f60".
-tree_selectors do passed "5b284afa7f60".
-tree_source do passed "5b284afa7f60".
-tree_lists do passed "5b284afa7f60".
-tree_args do passed "5b284afa7f60".
-tree_args_unread do passed "5b284afa7f60".
-tree_text_refuses do passed "5b284afa7f60".
-tree_interleave do passed "5b284afa7f60".
-tree_apply do passed "5b284afa7f60".
-tree_memo do passed "5b284afa7f60".
-tree_foreign do passed "5b284afa7f60".
-tree_literals do passed "5b284afa7f60".
-tree_parse_complete do passed "5b284afa7f60".
-tree_calc do passed "5b284afa7f60".
-TextMatchingSpeed do passed "5b284afa7f60".
-CExpressions do passed "5b284afa7f60".
-JohnPrograms do passed "5b284afa7f60".
-LawFiles do passed "5b284afa7f60".
-IrlPrograms do passed "5b284afa7f60".
-Arm64Table do passed "5b284afa7f60".
-X86Table do passed "5b284afa7f60".
-OsDefinitions do passed "5b284afa7f60".
-TpegItself do passed "5b284afa7f60".
-WholeSuite do passed "23642fb9113d".
-tree_selectors do passed "23642fb9113d".
-tree_source do passed "23642fb9113d".
-tree_lists do passed "23642fb9113d".
-tree_args do passed "23642fb9113d".
-tree_args_unread do passed "23642fb9113d".
-tree_text_refuses do passed "23642fb9113d".
-tree_interleave do passed "23642fb9113d".
-tree_apply do passed "23642fb9113d".
-tree_memo do passed "23642fb9113d".
-tree_foreign do passed "23642fb9113d".
-tree_literals do passed "23642fb9113d".
-tree_parse_complete do passed "23642fb9113d".
-tree_calc do passed "23642fb9113d".
-TextMatchingSpeed do passed "23642fb9113d".
-CExpressions do passed "23642fb9113d".
-JohnPrograms do passed "23642fb9113d".
-LawFiles do passed "23642fb9113d".
-IrlPrograms do passed "23642fb9113d".
-Arm64Table do passed "23642fb9113d".
-X86Table do passed "23642fb9113d".
-OsDefinitions do passed "23642fb9113d".
-TpegItself do passed "23642fb9113d".
+; Appended by notes/plan/record, one event per check it asked, naming the code it asked about. Never edited by hand.
+WholeSuite do observed passed(tree: "504c17079996").
+tree_selectors do observed passed(tree: "504c17079996").
+tree_source do observed passed(tree: "504c17079996").
+tree_lists do observed passed(tree: "504c17079996").
+tree_args do observed passed(tree: "504c17079996").
+tree_args_unread do observed passed(tree: "504c17079996").
+tree_text_refuses do observed passed(tree: "504c17079996").
+tree_interleave do observed passed(tree: "504c17079996").
+tree_apply do observed passed(tree: "504c17079996").
+tree_memo do observed passed(tree: "504c17079996").
+tree_foreign do observed passed(tree: "504c17079996").
+tree_literals do observed passed(tree: "504c17079996").
+tree_parse_complete do observed passed(tree: "504c17079996").
+tree_calc do observed passed(tree: "504c17079996").
+TextMatchingSpeed do observed passed(tree: "504c17079996").
+CExpressions do observed passed(tree: "504c17079996").
+JohnPrograms do observed passed(tree: "504c17079996").
+LawFiles do observed passed(tree: "504c17079996").
+IrlPrograms do observed passed(tree: "504c17079996").
+Arm64Table do observed passed(tree: "504c17079996").
+X86Table do observed passed(tree: "504c17079996").
+OsDefinitions do observed passed(tree: "504c17079996").
+TpegItself do observed passed(tree: "504c17079996").
+WholeSuite do observed passed(tree: "bf4e9b900ba5").
+tree_selectors do observed passed(tree: "bf4e9b900ba5").
+tree_source do observed passed(tree: "bf4e9b900ba5").
+tree_lists do observed passed(tree: "bf4e9b900ba5").
+tree_args do observed passed(tree: "bf4e9b900ba5").
+tree_args_unread do observed passed(tree: "bf4e9b900ba5").
+tree_text_refuses do observed passed(tree: "bf4e9b900ba5").
+tree_interleave do observed passed(tree: "bf4e9b900ba5").
+tree_apply do observed passed(tree: "bf4e9b900ba5").
+tree_memo do observed passed(tree: "bf4e9b900ba5").
+tree_foreign do observed passed(tree: "bf4e9b900ba5").
+tree_literals do observed passed(tree: "bf4e9b900ba5").
+tree_parse_complete do observed passed(tree: "bf4e9b900ba5").
+tree_calc do observed passed(tree: "bf4e9b900ba5").
+TextMatchingSpeed do observed passed(tree: "bf4e9b900ba5").
+CExpressions do observed passed(tree: "bf4e9b900ba5").
+JohnPrograms do observed passed(tree: "bf4e9b900ba5").
+LawFiles do observed passed(tree: "bf4e9b900ba5").
+IrlPrograms do observed passed(tree: "bf4e9b900ba5").
+Arm64Table do observed passed(tree: "bf4e9b900ba5").
+X86Table do observed passed(tree: "bf4e9b900ba5").
+OsDefinitions do observed passed(tree: "bf4e9b900ba5").
+TpegItself do observed passed(tree: "bf4e9b900ba5").
+WholeSuite do observed passed(tree: "d025fabd2715").
+tree_selectors do observed passed(tree: "d025fabd2715").
+tree_source do observed passed(tree: "d025fabd2715").
+tree_lists do observed passed(tree: "d025fabd2715").
+tree_args do observed passed(tree: "d025fabd2715").
+tree_args_unread do observed passed(tree: "d025fabd2715").
+tree_text_refuses do observed passed(tree: "d025fabd2715").
+tree_interleave do observed passed(tree: "d025fabd2715").
+tree_apply do observed passed(tree: "d025fabd2715").
+tree_memo do observed passed(tree: "d025fabd2715").
+tree_foreign do observed passed(tree: "d025fabd2715").
+tree_literals do observed passed(tree: "d025fabd2715").
+tree_parse_complete do observed passed(tree: "d025fabd2715").
+tree_calc do observed passed(tree: "d025fabd2715").
+TextMatchingSpeed do observed passed(tree: "d025fabd2715").
+CExpressions do observed passed(tree: "d025fabd2715").
+JohnPrograms do observed passed(tree: "d025fabd2715").
+LawFiles do observed passed(tree: "d025fabd2715").
+IrlPrograms do observed passed(tree: "d025fabd2715").
+Arm64Table do observed passed(tree: "d025fabd2715").
+X86Table do observed passed(tree: "d025fabd2715").
+OsDefinitions do observed passed(tree: "d025fabd2715").
+TpegItself do observed passed(tree: "d025fabd2715").
+WholeSuite do observed passed(tree: "5b284afa7f60").
+tree_selectors do observed passed(tree: "5b284afa7f60").
+tree_source do observed passed(tree: "5b284afa7f60").
+tree_lists do observed passed(tree: "5b284afa7f60").
+tree_args do observed passed(tree: "5b284afa7f60").
+tree_args_unread do observed passed(tree: "5b284afa7f60").
+tree_text_refuses do observed passed(tree: "5b284afa7f60").
+tree_interleave do observed passed(tree: "5b284afa7f60").
+tree_apply do observed passed(tree: "5b284afa7f60").
+tree_memo do observed passed(tree: "5b284afa7f60").
+tree_foreign do observed passed(tree: "5b284afa7f60").
+tree_literals do observed passed(tree: "5b284afa7f60").
+tree_parse_complete do observed passed(tree: "5b284afa7f60").
+tree_calc do observed passed(tree: "5b284afa7f60").
+TextMatchingSpeed do observed passed(tree: "5b284afa7f60").
+CExpressions do observed passed(tree: "5b284afa7f60").
+JohnPrograms do observed passed(tree: "5b284afa7f60").
+LawFiles do observed passed(tree: "5b284afa7f60").
+IrlPrograms do observed passed(tree: "5b284afa7f60").
+Arm64Table do observed passed(tree: "5b284afa7f60").
+X86Table do observed passed(tree: "5b284afa7f60").
+OsDefinitions do observed passed(tree: "5b284afa7f60").
+TpegItself do observed passed(tree: "5b284afa7f60").
+WholeSuite do observed passed(tree: "23642fb9113d").
+tree_selectors do observed passed(tree: "23642fb9113d").
+tree_source do observed passed(tree: "23642fb9113d").
+tree_lists do observed passed(tree: "23642fb9113d").
+tree_args do observed passed(tree: "23642fb9113d").
+tree_args_unread do observed passed(tree: "23642fb9113d").
+tree_text_refuses do observed passed(tree: "23642fb9113d").
+tree_interleave do observed passed(tree: "23642fb9113d").
+tree_apply do observed passed(tree: "23642fb9113d").
+tree_memo do observed passed(tree: "23642fb9113d").
+tree_foreign do observed passed(tree: "23642fb9113d").
+tree_literals do observed passed(tree: "23642fb9113d").
+tree_parse_complete do observed passed(tree: "23642fb9113d").
+tree_calc do observed passed(tree: "23642fb9113d").
+TextMatchingSpeed do observed passed(tree: "23642fb9113d").
+CExpressions do observed passed(tree: "23642fb9113d").
+JohnPrograms do observed passed(tree: "23642fb9113d").
+LawFiles do observed passed(tree: "23642fb9113d").
+IrlPrograms do observed passed(tree: "23642fb9113d").
+Arm64Table do observed passed(tree: "23642fb9113d").
+X86Table do observed passed(tree: "23642fb9113d").
+OsDefinitions do observed passed(tree: "23642fb9113d").
+TpegItself do observed passed(tree: "23642fb9113d").
+tree_selectors do observed passed(tree: "68672b71ec4b").
+tree_source do observed passed(tree: "68672b71ec4b").
+tree_lists do observed passed(tree: "68672b71ec4b").
+tree_args do observed passed(tree: "68672b71ec4b").
+tree_args_unread do observed passed(tree: "68672b71ec4b").
+tree_text_refuses do observed passed(tree: "68672b71ec4b").
+tree_interleave do observed passed(tree: "68672b71ec4b").
+tree_apply do observed passed(tree: "68672b71ec4b").
+tree_memo do observed passed(tree: "68672b71ec4b").
+tree_foreign do observed passed(tree: "68672b71ec4b").
+tree_literals do observed passed(tree: "68672b71ec4b").
+tree_parse_complete do observed passed(tree: "68672b71ec4b").
+tree_calc do observed passed(tree: "68672b71ec4b").
+TextMatchingSpeed do observed failed(tree: "68672b71ec4b").
+CExpressions do observed passed(tree: "68672b71ec4b").
+JohnPrograms do observed passed(tree: "68672b71ec4b").
+LawFiles do observed passed(tree: "68672b71ec4b").
+IrlPrograms do observed passed(tree: "68672b71ec4b").
+Arm64Table do observed passed(tree: "68672b71ec4b").
+X86Table do observed passed(tree: "68672b71ec4b").
+OsDefinitions do observed passed(tree: "68672b71ec4b").
+TpegItself do observed passed(tree: "68672b71ec4b").
+conditional_right do observed tested(tree: "68672b71ec4b", trials: 100).
+minus_left do observed tested(tree: "68672b71ec4b", trials: 100).
+comment_blank do observed tested(tree: "68672b71ec4b", trials: 100).

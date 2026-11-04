@@ -1,6 +1,7 @@
 ;;; What John objects can ask of the system.  Each message below is a Maru selector John's objects answer, as
 ;;; john-eval.l's own builtins are, and the question goes to grammars and programs defined outside the plan.
-;;; Only notes/plan/record.l sends them: the plan's rules read `green`, so replaying evidence or planning never runs one.
+;;; Only notes/plan/observe.l sends them: the plan's rules read `evidence`, so replaying it or planning never runs one.
+;;; Each answers an Evidence value about this code.
 
 (define fork	(subr "fork" ">i"))
 (define alarm	(subr "alarm" "i>i"))
@@ -22,6 +23,8 @@
 	 (= 0 (byte-at probe-status 0))
 	 (= 0 (byte-at probe-status 1)))))
 
+(define-function probe-evidence (ok)
+  (john-make-variant (if ok 'passed 'failed) (list (list 'tree: plan-tree)) *john-world* ()))
 (define-function probe-prop (object property) (john-lookup *john-world* object property))
 (define-function probe-join (strings)
   (let ((s "")) (list-do x strings (set s (concat-strings s " '" x "'"))) s))
@@ -51,9 +54,9 @@
 	(list-do c (john-instances 'Case) (set names (concat-strings names " " (symbol->string c))))
 	(probe-run "cases" 1800 (concat-strings "nice make check CHECKS='" names "'"))
 	(probe-collect-shown "cases")))
-  (john-bool (or (probe-case-shown? self)
-		 (let ((name (symbol->string self)))
-		   (probe-run name 600 (concat-strings "nice make check CHECKS='" name "'"))))))
+  (probe-evidence (or (probe-case-shown? self)
+		      (let ((name (symbol->string self)))
+			(probe-run name 600 (concat-strings "nice make check CHECKS='" name "'"))))))
 
 ;;; ---- a command whose exit status is the answer; what a test suite shows counts for the cases it ran
 
@@ -62,7 +65,7 @@
   (let* ((name (symbol->string self)) (ok (probe-run name 1800 (probe-prop self 'command))))
     (probe-collect-shown name)
     (set *cases-ran* 1)	; if a case isn't shown it runs alone
-    (john-bool ok)))
+    (probe-evidence ok)))
 
 ;;; ---- a grammar: on every evaluator it compiles in process, with what it inherits, and reads its language to the end
 
@@ -81,4 +84,28 @@
 	(ok 1))
     (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
       (and ok (set ok (probe-run name 300 (concat-strings "nice " evaluator " notes/plan/live-grammar.l" arguments)))))
-    (john-bool ok)))
+    (probe-evidence ok)))
+
+;;; ---- a law: one run of its file answers for all of them; check/law.l's text is read by a command, law-events.l
+
+(define *law-runs* ())	; (file . events)
+(define-function probe-law-run (file)
+  (let ((found ())) (list-do r *law-runs* (and (equal file (car r)) (set found r))) found))
+(define-function probe-law-events (file support)
+  (if (probe-law-run file)
+      (cdr (probe-law-run file))
+    (let* ((name (concat-strings "law-" (long->string (list-length *law-runs*))))
+	   (report (concat-strings probe-logs name ".log"))
+	   (events (concat-strings probe-logs name ".events")))
+      (probe-run name 1800 (concat-strings "nice ./eval check/law.l " support " " file))
+      (probe-run (concat-string name "-events") 60
+		 (concat-strings "./eval notes/plan/law-events.l " plan-tree " " report " > " events))
+      (let ((read (john-read-text (contents-of-file-named events))))
+	(push *law-runs* (cons file read))
+	read))))
+(define-john-builtin law-verdict john-law-verdict)
+(define-method john-law-verdict <symbol> ()
+  (let ((answer (probe-evidence ())))
+    (list-do e (probe-law-events (probe-prop self 'file) (probe-prop self 'support))
+      (and (= self (cadr e)) (set answer (john-eval (cadddr e) *john-world* ()))))
+    answer))

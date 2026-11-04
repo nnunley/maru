@@ -1,0 +1,12 @@
+;;; A value as John reads it back.
+(define-function event-escape (s)
+  (let ((out (array)) (n 0))
+    (for (i 0 (string-length s))
+      (let ((c (string-at s i)))
+	(cond ((= c ?\n) (set-array-at out n ?\\) (set n (+ n 1)) (set c ?n))
+	      ((or (= c ?\") (= c ?\\)) (set-array-at out n ?\\) (set n (+ n 1))))
+	(set-array-at out n c)
+	(set n (+ n 1))))
+    (array->string out)))
+(define-selector event-text (v) (long->string v))
+(define-method event-text <string> () (concat-strings "\"" (event-escape self) "\""))

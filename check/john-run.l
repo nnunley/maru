@@ -42,6 +42,15 @@
 (define-function airline (text) (john-run (concat-list (john-read "check/john/airline.john") (john-read-text text))))
 (define-function maze (more) (john-run (concat-list (john-read "check/john/maze.john") more)))
 
+;; is: the same value, or one of a kind; a qualification's is gives that value
+(define is-program
+  (concat-strings
+    "set E = none | ran(at) | good(at, n). group Fine good none. group Thing P Q. "
+    "create P e f x. create Q y. make P A ran(at: \"t\") ran(at: \"t\") 3. make P B none good(at: \"t\", n: 1) 4. make Q C 1. "
+    "qualify P same-as: o is its e = o e. qualify P latest is its e. "))
+(define-function is-says (question answer)
+  (expect (concat-strings "is " question "? " answer)
+	  (equal (list answer) (run-text (concat-strings is-program "is " question "?")))))
 (define-function suite ()
   (expect "Hanoi2 in 3 moves"
     (equal (john-run-file "check/john/hanoi2.john")
@@ -214,6 +223,23 @@
 						 "at time 5: an expression reads only the past"))
   (expect "a future time in a quantifier" (has? (child "create C a. make C X 1. qualify C ever if for some time T up to 3 do it a = 1. X ever.")
 						"time 3 is later than now"))
+  (is-says "A e is ran" "yes")
+  (is-says "A e is good" "no")
+  (is-says "B e is none" "yes")
+  (is-says "A e is E" "yes")
+  (is-says "B f is Fine" "yes")
+  (is-says "A e is Fine" "no")
+  (is-says "A is P" "yes")
+  (is-says "A is Thing" "yes")
+  (is-says "C is P" "no")
+  (is-says "A is A" "yes")
+  (is-says "A is B" "no")
+  (is-says "3 is Number" "yes")
+  (is-says "A e is A f" "yes")
+  (is-says "B e is B f" "no")
+  (is-says "B f is good(at: \"t\", n: 1)" "yes")
+  (is-says "B f is good(at: \"t\", n: 2)" "no")
+  (is-says "A latest is ran" "yes")
   (and ok (println "john run ok")))
 
 (if (not *arguments*) (suite)

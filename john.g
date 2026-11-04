@@ -27,6 +27,7 @@ neg		= "not" wb neg:a						-> `(not ,a)
 		| compare ;
 cmpop		= "<=" -> '<= | ">=" -> '>= | "<" -> '< | ">" -> '> | "=" -> '= ;
 compare		= arith:a cmpop:o _ arith:b					-> `(,o ,a ,b)
+		| arith:a "is" wb arith:b					-> `(is ,a ,b)	# ours: the same, or one of
 		| arith:a rel:r arith:b						-> `(rel ,r ,a ,b)
 		| arith ;
 arop		= "+" -> '+ | "-" -> '- | "*" -> '* | "/" -> '/ ;
@@ -69,7 +70,8 @@ aparam		= tvar
 kwparam		= kw:k name:p							-> (cons k p) ;
 head		= kwparam+:ps							-> (cons (john-selector ps) (map cdr ps))
 		| name:n							-> (list n) ;
-qbody		= ("if" | "is") wb expr:e					-> `(if ,e)
+qbody		= "if" wb expr:e						-> `(if ,e)
+		| "is" wb expr:v						-> `(value ,v)	# ours: its value is that one's; the memos' one use answers yes or no
 		| expr:v ("if" wb expr)?:g					-> `(value ,v ,@g) ;
 effect		= chain:t "=" _ arith:v ("if" wb compare)?:g			-> (john-effect t v g) ;
 effects		= effect:a ("and" wb effect)*:b					-> `(,a ,@b) ;

@@ -157,6 +157,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   Ours: `set Light = lit | dark.` names what a value may be, and `set Evidence = untested | passed(tree) | failed(tree).` gives a
   member named fields: `passed(tree: T)` makes one, it must name every field the set declares, `x tree` reads one, and `x kind` is its
   member's name. Two values are the same by what they hold, and comparing a value with fields to a bare name is an error.
+  `a is b` asks whether a is one of a kind, b naming a member, its set, a group holding it or a class, and otherwise whether they're the
+  same value; so `its evidence is Good`, after `group Good passed tested proved.`, and a value with fields simply isn't a bare name.
+  `qualify C p is E` gives p E's value (the memos have it as `if`, in one use that answers yes or no).
+- `plan_evidence` (`check/plan-evidence.l`): what `check/law.l` prints, read by `notes/plan/law-report.g` in a command, `law-events.l`, to events of
+  evidence, one a law, read back through John: tested and proved hold if they're about this code, refuted, starved, vacuous, inconclusive and a law that
+  stopped its run don't. The plan itself replays and plans.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
@@ -198,6 +204,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   generated lists. An answer of unsatisfiable means no plan avoids an evaluator error, so a message the encoding can't answer never
   reads as one: `kind` and a loaded file's messages are asked of the evaluator on a constant (reading only what no action writes), on
   a changing value they are `E_SAT_UNSUPPORTED` naming the message, and a message nothing defines is the search's error.
+  What `satisfy ... using` leaves out can't happen, so it needn't be encodable, and a value with fields no action in use writes is a
+  constant; one that changes is refused.
   The formula's clauses live in a C store (`dimacs.irl`), out of Maru's
   heap, which the solver, the checker's DIMACS text and the model check all read.
   The search planner is unchanged otherwise.
@@ -340,9 +348,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 ## The evidence plan
 
 `notes/plan/tree-matching.john` says what stage 1 builds, how the pieces relate and what would show each works.
-`./eval notes/plan/record.l [full]` asks its checks (cases, measures, and every tree grammar compiled live on each
-evaluator, reading its language) and appends the answers to `evidence.john`; `./eval notes/plan/next.l` shows what's
-done and the next step, running nothing. `notes/plan/LOOP.md` holds the loop's rules and notes.
+`./eval notes/plan/observe.l [full]` asks its checks (cases, measures, and every tree grammar compiled live on each
+evaluator, reading its language) and prints the answers as events, each an `Evidence` value naming the code it's about;
+`notes/plan/record [full]` appends them to `evidence.john`; `./eval notes/plan/next.l` shows what's done and the next step,
+running nothing. A law's check answers its verdict, with what backs it, and only tested or proved counts. Planning says `using build`, so
+under `sat` the evidence is constant. `notes/plan/LOOP.md` holds the loop's rules and notes.
 
 ## Known not to work (verified on arm64 macOS)
 

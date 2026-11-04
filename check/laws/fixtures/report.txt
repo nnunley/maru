@@ -1,0 +1,9 @@
+law a_b: TESTED 100
+law c: PROVED 7
+law d: REFUTED x="p\"q" y=3 seed=42
+law e: STARVED 0 of 2000
+law f: VACUOUS
+law g: INCONCLUSIVE status=139 input=(0)
+law h: 
+error: undefined variable: double
+grammar cexpr.primary: accepted 1000 of 1079

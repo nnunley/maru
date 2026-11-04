@@ -1,0 +1,6 @@
+#!/bin/sh
+# notes/plan/record [full]: appends what the checks answer about this code to the evidence, and shows the plan.
+events=$(mktemp)
+./eval notes/plan/observe.l "$@" > "$events" && cat "$events" >> notes/plan/evidence.john
+rm -f "$events"
+exec ./eval notes/plan/next.l

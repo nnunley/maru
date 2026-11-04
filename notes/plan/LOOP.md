@@ -8,7 +8,7 @@ The plan says what each `Capability` is (`what`, `where`), what it builds on (`b
 
 Each iteration, with fresh eyes:
 
-1. `./eval notes/plan/record.l` asks the checks, appends what they answered to `evidence.john`, and prints what's done, what isn't and why, and the next step. `./eval notes/plan/next.l` prints that without running anything.
+1. `notes/plan/record` asks the checks (`observe.l`), appends what they answered to `evidence.john`, and prints what's done, what isn't and why, and the next step. `./eval notes/plan/next.l` prints that without running anything.
 2. Take the next step, and as much as naturally goes with it. Read the failing check's log in `/tmp/maru-plan/`.
 3. Change the code until that check passes, keeping earlier ones green.
 4. Record again. Add `check/lines` entries as needed: `make check CHECKS=lines` names the delta.
@@ -17,9 +17,9 @@ Each iteration, with fresh eyes:
 
 An answer counts only for the code it ran against, named by `notes/plan/tree-hash` (tracked files and untracked source files, here and in the submodules, without the evidence and docs). Change the code and every result is stale until recorded again, so a capability is `done` only with evidence about the code as it stands.
 
-`./eval notes/plan/record.l full` also runs `WholeSuite`, whose run counts as evidence for every case it passes.
+`notes/plan/record full` also runs `WholeSuite`, whose run counts as evidence for every case it passes.
 
-Probes run only from `record.l`. The plan's rules read `green`, never `observe`, so replaying evidence and planning run nothing.
+Probes run only from `observe.l`. The plan's rules read `evidence`, never `observe`, so replaying evidence and planning run nothing.
 
 ## Stop and report, without working around it
 
@@ -32,7 +32,7 @@ Probes run only from `record.l`. The plan's rules read `green`, never `observe`,
 
 ## Rules
 
-- Never edit `notes/plan/evidence.john` by hand; only `record.l` writes it.
+- Never edit `notes/plan/evidence.john` by hand; only `record` writes it.
 - Be a good neighbour: other agents share this machine. Use `nice`, and a `timeout` on anything that might loop, since an evaluator
   with no tail calls can hang or overflow silently. Never kill a process you didn't start, and never use a broad `pkill`.
 - Work only in `.worktrees/tpeg-trees`, on branch `tpeg-trees`. Don't push, and don't merge to `main`.

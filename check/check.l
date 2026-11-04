@@ -395,6 +395,10 @@
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
+(check "plan_evidence"
+  (unit-assert (equal (last (run "plan_evidence" "./eval check/plan-evidence.l")) "plan evidence ok"))
+  ;; the plan as it stands replays and plans, running no check
+  (unit-assert (= 0 (run-status 120 "exec </dev/null >/dev/null 2>&1; exec ./eval notes/plan/next.l"))))
 
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.

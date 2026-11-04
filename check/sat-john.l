@@ -172,6 +172,62 @@
     (child
       "create P x. create Q y. action P up consequence its x = 2. make P A 1. goal P done try its x y = 2. set-opt planner sat. A satisfy done.")
     "unsatisfiable within"))
+;; evidence as values with fields: what `using` leaves out can't happen, so it doesn't have to be encodable
+(define evidence-program
+  (concat-strings
+    "set Evidence = untested | passed(commit) | failed(commit). create Code tree. make Code Now \"abc\". "
+    "create Case evidence. make Case c1 untested. make Case c2 untested. make Case c3 untested. "
+    "action Case passed Tree consequence its evidence = passed(commit: Tree). "
+    "qualify Case holds if its evidence kind = passed and its evidence commit = Now tree. "
+    "create Thing shown planned. make Thing K1 c1 no. make Thing K2 c2 no. make Thing K3 c3 no. "
+    "qualify Thing done if its shown holds = yes or its planned = yes. "
+    "create Team. make Team T. action Team build Thing consequence Thing planned = yes. "
+    "rule Team build is Thing done = no. goal Team deliver try for every all Thing do each done = yes. "
+    "set-opt planner sat. c1 do passed \"abc\". c2 do passed \"old\". "))
+(expect
+  "a value with fields no action in use writes is read as a constant"
+  (has? (child (concat-strings evidence-program "T satisfy deliver using build."))
+	"satisfied at time: 4"))
+(expect
+  "an action that writes a value with fields, in use, is refused"
+  (has? (child (concat-strings evidence-program "T satisfy deliver."))
+	"E_SAT_UNSUPPORTED: an enumerated value with fields"))
+(expect
+  "two constant values with fields compare by what they hold"
+  (has?
+    (child
+      "set E = none | seen(at). create P a b x. action P up consequence its x = 2. make P A seen(at: \"t\") seen(at: \"t\") 1. goal P done try its a = its b and its x = 2. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a property that changes among values with fields is refused, not unsatisfiable"
+  (has?
+    (child
+      "set E = none | seen(at). create P a b. action P copy consequence its a = its b. make P A seen(at: \"s\") seen(at: \"t\"). goal P done try its a at = \"t\". set-opt planner sat. A satisfy done.")
+    "E_SAT_UNSUPPORTED: an enumerated value with fields that changes"))
+(expect
+  "a property that changes can't hold a value with fields"
+  (has?
+    (child
+      "set E = none | seen(at). create P a b. action P copy consequence its a = its b. make P A none seen(at: \"t\"). goal P done try its a kind = seen. set-opt planner sat. A satisfy done.")
+    "E_SORT"))
+(expect
+  "is reads the kind of a value that changes, and a group's"
+  (has?
+    (child
+      "set Light = lit | dark | off. group On lit. create P state. action P flip consequence its state = lit. make P A dark. goal P done try its state is On. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "is reads a class, and what's the same"
+  (has?
+    (child
+      "create P x. action P up consequence its x = 2. make P A 1. goal P done try A is P and its x is 2. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a value with fields is its kind, and isn't another's"
+  (has?
+    (child
+      "set E = none | seen(at). create P a x. action P up consequence its x = 2. make P A seen(at: \"t\") 1. goal P done try its a is seen and not its a is none and its x = 2. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
 ;; planning over names: the least length, replayed by the evaluator, the same as the search's
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function no-satisfy (fs)
