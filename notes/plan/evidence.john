@@ -139,3 +139,29 @@ TpegItself do observed passed(tree: "68672b71ec4b").
 conditional_right do observed tested(tree: "68672b71ec4b", trials: 100).
 minus_left do observed tested(tree: "68672b71ec4b", trials: 100).
 comment_blank do observed tested(tree: "68672b71ec4b", trials: 100).
+WholeSuite do observed passed(tree: "55a0e20670e5").
+tree_selectors do observed passed(tree: "55a0e20670e5").
+tree_source do observed passed(tree: "55a0e20670e5").
+tree_lists do observed passed(tree: "55a0e20670e5").
+tree_args do observed passed(tree: "55a0e20670e5").
+tree_args_unread do observed passed(tree: "55a0e20670e5").
+tree_text_refuses do observed passed(tree: "55a0e20670e5").
+tree_interleave do observed passed(tree: "55a0e20670e5").
+tree_apply do observed passed(tree: "55a0e20670e5").
+tree_memo do observed passed(tree: "55a0e20670e5").
+tree_foreign do observed passed(tree: "55a0e20670e5").
+tree_literals do observed passed(tree: "55a0e20670e5").
+tree_parse_complete do observed passed(tree: "55a0e20670e5").
+tree_calc do observed passed(tree: "55a0e20670e5").
+TextMatchingSpeed do observed passed(tree: "55a0e20670e5").
+CExpressions do observed passed(tree: "55a0e20670e5").
+JohnPrograms do observed passed(tree: "55a0e20670e5").
+LawFiles do observed passed(tree: "55a0e20670e5").
+IrlPrograms do observed passed(tree: "55a0e20670e5").
+Arm64Table do observed passed(tree: "55a0e20670e5").
+X86Table do observed passed(tree: "55a0e20670e5").
+OsDefinitions do observed passed(tree: "55a0e20670e5").
+TpegItself do observed passed(tree: "55a0e20670e5").
+conditional_right do observed tested(tree: "55a0e20670e5", trials: 100).
+minus_left do observed tested(tree: "55a0e20670e5", trials: 100).
+comment_blank do observed tested(tree: "55a0e20670e5", trials: 100).
