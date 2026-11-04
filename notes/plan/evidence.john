@@ -1,68 +1,24 @@
-; Appended by notes/plan/record.l, one event per check it asked. Never edited by hand.
-tree_selectors do passed.
-tree_source do passed.
-tree_lists do passed.
-tree_args do passed.
-tree_text_refuses do passed.
-tree_interleave do passed.
-tree_apply do passed.
-tree_memo do passed.
-tree_foreign do passed.
-tree_literals do passed.
-tree_parse_complete do passed.
-tree_calc do passed.
-WholeSuite do passed.
-TextMatchingSpeed do passed.
-CExpressions do passed.
-JohnPrograms do passed.
-LawFiles do passed.
-IrlPrograms do passed.
-Arm64Table do passed.
-X86Table do passed.
-OsDefinitions do passed.
-TpegItself do passed.
-WholeSuite do passed.
-tree_selectors do passed.
-tree_source do passed.
-tree_lists do passed.
-tree_args do passed.
-tree_text_refuses do passed.
-tree_interleave do passed.
-tree_apply do passed.
-tree_memo do passed.
-tree_foreign do passed.
-tree_literals do passed.
-tree_parse_complete do passed.
-tree_calc do passed.
-TextMatchingSpeed do passed.
-CExpressions do passed.
-JohnPrograms do passed.
-LawFiles do passed.
-IrlPrograms do passed.
-Arm64Table do passed.
-X86Table do passed.
-OsDefinitions do passed.
-TpegItself do passed.
-WholeSuite do passed.
-tree_selectors do passed.
-tree_source do passed.
-tree_lists do passed.
-tree_args do passed.
-tree_args_unread do passed.
-tree_text_refuses do passed.
-tree_interleave do passed.
-tree_apply do passed.
-tree_memo do passed.
-tree_foreign do passed.
-tree_literals do passed.
-tree_parse_complete do passed.
-tree_calc do passed.
-TextMatchingSpeed do passed.
-CExpressions do passed.
-JohnPrograms do passed.
-LawFiles do passed.
-IrlPrograms do passed.
-Arm64Table do passed.
-X86Table do passed.
-OsDefinitions do passed.
-TpegItself do passed.
+; Appended by notes/plan/record.l, one event per check it asked, naming the code it asked about. Never edited by hand.
+WholeSuite do passed "fa772702dde5".
+tree_selectors do passed "fa772702dde5".
+tree_source do passed "fa772702dde5".
+tree_lists do passed "fa772702dde5".
+tree_args do passed "fa772702dde5".
+tree_args_unread do passed "fa772702dde5".
+tree_text_refuses do passed "fa772702dde5".
+tree_interleave do passed "fa772702dde5".
+tree_apply do passed "fa772702dde5".
+tree_memo do passed "fa772702dde5".
+tree_foreign do passed "fa772702dde5".
+tree_literals do passed "fa772702dde5".
+tree_parse_complete do passed "fa772702dde5".
+tree_calc do passed "fa772702dde5".
+TextMatchingSpeed do passed "fa772702dde5".
+CExpressions do passed "fa772702dde5".
+JohnPrograms do passed "fa772702dde5".
+LawFiles do passed "fa772702dde5".
+IrlPrograms do passed "fa772702dde5".
+Arm64Table do passed "fa772702dde5".
+X86Table do passed "fa772702dde5".
+OsDefinitions do passed "fa772702dde5".
+TpegItself do passed "fa772702dde5".

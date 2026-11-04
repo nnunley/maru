@@ -15,6 +15,8 @@ Each iteration, with fresh eyes:
 5. Commit, code and `notes/plan/evidence.john` together, with a prose message saying what changed and why.
 6. Report: what's green now, what you learned, and anything the next iteration should know. Add that to the end of this file too.
 
+An answer counts only for the code it ran against, named by `notes/plan/tree-hash` (the tracked tree without the evidence and docs). Change the code and every result is stale until recorded again, so a capability is `done` only with evidence about the code as it stands.
+
 `./eval notes/plan/record.l full` also runs `WholeSuite`, whose run counts as evidence for every case it passes.
 
 Probes run only from `record.l`. The plan's rules read `green`, never `observe`, so replaying evidence and planning run nothing.

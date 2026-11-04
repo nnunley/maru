@@ -1,11 +1,9 @@
-;;; ./eval notes/plan/record.l [full]: asks the checks in the plan, appends what they answered, and shows the plan.
+;;; ./eval notes/plan/record.l [full]: asks the checks in the plan, appends what they answered about this code, and shows the plan.
 (define full-record (and *arguments* (= "full" (car *arguments*))))
 (set *arguments* ())
 (require "notes/plan/plan-world.l")
-(define system (subr "system" "s"))
-(system (concat-strings "mkdir -p " probe-logs))
 (define-function record-answer (check answer)
-  (let ((event (concat-strings (symbol->string check) " do " (if (= answer 'yes) "passed" "failed") ".")))
+  (let ((event (concat-strings (symbol->string check) " do " (if (= answer 'yes) "passed" "failed") " \"" plan-tree "\".")))
     (system (concat-strings "echo '" event "' >> notes/plan/evidence.john"))
     (println (if (= answer 'yes) "PASS " "FAIL ") check (if (= answer 'yes) "" (concat-strings " (" probe-logs (symbol->string check) ".log)")))))
 (list-do check (john-instances 'Check)

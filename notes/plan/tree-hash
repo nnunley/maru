@@ -1,0 +1,9 @@
+#!/bin/sh
+# The code as it stands now, committed or not: a hash of the tracked tree without the evidence and the docs.
+# Not the commit, since committing the evidence would make a new commit and so outdate the evidence.
+index=$(mktemp)
+cp "$(git rev-parse --git-path index)" "$index"
+GIT_INDEX_FILE=$index git add -u
+GIT_INDEX_FILE=$index git rm -q --cached --ignore-unmatch notes/plan/evidence.john '*.md'
+GIT_INDEX_FILE=$index git write-tree | cut -c1-12
+rm -f "$index"

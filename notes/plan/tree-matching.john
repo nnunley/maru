@@ -2,16 +2,18 @@
 ; the others, and what would show it works.
 ;
 ; A Check is something the system can be asked.  notes/plan/record.l asks every one with `observe`, and writes what
-; it answered to evidence.john as an event, `tree_lists do passed.`  Replaying those events gives the chain of worlds,
-; so `green` here is the latest answer, and `at time` reads earlier ones.  Plans never run a check: rules read `green`.
+; it answered to evidence.john as an event naming the code it ran against, `tree_lists do passed "1f3a...".`  Replaying
+; those events gives the chain of worlds, so `green` is the latest answer, and `at time` reads earlier ones.  An answer
+; counts only for the code it ran against: plan-world.l makes `Now`, this tree, so a capability is proven only if its
+; checks hold now.  Plans never run a check: rules read what's recorded.
 
 start-world plan.
 load "notes/plan/probes.l".
 
 group Check Case Measure Grammar.
-create Case green.                                 ; a case in check/check.l
-create Measure green command cadence.              ; a program; its exit status is the answer
-create Grammar green file class rule host inherits samples.  ; compiled live, reading its own language
+create Case green tested-on.                                 ; a case in check/check.l
+create Measure green tested-on command cadence.              ; a program; its exit status is the answer
+create Grammar green tested-on file class rule host inherits samples.  ; compiled live, reading its own language
 
 qualify Case observe is it case-passes.
 qualify Measure observe is it command-succeeds.
@@ -22,36 +24,40 @@ qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = routine.
 
 ; first, because what a whole run shows counts for the cases below, and they then needn't run again
-make Measure WholeSuite untested "nice make check" full.
+make Measure WholeSuite untested none "nice make check" full.
 
-make Case tree_selectors untested.
-make Case tree_source untested.
-make Case tree_lists untested.
-make Case tree_args untested.
-make Case tree_args_unread untested.
-make Case tree_text_refuses untested.
-make Case tree_interleave untested.
-make Case tree_apply untested.
-make Case tree_memo untested.
-make Case tree_foreign untested.
-make Case tree_literals untested.
-make Case tree_parse_complete untested.
-make Case tree_calc untested.
+make Case tree_selectors untested none.
+make Case tree_source untested none.
+make Case tree_lists untested none.
+make Case tree_args untested none.
+make Case tree_args_unread untested none.
+make Case tree_text_refuses untested none.
+make Case tree_interleave untested none.
+make Case tree_apply untested none.
+make Case tree_memo untested none.
+make Case tree_foreign untested none.
+make Case tree_literals untested none.
+make Case tree_parse_complete untested none.
+make Case tree_calc untested none.
 
-make Measure TextMatchingSpeed untested "notes/plan/speed" routine.
+make Measure TextMatchingSpeed untested none "notes/plan/speed" routine.
 
-make Grammar CExpressions untested "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
-make Grammar JohnPrograms untested "john.g" "<john>" "program" "john.l" [ CExpressions ]
+make Grammar CExpressions untested none "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
+make Grammar JohnPrograms untested none "john.g" "<john>" "program" "john.l" [ CExpressions ]
   [ "check/john/hanoi2.john", "check/john/x86-allocator.john", "check/john/airline.john" ].
-make Grammar LawFiles untested "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
-make Grammar IrlPrograms untested "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
-make Grammar Arm64Table untested "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
-make Grammar X86Table untested "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
-make Grammar OsDefinitions untested "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
-make Grammar TpegItself untested "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
+make Grammar LawFiles untested none "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
+make Grammar IrlPrograms untested none "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
+make Grammar Arm64Table untested none "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
+make Grammar X86Table untested none "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
+make Grammar OsDefinitions untested none "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
+make Grammar TpegItself untested none "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
 
-action Check passed consequence its green = yes.
-action Check failed consequence its green = no.
+; an answer says which code gave it, and it's only good for that code
+create Code tree.
+action Check passed Tree consequence its green = yes and its tested-on = Tree.
+action Check failed Tree consequence its green = no and its tested-on = Tree.
+qualify Check holds if its green = yes and its tested-on = Now tree.
+qualify Check stale if its green = yes and not its tested-on = Now tree.
 
 ; ---- what we're building
 create Capability what where shown-by builds-on planned.
@@ -82,7 +88,7 @@ make Capability NothingElseBroke "every other check in the repository still pass
   "the whole tree" [ WholeSuite ] [ EndToEnd, ForeignRules ] no.
 
 ; ---- how the pieces relate
-qualify Capability proven if for every its shown-by do each green = yes.
+qualify Capability proven if for every its shown-by do each holds = yes.
 qualify Capability done if it proven = yes or it planned = yes.
 qualify Capability ready if for every its builds-on do each done = yes.
 rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
@@ -101,5 +107,5 @@ rule Team build is Capability done = no.
 rule Team build is Capability ready = yes.
 goal Team deliver try for every all Capability do each done = yes.
 goal-optimization Team deliver use build if 1 = 1.
-; the same pieces built in another order are the same world
-set-opt merge-worlds yes.
+; every capability, in some order that respects builds-on: no choice to search among
+goal-strategy Team deliver sat.
