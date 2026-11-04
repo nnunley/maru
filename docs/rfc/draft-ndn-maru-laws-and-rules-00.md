@@ -138,7 +138,8 @@ how long generation takes.
 The defaults are small because a small size already reaches the cases
 that matter (Appendix A's mutants are all caught at size 1) and keeps a
 check's time in seconds. **Resolution precedence:** a value written in
-the law; then the law file's `defaults` line; then this table.
+the law; then the law file's `defaults` line; then this table. For a
+sweep, `MARU_LAW_SEED` and `MARU_LAW_TRIALS` in the environment override all three.
 
 ### Rules
 

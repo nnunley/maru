@@ -6,8 +6,9 @@
 ;;;   ./eval check/check.l pepsi ...    run the named cases; a name no case has fails
 
 (define system (subr "system" "s"))
+;; run directly, it keeps out of the directory a parallel run in this checkout is using
 (require "check/temp.l")
-(define tmp check-tmp)
+(define tmp (if (env-var "MARU_CHECK_TMP") check-tmp (concat-strings check-tmp "/direct")))
 (system (concat-strings "rm -rf " tmp " && mkdir -p " tmp))
 
 (define-function split (str sep)
@@ -292,6 +293,11 @@
   (unit-assert (refuses "reserved" "reserved"))
   (unit-assert (refuses "param-lr" "left-recursive")))
 
+;; the runner removes its directory, so it refuses one it couldn't safely remove, before removing anything
+(check "check_tmp"
+  (list-do unsafe '("/" "" "/tmp/" "/Users" "/tmp/a b" "/tmp/x/../..")
+    (unit-assert (fails-saying "check_tmp" (concat-strings "MARU_CHECK_TMP='" unsafe "' ./eval check/parallel.l lines")
+			       "must be a plain path under /tmp/"))))
 ;; non-local exit through stubs Maru writes, on every evaluator this host has, in each instruction set it runs
 (define-function native-evaluators ()
   (let ((out '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")))

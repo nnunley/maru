@@ -42,7 +42,9 @@
 (define failed
   (run-jobs jobs check-tmp
 	    (map (lambda (name)
-		   (cons name (concat-strings "MARU_CHECK_TMP=" check-tmp "/" name " exec ./eval check/check.l " name)))
+		   ;; the laws' expected lines assume their written trials and seeds
+		   (cons name (concat-strings "unset MARU_LAW_SEED MARU_LAW_TRIALS; MARU_CHECK_TMP=" check-tmp "/" name
+					      " exec ./eval check/check.l " name)))
 		 names)))
 (if failed
     (let ()

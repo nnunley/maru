@@ -1,5 +1,7 @@
 ;;; ./eval check/sweep.l [SEEDS]: the generated laws on fresh seeds, more trials, and every evaluator: the search for new
-;;; corner cases, where make check is a repeatable gate.  A failure names the seed; rerun it with MARU_LAW_SEED set.
+;;; corner cases, where make check is a repeatable gate.  A failure's run is named law-evaluator-seed; set MARU_LAW_SEED to that
+;;; seed to rerun it (a REFUTED line's own seed= has the law's position in the file added).  The laws here are the collector's,
+;;; not an instruction set's, so this keeps to this machine's own evaluators.
 ;;; MARU_CHECK_JOBS says how many at once (default 4).
 (require "check/temp.l")
 (require "check/jobs.l")

@@ -1,5 +1,5 @@
 -- the logic engine's own laws; terms come from rules: atoms, variables (V n), pairs (P a b)
-under test: unify, walk_all, holds, generate, enumerate
+under test: unify, walk_all, holds, enumerate
 
 fact atom(A)
 fact atom(B)
