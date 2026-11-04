@@ -66,7 +66,10 @@
 (define-function john-write (w o p v)
   (set (<john-world>-cache w) ())	; qualifications read the old value
   (set (<john-world>-writes w) (cons (cons o (cons p v)) (<john-world>-writes w))))
-(define-function john-at-time (w t) (while (> (<john-world>-time w) t) (set w (<john-world>-parent w))) w)
+(define-function john-at-time (w t)
+  (or (>= t 0) (john-fail "at time " t ": before the first world"))
+  (while (> (<john-world>-time w) t) (set w (<john-world>-parent w)))
+  w)
 
 ;;; ---- values.  A value is a Maru value, what it does chosen by its type: a name (an object or
 ;;; a word like empty), a number, a string, a list, or a class named where a value is read
@@ -174,8 +177,8 @@
       (let ((h (john-true? (john-eval p w (cons (cons 'each x) env)))))
 	(if all? (or h (set r ())) (and h (set r 1)))))
     (john-bool r)))
-(define-function john-quantify-time (all? v lo hi p w env)	; times lo+1 ... hi, none later than w
-  (let ((r all?) (t (+ 1 (if lo (john-eval lo w env) 0))) (end (john-eval hi w env)))
+(define-function john-quantify-time (all? v lo hi p w env)	; times lo+1 ... hi, none later than w, none before the first action
+  (let ((r all?) (t (+ 1 (if lo (max 0 (john-eval lo w env)) 0))) (end (john-eval hi w env)))
     (or (<= end (<john-world>-time w)) (john-fail "time " end " is later than now, " (<john-world>-time w)))
     (while (<= t end)
       (let ((h (john-true? (john-eval p w (cons (cons v t) env)))))
@@ -380,7 +383,8 @@
       (if c (set *john-world* c) (john-say (concat-strings (john-text r) " can't " (john-text a)))))))
 (define-function john-statement (s)
   (let ((op (car s)))
-    (cond ((= op 'start-world) (set *john-world* (new <john-world>)) (set (<john-world>-time *john-world*) 0))
+    (cond ((= op 'load) (require (cadr s)))
+	  ((= op 'start-world) (set *john-world* (new <john-world>)) (set (<john-world>-time *john-world*) 0))
 	  ((= op 'end-world))
 	  ((= op 'group) (or (john-class (cadr s)) (push *john-classes* (list (cadr s) ())))
 	   (list-do m (cddr s) (let ((cl (or (john-class m) (let () (push *john-classes* (list m ())) (john-class m)))))

@@ -1,19 +1,23 @@
 # The stage 1 evidence loop
 
-Goal: `notes/plan/tree-matching.john`'s goal is green, which is stage 1 of
+Goal: `notes/plan/tree-matching.john`'s goal is reached, which is stage 1 of
 `docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`. Background on approach and pitfalls, not a task list:
-`docs/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC's "Parser types and instances", "Streams" and "The input stack" decide.
+`docs/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC wins.
+
+The plan says what each `Capability` is (`what`, `where`), what it builds on (`builds-on`) and what would show it works (`shown-by`). A `Check` is anything the system can be asked: a `Case` in `check/check.l`, a `Measure` (a program's exit status), or a `Grammar` (compiled live on each evaluator, reading its language). John objects ask through messages `notes/plan/probes.l` defines.
 
 Each iteration, with fresh eyes:
 
-1. `notes/plan/record` runs the checks, appends evidence, and prints what's green and John's plan. Read it.
-2. Take the first thing in the plan, and as much as naturally goes with it. Read the failing check's log.
+1. `./eval notes/plan/record.l` asks the checks, appends what they answered to `evidence.john`, and prints what's done, what isn't and why, and the next step. `./eval notes/plan/next.l` prints that without running anything.
+2. Take the next step, and as much as naturally goes with it. Read the failing check's log in `/tmp/maru-plan/`.
 3. Change the code until that check passes, keeping earlier ones green.
-4. `notes/plan/record` again. Add `check/lines` entries as needed: `make check CHECKS=lines` names the delta.
+4. Record again. Add `check/lines` entries as needed: `make check CHECKS=lines` names the delta.
 5. Commit, code and `notes/plan/evidence.john` together, with a prose message saying what changed and why.
 6. Report: what's green now, what you learned, and anything the next iteration should know. Add that to the end of this file too.
 
-When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record full` to test `Suite`.
+`./eval notes/plan/record.l full` also runs `WholeSuite`, whose run counts as evidence for every case it passes.
+
+Probes run only from `record.l`. The plan's rules read `green`, never `observe`, so replaying evidence and planning run nothing.
 
 ## Stop and report, without working around it
 
@@ -21,18 +25,20 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
   weaken, delete or edit a `check/tpeg-*` file or `tree-matching.john`; report what you think is wrong and why.
 - The evidence seems to say a decision in the RFC is wrong: arguments on the input, whole-list matching, data separate from
   state, two parser types, memos on the stream, one grammar object with a swapped input. Report it; don't reopen it.
-- `Speed` fails and you can't see how to fix it without changing what's specified.
+- `TextMatchingSpeed` fails and you can't see how to fix it without changing what's specified.
 - Something outside the plan's Global Constraints has to change.
 
 ## Rules
 
-- Never edit `notes/plan/evidence.john` by hand; only `record` writes it.
+- Never edit `notes/plan/evidence.john` by hand; only `record.l` writes it.
 - Be a good neighbour: other agents share this machine. Use `nice`, and a `timeout` on anything that might loop, since an evaluator
   with no tail calls can hang or overflow silently. Never kill a process you didn't start, and never use a broad `pkill`.
 - Work only in `.worktrees/tpeg-trees`, on branch `tpeg-trees`. Don't push, and don't merge to `main`.
 - Commits carry no attribution lines.
 
 ## Notes from iterations
+
+**The plan says what it means (after iteration 9).** Requirements became capabilities with named relationships, and events name the check that answered. The old evidence named only a requirement, so it couldn't say which of a requirement's checks had failed, and was deleted. Names in older notes below (`Req`, `Selectors`, `Args`, `Suite`, `notes/plan/record`) are from before this. Planning from no evidence at all takes about 45 s even with `merge-worlds`. `at time N` far ahead printed nothing within 30 s and is not explained yet.
 
 **Evidence is prior worlds (after iteration 9).** `passed` and `failed` set a requirement's `done`, so each check run is a world in John's chain, and `at time T` reads an earlier one. `next.l` is one program now. `evidence.john` is how the chain persists, since John keeps worlds in memory. **On text, parameters stay arguments of a rule's method:** `nile-grammar.g` uses them, and only `<source-parser>` puts them on the input.
 

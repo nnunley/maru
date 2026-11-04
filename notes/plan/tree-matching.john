@@ -1,32 +1,104 @@
-; Stage 1 of draft-ndn-maru-typed-tree-matching-00: intent as requirements and a goal.
-; Evidence is events in evidence.john, appended by notes/plan/record from real check runs.
-; Each check run is a world in John's chain of worlds, so a prior state can be read with `at time T`, and
-; `satisfy` plans on from the newest. goal-optimization keeps the planner to real work: it can't pass a check.
+; Stage 1 of docs/rfc/draft-ndn-maru-typed-tree-matching-00.md: what we're building, how each piece relates to
+; the others, and what would show it works.
+;
+; A Check is something the system can be asked.  notes/plan/record.l asks every one with `observe`, and writes what
+; it answered to evidence.john as an event, `tree_lists do passed.`  Replaying those events gives the chain of worlds,
+; so `green` here is the latest answer, and `at time` reads earlier ones.  Plans never run a check: rules read `green`.
+
 start-world plan.
-create Req needs also done.
+load "notes/plan/probes.l".
+
+group Check Case Measure Grammar.
+create Case green.                                 ; a case in check/check.l
+create Measure green command cadence.              ; a program; its exit status is the answer
+create Grammar green file class rule host inherits samples.  ; compiled live, reading its own language
+
+qualify Case observe is it case-passes.
+qualify Measure observe is it command-succeeds.
+qualify Grammar observe is it compiles-and-reads.
+
+; which checks a plain `record` asks; `record full` asks them all
+qualify Check routine if 1 = 1.
+qualify Measure routine if its cadence = routine.
+
+; first, because what a whole run shows counts for the cases below, and they then needn't run again
+make Measure WholeSuite untested "nice make check" full.
+
+make Case tree_selectors untested.
+make Case tree_source untested.
+make Case tree_lists untested.
+make Case tree_args untested.
+make Case tree_text_refuses untested.
+make Case tree_interleave untested.
+make Case tree_apply untested.
+make Case tree_memo untested.
+make Case tree_foreign untested.
+make Case tree_literals untested.
+make Case tree_parse_complete untested.
+make Case tree_calc untested.
+
+make Measure TextMatchingSpeed untested "notes/plan/speed" routine.
+
+make Grammar CExpressions untested "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
+make Grammar JohnPrograms untested "john.g" "<john>" "program" "john.l" [ CExpressions ]
+  [ "check/john/hanoi2.john", "check/john/x86-allocator.john", "check/john/airline.john" ].
+make Grammar LawFiles untested "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
+make Grammar IrlPrograms untested "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
+make Grammar Arm64Table untested "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
+make Grammar X86Table untested "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
+make Grammar OsDefinitions untested "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
+make Grammar TpegItself untested "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
+
+action Check passed consequence its green = yes.
+action Check failed consequence its green = no.
+
+; ---- what we're building
+create Capability what where shown-by builds-on planned.
+
+make Capability InputSelectors "a grammar reads its input only through in-head, in-tail and the other input selectors"
+  "input.l" [ tree_selectors ] [ ] no.
+make Capability AnySource "a grammar can match any source, each stream cell holding its head, lazy tail and memos"
+  "source-parser.l" [ tree_source ] [ InputSelectors ] no.
+make Capability ListPatterns "a rule can descend into a list and match inside it, as OMeta's form: does"
+  "compile-tpeg.l, tpeg.g" [ tree_lists ] [ AnySource ] no.
+make Capability ArgsOnInput "a rule's arguments are cells prepended to the stream on a source; on text they stay method arguments"
+  "compile-tpeg.l" [ tree_args, tree_text_refuses ] [ ListPatterns ] no.
+make Capability LiveGrammars "grammars compile in process, so code and grammar blocks can interleave on one input, and every grammar in the tree still compiles live and reads its language"
+  "tpeg-repl.l, compile-tpeg.l" [ tree_interleave, CExpressions, JohnPrograms, LawFiles, IrlPrograms, Arm64Table, X86Table, OsDefinitions, TpegItself ] [ AnySource ] no.
+make Capability ApplyAndSuper "a rule named at run time can be applied, and an override can call its parent's rule"
+  "compile-tpeg.l" [ tree_apply ] [ ArgsOnInput, LiveGrammars ] no.
+make Capability MemosOnStream "the memo table lives on the stream, so a rule's answer is shared by whoever reads that cell"
+  "source-parser.l" [ tree_memo ] [ ListPatterns ] no.
+make Capability ForeignRules "a grammar can call another grammar's rule on the same input, with fresh memos, through a proxy cell"
+  "source-parser.l, compile-tpeg.l" [ tree_foreign ] [ MemosOnStream ] no.
+make Capability OneMatcherForAll "literals in a rule match what the source holds, and a file's grammar must parse completely"
+  "compile-tpeg.l, tpeg.g" [ tree_literals, tree_parse_complete ] [ AnySource ] no.
+make Capability EndToEnd "a calculator written as a grammar over trees runs with memos and arguments together"
+  "check/tpeg-calc.l" [ tree_calc ] [ MemosOnStream, ArgsOnInput ] no.
+make Capability TextStaysFast "text matching pays nothing for all this: within 15% of main's"
+  "text-parser.l" [ TextMatchingSpeed ] [ AnySource ] no.
+make Capability NothingElseBroke "every other check in the repository still passes"
+  "the whole tree" [ WholeSuite ] [ EndToEnd, ForeignRules ] no.
+
+; ---- how the pieces relate
+qualify Capability proven if for every its shown-by do each green = yes.
+qualify Capability done if it proven = yes or it planned = yes.
+qualify Capability ready if for every its builds-on do each done = yes.
+rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
+rel-qualify Check:C supports Capability:K if C in K shown-by.
+
+; ---- what the history says, for reading, never for planning
+qualify Check regressed if it green = no and for some time A up to time do (at time A it green = yes).
+qualify Check observed-within: N if
+  for some time A after (time - N) up to time do ((at time A it did passed) or (at time A it did failed)).
+
+; ---- the goal
 create Team.
-make Req None None None yes.
-make Req Selectors None None no.
-make Req Source Selectors None no.
-make Req Lists Source None no.
-make Req Args Lists None no.
-make Req Interleave Source None no.
-make Req Apply Args Interleave no.
-make Req Memos Lists None no.
-make Req Foreign Memos None no.
-make Req Literals Source None no.
-make Req Calc Memos Args no.
-make Req Speed Source None no.
-make Req Suite Calc Foreign no.
 make Team T.
-action Req passed consequence its done = yes.
-action Req failed consequence its done = no.
-action Team finish Req consequence Req done = yes.
-rule Team finish is Req done = no.
-rule Team finish is Req needs done = yes.
-rule Team finish is Req also done = yes.
-; every requirement is named, so one going red again comes back into the plan
-goal Team ship try Selectors done = yes and Source done = yes and Lists done = yes and Args done = yes and
-  Interleave done = yes and Apply done = yes and Memos done = yes and Foreign done = yes and
-  Literals done = yes and Calc done = yes and Speed done = yes and Suite done = yes.
-goal-optimization Team ship use finish if 1 = 1.
+action Team build Capability consequence Capability planned = yes.
+rule Team build is Capability done = no.
+rule Team build is Capability ready = yes.
+goal Team deliver try for every all Capability do each done = yes.
+goal-optimization Team deliver use build if 1 = 1.
+; the same pieces built in another order are the same world
+set-opt merge-worlds yes.

@@ -1,18 +1,26 @@
-;;; ./eval notes/plan/next.l: replays the evidence as a chain of worlds, says what's done in the newest,
-;;; and plans on from there.  The plan's answer starts with the evidence, the world chain's own history.
-(require "john-eval.l")
-(define plan     (john-read "notes/plan/tree-matching.john"))
-(define evidence (john-read "notes/plan/evidence.john"))
-(define reqs '(Selectors Source Lists Args Interleave Apply Memos Foreign Literals Calc Speed Suite))
-(define answers
-  (john-run (concat-list plan
-			 (concat-list evidence
-				      (concat-list (map (lambda (r) (list 'query (list 'send r 'done))) reqs)
-						   (john-read-text "T satisfy ship."))))))
-(let ((rs reqs) (as answers))
-  (while rs
-    (println (car rs) " " (or (car as) "?"))
-    (set rs (cdr rs))
-    (set as (cdr as)))
-  (println "worlds of evidence: " (list-length evidence))
-  (list-do l as (println l)))
+;;; ./eval notes/plan/next.l: what's done, what isn't and why, and the next step.  Runs no check.
+(require "notes/plan/plan-world.l")
+(define-function not-green (capability)
+  (let ((out ()))
+    (list-do c (plan-ask capability 'shown-by) (or (= 'yes (plan-ask c 'green)) (push out c)))
+    (list-reverse! out)))
+(list-do capability (john-instances 'Capability)
+  (println (if (plan-yes? capability 'proven) "done     " "not done ") capability ": " (plan-ask capability 'what))
+  (or (plan-yes? capability 'proven)
+      (let ()
+	(list-do c (not-green capability) (println "           " c " is " (plan-ask c 'green)))
+	(or (plan-yes? capability 'ready)
+	    (list-do b (plan-ask capability 'builds-on)
+	      (or (plan-yes? b 'proven) (println "           waiting on " b)))))))
+(list-do c (john-instances 'Check)
+  (and (plan-yes? c 'regressed) (println "regressed: " c)))
+(println "events of evidence: " (list-length plan-evidence))
+;; the plan's answer starts with the evidence, the world chain's own history; what's new starts at now
+(let ((now (<john-world>-time *john-world*)))
+  (john-statement '(satisfy T deliver () () ()))
+  (let ((steps (john-path *john-world*)) (n now))
+    (while (and steps (> n 0)) (set steps (cdr steps)) (set n (- n 1)))
+    (cond (steps (println "next: " (john-step-text (car steps))))
+	  ((= 'yes (john-eval '(every (all Capability) (= (send each done) yes)) *john-world* ())) (println "nothing left to build"))
+	  (else (println "no plan: " (car *john-out*))))
+    (list-do st (and steps (cdr steps)) (println "then: " (john-step-text st)))))

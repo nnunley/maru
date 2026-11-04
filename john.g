@@ -73,6 +73,7 @@ method		= "maximize" wb -> 'maximize | "minimize" wb -> 'minimize ;
 makebody	= "make" wb name:c primary:o primary*:v				-> `(make ,c ,o ,@v) ;
 
 statement	= "start-world" wb name:n end					-> `(start-world ,n)
+		| "load" wb string:p end					-> `(load ,p)	# ours: Maru files whose messages the program sends
 		| "end-world" wb end						-> '(end-world)
 		| "group" wb name:g name+:cs end				-> `(group ,g ,@cs)
 		| "create" wb idpart:c ":" _ typed:a ("," _ typed)*:b end	-> `(create ,c typed ,a ,@b)

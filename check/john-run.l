@@ -66,6 +66,14 @@
 				    goal P done try its a = 2 and its b = 1. X satisfy done.")
 			  '("looking 1 time unit ahead (1 possible worlds)" "satisfied at time: 1" "satisfied by: [ X swap ]")))
   (expect "at: below 1 is an error" (has? (child "[ 1, 2 ] at: 0.") "at: 0 is below 1"))
+  ;; a program loads Maru files, and its objects and values answer the messages they define
+  (let ((out (run-text "load \"check/john-message.l\". create Source text. make Source S \"1 + f(2)\". qualify Source valid is (it text-of) parses-as-c. make Source B \"1 +\". 21 doubled. S valid. B valid.")))
+    (expect "a message from a loaded file" (= "42" (car out)))
+    (expect "an object asks a grammar" (and (= "yes" (cadr out)) (= "no" (caddr out)))))
+  (expect "a message nothing defines stays an error" (has? (child "21 tripled.") "no property or qualification tripled"))
+  ;; time before the first world is an error when read, and an empty stretch of a window that reaches there
+  (expect "at time before the first world" (has? (child "start-world w. create A p. make A X 1. at time (time - 1) X p.") "before the first world"))
+  (expect "a window reaching before the first world" (has? (child "start-world w. create A p. action A go consequence its p = 2. make A X 1. X do go. for some time T after (time - 9) up to time do (at time T X p = 2).") "yes"))
   (expect "to: a negative length is an error" (has? (child "[ 1 ] to: -1.") "to: -1 is a negative length"))
   (expect "an unknown name is an error" (has? (child "nosuch.") "unknown name: nosuch"))
   (expect "an unknown property is an error" (has? (child "create C. make C X. X colour.") "no property or qualification colour of X"))
