@@ -40,24 +40,24 @@ status : .force
 # in-process (jit_run); bin/<arch>/ keeps their names unchanged.
 CROSS = $(shell test "$$(uname -sm)" = "Darwin arm64" && arch -x86_64 /usr/bin/true 2>/dev/null && echo bin/x86_64/eval bin/x86_64/eval2)
 
-bin/x86_64/eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+bin/x86_64/eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c undo.c
 	@mkdir -p bin/x86_64
 	$(CC) -arch x86_64 -g $(CFLAGS) -o $@ eval.c $(LIBS)
 
-bin/x86_64/eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+bin/x86_64/eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c osdefs.k
 	@mkdir -p bin/x86_64
 	$(CC) -arch x86_64 -g $(CFLAGS) -o $@ eval2.c $(LIBS)
 
-eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c undo.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
-CHECK_LIBS = build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
+CHECK_LIBS = build/gc-shapes.g.l build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
 
@@ -73,7 +73,7 @@ maru-check : eval2 .force
 	cc -m32 -o maru-check maru-check.s
 	./maru-check
 
-eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c undo.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 

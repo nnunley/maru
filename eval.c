@@ -1217,8 +1217,15 @@ static int printSource(oop exp)
     return fprintSource(stdout, exp);
 }
 
+char maru_fatal_message[1024];		/* what a handler of a fatal error reads, through dlsym */
+
 static void fatal(char *reason, ...)
 {
+  if (reason) {
+      va_list ap;
+      FILE *f= fmemopen(maru_fatal_message, sizeof(maru_fatal_message) - 1, "w");
+      if (f) { va_start(ap, reason);  vfprintf(f, reason, ap);  va_end(ap);  fclose(f); }
+  }
   if (reason) {
     va_list ap;
     va_start(ap, reason);
@@ -1539,6 +1546,9 @@ static void arity3(oop args, char *name)
 }
 
 #define subr(NAME)	oop subr_##NAME(oop args, oop ctx)
+#define UNDO_CONS newPair
+#define UNDO_VARIABLE_WRITE(V, OLD)	set(V, Variable,value, OLD)
+#include "undo.c"
 
 static subr(if)
 {
@@ -1581,10 +1591,17 @@ static subr(set)
   }
   oop val= eval(cadr(args), ctx);
   if (is(Expr, val) && (nil == get(val, Expr,name))) set(val, Expr,name, get(var, Variable,name));
-  if (isGlobal(var)) return set(var, Variable,value, val);
+  GC_PROTECT(val);
+  if (isGlobal(var)) {
+    undoNote(var, UNDO_VARIABLE, 0, get(var, Variable,value));
+    GC_UNPROTECT(val);
+    return set(var, Variable,value, val);
+  }
   int delta= getLong(get(get(ctx, Context,env), Env,level)) - getLong(get(get(var, Variable,env), Env,level));
   oop cx= ctx;
   while (delta--) cx= get(cx, Context,home);
+  undoArrayWrite(get(cx, Context,bindings), getLong(get(var, Variable,index)));
+  GC_UNPROTECT(val);
   return arrayAtPut(get(cx, Context,bindings), getLong(get(var, Variable,index)), val);
 }
 
@@ -2130,6 +2147,7 @@ static subr(set_car)
 {
   arity2(args, "set-car");
   oop arg= getHead(args);				if (!is(Pair, arg)) return nil;
+  undoNote(arg, UNDO_HEAD, 0, getHead(arg));
   return setHead(arg, getHead(getTail(args)));
 }
 
@@ -2143,6 +2161,7 @@ static subr(set_cdr)
 {
   arity2(args, "set-cdr");
   oop arg= getHead(args);				if (!is(Pair, arg)) return nil;
+  undoNote(arg, UNDO_TAIL, 0, getTail(arg));
   return setTail(arg, getHead(getTail(args)));
 }
 
@@ -2196,6 +2215,7 @@ static subr(set_string_at)
   oop val= getHead(getTail(getTail(args)));	if (!isLong(val)) { fprintf(stderr, "set-string-at: non-integer value: ");  fdumpln(stderr, val);  fatal(0); }
   int idx= getLong(arg);
   if (idx < 0) return nil;
+  undoStringWrite(arr, idx);
   int len= stringLength(arr);
   if (len <= idx) {
     if (len < 2) len= 2;
@@ -2341,6 +2361,7 @@ static subr(set_array_at)
   oop arr= getHead(args);
   oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;
   oop val= getHead(getTail(getTail(args)));
+  undoArrayWrite(arr, getLong(arg));
   return arrayAtPut(arr, getLong(arg), val);
 }
 
@@ -2623,6 +2644,7 @@ static subr(set_oop_at)
   oop obj= getHead(args);
   oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;
   oop val= getHead(getTail(getTail(args)));
+  undoNote(obj, UNDO_OOP, getLong(arg), oopAt(obj, getLong(arg)));
   return oopAtPut(obj, getLong(arg), val);
 }
 
@@ -3057,6 +3079,11 @@ static subr_ent_t subr_tab[] = {
     { " cons",			subr_cons },
     { " pair?",			subr_pairP },
     { " car",			subr_car },
+    { " undo-begin",		subr_undo_begin },
+    { " undo-commit",		subr_undo_commit },
+    { " undo-rollback",	subr_undo_rollback },
+    { " undo-pause",		subr_undo_pause },
+    { " undo-resume",		subr_undo_resume },
     { " set-car",		subr_set_car },
     { " cdr",			subr_cdr },
     { " set-cdr",		subr_set_cdr },
@@ -3163,6 +3190,8 @@ int main(int argc, char **argv)
   GC_add_root(&evaluators);
   GC_add_root(&applicators);
   GC_add_root(&backtrace);
+  GC_add_root(&undoLog);
+  GC_out_of_memory_function= undoOutOfMemory;
   GC_add_root(&arguments);
   GC_add_root(&input);
   GC_add_root(&output);

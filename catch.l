@@ -38,6 +38,7 @@
      (return))))
 
 (define *catch-tags* ())	; the tags of the catches now running, newest first
+(define *handlers* ())		; recover.l's handlers, as they stood when each catch began
 (define *thrown* ())		; (tag . value), while a throw is on its way
 
 (define-function throw (tag value)
@@ -47,9 +48,11 @@
 
 (define-function catch (tag thunk)
   (let* ((tags *catch-tags*)
+	 (handlers *handlers*)
 	 (_ (set *catch-tags* (cons tag tags)))
 	 (answer (%catch thunk ())))
     (set *catch-tags* tags)
+    (set *handlers* handlers)
     (if *thrown*
 	(if (= tag (car *thrown*))
 	    (let ((value (cdr *thrown*)))
@@ -61,9 +64,11 @@
 ;; a catch no thrower can name, so a throw stops here on its way, the cleanup runs, and it goes on
 (define-function unwind-protect-call (body cleanup)
   (let* ((tags *catch-tags*)
+	 (handlers *handlers*)
 	 (_ (set *catch-tags* (cons 'unwind-protect tags)))
 	 (answer (%catch body ())))
     (set *catch-tags* tags)
+    (set *handlers* handlers)
     (let ((thrown *thrown*))
       (set *thrown* ())
       (cleanup)

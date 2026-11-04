@@ -300,6 +300,14 @@
 (check "catch"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "catch" (concat-strings evaluator " check/catch.l") 300)) "catch ok"))))
+;; errors are survivable and leave state as it was; the collector's laws hold (check/laws/gc.law), on every evaluator
+(check "recover"
+  (list-do evaluator (native-evaluators)
+    (unit-assert (equal (last (run "recover" (concat-strings evaluator " check/recover.l") 300)) "recover ok"))))
+(check "gc_laws"
+  (list-do evaluator (native-evaluators)
+    (unit-assert (= 0 (run-status 300 (concat-strings "exec </dev/null >" tmp "/gc_laws.out 2>&1; " evaluator
+						      " check/law.l check/laws/gc-reference.l check/laws/gc.law"))))))
 ;; exe.l's programs, the same bytes from every evaluator, run where this host can: natively, under Rosetta, or
 ;; in a Linux VM.  A target with nowhere to run says so.
 (define-function exe-can? (test) (= 0 (run-status 20 (concat-strings "exec </dev/null >/dev/null 2>&1; " test))))

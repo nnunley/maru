@@ -290,6 +290,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   calling convention keeps where, `stub.l` writes a stub once as intents, `stub-arm64.g` and `stub-x64.g` lower them by tree
   matching to encoder forms, and the result is a primitive like the evaluator's own (`allocate-atomic`, its function the stub).
   On every evaluator and instruction set the host has: through deep frames and C, with the collector's roots restored.
+- `recover` (`check/recover.l`): `recover.l`. `error` and C's `fatal` signal a condition a handler sees where it happened, and
+  `try` runs its body in a world, an undo log (`undo.c`): if it fails, every write through a primitive is undone (Warth's
+  Worlds, 3.1). Reads cost nothing and C sees current values; raw memory, the evaluators' tables, files and foreign state
+  aren't covered. A value leaving a failed world keeps what it was made with. With no handler, errors end the program as before.
+- `gc_laws` (`check/laws/gc.law`): over graphs rules generate, in a forked child per question, on every evaluator: what's
+  reachable survives and what isn't is freed, sharing and cycles hold, marking can't overflow the stack, the heap's books balance
+  (`GC_check_heap`), worlds and throws keep all that, and `(set-heap-limit bytes)` reached is an error that can be recovered from,
+  repeatedly. Free blocks are in lists by size, so an allocation walks nothing.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
@@ -326,7 +334,7 @@ done and the next step, running nothing. `notes/plan/LOOP.md` holds the loop's r
   `test-mach-o.l`, `assembler.k`. On arm64 they first fail at
   `mprotect: Permission denied` (eval.c:2497).
 - Neither evaluator eliminates tail calls, and a stack overflow is an unguarded
-  segfault. On the default 8 MB stack `eval` overflows between 2,000 and 4,000 nested
+  segfault, the one failure `recover.l` can't yet catch. On the default 8 MB stack `eval` overflows between 2,000 and 4,000 nested
   tail calls, and `eval2` between 4,000 and 7,000.
 - `eval2.c` was hand-edited upstream; nothing here regenerates it.
 - Cross-compiling: ir2 sizes follow the host's `osdefs.k`. Since that change
