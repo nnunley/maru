@@ -235,46 +235,6 @@
 ;; Encoded code runs in-process on every evaluator this host has: its own,
 ;; and on arm64 macOS bin/x86_64/eval2 under Rosetta.
 (define host-isa (if (= "x86_64" (car (run "uname-m" "uname -m"))) 'x64 'arm64))
-;; exe.l's programs, the same bytes from every evaluator, run where this host can: natively, under Rosetta, or
-;; in a Linux VM.  A target with nowhere to run says so.
-(define-function exe-can? (test) (= 0 (run-status 20 (concat-strings "exec </dev/null >/dev/null 2>&1; " test))))
-(define-function exe-transcript (name command)
-  (let ((out (concat-strings tmp "/" name ".out")))
-    (let ((status (run-status 60 (concat-strings "exec >" out " 2>/dev/null; " command))))
-      (list (contents-of-file-named out) (>> status 8)))))
-(check "exe"
-  (let ((dirs '("exe1" "exe2" "exe3"))
-	;; colima ssh turns every failing status into 1, so the VM says the status
-	(vm "colima ssh -- sh -c 'cat > /tmp/b; chmod +x /tmp/b; /tmp/b; echo status $?; rm -f /tmp/b'")
-	(mac-arm (exe-can? "test \"$(uname -sm)\" = 'Darwin arm64'"))
-	(rosetta (exe-can? "test \"$(uname -s)\" = Darwin && arch -x86_64 /usr/bin/true"))
-	(linux-vm (exe-can? "colima status")))
-    (list-do d dirs (run-status 5 (concat-strings "mkdir -p " tmp "/" d)))
-    (unit-assert (equal (last (run "exe1" (concat-strings "./eval check/exe.l " tmp "/exe1"))) "exe ok"))
-    (unit-assert (equal (last (run "exe2" (concat-strings "./eval2 -b boot2.l check/exe.l " tmp "/exe2"))) "exe ok"))
-    (unit-assert (equal (last (run "exe3" (concat-strings "./eval3 -b boot2.l check/exe.l " tmp "/exe3"))) "exe ok"))
-    (list-do target '("linux-i386" "linux-x64" "linux-arm64" "macos-arm64" "macos-x64" "answer")
-      (let ((one (concat-strings tmp "/exe1/" target)))
-	(list-do d '("exe2" "exe3")
-	  (unit-assert (exe-can? (concat-strings "cmp " one " " tmp "/" d "/" target))))))
-    (define-function exe-runs (target command)
-      (unit-assert (equal (exe-transcript target command) (list "hello from maru\n" 42))))
-    (let ((dir (concat-strings tmp "/exe1/")))
-      (if mac-arm
-	  (let ()
-	    (exe-runs "macos-arm64" (concat-strings dir "macos-arm64"))
-	    (unit-assert (exe-can? (concat-strings "codesign -v " dir "macos-arm64")))
-	    (unit-assert (equal (exe-transcript "answer" (concat-strings dir "answer")) (list "" 42)))
-	    (unit-assert (equal (last (run "exe-jit" "./eval2 -b boot2.l check/exe.l --jit")) "exe ok")))
-	(println "exe: macos-arm64 not run here"))
-      (if rosetta
-	  (exe-runs "macos-x64" (concat-strings "arch -x86_64 " dir "macos-x64"))
-	(println "exe: macos-x64 not run here"))
-      (if linux-vm
-	  (list-do target '("linux-i386" "linux-x64" "linux-arm64")
-	    (unit-assert (equal (exe-transcript target (concat-strings vm " < " dir target))
-				(list "hello from maru\nstatus 42\n" 0))))
-	(println "exe: linux targets not run here, no colima")))))
 (check "jit_run"
   (list-do e (cons (list "./eval2" host-isa)
 		   (if (= 0 (system "test -x bin/x86_64/eval2")) (list (list "bin/x86_64/eval2" 'x64)) ()))
@@ -331,6 +291,52 @@
   (unit-assert (refuses "reserved" "reserved"))
   (unit-assert (refuses "param-lr" "left-recursive")))
 
+;; exe.l's programs, the same bytes from every evaluator, run where this host can: natively, under Rosetta, or
+;; in a Linux VM.  A target with nowhere to run says so.
+(define-function exe-can? (test) (= 0 (run-status 20 (concat-strings "exec </dev/null >/dev/null 2>&1; " test))))
+(define-function exe-transcript (name command)
+  (let ((out (concat-strings tmp "/" name ".out")))
+    (let ((status (run-status 60 (concat-strings "exec >" out " 2>/dev/null; " command))))
+      (list (contents-of-file-named out) (>> status 8)))))
+(check "exe"
+  (let ((dirs '("exe1" "exe2" "exe3"))
+	;; colima ssh turns every failing status into 1, so the VM says the status
+	(vm "colima ssh -- sh -c 'cat > /tmp/b; chmod +x /tmp/b; /tmp/b; echo status $?; rm -f /tmp/b'")
+	(mac-arm (exe-can? "test \"$(uname -sm)\" = 'Darwin arm64'"))
+	(rosetta (exe-can? "test \"$(uname -s)\" = Darwin && arch -x86_64 /usr/bin/true"))
+	(linux-vm (exe-can? "colima status")))
+    (list-do d dirs (run-status 5 (concat-strings "mkdir -p " tmp "/" d)))
+    (unit-assert (equal (last (run "exe1" (concat-strings "./eval check/exe.l " tmp "/exe1"))) "exe ok"))
+    (unit-assert (equal (last (run "exe2" (concat-strings "./eval2 -b boot2.l check/exe.l " tmp "/exe2"))) "exe ok"))
+    (unit-assert (equal (last (run "exe3" (concat-strings "./eval3 -b boot2.l check/exe.l " tmp "/exe3"))) "exe ok"))
+    (unit-assert (fails-saying "exe-import" "./eval check/exe.l --import-on-linux" "linux-x64 is static"))
+    (unit-assert (fails-saying "exe-entry" "./eval check/exe.l --no-entry" "isn't in the buffer"))
+    (unit-assert (fails-saying "exe-unwritable" "./eval check/exe.l --unwritable" "can't write /nonexistent/maru"))
+    (list-do target '("linux-i386" "linux-x64" "linux-arm64" "macos-arm64" "macos-x64" "macos-arm64-libsystem" "macos-x64-libsystem"
+		     "macos-arm64-big" "macos-x64-big" "linux-x64-big" "answer")
+      (let ((one (concat-strings tmp "/exe1/" target)))
+	(list-do d '("exe2" "exe3")
+	  (unit-assert (exe-can? (concat-strings "cmp " one " " tmp "/" d "/" target))))))
+    (define-function exe-runs (target command)
+      (unit-assert (equal (exe-transcript target command) (list "hello from maru\n" 42))))
+    (let ((dir (concat-strings tmp "/exe1/")))
+      (if mac-arm
+	  (let ()
+	    (list-do target '("macos-arm64" "macos-arm64-libsystem" "macos-arm64-big")
+	      (exe-runs target (concat-strings dir target))
+	      (unit-assert (exe-can? (concat-strings "codesign -v " dir target))))
+	    (unit-assert (equal (exe-transcript "answer" (concat-strings dir "answer")) (list "" 42)))
+	    (unit-assert (equal (last (run "exe-jit" "./eval2 -b boot2.l check/exe.l --jit")) "exe ok")))
+	(println "exe: macos-arm64 not run here"))
+      (if rosetta
+	  (list-do target '("macos-x64" "macos-x64-libsystem" "macos-x64-big")
+	    (exe-runs target (concat-strings "arch -x86_64 " dir target)))
+	(println "exe: macos-x64 not run here"))
+      (if linux-vm
+	  (list-do target '("linux-i386" "linux-x64" "linux-arm64" "linux-x64-big")
+	    (unit-assert (equal (exe-transcript target (concat-strings vm " < " dir target))
+				(list "hello from maru\nstatus 42\n" 0))))
+	(println "exe: linux targets not run here, no colima")))))
 ;; a grammar that stops parsing partway is an error, and doesn't quietly lose its remaining rules
 (check "tree_parse_complete"
   (unit-assert (fails-saying "parse-complete" "./eval compile-tpeg.l check/tpeg-broken.g" "stopped parsing check/tpeg-broken.g")))

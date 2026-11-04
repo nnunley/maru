@@ -281,7 +281,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   x86-64 under Rosetta through `bin/x86_64/eval2`).
 - `exe` (`check/exe.l`): `exe.l` writes executables with no compiler, linker or codesign, for `linux-i386`, `linux-x64`,
   `linux-arm64`, `macos-arm64` and `macos-x64`, from an assembly buffer, as `code-region.l` runs one in-process. ELF is
-  static; Mach-O keeps dyld and signs itself ad hoc (`sha256.l`, FIPS 180-4's vectors). Each program prints a message
+  static; Mach-O keeps dyld and signs itself ad hoc (`sha256.l`, FIPS 180-4's vectors). On Linux a program makes system calls; on
+  macOS the stable interface is `libSystem`, so a program imports `write` and `exit` through slots in `__DATA` that dyld fills. Each program prints a message
   and exits 42, the bytes are the same from all three evaluators, and each runs where it can: natively, under Rosetta,
   or in Colima's Linux VM, and a target with nowhere to run says so. One piece of arm64 code returns 42 from a file and
   through the JIT.
