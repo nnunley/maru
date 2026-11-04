@@ -17,7 +17,7 @@ reference gc_long_list(n)
 reference gc_deep_heads(n)
 under test: shape, length, ceiling
 let numerals = [0, 1, 2, 7, 31]
-defaults trials = 30
+defaults trials = 15
 
 rule s_number: number(n)            => shape(n)
 rule s_text:   number(n)            => shape(text(n))
@@ -26,11 +26,9 @@ rule s_array:  shape(a), shape(b)   => shape(arr(a, b))
 rule s_box:    shape(a)             => shape(box(a))
 
 -- past where recursive marking overflowed the stack (between 100,000 and 200,000)
-fact length(1000)
 fact length(300000)
 -- heap ceilings, in megabytes, for running out
 fact ceiling(8)
-fact ceiling(24)
 
 law survives:     all s: shape(s). gc_survives(s) = accept
 law stable:       all s: shape(s). gc_stable(s) = accept

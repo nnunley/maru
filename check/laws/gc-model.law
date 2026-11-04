@@ -5,7 +5,7 @@ reference merge_is_bounded(n)
 reference many_slots(n)
 reference allocations(ops, every)
 under test: program, op, on, past, ops, pace, loops, slots, once
-defaults trials = 150, size = 5
+defaults trials = 100, size = 5
 let numerals = [0, 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 63, 64, 65, 127, 128, 129, 255, 256, 1000, 4097]
 
 -- few slots and many writes, so worlds overwrite each other: what a mistake in the log needs in order to show

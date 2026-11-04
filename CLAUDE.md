@@ -55,6 +55,9 @@ sizes by definition.
 
     make check
 
+`make check` runs the cases four at a time (`check/parallel.l`, `MARU_CHECK_JOBS` to change it), and says which were slowest;
+`make check-quick` leaves out the slowest, for everyday edits. Everything runs before a merge.
+
 `check/check.l` (untyped Maru, built on boot.l's `unit-test`) runs each demo and
 asserts what it computes; `make check CHECKS="NAME…"` runs selected cases, after
 building what is stale. Libraries and grammars that checks open are built by make into

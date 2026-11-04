@@ -6,7 +6,15 @@
 ;;;   ./eval check/check.l pepsi ...    run the named cases; a name no case has fails
 
 (define system (subr "system" "s"))
-(define tmp "/tmp/maru-check")
+;; each case of a parallel run (check/parallel.l) has a directory of its own
+;; an environment variable as a string, or ()
+(define-function environment (name)
+  (let ((p ((subr "getenv" "s>p") name)))
+    (and p (!= 0 p)
+	 (let ((chars ()) (i 0))
+	   (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
+	   (list->string (list-reverse! chars))))))
+(define tmp (or (environment "MARU_CHECK_TMP") "/tmp/maru-check"))
 (system (concat-strings "rm -rf " tmp " && mkdir -p " tmp))
 
 (define-function split (str sep)
@@ -313,15 +321,18 @@
     (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)")))))
 (define-function law-file-holds (name evaluator support file)
   (= 0 (run-status 500 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>&1; exec " evaluator " check/law.l " support " " file))))
-(define this-host-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))	; these laws are the collector's, not an instruction set's
+;; the heaviest laws are the collector's, not an instruction set's or a particular evaluator's: one with tagged integers and
+;; one with boxed.  eval2 shares eval3's collector and undo log, and keeps recover and gc_every
+(define heavy-law-evaluators '("./eval" "./eval3 -b boot2.l"))
 (check "gc_laws"
-  (list-do evaluator this-host-evaluators
-    (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law"))
+  (list-do evaluator heavy-law-evaluators
+    (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law")))
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (law-file-holds "gc_every" evaluator "check/laws/gc-reference.l" "check/laws/gc-every.law"))))
 ;; generated programs against a model of what they should do, and generated allocations; collecting on every allocation
 ;; is slow, so that runs on one evaluator with tagged integers and one without
 (check "gc_model"
-  (list-do evaluator this-host-evaluators
+  (list-do evaluator heavy-law-evaluators
     (unit-assert (law-file-holds "gc_model" evaluator "check/laws/gc-model.l" "check/laws/gc-model.law")))
   (list-do evaluator '("./eval" "./eval3 -b boot2.l")
     (unit-assert (law-file-holds "gc_model_paced" evaluator "check/laws/gc-model.l" "check/laws/gc-model-paced.law"))))
@@ -627,4 +638,4 @@
 
 (let ((missing (unmatched *selected* *ran*)))
   (and missing (error "FAIL no check named: " missing)))
-(println "all checks passed")
+(or (environment "MARU_CHECK_TMP") (println "all checks passed"))

@@ -63,7 +63,11 @@ CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.
 
 check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l kscript.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
-	./eval check/check.l $(CHECKS)
+	./eval check/parallel.l $(CHECKS)
+
+check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l kscript.g.l $(CROSS) .force
+	-$(MAKE) -k -s $(CHECK_LIBS)
+	./eval check/parallel.l --quick
 
 # a target whose recipe fails is removed, so no check reads a half-written file
 .DELETE_ON_ERROR :

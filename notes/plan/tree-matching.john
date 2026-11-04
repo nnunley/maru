@@ -21,10 +21,10 @@ qualify Grammar observe is it compiles-and-reads.
 
 ; which checks a plain `record` asks; `record full` asks them all
 qualify Check routine if 1 = 1.
-qualify Measure routine if its cadence = routine.
+qualify Measure routine if its cadence = "routine".
 
 ; first, because what a whole run shows counts for the cases below, and they then needn't run again
-make Measure WholeSuite untested none "nice make check" full.
+make Measure WholeSuite untested none "nice make check" "full".
 
 make Case tree_selectors untested none.
 make Case tree_source untested none.
@@ -40,7 +40,7 @@ make Case tree_literals untested none.
 make Case tree_parse_complete untested none.
 make Case tree_calc untested none.
 
-make Measure TextMatchingSpeed untested none "notes/plan/speed" routine.
+make Measure TextMatchingSpeed untested none "notes/plan/speed" "routine".
 
 make Grammar CExpressions untested none "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
 make Grammar JohnPrograms untested none "john.g" "<john>" "program" "john.l" [ CExpressions ]

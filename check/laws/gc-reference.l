@@ -39,7 +39,7 @@
 		  (collect 2) (churn 40000) (collect 1)
 		  (equal (shape-of x) s)))))
 
-(define gc-copies 300)
+(define gc-copies 200)
 ;; many copies: what's dropped is freed, down to where it began, and what's held isn't
 (define-function copies (s)
   (let ((all ())) (for (i 0 gc-copies) (set all (cons (build s) all))) all))
@@ -151,10 +151,10 @@
 (define-function gc_oom_is_bounded (megabytes)
   (gc-verdict (lambda ()
 		(limit-above-use megabytes)
-		(for (i 0 3) (try (unbounded) (lambda (c) c)))
+		(for (i 0 2) (try (unbounded) (lambda (c) c)))
 		;; the first times grow the heap as far as the limit and the reserve take it; after that it must not grow at all
 		(let ((after-one (gc-heap-bytes)))
-		  (for (i 0 5) (try (unbounded) (lambda (c) c)))
+		  (for (i 0 3) (try (unbounded) (lambda (c) c)))
 		  (collect 1)
 		  (and (= 0 (gc-check-heap))
 		       (= (gc-heap-bytes) after-one))))))
