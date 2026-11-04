@@ -286,6 +286,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   and exits 42, the bytes are the same from all three evaluators, and each runs where it can: natively, under Rosetta,
   or in Colima's Linux VM, and a target with nowhere to run says so. One piece of arm64 code returns 42 from a file and
   through the JIT.
+- `catch` (`check/catch.l`): `catch.l`'s `catch`, `throw` and `unwind-protect`, in native stubs with no C. `abi.spec` says what each
+  calling convention keeps where, `stub.l` writes a stub once as intents, `stub-arm64.g` and `stub-x64.g` lower them by tree
+  matching to encoder forms, and the result is a primitive like the evaluator's own (`allocate-atomic`, its function the stub).
+  On every evaluator and instruction set the host has: through deep frames and C, with the collector's roots restored.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

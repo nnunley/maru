@@ -291,6 +291,15 @@
   (unit-assert (refuses "reserved" "reserved"))
   (unit-assert (refuses "param-lr" "left-recursive")))
 
+;; non-local exit through stubs Maru writes, on every evaluator this host has, in each instruction set it runs
+(define-function native-evaluators ()
+  (let ((out '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")))
+    (and (= 0 (run-status 5 "exec </dev/null >/dev/null 2>&1; test -x bin/x86_64/eval"))
+	 (set out (concat-list out '("bin/x86_64/eval" "bin/x86_64/eval2 -b boot2.l"))))
+    out))
+(check "catch"
+  (list-do evaluator (native-evaluators)
+    (unit-assert (equal (last (run "catch" (concat-strings evaluator " check/catch.l") 300)) "catch ok"))))
 ;; exe.l's programs, the same bytes from every evaluator, run where this host can: natively, under Rosetta, or
 ;; in a Linux VM.  A target with nowhere to run says so.
 (define-function exe-can? (test) (= 0 (run-status 20 (concat-strings "exec </dev/null >/dev/null 2>&1; " test))))

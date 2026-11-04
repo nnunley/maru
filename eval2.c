@@ -2883,13 +2883,13 @@ static subr(allocate)
     return _newOops(getLong(type), sizeof(oop) * getLong(size));
 }
 
-// static subr(allocate_atomic)
-// {
-//     arity2(args, "allocate-atomic");
-//     oop type= getHead(args);			if (!isLong(type)) return nil;
-//     oop size= getHead(getTail(args));		if (!isLong(size)) return nil;
-//     return _newBits(getLong(type), getLong(size));
-// }
+static subr(allocate_atomic)
+{
+    arity2(args, "allocate-atomic");
+    oop type= getHead(args);			if (!isLong(type)) return nil;
+    oop size= getHead(getTail(args));		if (!isLong(size)) return nil;
+    return _newBits(getLong(type), getLong(size));
+}
 
 static subr(oop_at)
 {
@@ -3399,7 +3399,7 @@ static subr_ent_t subr_tab[] = {
     { " subr",			subr_subr },
     { " subr-name",		subr_subr_name },
     { " allocate",		subr_allocate },
-//     { " allocate-atomic",	subr_allocate_atomic },
+    { " allocate-atomic",	subr_allocate_atomic },
     { " oop-at",		subr_oop_at },
     { " set-oop-at",		subr_set_oop_at },
     { " not",			subr_not },

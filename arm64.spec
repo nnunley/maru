@@ -30,8 +30,10 @@
 00 111 0 01 01 imm12 Rn Rt		LDRB Wt, [Xn|SP, #imm12]
 10 101 0 010 0 imm7 Rt2 Rn Rt		STP Xt, Xt2, [Xn|SP, #simm7*8]
 10 101 0 011 0 imm7 Rt2 Rn Rt		STP Xt, Xt2, [Xn|SP, #simm7*8]!
+01 101 1 011 0 imm7 Rt2 Rn Rt		STP Dt, Dt2, [Xn|SP, #simm7*8]!
 10 101 0 010 1 imm7 Rt2 Rn Rt		LDP Xt, Xt2, [Xn|SP, #simm7*8]
 10 101 0 001 1 imm7 Rt2 Rn Rt		LDP Xt, Xt2, [Xn|SP], #simm7*8
+01 101 1 001 1 imm7 Rt2 Rn Rt		LDP Dt, Dt2, [Xn|SP], #simm7*8
 
 0 00101 imm26				B pc+simm26*4
 1 00101 imm26				BL pc+simm26*4
