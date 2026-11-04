@@ -54,9 +54,13 @@ primary		= number
 		| "(" _ expr:e ")" _						-> e
 		| "its" wb							-> 'it
 		| "the" wb name
+		| name:n "(" _ field:a ("," _ field)*:b ")" _			-> `(variant ,n ,a ,@b)	# ours
 		| name ;
+field		= kw:k expr:v							-> (list k v) ;
+member		= name:n "(" _ name:a ("," _ name)*:b ")" _			-> `(,n ,a ,@b)
+		| name:n							-> (list n) ;
 
-# statements
+# statements.  set declares what a property may hold, each a name or a name with named fields: ours, after the laws' set
 typed		= "*" _ name:t name:p						-> `(* ,t ,p)
 		| name:t name:p							-> `(- ,t ,p) ;
 tvar		= idpart:t ":" _ name:v						-> (list t v) ;
@@ -72,7 +76,8 @@ effects		= effect:a ("and" wb effect)*:b					-> `(,a ,@b) ;
 method		= "maximize" wb -> 'maximize | "minimize" wb -> 'minimize ;
 makebody	= "make" wb name:c primary:o primary*:v				-> `(make ,c ,o ,@v) ;
 
-statement	= "start-world" wb name:n end					-> `(start-world ,n)
+statement	= "set" wb name:c "=" _ member:a ("|" _ member)*:b end		-> `(enumeration ,c ,a ,@b)	# ours
+		| "start-world" wb name:n end					-> `(start-world ,n)
 		| "load" wb string:p end					-> `(load ,p)	# ours: Maru files whose messages the program sends
 		| "end-world" wb end						-> '(end-world)
 		| "group" wb name:g name+:cs end				-> `(group ,g ,@cs)

@@ -102,13 +102,67 @@
 (define-method john-class-of <long> () 'Number)
 (define-method john-class-of <string> () 'String)
 
+;;; ---- enumerated values: set Name = a | b(x, y).  A plain one is itself; one with fields is a value holding them, by name
+
+(define *john-enumerations* ())		; (set (member field...) ...), this program's and the prelude's
+(define-function john-prelude-enumerations () '((Answer (yes) (no)) (Nothing (empty))))
+(define-function john-member (name)	; (set . (member field...)) or ()
+  (let ((found ()))
+    (list-do e *john-enumerations*
+      (list-do m (cdr e) (and (not found) (= name (car m)) (set found (cons (car e) m)))))
+    found))
+
+(define-structure <john-variant> (set kind fields))	; fields: ((name . value) ...), in the order the set declares
+(define-method john-class-of <john-variant> () self.set)
+(define-method john-text <john-variant> ()
+  (let ((s (concat-string (symbol->string self.kind) "(")) (first 1))
+    (list-do f self.fields
+      (set s (concat-strings s (if first "" ", ") (symbol->string (car f)) ": " (john-text (cdr f))))
+      (set first ()))
+    (concat-string s ")")))
+;; two values are the same by what they hold
+;; a value with fields against its bare name would just be no, so that's an error: it's the kind that compares to a name
+(define-function john-kind-only (name)
+  (john-fail name " has fields, so compare its kind: x kind = " name))
+(define-selector john-same (a b) (equal a b))
+(define-method john-same <symbol> (b)
+  (if (= <john-variant> (type-of b))
+      (john-kind-only self)
+    (= self b)))
+(define-method john-same <john-variant> (b)
+  (and (symbol? b) (john-kind-only b))
+  (and (= <john-variant> (type-of b))
+       (= self.kind (<john-variant>-kind b))
+       (let ((same 1) (theirs (<john-variant>-fields b)))
+	 (list-do f self.fields
+	   (or (john-same (cdr f) (cdar theirs)) (set same ()))
+	   (set theirs (cdr theirs)))
+	 same)))
+(define-method john-same <pair> (b)
+  (and (pair? b)
+       (john-same (car self) (car b))
+       (john-same (cdr self) (cdr b))))
+;; (variant kind (field: form) ...), with every field the set declares and no others, whatever the order
+(define-function john-field-name (k)	; field: -> field
+  (let ((s (symbol->string k))) (string->symbol (string-copy s 0 (- (string-length s) 1)))))
+
 ;;; ---- expressions, in world w with env ((name . value) ...)
 
 (define john-eval)
+(define-function john-make-variant (kind fields w env)
+  (let ((m (john-member kind)) (out ()))
+    (or m (john-fail "no such value: " kind))
+    (let ((given (map (lambda (f) (cons (john-field-name (car f)) (cadr f))) fields)))
+      (list-do g given (or (member? (car g) (cddr m)) (john-fail kind " has no field " (car g))))
+      (list-do name (cddr m)
+	(let ((g (assq name given)))
+	  (or g (john-fail kind " needs its field " name))
+	  (push out (cons name (john-eval (cdr g) w env)))))
+      (new <john-variant> (car m) kind (list-reverse! out)))))
 (define-function john-name (x w env)
   (let ((b (assq x env)))
     (cond (b (cdr b))
-	  ((member? x '(yes no empty)) x)
+	  ((john-member x) x)		; a member's name, which is what kind answers
 	  ((john-object? x) x)
 	  ((john-class x) (john-class-ref x))
 	  ((= x 'time) (<john-world>-time w))
@@ -144,6 +198,10 @@
 (define-function john-no-builtin (sel r) (john-fail "no property or qualification " sel " of " (john-text r)))
 (define-form define-john-builtin (message name)
   `(let () (define-selector ,name (r . _) (john-no-builtin ',message r)) (push *john-builtins* (cons ',message ,name))))
+;; what an enumerated value is: its member's name, for a plain one and one with fields alike
+(define-john-builtin kind john-kind)
+(define-method john-kind <john-variant> () self.kind)
+(define-method john-kind <symbol> () (if (john-member self) self (john-no-builtin 'kind self)))
 (define-john-builtin name john-name-of)	(define-method john-name-of <string> () (string->symbol self))
 (define-john-builtin size john-size)	(define-method john-size <pair> () (list-length self))	(define-method john-size <undefined> () 0)
 (define-john-builtin first john-first)	(define-method john-first <pair> () (car self))
@@ -160,9 +218,12 @@
 					(define-method john-from <undefined> (n) ())
 (define-function john-builtin (r sel args)
   (let ((b (assq sel *john-builtins*))) (if b (apply (cdr b) (cons r args)) (john-no-builtin sel r))))
+(define-function john-field (r sel)	; (field . value) if r is a value with that field
+  (and (= <john-variant> (type-of r)) (assq sel (<john-variant>-fields r))))
 (define-function john-send (r sel args w)
   (let ((c (john-class-of r)))
     (cond ((and (john-object? r) (not args) (member? sel (john-props c))) (john-lookup w r sel))
+	  ((and (not args) (john-field r sel)) (cdr (john-field r sel)))
 	  ((john-quals c sel) (john-qualify r (john-quals c sel) args w))
 	  (else (john-builtin r sel args)))))
 (define-function john-holds (r a b w env)
@@ -210,7 +271,8 @@
 	(else (let ((op (car x)))
 		(cond ((= op 'send) (john-send (john-eval (cadr x) w env) (caddr x) (map (lambda (a) (john-eval a w env)) (cdddr x)) w))
 		      ((= op 'list) (map (lambda (a) (john-eval a w env)) (cdr x)))
-		      ((= op '=) (john-bool (equal (john-eval (cadr x) w env) (john-eval (caddr x) w env))))
+		      ((= op '=) (john-bool (john-same (john-eval (cadr x) w env) (john-eval (caddr x) w env))))
+		      ((= op 'variant) (john-make-variant (cadr x) (cddr x) w env))
 		      ((member? op '(< > <= >=))
 		       (let ((a (john-eval (cadr x) w env)) (b (john-eval (caddr x) w env)))
 			 (john-bool (cond ((= op '<) (< a b)) ((= op '>) (> a b)) ((= op '<=) (<= a b)) (else (>= a b))))))
@@ -405,6 +467,7 @@
 (define-function john-statement (s)
   (let ((op (car s)))
     (cond ((= op 'load) (require (cadr s)))
+	  ((= op 'enumeration) (set *john-enumerations* (cons (cdr s) *john-enumerations*)))
 	  ((= op 'start-world) (set *john-world* (new <john-world>)) (set (<john-world>-time *john-world*) 0))
 	  ((= op 'end-world))
 	  ((= op 'group) (or (john-class (cadr s)) (push *john-classes* (list (cadr s) ())))
@@ -435,7 +498,7 @@
 	  (else (john-fail "statement not read yet: " op)))))
 (define-function john-reset ()
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())
-  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-goal-strategies* ()) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
+  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-goal-strategies* ()) (set *john-enumerations* (john-prelude-enumerations)) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
   (set (<john-world>-time *john-world*) 0))
 (define-function john-run (forms)
   (john-reset)

@@ -140,6 +140,7 @@
   (and (pair? x)
        (let ()
 	 (cond ((= (car x) 'at-time) (john-sat-refuse "at time"))
+	       ((= (car x) 'variant) (john-sat-refuse "an enumerated value with fields"))
 	       ((and (member? (car x) '(every any)) (pair? (cdr x)) (= 'time (cadr x)) (cddddr x))
 		(john-sat-refuse (if (= 'every (car x)) "for every time" "for some time")))
 	       ((and (= (car x) 'rel) (pair? (cdr x)) (= 'did (cadr x))) (john-sat-refuse "did")))
@@ -582,6 +583,21 @@
 	((= sel 'at:)
 	 (and (pair? r) (long? (car args)) (<= 1 (car args)) (<= (car args) (list-length r))))
 	(else (pair? r))))
+;; the messages the encoding works out itself, on a list that changes too; any other a value
+;; answers (kind, a loaded file's) is asked of the evaluator, which takes a constant
+(define *sat-encoded-builtins* '(name size first second third rest last at: to: from:))
+(define *sat-fixed-world* ())	; what holds at every step: a loaded message reads this, so reading what changes stops it
+(define-function sat-ask (r sel args)
+  (let ((now *john-world*) (answer ()))
+    (set *john-world* *sat-fixed-world*)
+    (set answer (john-builtin r sel args))
+    (set *john-world* now)
+    (sat-const answer)))
+(define-function john-sat-defined? (sel)	; does anything in the program answer sel?
+  (let ((found ()))
+    (list-do q *john-quals* (and (= sel (cadr q)) (set found 1)))
+    (list-do c *john-classes* (and (member? sel (john-props (car c))) (set found 1)))
+    found))
 (define sat-eval)
 (define sat-qualify)
 ;; A piece of encoding asked again at one time, of equal terms, is the same formula: it is
@@ -640,7 +656,16 @@
 	  ((john-quals c sel)
 	   (sat-memo t (cons sel (cons r args))
 		     (lambda () (sat-qualify r (john-quals c sel) args t))))
-	  ((not (assq sel *john-builtins*)) (sat-err *sat-t*) *sat-stop*)
+	  ((not (assq sel *john-builtins*))
+	   ;; another class's message is the evaluator's error here, so the step can't be taken;
+	   ;; one nothing defines is a mistake in the program, and "unsatisfiable" would hide it
+	   (or (john-sat-defined? sel) (john-fail "no property or qualification " sel))
+	   (sat-err *sat-t*)
+	   *sat-stop*)
+	  ((not (member? sel *sat-encoded-builtins*))
+	   (if (and known (sat-const? r))
+	       (sat-ask (cdr r) sel (map cdr args))
+	       (john-sat-refuse (concat-strings "the message " (symbol->string sel) " of a changing value"))))
 	  ((not known) (john-sat-refuse "a builtin's argument that is a list or a changing number"))
 	  ((= 'lst (car r))
 	   (sat-memo t
@@ -849,6 +874,15 @@
 		    (set row (car out))))
 	      (or (member? (caddr e) (cdr row)) (set-cdr row (cons (caddr e) (cdr row)))))))))
     out))
+(define-function john-sat-fixed-world ()	; the world without anything an action can write
+  (let ((fixed (new <john-world>)) (mutable (john-sat-mutable)) (kept ()) (w *john-world*))
+    (while w
+      (list-do e (<john-world>-writes w)
+	(or (member? (cadr e) (cdr (assq (car e) mutable))) (push kept e)))
+      (set w (<john-world>-parent w)))
+    (set (<john-world>-writes fixed) (list-reverse! kept))
+    (set (<john-world>-time fixed) (<john-world>-time *john-world*))
+    fixed))
 ;; (action . literal): goal-optimizations narrowing step t (G13)
 (define-function john-sat-allowed (o g t using)
   (and (not using)
@@ -926,6 +960,7 @@
     (set *sat-memo* (array (+ *john-limit* 1)))
     (set *sat-groups* (array))
     (set *sat-memo-on* 1)
+    (set *sat-fixed-world* (john-sat-fixed-world))
     (set-array-at *sat-states*
 		  0
 		  (map (lambda (row)

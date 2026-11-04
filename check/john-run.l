@@ -88,6 +88,39 @@
 	  (has? (child "create C n. make C X 0. goal C g try its n = 0. goal-strategy C typo sat. X satisfy g.") "goal-strategy for no goal: typo"))
   (expect "an unknown strategy is an error"
 	  (has? (child "create C n. make C X 0. goal C g try its n = 0. goal-strategy C g telepathy. X satisfy g.") "no strategy telepathy"))
+  ;; enumerated values: plain ones are names a typo can't be, and fields are read by name
+  (let* ((world "set Result = untested | passed(tree, trials) | refuted(tree, seed). create C r. action C ran R consequence its r = R. make C X untested. ")
+	 (ask (lambda (text) (last (run-text (concat-strings world text))))))
+    (expect "a plain value" (= "yes" (ask "X r = untested.")))
+    (expect "its kind" (= "untested" (ask "X r kind.")))
+    (expect "a value with fields"
+	    (= "passed(tree: abc, trials: 3)" (ask "X do ran passed(tree: \"abc\", trials: 3). X r.")))
+    (expect "its field" (= "3" (ask "X do ran passed(tree: \"abc\", trials: 1 + 2). X r trials.")))
+    (expect "its kind" (= "refuted" (ask "X do ran refuted(seed: 7, tree: \"t\"). X r kind.")))
+    (expect "the same by what it holds"
+	    (= "yes" (ask "X do ran passed(tree: \"a\", trials: 1). X r = passed(trials: 1, tree: \"a\").")))
+    (expect "different by what it holds"
+	    (= "no" (ask "X do ran passed(tree: \"a\", trials: 1). X r = passed(tree: \"a\", trials: 2).")))
+    (expect "different by kind"
+	    (= "no" (ask "X do ran passed(tree: \"a\", trials: 1). X r = refuted(tree: \"a\", seed: 1).")))
+    (expect "a world keeps the value it was given"
+	    (= "untested" (ask "X do ran passed(tree: \"a\", trials: 1). at time 0 X r kind.")))
+    (expect "a set's values can have qualifications"
+	    (= "yes" (ask "qualify Result good if its kind = passed. X do ran passed(tree: \"a\", trials: 1). X r good."))))
+  (let ((world "set Result = untested | passed(tree). create C r. make C X untested. "))
+    (expect "a typo of a plain value is an error" (has? (child (concat-strings world "X r = untseted.")) "unknown name: untseted"))
+    (expect "a field it doesn't have" (has? (child (concat-strings world "passed(tree: 1) seed.")) "no property or qualification seed"))
+    (expect "a field a value can't be given" (has? (child (concat-strings world "passed(tree: 1, seed: 2).")) "passed has no field seed"))
+    (expect "a field left out" (has? (child (concat-strings world "passed(tree: 1) = 1. passed(tree: 2) tree. passed(x: 1)."))
+				     "passed has no field x"))
+    (expect "a value missing its field" (has? (child (concat-strings world "set Other = both(a, b). both(a: 1)."))
+					      "both needs its field b"))
+    (expect "a bare name is its kind" (= "yes" (last (run-text (concat-strings world "passed(tree: 1) kind = passed.")))))
+    (expect "a value against a bare name is an error, not a quiet no"
+	    (has? (child (concat-strings world "passed(tree: 1) = passed.")) "compare its kind"))
+    (expect "and the other way round" (has? (child (concat-strings world "passed = passed(tree: 1).")) "compare its kind"))
+    (expect "yes, no and empty are still words" (= "yes" (last (run-text "create C r. make C X no. X r = no."))))
+    (expect "a value of no set" (has? (child (concat-strings world "other(a: 1).")) "no such value: other")))
   ;; time before the first world is an error when read, and an empty stretch of a window that reaches there
   (expect "at time before the first world" (has? (child "start-world w. create A p. make A X 1. at time (time - 1) X p.") "before the first world"))
   (expect "a window reaching before the first world" (has? (child "start-world w. create A p. action A go consequence its p = 2. make A X 1. X do go. for some time T after (time - 9) up to time do (at time T X p = 2).") "yes"))

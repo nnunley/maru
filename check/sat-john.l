@@ -123,6 +123,55 @@
     (child
       "create P x. action P up consequence its x = 2. make P A 1. qualify P was-one if at time 0 its x = 1. qualify P there if it was-one = yes and its x = 2. goal P done try it there = yes. set-opt planner sat. A satisfy done.")
     "E_SAT_UNSUPPORTED: at time"))
+;; "unsatisfiable" is a proof, so a message the encoding can't answer must never read as an impossible step
+(expect
+  "kind on a value that changes is answered, case by case"
+  (has?
+    (child
+      "set Light = lit | dark. create P state. action P flip consequence its state = lit. make P A dark. goal P done try its state kind = lit. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a loaded message on a constant is asked of what the file defines"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P x. action P up consequence its x = 2. make P A 1. goal P done try its x = 2 and 21 doubled = 42. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a loaded message on a changing number is refused by name, not unsatisfiable"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P x. action P up consequence its x = its x + 1. make P A 1. goal P done try its x doubled = 4. set-opt planner sat. A satisfy done.")
+    "E_SAT_UNSUPPORTED: the message doubled of a changing value"))
+(expect
+  "a loaded message on a changing list is refused by name, not unsatisfiable"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P l. action P grow consequence its l = its l + [ 1 ]. make P A [ 1 ]. goal P done try its l tally = 4. set-opt planner sat. A satisfy done.")
+    "E_SAT_UNSUPPORTED: the message tally of a changing value"))
+(expect
+  "a loaded message may read what never changes"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P x text. action P up consequence its x = 2. make P A 1 \"a\". goal P done try its x = 2 and A text-of = \"a\". set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a loaded message reading what changes stops, not unsatisfiable"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P text. action P edit consequence its text = \"b\". make P A \"a\". goal P done try A text-of = \"b\". set-opt planner sat. A satisfy done.")
+    "no value for A text"))
+(expect
+  "a message nothing defines is the error the search gives, not unsatisfiable"
+  (has?
+    (child
+      "create P x. action P up consequence its x = 2. make P A 1. goal P done try its x nosuch = 2. set-opt planner sat. A satisfy done.")
+    "no property or qualification nosuch"))
+(expect
+  "a property of another class is still a step the evaluator can't take"
+  (has?
+    (child
+      "create P x. create Q y. action P up consequence its x = 2. make P A 1. goal P done try its x y = 2. set-opt planner sat. A satisfy done.")
+    "unsatisfiable within"))
 ;; planning over names: the least length, replayed by the evaluator, the same as the search's
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function no-satisfy (fs)

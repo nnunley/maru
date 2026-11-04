@@ -154,6 +154,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   How a goal is solved is separate from what it means: `goal-strategy Class goal sat if guard.` names a strategy, the
   first whose guard holds, then `set-opt planner`, then the search. A loaded file adds one with `(john-strategy name
   function)`, and an unknown name is an error. Under `sat`, only what the goal can reach has to be encodable.
+  Ours: `set Light = lit | dark.` names what a value may be, and `set Evidence = untested | passed(tree) | failed(tree).` gives a
+  member named fields: `passed(tree: T)` makes one, it must name every field the set declares, `x tree` reads one, and `x kind` is its
+  member's name. Two values are the same by what they hold, and comparing a value with fields to a bare name is an error.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
@@ -192,7 +195,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   out of range or a list past `sat-list-length` making its step impossible. The x86
   allocator comes out at 6 and passes the slot-by-slot check (`check/john-allocation.l`,
   shared with `john_run`); list expressions over symbolic inputs equal the evaluator's on
-  generated lists. The formula's clauses live in a C store (`dimacs.irl`), out of Maru's
+  generated lists. An answer of unsatisfiable means no plan avoids an evaluator error, so a message the encoding can't answer never
+  reads as one: `kind` and a loaded file's messages are asked of the evaluator on a constant (reading only what no action writes), on
+  a changing value they are `E_SAT_UNSUPPORTED` naming the message, and a message nothing defines is the search's error.
+  The formula's clauses live in a C store (`dimacs.irl`), out of Maru's
   heap, which the solver, the checker's DIMACS text and the model check all read.
   The search planner is unchanged otherwise.
 - `sat_proof` (`check/sat-proof.l`): every UNSAT answer from `sat-decide` carries a DRAT
