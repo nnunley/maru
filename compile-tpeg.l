@@ -25,11 +25,6 @@
 (define-function tp-op (name)
   (concat-symbol (if (tp-source?) 'source-parser- 'text-parser-) name))
 
-;; a foreign rule call, p-r, is not generated on source yet
-(define-function tp-foreign-on-source (name)
-  (and (tp-source?)
-       (error "foreign rule call to "name" is not generated on <source-parser> yet")))
-
 ;; the rule and class being compiled, for the errors a list pattern or arguments give on text, and for super
 (define *tp-rule* "")
 (define *tp-class* ())
@@ -59,12 +54,67 @@
 			   `(,(tp-op 'super) self ',prefix (array-at %structure-bases ,*tp-class*) ',(car args) ,@(cdr args))))
     (else		())))
 
+;; A foreign rule p-r runs on an object of type <p>, which sees the input through proxy cells (source-parser.l).
+;; On text the same call goes to text-parser-invoke-rule-in, so the output is the text path's as before.
+(define-function tp-foreign-call (grammar name sel)
+  `(,(tp-op 'invoke-rule-in) self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,sel))
+
 ;; A rule's parameters are the first elements of its input: `rule :a :b` is `.:a .:b` at its start.
 (define-function tp-parameters (params body)
   (cond
     ((not params)	body)
     ((tp-source?)	`(match-all ,@(map (lambda (p) `(assign-result ,p (match-any))) params) ,body))
     (else		(error "rule " *tp-rule* " has parameters, which needs a grammar on <source-parser>"))))
+
+;; Left recursion, as irl-grammar.l's irl-left-recursive? finds it: the rules a pattern can call at its start. A
+;; rule with parameters has no memo, so one that reaches itself this way would overflow the stack; it is refused.
+(define-function tp-nullable? (pe)
+  (let ((h (car pe)))
+    (cond ((member? h '(match-zero-one match-zero-more peek-for peek-not result-expr)) 1)
+	  ((member? h '(match-class match-string)) (= 0 (string-length (cadr pe))))
+	  ((= h 'match-all)	(let ((r 1)) (list-do e (cdr pe) (or (tp-nullable? e) (set r ()))) r))
+	  ((= h 'match-first)	(let ((r ())) (list-do e (cdr pe) (and (tp-nullable? e) (set r 1))) r))
+	  ((member? h '(match-one-more make-span make-string make-symbol)) (tp-nullable? (cadr pe)))
+	  ((member? h '(assign-result make-number)) (tp-nullable? (caddr pe)))
+	  (else ()))))
+
+(define-function tp-left-calls (pe)
+  (let ((h (car pe)))
+    (cond ((= h 'match-rule) (list (cadr pe)))
+	  ((= h 'match-all)
+	   (let ((out ()) (go 1))
+	     (list-do e (cdr pe)
+	       (and go
+		    (let ()
+		      (set out (concat-list out (tp-left-calls e)))
+		      (or (tp-nullable? e) (set go ())))))
+	     out))
+	  ((= h 'match-first)
+	   (let ((out ()))
+	     (list-do e (cdr pe) (set out (concat-list out (tp-left-calls e))))
+	     out))
+	  ((member? h '(match-zero-one match-zero-more match-one-more peek-for peek-not make-span make-string make-symbol))
+	   (tp-left-calls (cadr pe)))
+	  ((member? h '(assign-result make-number)) (tp-left-calls (caddr pe)))
+	  (else ()))))
+
+(define-function tp-left-recursive? (name rules)
+  (let ((seen ()) (todo (tp-left-calls (cadr (assq name rules)))) (found ()))
+    (while (and todo (not found))
+      (let ((r (car todo)))
+	(set todo (cdr todo))
+	(if (= r name)
+	    (set found 1)
+	    (or (member? r seen)
+		(let ((d (assq r rules)))
+		  (push seen r)
+		  (and d (set todo (concat-list todo (tp-left-calls (cadr d))))))))))
+    found))
+
+(define-function tp-check-parameters (rules)
+  (list-do r rules
+    (when (and (tp-source?) (caddr r) (tp-left-recursive? (car r) rules))
+      (error "rule " (car r) " has parameters and is left-recursive, which would overflow the stack with no memo for its arguments"))))
 
 ;; A list pattern enters the current element, when in-enter holds for it, and its nested pattern must
 ;; reach the end of that element's stream. The element is the value, and the input moves past it.
@@ -95,7 +145,7 @@
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args))
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self))))
-    (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$ name))))
+    (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$ name)))
     (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map value-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(mapN1 effect-pe value-pe exps)) (set self.position pos) ())))
@@ -157,7 +207,7 @@
 					    (let () (tp-call-args name)
 						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args))
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self))))
-    (match-rule-in	(grammar name)	(let () (tp-foreign-on-source name) `(text-parser-invoke-rule-in self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,(concat-symbol '$$ name))))
+    (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$$ name)))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
@@ -279,6 +329,7 @@
 ;; The forms that define a grammar's rules on class: a selector for each rule's match and its effect, then the methods.
 (define-function tp-definition-forms (class rules)
   (let ((names (map car rules)))
+    (tp-check-parameters rules)
     `(,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
       ,@(map-with compile-value  rules class)

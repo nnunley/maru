@@ -213,6 +213,30 @@
 		   (error "no rule " name " in " (name-of-type parent)))))
     (apply source-parser-invoke-rule-plain (cons name (cons rule (cons self args))))))
 
+;; A foreign rule, p-r, runs on an object of its own type. That object sees the caller's input through proxy cells:
+;; a proxy's position is the caller's cell, so its head and end are the caller's, its tail is a proxy of the caller's
+;; tail, and its memo is empty. When the rule returns, the caller's input is the caller's cell it got to, and its
+;; result comes across. The object is kept on the caller, as text-parser.l keeps its foreign parsers, so its fields
+;; are its own; the proxies are not, so no memo outlives the call.
+(define-structure <proxy> (source))
+(define source-parser-proxy (new <proxy> ()))
+
+(define-method in-at-end <proxy> (c)	(stream-end? c))
+(define-method in-head <proxy> (c)	(stream-head c))
+(define-method in-tail <proxy> (c)	(stream-tail c))
+
+(define-function source-parser-invoke-rule-in (self type name rule)
+  (let ((sub (cdr (assq type (<source-parser>-foreign self)))))
+    (or sub (let ()
+	      (set sub (new type source-parser-proxy () () () ()))
+	      (set (<source-parser>-foreign self) (cons (cons type sub) (<source-parser>-foreign self)))))
+    (set (<source-parser>-position sub) (stream-at source-parser-proxy (<source-parser>-position self)))
+    (and (source-parser-invoke-rule name rule sub)
+	 (let ()
+	   (set (<source-parser>-position self) (<cell>-position (<source-parser>-position sub)))
+	   (set (<source-parser>-result self) (<source-parser>-result sub))
+	   1))))
+
 (define-function parse-source (grammar rule source)
   (let ((p (source-parser-for grammar source)))
     (or (source-parser-invoke-rule (<selector>-name rule) rule p)
