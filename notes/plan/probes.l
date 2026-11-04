@@ -18,8 +18,9 @@
       (alarm secs)
       (execl "/bin/sh" "sh" "-c" (concat-strings "exec </dev/null >" probe-logs name ".log 2>&1; " cmd) 0)
       (_exit 127))
-    (waitpid pid probe-status 0)
-    (and (= 0 (byte-at probe-status 0)) (= 0 (byte-at probe-status 1)))))
+    (and (= pid (waitpid pid probe-status 0))
+	 (= 0 (byte-at probe-status 0))
+	 (= 0 (byte-at probe-status 1)))))
 
 (define-function probe-prop (object property) (john-lookup *john-world* object property))
 (define-function probe-join (strings)

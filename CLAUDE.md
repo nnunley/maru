@@ -143,6 +143,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   request made while the flight had room wasn't cancelled since. An expression can't
   read the future. Qualifications are kept per world. `hanoi4.john` as printed is
   inconsistent (`Peg1` supports `B`, which sits on `C`).
+  A program can `load "file.l"`, and its objects and values answer the messages that file defines with
+  `define-john-builtin`, so an object can ask a grammar (`check/john-message.l`). Reading before the first world is an
+  error, and a time window reaching there starts at the first action.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
@@ -206,6 +209,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   span, the fields) and one function per rule, `G_rule(self)`, actions maru.k forms copied in
   unchanged. A child's inherited rules call its overrides; a left-recursive rule, lists and
   strings are errors naming the rule.
+- `tree_selectors`, `tree_source`, `tree_lists`, `tree_args`, `tree_args_unread`, `tree_apply`, `tree_memo`,
+  `tree_foreign`, `tree_literals`, `tree_calc`, `tree_interleave`, `tree_text_refuses`, `tree_parse_complete`
+  (`check/tpeg-*`): stage 1 of `docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`, on every evaluator. A grammar whose
+  parent is `<source-parser>` matches any source through the input selectors (`input.l`, `source-parser.l`): lists,
+  a user's type, bytes (`input-binary.l`; not on `eval2`, which says it skipped them). A pattern enters a list, a rule's
+  arguments are cells on its input and leaving one unread is an error, memos live on the stream's cells, and a foreign
+  rule reads through proxy cells with fresh memos. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
+  interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
   check; the `in`, `number` and `=` builtins work as specified; schemas, relation
@@ -278,6 +289,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   STEPS target ("a modest 400-page book" one programmer can hold); it is
   soft, so the check reports the total but doesn't fail over it. Prefer a DSL or grammar (as `gen-asm-x86.k` generates
   the x86 assembler) over writing code out, tests included.
+
+## The evidence plan
+
+`notes/plan/tree-matching.john` says what stage 1 builds, how the pieces relate and what would show each works.
+`./eval notes/plan/record.l [full]` asks its checks (cases, measures, and every tree grammar compiled live on each
+evaluator, reading its language) and appends the answers to `evidence.john`; `./eval notes/plan/next.l` shows what's
+done and the next step, running nothing. `notes/plan/LOOP.md` holds the loop's rules and notes.
 
 ## Known not to work (verified on arm64 macOS)
 

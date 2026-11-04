@@ -274,10 +274,17 @@
       (and (= word (string-copy text i (string-length word))) (set found 1))
       (incr i))
     found))
-(define-function refuses (name word)
-  (let ((out (concat-strings tmp "/refused-" name ".out")))
-    (and (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; ./eval compile-tpeg.l check/tpeg-refused/" name ".g"))))
+;; cmd exits with an error, and its output says word
+(define-function fails-saying (name cmd word)
+  (let ((out (concat-strings tmp "/" name ".out")))
+    (and (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; " cmd))))
 	 (output-has (contents-of-file-named out) word))))
+(define-function refuses (name word)
+  (fails-saying (concat-strings "refused-" name) (concat-strings "./eval compile-tpeg.l check/tpeg-refused/" name ".g") word))
+;; an argument its rule doesn't read is an error, and never reaches the caller's input
+(check "tree_args_unread"
+  (list-do rule '("leaves" "leavesall")
+    (unit-assert (fails-saying "tree_args_unread" (concat-strings "./eval check/tpeg-args-unread.l " rule) "left an argument unread"))))
 (check "tree_text_refuses"
   (list-do f '("list" "literal" "apply" "super")
     (unit-assert (refuses f "needs a grammar on <source-parser>")))
@@ -286,7 +293,7 @@
 
 ;; a grammar that stops parsing partway is an error, and doesn't quietly lose its remaining rules
 (check "tree_parse_complete"
-  (unit-assert (not (= 0 (run-status 60 "exec </dev/null >/dev/null 2>&1; ./eval compile-tpeg.l check/tpeg-broken.g")))))
+  (unit-assert (fails-saying "parse-complete" "./eval compile-tpeg.l check/tpeg-broken.g" "stopped parsing check/tpeg-broken.g")))
 ;; tpeg-repl.l reads a file of code and grammars interleaved, as repl.l reads test-pepsi.l (check/tpeg-interleave.l).
 (check "tree_interleave"
   (unit-assert (equal (last (run "tree_interleave" "./eval tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))

@@ -91,14 +91,25 @@
       (new <cell> source () () (car args) (source-parser-arguments source (cdr args) tail) ())
       tail))
 
+;; A rule that returns with one of its arguments still ahead of it would pass that argument to its caller as input.
+(define-function source-parser-check-arguments (name self first saved)
+  (let ((c first) (here (<source-parser>-position self)))
+    (while (not (= c saved))
+      (and (= c here) (error "rule " name " left an argument unread"))
+      (set c (<cell>-next c)))))
+
 ;; A rule takes no parameters: its arguments are the first elements of its input. On failure the
 ;; saved cell is restored, so no argument cell stays behind. This is the call with no memo; a call
 ;; with arguments always goes through it, since its answer depends on the arguments.
 (define-function source-parser-invoke-rule-plain (name rule self . args)
-  (let ((saved (<source-parser>-position self)))
-    (set (<source-parser>-position self) (source-parser-arguments (<source-parser>-source self) args saved))
-    (or (rule self)
-	(let () (set (<source-parser>-position self) saved) ()))))
+  (let* ((saved (<source-parser>-position self))
+	 (first (source-parser-arguments (<source-parser>-source self) args saved)))
+    (set (<source-parser>-position self) first)
+    (let ((matched (rule self)))
+      (if matched
+	  (let () (source-parser-check-arguments name self first saved) matched)
+	(set (<source-parser>-position self) saved)
+	()))))
 
 (define source-parser-invoke-rule-simply source-parser-invoke-rule-plain)
 ;; a call by name from code with arguments, as a generated call with arguments makes it: never memoized
@@ -123,14 +134,13 @@
 (define-function source-parser-memo-rule (rule key)
   (if (source-parser-effect? rule) (eval (concat-symbol '$ key)) rule))
 
-;; the answer a memo gives: nothing on failure, else where it got to, with its result
+;; the answer a memo gives: where it got to, with its result, if it succeeded. Otherwise nothing: it failed, or
+;; the rule is still running at this cell, so there is no answer yet.
 (define-function source-parser-memo-answer (self memo)
-  (if (= (<memo>-state memo) *failed*)
-      ()
-    (let ()
-      (set (<source-parser>-result self) (<memo>-result memo))
-      (set (<source-parser>-position self) (<memo>-position memo))
-      1)))
+  (when (= (<memo>-state memo) *succeeded*)
+    (set (<source-parser>-result self) (<memo>-result memo))
+    (set (<source-parser>-position self) (<memo>-position memo))
+    1))
 
 (define-function source-parser-invoke-rule-with-memo (name rule self . args)
   (if args

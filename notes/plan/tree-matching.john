@@ -28,6 +28,7 @@ make Case tree_selectors untested.
 make Case tree_source untested.
 make Case tree_lists untested.
 make Case tree_args untested.
+make Case tree_args_unread untested.
 make Case tree_text_refuses untested.
 make Case tree_interleave untested.
 make Case tree_apply untested.
@@ -62,7 +63,7 @@ make Capability AnySource "a grammar can match any source, each stream cell hold
 make Capability ListPatterns "a rule can descend into a list and match inside it, as OMeta's form: does"
   "compile-tpeg.l, tpeg.g" [ tree_lists ] [ AnySource ] no.
 make Capability ArgsOnInput "a rule's arguments are cells prepended to the stream on a source; on text they stay method arguments"
-  "compile-tpeg.l" [ tree_args, tree_text_refuses ] [ ListPatterns ] no.
+  "compile-tpeg.l" [ tree_args, tree_args_unread, tree_text_refuses ] [ ListPatterns ] no.
 make Capability LiveGrammars "grammars compile in process, so code and grammar blocks can interleave on one input, and every grammar in the tree still compiles live and reads its language"
   "tpeg-repl.l, compile-tpeg.l" [ tree_interleave, CExpressions, JohnPrograms, LawFiles, IrlPrograms, Arm64Table, X86Table, OsDefinitions, TpegItself ] [ AnySource ] no.
 make Capability ApplyAndSuper "a rule named at run time can be applied, and an override can call its parent's rule"

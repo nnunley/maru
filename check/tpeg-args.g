@@ -14,3 +14,7 @@ outer :c = {inner c}:r -> (list 'outer r) ;
 nest = {outer 7}:r -> r ;
 fallback = {picky 'no} | "y" -> 'second ;
 overlist = `( {pair 1 2}:r ) -> r ;
+readsone = .:a -> a ;
+leaves = {readsone 1 2} ;
+readsnone = -> (quote nothing) ;
+leavesall = {readsnone 1} ;

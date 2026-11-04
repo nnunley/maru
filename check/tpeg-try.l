@@ -21,6 +21,7 @@
 
 ;; eval2 has no byte buffers: its Data type is a stub.  eval3, its successor, has them.
 (define has-bytes (defined? 'data))
+(or has-bytes (println "no byte buffers on this evaluator: binary cases skipped"))
 
 (define-function bytes-of (string)
   (let ((s (data-stream 8)))

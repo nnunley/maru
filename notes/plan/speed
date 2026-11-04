@@ -1,5 +1,5 @@
 #!/bin/sh
-# Text matching stays within 15% of main's, with its grammar already compiled, measured together so load is shared.
+# Text matching stays within 15% of main's, with its grammar already compiled, one right after the other. Assumes the two checkouts are built.
 root=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
 hyperfine --shell=default --runs 5 --export-json /tmp/maru-plan/speed.json "cd $root && ./eval $PWD/notes/plan/speed-text.l" './eval notes/plan/speed-text.l' || exit 1
 python3 -c "import json;r=json.load(open('/tmp/maru-plan/speed.json'))['results'];f=lambda x:sum(a['time_wall_clock']['value'] for a in x['measurements'])/len(x['measurements']);m,n=f(r[0]),f(r[1]);print('main %.0f ms, here %.0f ms'%(m*1e3,n*1e3));raise SystemExit(0 if n<=m*1.15 else 1)"
