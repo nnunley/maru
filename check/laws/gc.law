@@ -26,6 +26,7 @@ rule s_array:  shape(a), shape(b)   => shape(arr(a, b))
 rule s_box:    shape(a)             => shape(box(a))
 
 -- past where recursive marking overflowed the stack (between 100,000 and 200,000)
+fact length(1000)
 fact length(300000)
 -- heap ceilings, in megabytes, for running out
 fact ceiling(8)

@@ -65,6 +65,10 @@ check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l 
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/parallel.l $(CHECKS)
 
+check-sweep : eval eval2 eval3 .force
+	-$(MAKE) -k -s $(CHECK_LIBS)
+	./eval check/sweep.l $(SEEDS)
+
 check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l kscript.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/parallel.l --quick

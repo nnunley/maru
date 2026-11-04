@@ -14,7 +14,8 @@
   (let ((i 0) (n (- (string-length str) (string-length sub))))
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (<= i n)))
-(define dir "/tmp/maru-check")
+(require "check/temp.l")
+(define dir check-tmp)
 (system (concat-strings "mkdir -p " dir))
 ;; make builds build/irl-lib.dylib (make check's CHECK_LIBS) from check/irl-lib-a.irl and -b.irl
 (define shlib (if (= 0 (system "test `uname` = Darwin")) "dylib" "so"))

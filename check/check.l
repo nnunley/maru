@@ -6,15 +6,8 @@
 ;;;   ./eval check/check.l pepsi ...    run the named cases; a name no case has fails
 
 (define system (subr "system" "s"))
-;; each case of a parallel run (check/parallel.l) has a directory of its own
-;; an environment variable as a string, or ()
-(define-function environment (name)
-  (let ((p ((subr "getenv" "s>p") name)))
-    (and p (!= 0 p)
-	 (let ((chars ()) (i 0))
-	   (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
-	   (list->string (list-reverse! chars))))))
-(define tmp (or (environment "MARU_CHECK_TMP") "/tmp/maru-check"))
+(require "check/temp.l")
+(define tmp check-tmp)
 (system (concat-strings "rm -rf " tmp " && mkdir -p " tmp))
 
 (define-function split (str sep)
@@ -308,7 +301,7 @@
 (check "catch"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "catch" (concat-strings evaluator " check/catch.l") 300)) "catch ok"))))
-;; errors are survivable and leave state as it was; the collector's laws hold (check/laws/gc.law), on every evaluator
+;; errors are survivable and leave state as it was, on every evaluator; the collector's laws hold (check/laws/gc.law)
 (check "recover"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "recover" (concat-strings evaluator " check/recover.l") 300)) "recover ok"))))
@@ -322,7 +315,7 @@
 (define-function law-file-holds (name evaluator support file)
   (= 0 (run-status 500 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>&1; exec " evaluator " check/law.l " support " " file))))
 ;; the heaviest laws are the collector's, not an instruction set's or a particular evaluator's: one with tagged integers and
-;; one with boxed.  eval2 shares eval3's collector and undo log, and keeps recover and gc_every
+;; one with boxed.  eval2 keeps recover and gc_every here, and all of them in the sweep (make check-sweep)
 (define heavy-law-evaluators '("./eval" "./eval3 -b boot2.l"))
 (check "gc_laws"
   (list-do evaluator heavy-law-evaluators
@@ -419,7 +412,7 @@
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
   (unit-assert (equal (law-run "engine" "check/laws/engine.l check/laws/engine.law")
-		      '(0 "law unify_equates: TESTED 100" "law unify_symmetric: TESTED 100" "law nat_generated: PROVED 4"))))
+		      '(0 "law unify_equates: TESTED 100" "law unify_symmetric: TESTED 100" "law nat_exhausted: PROVED 3" "law nat_drawn: TESTED 100"))))
 (check "law_rules"
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
@@ -638,4 +631,4 @@
 
 (let ((missing (unmatched *selected* *ran*)))
   (and missing (error "FAIL no check named: " missing)))
-(or (environment "MARU_CHECK_TMP") (println "all checks passed"))
+(or (env-var "MARU_CHECK_TMP") (println "all checks passed"))

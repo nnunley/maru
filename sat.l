@@ -51,9 +51,16 @@
     s))
 ;; a check that fails keeps its evidence: the formula and the proof, written to the scratch
 ;; directory and named in the error; a check that passes writes nothing
+(define-function sat-keep-dir ()
+  (let ((p ((subr "getenv" "s>p") "MARU_CHECK_TMP")))
+    (if (and p (!= 0 p))
+	(let ((chars ()) (i 0))
+	  (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
+	  (concat-strings (list->string (list-reverse! chars)) "/maru-sat"))
+      "/tmp/maru-sat")))
 (define-function sat-keep (text ext)
-  ((subr "system" "s>i") "mkdir -p /tmp/maru-sat")
-  (let ((path (concat-strings "/tmp/maru-sat/failed-" (format "%d" ((subr "getpid" ">l"))) ext)))
+  ((subr "system" "s>i") (concat-strings "mkdir -p " (sat-keep-dir)))
+  (let ((path (concat-strings (sat-keep-dir) "/failed-" (format "%d" ((subr "getpid" ">l"))) ext)))
     (let ((f ((subr "fopen" "ss>p") path "w")))
       ((subr "fputs" "sp>i") text f)
       ((subr "fclose" "p>i") f))

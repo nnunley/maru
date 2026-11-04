@@ -8,14 +8,14 @@
 
 (define system (subr "system" "s"))
 (define ok 1)
+(require "check/temp.l")
 (define-function expect (what c) (or c (and (println "FAIL " what) (set ok ()))))
 (define-function has? (str sub)
   (let ((i 0) (n (- (string-length str) (string-length sub))))
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (<= i n)))
 (define-function child (name args)
-  (system "mkdir -p /tmp/maru-check")
-  (let ((out (concat-strings "/tmp/maru-check/law-" name ".out")))
+  (let ((out (concat-strings check-tmp "/law-" name ".out")))
     (system (concat-strings "./eval check/law-compile-test.l " args " >" out " 2>&1"))
     (contents-of-file-named out)))
 

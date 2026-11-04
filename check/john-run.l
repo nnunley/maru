@@ -8,6 +8,7 @@
 ;;; runs TEXT in a child, and "puzzle" the puzzle allocator asked to satisfy its goal.
 (require "john-eval.l")
 (require "check/john-allocation.l")
+(require "check/temp.l")
 
 (define system (subr "system" "s"))
 (define ok 1)
@@ -19,9 +20,8 @@
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function run-text (text) (john-run (john-read-text text)))
 (define-function child-mode (args)	; output and errors of this file run in a child with args
-  (system "mkdir -p /tmp/maru-check")
-  (system (concat-strings "./eval check/john-run.l " args " >/tmp/maru-check/john-run.out 2>&1"))
-  (contents-of-file-named "/tmp/maru-check/john-run.out"))
+  (system (concat-strings "./eval check/john-run.l " args " >" check-tmp "/john-run.out 2>&1"))
+  (contents-of-file-named (concat-strings check-tmp "/john-run.out")))
 (define-function child (text) (child-mode (concat-strings "program '" text "'")))
 
 (define trap "create Square near blocked. create Robot position.

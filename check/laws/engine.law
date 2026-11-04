@@ -13,11 +13,8 @@ rule t_pair: term(a), term(b) => term([P, a, b])
 -- a toy relation, generated, checked and enumerated by the same rules
 rule zero: => nat(Z)
 rule succ: nat(n) => nat([S, n])
-fact seed(1)
-fact seed(2)
-fact seed(3)
-fact seed(4)
 
 law unify_equates: all a: term(a), b: term(b), succeeds(unify(realise(a), realise(b), empty)). walk_all(realise(a), empty) = realise(a) && walk_all(realise(a), unify(realise(a), realise(b), empty)) = walk_all(realise(b), unify(realise(a), realise(b), empty))
 law unify_symmetric: all a: term(a), b: term(b). unify(realise(a), realise(a), empty) = empty && succeeds(unify(realise(a), realise(b), empty)) = succeeds(unify(realise(b), realise(a), empty))
-law nat_generated: all i: seed(i). holds(generate(i)) = 1 && elem(generate(i), enumerate()) = 1 by exhaustion size 2
+law nat_exhausted: all n: nat(n). holds(n) = 1 && elem(n, enumerate()) = 1 by exhaustion size 2
+law nat_drawn: all n: nat(n). holds(n) = 1 && elem(n, enumerate()) = 1 by test size 2

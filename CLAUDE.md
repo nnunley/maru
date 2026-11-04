@@ -56,7 +56,9 @@ sizes by definition.
     make check
 
 `make check` runs the cases four at a time (`check/parallel.l`, `MARU_CHECK_JOBS` to change it), and says which were slowest;
-`make check-quick` leaves out the slowest, for everyday edits. Everything runs before a merge.
+`make check-quick` leaves out the slowest, for everyday edits. Everything runs before a merge. `make check-sweep` looks for new
+corner cases: the generated laws on fresh seeds, more trials and every evaluator; a failure names its seed, and `MARU_LAW_SEED`
+reruns it. A checkout writes under `/tmp/maru-check/` in a directory of its own, so two can run at once.
 
 `check/check.l` (untyped Maru, built on boot.l's `unit-test`) runs each demo and
 asserts what it computes; `make check CHECKS="NAME…"` runs selected cases, after
@@ -199,7 +201,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   by two watched literals) against the formula it reads itself through `dimacs.irl`'s grammars, else `E_PROOF`. It rejects a
   proof without its final `0`, an empty one, a lemma that doesn't follow (naming its line), and
   one that deletes what it needs. Formula and proof stay in memory; a check that fails writes
-  both to `/tmp/maru-sat` and names them in its error. `make clean` removes `/tmp/maru-check`
+  both to a `maru-sat` directory in the check's own (`/tmp/maru-sat` outside a check) and names them in its error. `make clean` removes `/tmp/maru-check`
   and `/tmp/maru-sat`.
 - `sat_core` (`check/sat-core.l`): `sat.irl`, a CDCL solver behind IPASIR (`sat_init`,
   `sat_add`, `sat_assume`, `sat_solve` answering 10, 20 or 0, `sat_val`, `sat_failed`), in

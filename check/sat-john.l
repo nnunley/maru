@@ -8,6 +8,7 @@
 
 (define system (subr "system" "s>i"))
 (define ok 1)
+(require "check/temp.l")
 (define-function expect (what c)
   (or c
       (let ()
@@ -18,11 +19,10 @@
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (<= i n)))
 (define-function child (text)
-  (system "mkdir -p /tmp/maru-check")
   (system (concat-strings "./eval check/sat-john.l program '"
 			  text
-			  "' >/tmp/maru-check/sat-john.out 2>&1"))
-  (contents-of-file-named "/tmp/maru-check/sat-john.out"))
+			  "' >" check-tmp "/sat-john.out 2>&1"))
+  (contents-of-file-named (concat-strings check-tmp "/sat-john.out")))
 
 ;; a child: run TEXT and stop
 (define-function run-child (text)
