@@ -82,6 +82,10 @@
 	    (= "gave up" (last (ask "make C X 0. goal-strategy C at-two sat if its n > 5. goal-strategy C at-two give-up if its n < 5. X"))))
     (expect "the planner option when no guard holds"
 	    (has? (car (ask "make C X 0. set-opt planner sat. goal-strategy C at-two give-up if its n > 5. X")) "trying 0 steps")))
+  (expect "an unknown planner is an error, not a quiet search"
+	  (has? (child "create C n. make C X 0. goal C g try its n = 0. set-opt planner telepathy. X satisfy g.") "no strategy telepathy"))
+  (expect "a strategy for a goal nothing defines is an error"
+	  (has? (child "create C n. make C X 0. goal C g try its n = 0. goal-strategy C typo sat. X satisfy g.") "goal-strategy for no goal: typo"))
   (expect "an unknown strategy is an error"
 	  (has? (child "create C n. make C X 0. goal C g try its n = 0. goal-strategy C g telepathy. X satisfy g.") "no strategy telepathy"))
   ;; time before the first world is an error when read, and an empty stretch of a window that reaches there

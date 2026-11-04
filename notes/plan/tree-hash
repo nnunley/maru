@@ -1,9 +1,25 @@
 #!/bin/sh
-# The code as it stands now, committed or not: a hash of the tracked tree without the evidence and the docs.
-# Not the commit, since committing the evidence would make a new commit and so outdate the evidence.
-index=$(mktemp)
-cp "$(git rev-parse --git-path index)" "$index"
-GIT_INDEX_FILE=$index git add -u
-GIT_INDEX_FILE=$index git rm -q --cached --ignore-unmatch notes/plan/evidence.john '*.md'
-GIT_INDEX_FILE=$index git write-tree | cut -c1-12
-rm -f "$index"
+# The code as it stands now, committed or not: a hash of every tracked file and every untracked source file (what
+# check/lines counts), here and in each submodule, without the evidence and the docs. Not the commit, since committing
+# the evidence would make a new commit and so outdate the evidence.
+set -e
+snapshot() {
+  index=$(mktemp)
+  cp "$(git rev-parse --git-path index)" "$index"
+  export GIT_INDEX_FILE=$index
+  git add -u
+  sources=$(git ls-files -o --exclude-standard | { grep -E '[.](l|k|g|c|h|nl|spec|osdefs|irl|dc|law|john)$|Makefile$' || true; })
+  [ -z "$sources" ] || echo "$sources" | git add --pathspec-from-file=-
+  git rm -q --cached --ignore-unmatch notes/plan/evidence.john '*.md'
+  git write-tree
+  unset GIT_INDEX_FILE
+  rm -f "$index"
+}
+cd "$(git rev-parse --show-toplevel)"
+states=$(mktemp)
+snapshot > "$states"
+for module in $(git config -f .gitmodules --get-regexp 'path$' | cut -d' ' -f2); do
+  if [ -e "$module/.git" ]; then (cd "$module" && snapshot) >> "$states"; else echo "$module not checked out" >> "$states"; fi
+done
+git hash-object "$states" | cut -c1-12
+rm -f "$states"

@@ -88,7 +88,8 @@ make Capability NothingElseBroke "every other check in the repository still pass
   "the whole tree" [ WholeSuite ] [ EndToEnd, ForeignRules ] no.
 
 ; ---- how the pieces relate
-qualify Capability proven if for every its shown-by do each holds = yes.
+; nothing shown is nothing proven
+qualify Capability proven if its shown-by size > 0 and for every its shown-by do each holds = yes.
 qualify Capability done if it proven = yes or it planned = yes.
 qualify Capability ready if for every its builds-on do each done = yes.
 rel-qualify Capability:A depends-on Capability:B if B in A builds-on.

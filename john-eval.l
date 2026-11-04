@@ -318,9 +318,12 @@
 (define *john-strategies* ())	; (name . function)
 (define-function john-strategy (name function) (push *john-strategies* (cons name function)))
 (define *john-goal-strategies* ())	; (class goal strategy guard), in program order
+(define-function john-goal-named? (g)
+  (let ((found ())) (list-do d *john-goals* (and (= g (cadr d)) (set found 1))) found))
 (define-function john-strategy-for (o g)
   (let ((name ()))
     (list-do d *john-goal-strategies*
+      (or (john-goal-named? (cadr d)) (john-fail "goal-strategy for no goal: " (cadr d)))
       (and (not name)
 	   (= g (cadr d))
 	   (john-isa? (john-object-class o) (car d))
