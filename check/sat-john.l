@@ -228,6 +228,30 @@
     (child
       "set E = none | seen(at). create P a x. action P up consequence its x = 2. make P A seen(at: \"t\") 1. goal P done try its a is seen and not its a is none and its x = 2. set-opt planner sat. A satisfy done.")
     "satisfied at time: 1"))
+(expect
+  "what the search doesn't reach isn't asked: a loaded message"
+  (has?
+    (child
+      "load \"check/john-message.l\". create P x y. action P up consequence its x = 2. make P A 0 \"n\". goal P done try its x = 0 or its y doubled = 4. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 0"))
+(expect
+  "what the search doesn't reach isn't asked: a message nothing defines"
+  (has?
+    (child
+      "create P x. action P up consequence its x = 2. make P A 0. goal P done try its x = 0 or its x nosuch = 2. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 0"))
+(expect
+  "unsatisfiable says when an error ruled out a step"
+  (has?
+    (child
+      "create P x. create Q y. action P up consequence its x = 2. make P A 1. goal P done try its x y = 2. set-opt planner sat. A satisfy done.")
+    "a step that would stop the evaluator counted as impossible"))
+(expect
+  "and doesn't when none did"
+  (not (has?
+	 (child
+	   "create P x. action P up consequence its x = 2. make P A 1. goal P done try its x = 3. set-opt planner sat. A satisfy done.")
+	 "would stop the evaluator")))
 ;; planning over names: the least length, replayed by the evaluator, the same as the search's
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function no-satisfy (fs)

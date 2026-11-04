@@ -1,12 +1,14 @@
 ;;; The plan and its evidence, replayed to a chain of worlds; what's asked of them, read through John's own evaluator.
 ;;; Now is the code as it stands, so what was recorded against other code doesn't count.
 (require "john-eval.l")
+(require "check/temp.l")
+(define probe-logs (concat-strings "/tmp/maru-plan/" (checkout-name) "/"))	; two checkouts mustn't read each other's reports
 (define system (subr "system" "s>i"))
 (define getpid (subr "getpid" ">i"))
 ;; what notes/plan/tree-hash says, or an error: without it no answer can be tied to any code
 (define-function plan-tree-now ()
-  (let* ((file (concat-strings "/tmp/maru-plan/tree-" (long->string (getpid))))
-	 (status (system (concat-strings "mkdir -p /tmp/maru-plan && notes/plan/tree-hash > " file)))
+  (let* ((file (concat-strings probe-logs "tree-" (long->string (getpid))))
+	 (status (system (concat-strings "mkdir -p " probe-logs " && notes/plan/tree-hash > " file)))
 	 (text (contents-of-file-named file)))
     (system (concat-strings "rm -f " file))
     (or (and (= 0 status) (= 13 (string-length text))) (error "notes/plan/tree-hash gave no hash"))

@@ -1,6 +1,7 @@
 ;;; ./eval notes/plan/observe.l [full]: asks the plan's checks and prints their answers as events of evidence, all of them
 ;;; or, if the code changed under them, none: that's an error.  What it's doing goes to stderr.
 (define full-record (and *arguments* (= "full" (car *arguments*))))
+(or (not *arguments*) full-record (error "the one argument is full, not " (car *arguments*)))
 (set *arguments* ())
 (require "notes/plan/plan-world.l")
 (define write (subr "write" "isl>l"))

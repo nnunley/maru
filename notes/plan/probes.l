@@ -10,7 +10,6 @@
 (define _exit	(subr "_exit" "i"))
 (define probe-status (subr "malloc" "l>p"))
 (set probe-status (probe-status 8))
-(define probe-logs "/tmp/maru-plan/")
 
 ;; Run cmd under sh, for at most secs seconds, its output in the log called name; true if it exits 0.
 (define-function probe-run (name secs cmd)

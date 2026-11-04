@@ -261,8 +261,13 @@
 	((= s (- *sat-t*)) b)
 	((= a b) a)
 	(else (cnf-mux *sat-c* s a b))))
+(define *sat-ruled-out* ())	; did an evaluator error rule out any step of this satisfy?
 (define-function sat-err (l)
-  (let ((e (sat-and (list *sat-reach* l)))) (or (= e (- *sat-t*)) (push *sat-errs* e))))
+  (let ((e (sat-and (list *sat-reach* l))))
+    (or (= e (- *sat-t*))
+	(let ()
+	  (set *sat-ruled-out* 1)
+	  (push *sat-errs* e)))))
 (define-function sat-under (l thunk)	; thunk's value, its errors only where l holds
   (let ((saved *sat-reach*))
     (set *sat-reach* (sat-and (list saved l)))
@@ -682,12 +687,13 @@
 	  ((not (assq sel *john-builtins*))
 	   ;; another class's message is the evaluator's error here, so the step can't be taken;
 	   ;; one nothing defines is a mistake in the program, and "unsatisfiable" would hide it
-	   (or (john-sat-defined? sel) (john-fail "no property or qualification " sel))
+	   ;; (on a path that can't be taken nothing is asked, as the search doesn't)
+	   (or (= *sat-reach* (- *sat-t*)) (john-sat-defined? sel) (john-fail "no property or qualification " sel))
 	   (sat-err *sat-t*)
 	   *sat-stop*)
 	  ((not (member? sel *sat-encoded-builtins*))
 	   (if (and known (sat-const? r))
-	       (sat-ask (cdr r) sel (map cdr args))
+	       (if (= *sat-reach* (- *sat-t*)) *sat-stop* (sat-ask (cdr r) sel (map cdr args)))
 	       (john-sat-refuse (concat-strings "the message " (symbol->string sel) " of a changing value"))))
 	  ((not known) (john-sat-refuse "a builtin's argument that is a list or a changing number"))
 	  ((= 'lst (car r))
@@ -1133,6 +1139,7 @@
 	(else "unknown")))
 (define-function john-sat-satisfy (o g args using by)
   (set *sat-using* using)
+  (set *sat-ruled-out* ())
   (john-sat-check (john-goal-of o g))
   (set *sat-conflicts* (cdr (assq 'sat-conflicts *john-options*)))
   (let ((k 0)
@@ -1166,6 +1173,8 @@
 	      (else (set k (+ k 1))))))
     (set *sat-memo-on* ())	; the memo and groups name this formula's literals only
     (cnf-free (<john-sat>-cnf enc))
+    (and *sat-ruled-out* (not done)
+	 (john-say "a step that would stop the evaluator counted as impossible, so this may be a mistake in the program"))
     (or done
 	(john-say (concat-strings "unsatisfiable within " (format "%d" *john-limit*) " steps"
 				  " (width " (format "%d" (john-sat-width))
