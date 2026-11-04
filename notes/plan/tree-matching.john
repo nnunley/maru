@@ -1,2 +1,32 @@
-
+; Stage 1 of draft-ndn-maru-typed-tree-matching-00: intent as requirements and a goal.
+; Evidence is events in evidence.john, appended by notes/plan/record from real check runs.
+; Each check run is a world in John's chain of worlds, so a prior state can be read with `at time T`, and
+; `satisfy` plans on from the newest. goal-optimization keeps the planner to real work: it can't pass a check.
+start-world plan.
+create Req needs also done.
+create Team.
+make Req None None None yes.
+make Req Selectors None None no.
+make Req Source Selectors None no.
+make Req Lists Source None no.
+make Req Args Lists None no.
+make Req Interleave Source None no.
+make Req Apply Args Interleave no.
+make Req Memos Lists None no.
+make Req Foreign Memos None no.
+make Req Literals Source None no.
+make Req Calc Memos Args no.
+make Req Speed Source None no.
+make Req Suite Calc Foreign no.
+make Team T.
+action Req passed consequence its done = yes.
+action Req failed consequence its done = no.
+action Team finish Req consequence Req done = yes.
+rule Team finish is Req done = no.
+rule Team finish is Req needs done = yes.
+rule Team finish is Req also done = yes.
+; every requirement is named, so one going red again comes back into the plan
+goal Team ship try Selectors done = yes and Source done = yes and Lists done = yes and Args done = yes and
+  Interleave done = yes and Apply done = yes and Memos done = yes and Foreign done = yes and
+  Literals done = yes and Calc done = yes and Speed done = yes and Suite done = yes.
 goal-optimization Team ship use finish if 1 = 1.
