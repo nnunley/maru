@@ -1,0 +1,39 @@
+-- The same small programs, with a collection on every allocation and every seventh: what only a collection at the wrong moment finds
+reference programs_agree_every(p, every)
+under test: program, op, on, past, pace
+defaults trials = 10, size = 3
+let numerals = [0, 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 63, 64, 65, 127, 128, 129, 255, 256, 1000, 4097]
+
+-- few slots and many writes, so worlds overwrite each other: what a mistake in the log needs in order to show
+fact on(0)
+fact on(1)
+-- a few places past the end: growing, failing, and growing past the same place again is what shows stale data
+fact past(2)
+fact past(3)
+fact past(5)
+fact past(9)
+fact program(End)
+rule p_one:      op(o), program(p)                      => program(seq(o, p))
+rule p_three:    op(a), op(b), op(c), program(p)        => program(seq(a, seq(b, seq(c, p))))
+rule o_global:   on(s), number(v) => op(global(s, v))
+rule o_global2:  on(s), number(v) => op(global(s, v))
+rule o_car:      on(s), number(v) => op(car(s, v))
+rule o_cdr:      on(s), number(v) => op(cdr(s, v))
+rule o_slot:     on(s), number(v) => op(slot(s, v))
+rule o_grow:     past(s), number(v) => op(slot(s, v))
+rule o_grow3:    past(s), number(v) => op(slot(s, v))
+rule o_char:     on(s), number(v) => op(char(s, v))
+rule o_grow2:    past(s), number(v) => op(char(s, v))
+rule o_grow4:    past(s), number(v) => op(char(s, v))
+rule o_captured: number(v)            => op(captured(v))
+fact op(Collect)
+fact op(Churn)
+rule o_ended:    op(a), program(p)    => op(ended(seq(a, p)))
+rule o_failed:   op(a), program(p)    => op(failed(seq(a, p)))
+rule o_failed2:  op(a), op(b)         => op(failed(seq(a, seq(b, End))))
+rule o_thrown:   op(a), program(p)    => op(thrown(seq(a, p)))
+
+fact pace(1)
+fact pace(7)
+
+law programs_paced: all p: program(p), e: pace(e). programs_agree_every(p, e) = accept

@@ -298,6 +298,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   reachable survives and what isn't is freed, sharing and cycles hold, marking can't overflow the stack, the heap's books balance
   (`GC_check_heap`), worlds and throws keep all that, and `(set-heap-limit bytes)` reached is an error that can be recovered from,
   repeatedly. Free blocks are in lists by size, so an allocation walks nothing.
+- `gc_model` (`check/laws/gc-model.law`, `gc-model-paced.law`): generated programs (writes to a few slots, nested worlds that
+  end, fail or are thrown out of, collections) run on real objects and on a pure model, and must agree in everything observable,
+  with an empty log and balanced heap after; allocation sequences of many sizes; collections every allocation and every seventh.
+  A world keeps one record per slot however often it writes it, and a commit hands its parent only what the parent lacks, so a
+  loop in a `try` doesn't grow the log, though each call that sets a fresh local still adds a record. Generators are aimed by
+  deliberate bugs: reintroduce one and count the seeds that catch it.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

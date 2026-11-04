@@ -304,10 +304,19 @@
 (check "recover"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "recover" (concat-strings evaluator " check/recover.l") 300)) "recover ok"))))
+(define-function law-file-holds (name evaluator support file)
+  (= 0 (run-status 500 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>&1; exec " evaluator " check/law.l " support " " file))))
+(define this-host-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))	; these laws are the collector's, not an instruction set's
 (check "gc_laws"
-  (list-do evaluator (native-evaluators)
-    (unit-assert (= 0 (run-status 300 (concat-strings "exec </dev/null >" tmp "/gc_laws.out 2>&1; " evaluator
-						      " check/law.l check/laws/gc-reference.l check/laws/gc.law"))))))
+  (list-do evaluator this-host-evaluators
+    (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law"))))
+;; generated programs against a model of what they should do, and generated allocations; collecting on every allocation
+;; is slow, so that runs on one evaluator with tagged integers and one without
+(check "gc_model"
+  (list-do evaluator this-host-evaluators
+    (unit-assert (law-file-holds "gc_model" evaluator "check/laws/gc-model.l" "check/laws/gc-model.law")))
+  (list-do evaluator '("./eval" "./eval3 -b boot2.l")
+    (unit-assert (law-file-holds "gc_model_paced" evaluator "check/laws/gc-model.l" "check/laws/gc-model-paced.law"))))
 ;; exe.l's programs, the same bytes from every evaluator, run where this host can: natively, under Rosetta, or
 ;; in a Linux VM.  A target with nowhere to run says so.
 (define-function exe-can? (test) (= 0 (run-status 20 (concat-strings "exec </dev/null >/dev/null 2>&1; " test))))

@@ -75,6 +75,19 @@
   (expect "kept: a pair" pair '(3 . 3))
   (expect "kept: an array" (array-at arr 40) 3))
 
+;; what a failed world wrote past the end stays gone when the array or string grows again (found by check/laws/gc-model.law)
+(let ((a (array)) (t (string 2)))
+  (set-array-at a 0 'first)
+  (set-string-at t 0 ?a)
+  (try (let () (set-array-at a 5 'stale) (set-string-at t 40 ?z) (error "stop")) (lambda (c) c))
+  (expect "the array's end" (array-length a) 1)
+  (set-array-at a 9 'later)
+  (expect "no stale element" (array-at a 5) ())
+  (set-string-at t 40 ?y)
+  (set-string-at t 39 ?x)
+  (expect "the string's later write" (string-at t 40) ?y)
+  (expect "no stale character" (string-at t 20) 0))
+
 ;; nesting: an inner commit is still undone by the outer failure, an inner failure leaves the outer's writes
 (set global 0)
 (try (let ()

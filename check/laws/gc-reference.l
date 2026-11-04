@@ -25,7 +25,7 @@
 (define-function collect (n) (for (i 0 n) (gc-collect)))
 ;; asks a question in a child: its body answers true to accept
 (define-function gc-verdict (ask)
-  (let ((status (law-child (lambda () (_exit (if (ask) 0 3))))))
+  (let ((status (law-child (lambda () ((subr "alarm" "i>i") 60) (_exit (if (ask) 0 3))))))
     (cond ((= 0 status) accept) ((= (<< 3 8) status) reject) (else (list 'crash status)))))
 (define-function churn (n) (for (i 0 n) (cons i i)))
 
