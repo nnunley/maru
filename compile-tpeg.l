@@ -29,12 +29,6 @@
 (define *tp-rule* "")
 (define *tp-class* ())
 
-;; A call with arguments is generated on source only: its arguments are cells on the input.
-(define-function tp-call-args (name)
-  (or (tp-source?)
-      (error "rule " *tp-rule* " calls " name " with arguments, which needs a grammar on <source-parser>")))
-
-;; An object literal, 'x, matches an element by in-same, which only a grammar on <source-parser> has.
 (define-function tp-object-literal ()
   (or (tp-source?)
       (error "rule " *tp-rule* " has an object literal, which needs a grammar on <source-parser>")))
@@ -60,11 +54,15 @@
   `(,(tp-op 'invoke-rule-in) self ,(concat-symbol '< (concat-symbol grammar '>)) ',name ,sel))
 
 ;; A rule's parameters are the first elements of its input: `rule :a :b` is `.:a .:b` at its start.
+;; On <source-parser> a parameter is an element the rule reads from the input. On text it stays an
+;; argument of the rule's method, as it always was, since an integer position can't hold a cell.
 (define-function tp-parameters (params body)
-  (cond
-    ((not params)	body)
-    ((tp-source?)	`(match-all ,@(map (lambda (p) `(assign-result ,p (match-any))) params) ,body))
-    (else		(error "rule " *tp-rule* " has parameters, which needs a grammar on <source-parser>"))))
+  (if (and params (tp-source?))
+      `(match-all ,@(map (lambda (p) `(assign-result ,p (match-any))) params) ,body)
+    body))
+
+(define-function tp-method-parameters (params)
+  (if (tp-source?) () params))
 
 ;; Left recursion, as irl-grammar.l's irl-left-recursive? finds it: the rules a pattern can call at its start. A
 ;; rule with parameters has no memo, so one that reaches itself this way would overflow the stack; it is refused.
@@ -142,8 +140,7 @@
     (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
     (match-rule		(name . args)	(or (tp-named-call name args '$)
 					    (if args
-					    (let () (tp-call-args name)
-						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args))
+					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$ name) self ,@args)
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self))))
     (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$ name)))
     (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
@@ -204,8 +201,7 @@
     (match-object	(obj)		(let () (tp-object-literal) `(,(tp-op 'match-object) self ',obj)))
     (match-rule		(name . args)	(or (tp-named-call name args '$$)
 					    (if args
-					    (let () (tp-call-args name)
-						   `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args))
+					    `(,(tp-op 'invoke-rule-simply) ',name ,(concat-symbol '$$ name) self ,@args)
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self))))
     (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$$ name)))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
@@ -283,7 +279,7 @@
     (set *tp-class* class)
     (let* ((body (tp-parameters (caddr rule) (cadr rule)))
 	   (vars (find-vars body)))
-      `(define-method ,(concat-symbol '$ name) ,class ()
+      `(define-method ,(concat-symbol '$ name) ,class ,(tp-method-parameters (caddr rule))
 	 (let ,vars
 	   ,(value-pe body))))))
 
@@ -293,7 +289,7 @@
     (set *tp-class* class)
     (let* ((body (tp-parameters (caddr rule) (cadr rule)))
 	   (vars (find-vars body)))
-      `(define-method ,(concat-symbol '$$ name) ,class ()
+      `(define-method ,(concat-symbol '$$ name) ,class ,(tp-method-parameters (caddr rule))
 	 (let ,vars
 	   ,(effect-pe body))))))
 
@@ -329,7 +325,7 @@
 ;; The forms that define a grammar's rules on class: a selector for each rule's match and its effect, then the methods.
 (define-function tp-definition-forms (class rules)
   (let ((names (map car rules)))
-    (tp-check-parameters rules)
+    (and (tp-source?) (tp-check-parameters rules))
     `(,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
       ,@(map-with compile-value  rules class)

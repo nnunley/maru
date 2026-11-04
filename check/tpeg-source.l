@@ -1,6 +1,7 @@
 ;;; A grammar matches over any source, and a match's value doesn't decide its success.
 (require "check/tpeg-run.l")
 (load "build/tpeg-mini.g.l")
+(load "build/tpeg-textargs.g.l")
 
 (expect "text" (try <mini> $sum "2+3") '(5))
 (expect "a list of characters" (try <mini> $sum '(?2 ?+ ?3)) '(5))
@@ -14,4 +15,5 @@
 (expect "a nil element" (try <mini> $any '(())) '(()))
 (expect "a zero element" (try <mini> $any '(0)) '(0))
 (expect "the end isn't an element" (try <mini> $any ()) ())
+(expect "parameters on text" (parse-string <ta> $callp "xy") '(1 2))
 (finish "tpeg source")

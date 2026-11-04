@@ -34,6 +34,8 @@ When `Calc`, `Apply`, `Literals` and `Speed` are green, run `notes/plan/record f
 
 ## Notes from iterations
 
+**Evidence is prior worlds (after iteration 9).** `passed` and `failed` set a requirement's `done`, so each check run is a world in John's chain, and `at time T` reads an earlier one. `next.l` is one program now. `evidence.john` is how the chain persists, since John keeps worlds in memory. **On text, parameters stay arguments of a rule's method:** `nile-grammar.g` uses them, and only `<source-parser>` puts them on the input.
+
 **Grammars are live; `--on` is gone (after iteration 4).** A grammar names its parser type by its parent, `<trees> : <source-parser> ()`, and is brought in by importing it. Rules compile in-process, with `.g.l` files as a cache. Read `repl.l` and `test-pepsi.l`:
 `tpeg-repl.l` does the same with `compile-tpeg.l`'s generator. `tpeg.g` already reads `{ … }` blocks to `grammar-define`, `grammar-extend` and `grammar-eval`; those forms are what's missing. `tpeg-load` loads a `.g` file in-process, so a child's parent is already known. Notes below that mention `--on` or `<X/source>` are out of date.
 

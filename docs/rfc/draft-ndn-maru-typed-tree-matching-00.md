@@ -277,7 +277,7 @@ There MUST be two parser types. [R-parser-types]
 only reads text stays on it, and direct code for lists or binary is an optimization for later, through [R-opt-specialize], if evidence asks for it.
 
 A grammar MUST name its parser type by its parent, as `<dc> : <parser> ()` does in `test-dc.g`: `<trees> : <source-parser> ()` runs on `<source-parser>`, and a child runs on what its parent runs on. No flag or build step
-chooses it. A list pattern, an object literal or a call with arguments in a grammar on `<text-parser>` MUST stop with an error naming the rule. [R-instances]
+chooses it. A list pattern, an object literal, `{apply}` or `{super}` in a grammar on `<text-parser>` MUST stop with an error naming the rule. [R-instances]
 
 A grammar on `<source-parser>` MUST read one input to equal results from text, a list of characters, a `<data-stream>`, and a user's type that generates its elements on demand. [R-any-source] A grammar that wants any source
 declares `<source-parser>`, which reads text too; one that only reads text and wants its speed stays on `<text-parser>`.
@@ -350,8 +350,8 @@ A list pattern MUST match only if `in-enter` holds for the current element, its 
 element, and the input moves past it. On failure, the input is as it was. [R-list-pattern] This is the thesis's `List-Success` rule and OMeta/Squeak 2's `form:`. Its body compiles inline in its rule, so its bindings are ordinary
 bindings of that rule. `peg-compile.l`'s `match-list` doesn't require the end; see Compatibility.
 
-A call's arguments MUST be elements its rule reads from the input, first argument first: new cells whose tail is the current input. [R-args-on-input] `:a` is shorthand for `.:a`, and a rule can match its arguments with any
-pattern. `tpeg`'s function arguments go; its `rule :a` syntax stays. Failure restores the saved cell, so no cell stays behind.
+A call's arguments MUST be elements its rule reads from the input, first argument first: new cells whose tail is the current input. [R-args-on-input] `:a` is shorthand for `.:a`, and a rule can match its arguments with any pattern. On `<text-parser>` a parameter stays an argument of the rule's method, as today and as `nile-grammar.g` uses it, because an integer
+position can't hold a cell; so a text rule binds its arguments but can't match them. Failure restores the saved cell, so no cell stays behind.
 
 Within one parser, entering the same value twice MUST reuse its stream and so its memos, as OMeta/Squeak 2's `om2streams` does for each matcher. [R-stream-per-value] A foreign rule `p-r` MUST run on an object of `<p>`, sees the
 input through a proxy cell with fresh memos, and hands back where it got to, as OMeta's `foreign` does. [R-foreign-proxy] Its fields are its own: it is a different grammar.
@@ -840,9 +840,7 @@ design did: grammars under `<text-parser>` meant characters, and `<cnf>` was a t
 made a property of its actions into a property of grammars. `<cnf>` is expected
 tokens and calls, and streams were never only text, in Maru or OMeta. Text stays, as one parser type among others.
 
-**Why not keep `tpeg`'s function arguments?** They compile directly, but a parameter could then only be
-bound, never matched, and OMeta/Squeak 2, OMeta/JS and `peg` all put arguments on the input. Specializing
-for known arguments removes the cost ([R-opt-specialize]).
+**Why not `tpeg`'s function arguments on `<source-parser>` as well?** A parameter could then only be bound, never matched, and OMeta/Squeak 2, OMeta/JS and `peg` all put arguments on the input. They stay on text, where they cost nothing. An earlier version refused them on text, which broke Nile's grammar.
 
 **Why not hard-code the evaluator's pair layout in native code?** It is the smallest change, but
 `eval.c` tags integers and `eval2.c` boxes them, so it is wrong under one of them, and it would need

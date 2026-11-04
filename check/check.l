@@ -279,7 +279,7 @@
     (and (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; ./eval compile-tpeg.l check/tpeg-refused/" name ".g"))))
 	 (output-has (contents-of-file-named out) word))))
 (check "tree_text_refuses"
-  (list-do f '("args" "params" "list" "literal" "apply" "super")
+  (list-do f '("list" "literal" "apply" "super")
     (unit-assert (refuses f "needs a grammar on <source-parser>")))
   (unit-assert (refuses "reserved" "reserved"))
   (unit-assert (refuses "param-lr" "left-recursive")))
