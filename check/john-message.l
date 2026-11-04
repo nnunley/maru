@@ -7,3 +7,5 @@
     (john-bool (and ($expression p) (= (<text-parser>-position p) (string-length self))))))
 (define-john-builtin text-of john-text-of)
 (define-method john-text-of <symbol> () (john-lookup *john-world* self 'text))
+;; a strategy a file adds: how a goal gets solved, chosen by name in the program
+(john-strategy 'give-up (lambda (o g args using by) (john-say "gave up")))

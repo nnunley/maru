@@ -110,6 +110,19 @@
     (child
       "create P x. make P A 1. goal P done try at time 0 its x = 1. set-opt planner sat. A satisfy done.")
     "E_SAT_UNSUPPORTED: at time"))
+;; only what the goal can reach has to be encodable, so a program can keep questions about its history
+(expect
+  "a time-reading qualification the goal doesn't use is left alone"
+  (has?
+    (child
+      "create P x. action P up consequence its x = 2. make P A 1. qualify P was-one if at time 0 its x = 1. goal P done try its x = 2. set-opt planner sat. A satisfy done.")
+    "satisfied at time: 1"))
+(expect
+  "a time-reading qualification the goal does use is still refused"
+  (has?
+    (child
+      "create P x. action P up consequence its x = 2. make P A 1. qualify P was-one if at time 0 its x = 1. qualify P there if it was-one = yes and its x = 2. goal P done try it there = yes. set-opt planner sat. A satisfy done.")
+    "E_SAT_UNSUPPORTED: at time"))
 ;; planning over names: the least length, replayed by the evaluator, the same as the search's
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function no-satisfy (fs)
@@ -187,7 +200,7 @@
 ;; with unknown inputs; an add that overflows in the circuit forbids its step
 (define climb "create C n. make C X 32750. action C up consequence it n = its n + 10. goal C done try its n > 32767. ")
 (john-run (john-read-text climb))
-(john-sat-check)	; the sorts the encoding reads
+(john-sat-check *john-goals*)	; the sorts the encoding reads
 (let ((enc (john-sat-begin 'X 'done () () ())))
   (john-sat-step enc 0)
   (expect "a changing number is bits after a step" (= 'bv (car (sat-cell 'X 'n 1))))

@@ -91,6 +91,7 @@ statement	= "start-world" wb name:n end					-> `(start-world ,n)
 		| "action-optimization" wb name:c name:a ("dynamically" wb -> 'dynamically)?:d "establish" wb expr:e end
 										-> `(action-optimization ,c ,a ,(car d) ,e)
 		| "heuristic" wb name:c name:g number:w method:m expr:e end	-> `(heuristic ,c ,g ,w ,m ,e)
+		| "goal-strategy" wb name:c name:g name:s ("if" wb expr)?:e end	-> `(goal-strategy ,c ,g ,s ,(car e))	# ours
 		| "goal" wb name:c name:g name*:ps "try" wb expr:e end		-> `(goal ,c ,g ,ps ,e)
 		| "set-opt" wb name:n primary:v end				-> `(set-opt ,n ,v)
 		| "for" wb !quant expr:l "do" wb (makebody | expr):b end	-> `(for ,l ,b)

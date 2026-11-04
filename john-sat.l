@@ -152,19 +152,25 @@
 	 (and (> (list-length v) n)
 	      (error "E_BOUND: a list of " (list-length v) " does not fit sat-list-length " n))
 	 (list-do x v (john-list-bound-check x n)))))
-(define-function john-sat-check ()
+;; the qualifications and relations x names, and those they name, added to reached
+(define-function john-sat-reach (x reached)
+  (cond ((pair? x) (john-sat-reach (cdr x) (john-sat-reach (car x) reached)))
+	((symbol? x)
+	 (list-do q *john-quals*
+	   (and (= x (cadr q)) (not (member? q reached)) (set reached (john-sat-reach (cdddr q) (cons q reached)))))
+	 (list-do r *john-rels*
+	   (and (= x (car r)) (not (member? r reached)) (set reached (john-sat-reach (cdr r) (cons r reached)))))
+	 reached)
+	(else reached)))
+;; only what the goals can reach has to be encodable: a program may keep other questions, about its history say
+(define-function john-sat-check (goals)
   (list-do opt '(two-player-game max-time-ahead)
     (and (cdr (assq opt *john-options*)) (john-sat-refuse (symbol->string opt))))
-  (list-do table (list *john-quals*
-		       *john-rels*
-		       *john-actions*
-		       *john-rules*
-		       *john-goals*
-		       *john-aopts*
-		       *john-gopts*
-		       *john-heuristics*)
-    (john-sat-scan table)
-    (john-bound-check table (john-sat-width)))
+  (let* ((roots (list goals *john-actions* *john-rules* *john-aopts* *john-gopts* *john-heuristics*))
+	 (reached (john-sat-reach roots ())))
+    (list-do table (cons reached roots)
+      (john-sat-scan table)
+      (john-bound-check table (john-sat-width))))
   (list-do e (john-sorts)
     (let ((v (john-lookup *john-world* (car (car e)) (cadr (car e)))))
       (john-bound-check v (john-sat-width))
@@ -1053,7 +1059,7 @@
 	((= 'unsat (car r)) "unsatisfiable")
 	(else "unknown")))
 (define-function john-sat-satisfy (o g args using by)
-  (john-sat-check)
+  (john-sat-check (john-goal-of o g))
   (set *sat-conflicts* (cdr (assq 'sat-conflicts *john-options*)))
   (let ((k 0)
 	(done ())
@@ -1095,4 +1101,4 @@
 (define-function john-run-sorts (forms)
   (john-reset)
   (list-do s forms (or (= 'satisfy (car s)) (john-statement s)))
-  (john-sat-check))
+  (john-sat-check *john-goals*))

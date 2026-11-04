@@ -313,10 +313,23 @@
   (let ((out ())) (while (<john-world>-action w) (push out (<john-world>-action w)) (set w (<john-world>-parent w))) out))
 (define john-sat-satisfy)
 (define john-search)
-(define-function john-satisfy (o g args using by)	; planner sat: john-sat.l, loaded when first asked for
-  (if (= 'sat (cdr (assq 'planner *john-options*)))
-      (let () (require "john-sat.l") (john-sat-satisfy o g args using by))
-    (john-search o g args using by)))
+;; How a goal gets solved is separate from what it means (RN-2008-003, Six).  A strategy takes (o g args using by).
+;; A goal's first goal-strategy whose guard holds names one; otherwise set-opt planner does; otherwise it's the search.
+(define *john-strategies* ())	; (name . function)
+(define-function john-strategy (name function) (push *john-strategies* (cons name function)))
+(define *john-goal-strategies* ())	; (class goal strategy guard), in program order
+(define-function john-strategy-for (o g)
+  (let ((name ()))
+    (list-do d *john-goal-strategies*
+      (and (not name)
+	   (= g (cadr d))
+	   (john-isa? (john-object-class o) (car d))
+	   (or (not (cadddr d)) (john-true? (john-eval (cadddr d) *john-world* (list (cons 'it o)))))
+	   (set name (caddr d))))
+    (set name (or name (cdr (assq 'planner *john-options*)) 'search))
+    (or (cdr (assq name *john-strategies*)) (john-fail "no strategy " name))))
+(define-function john-satisfy (o g args using by)
+  ((john-strategy-for o g) o g args using by))
 (define-function john-goal-of (o g)	; o's goal g, its class's or a group's
   (let ((goal ()) (c (john-object-class o)))
     (list-do d *john-goals* (and (= g (cadr d)) (john-isa? c (car d)) (set goal d)))
@@ -353,6 +366,11 @@
 	      (set frontier next)
 	      (and next (john-say (concat-strings "looking " (format "%d" k) " time unit ahead (" (format "%d" (list-length next)) " possible worlds)")))))))
     (if found (john-satisfied found) (john-say (if frontier "not satisfied within the time limit" "unsatisfiable")))))
+
+(john-strategy 'search john-search)
+(john-strategy 'sat (lambda (o g args using by)	; john-sat.l, loaded when first asked for
+		      (require "john-sat.l")
+		      (john-sat-satisfy o g args using by)))
 
 ;;; ---- statements
 
@@ -404,6 +422,7 @@
 	  ((= op 'heuristic) (set *john-heuristics* (concat-list *john-heuristics* (list (cdr s)))))
 	  ((= op 'set-opt) (push *john-options* (cons (cadr s) (if (symbol? (caddr s)) (caddr s) (john-eval (caddr s) *john-world* ())))))	; a word is itself: planner sat
 	  ((= op 'action-optimization) (set *john-aopts* (concat-list *john-aopts* (list (cdr s)))))
+	  ((= op 'goal-strategy) (set *john-goal-strategies* (concat-list *john-goal-strategies* (list (cdr s)))))
 	  ((= op 'goal-optimization) (set *john-gopts* (concat-list *john-gopts* (list (cdr s)))))
 	  ((= op 'satisfy) (john-satisfy (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cadddr s))
 					 (car (cddddr s)) (cadr (cddddr s))))
@@ -413,7 +432,7 @@
 	  (else (john-fail "statement not read yet: " op)))))
 (define-function john-reset ()
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())
-  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
+  (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-goal-strategies* ()) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
   (set (<john-world>-time *john-world*) 0))
 (define-function john-run (forms)
   (john-reset)

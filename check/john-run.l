@@ -71,6 +71,19 @@
     (expect "a message from a loaded file" (= "42" (car out)))
     (expect "an object asks a grammar" (and (= "yes" (cadr out)) (= "no" (caddr out)))))
   (expect "a message nothing defines stays an error" (has? (child "21 tripled.") "no property or qualification tripled"))
+  ;; a goal says how it's solved, by the first strategy whose guard holds: the meaning stays the same
+  (let* ((world "create C n. action C up consequence its n = its n + 1. goal C at-two try its n = 2. ")
+	 (ask (lambda (text) (run-text (concat-strings "load \"check/john-message.l\". " world text " satisfy at-two.")))))
+    (expect "the search by default" (has? (last (ask "make C X 0. X")) "X up , X up"))
+    (expect "a named strategy" (has? (last (ask "make C X 0. goal-strategy C at-two sat. X")) "X up , X up"))
+    (expect "the sat strategy ran" (has? (car (ask "make C X 0. goal-strategy C at-two sat. X")) "trying 0 steps"))
+    (expect "a loaded file's strategy" (= "gave up" (last (ask "make C X 0. goal-strategy C at-two give-up. X"))))
+    (expect "the first whose guard holds, by the data"
+	    (= "gave up" (last (ask "make C X 0. goal-strategy C at-two sat if its n > 5. goal-strategy C at-two give-up if its n < 5. X"))))
+    (expect "the planner option when no guard holds"
+	    (has? (car (ask "make C X 0. set-opt planner sat. goal-strategy C at-two give-up if its n > 5. X")) "trying 0 steps")))
+  (expect "an unknown strategy is an error"
+	  (has? (child "create C n. make C X 0. goal C g try its n = 0. goal-strategy C g telepathy. X satisfy g.") "no strategy telepathy"))
   ;; time before the first world is an error when read, and an empty stretch of a window that reaches there
   (expect "at time before the first world" (has? (child "start-world w. create A p. make A X 1. at time (time - 1) X p.") "before the first world"))
   (expect "a window reaching before the first world" (has? (child "start-world w. create A p. action A go consequence its p = 2. make A X 1. X do go. for some time T after (time - 9) up to time do (at time T X p = 2).") "yes"))

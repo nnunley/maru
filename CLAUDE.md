@@ -146,6 +146,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   A program can `load "file.l"`, and its objects and values answer the messages that file defines with
   `define-john-builtin`, so an object can ask a grammar (`check/john-message.l`). Reading before the first world is an
   error, and a time window reaching there starts at the first action.
+  How a goal is solved is separate from what it means: `goal-strategy Class goal sat if guard.` names a strategy, the
+  first whose guard holds, then `set-opt planner`, then the search. A loaded file adds one with `(john-strategy name
+  function)`, and an unknown name is an error. Under `sat`, only what the goal can reach has to be encodable.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
   into a `.k` program that `maru.k` compiles and that prints what it should;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
