@@ -11,7 +11,8 @@ reference gc_after_throw(s)
 reference gc_throw_restores_roots(s)
 reference gc_heap_consistent(s)
 reference gc_out_of_memory(m)
-reference gc_every_allocation(s, t)
+reference gc_oom_is_bounded(m)
+reference gc_oom_final_exit(m)
 reference gc_long_list(n)
 reference gc_deep_heads(n)
 under test: shape, length, ceiling
@@ -28,8 +29,8 @@ rule s_box:    shape(a)             => shape(box(a))
 fact length(1000)
 fact length(300000)
 -- heap ceilings, in megabytes, for running out
-fact ceiling(32)
-fact ceiling(128)
+fact ceiling(8)
+fact ceiling(24)
 
 law survives:     all s: shape(s). gc_survives(s) = accept
 law stable:       all s: shape(s). gc_stable(s) = accept
@@ -43,6 +44,7 @@ law after_throw:  all s: shape(s). gc_after_throw(s) = accept
 law restores_roots: all s: shape(s). gc_throw_restores_roots(s) = accept
 law heap_consistent: all s: shape(s). gc_heap_consistent(s) = accept
 law out_of_memory: all m: ceiling(m). gc_out_of_memory(m) = accept by exhaustion
-law every_allocation: all s: shape(s), t: shape(t). gc_every_allocation(s, t) = accept
+law oom_bounded: all m: ceiling(m). gc_oom_is_bounded(m) = accept by exhaustion
+law oom_final_exit: all m: ceiling(m). gc_oom_final_exit(m) = accept by exhaustion
 law long_list:    all n: length(n). gc_long_list(n) = accept by exhaustion
 law deep_heads:   all n: length(n). gc_deep_heads(n) = accept by exhaustion

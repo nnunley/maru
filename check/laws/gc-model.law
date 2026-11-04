@@ -4,7 +4,7 @@ reference log_is_bounded(n)
 reference merge_is_bounded(n)
 reference many_slots(n)
 reference allocations(ops, every)
-under test: program, op, on, past, ops, pace, loops, slots
+under test: program, op, on, past, ops, pace, loops, slots, once
 defaults trials = 150, size = 5
 let numerals = [0, 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 63, 64, 65, 127, 128, 129, 255, 256, 1000, 4097]
 
@@ -46,6 +46,7 @@ rule a_collect:  ops(p)               => ops(step(Collect, 0, p))
 -- how often a collection falls: at an awkward prime, then normally
 fact pace(101)
 fact pace(32768)
+fact once(1)
 fact loops(1000)
 fact loops(100000)
 fact slots(500)
@@ -56,6 +57,7 @@ law log_bounded:    all n: loops(n). log_is_bounded(n) = accept by exhaustion
 law merge_bounded:  all n: loops(n). merge_is_bounded(n) = accept by exhaustion
 law many_slots:     all n: slots(n). many_slots(n) = accept by exhaustion
 law allocations:    all a: ops(a), e: pace(e). allocations(a, e) = accept
--- the generators reach what the laws are about: each operation is drawn, and nesting happens
-law coverage:       all p: program(p), a: ops(a). generated_kinds(p, a) >= 0
+-- the generators reach what the laws are about: every_kind fails if an operation was never drawn by the tally before it
+law draw_for_tally: all p: program(p), a: ops(a). draw_for_tally(p, a) = 0
+law every_kind:     all n: once(n). kinds_missing(n) = 0 by exhaustion
 

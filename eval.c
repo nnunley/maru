@@ -167,7 +167,7 @@ static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
 static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 
 static oop traceStack= nil;
-static int traceDepth= 0;
+long traceDepth= 0;			/* restored by a throw, through dlsym */
 
 static oop newData(size_t len)		{ return _newBits(Data, len); }
 
@@ -414,6 +414,8 @@ static oop lookup(oop env, oop name)
   return get(var, Variable,value);
 }
 
+static void undoVariableWrite(oop var);
+
 static oop define(oop env, oop name, oop value)
 {
   oop bindings= get(env, Env,bindings);
@@ -422,6 +424,7 @@ static oop define(oop env, oop name, oop value)
     while (--index >= 0) {
       oop var= arrayAt(bindings, index);
       if (get(var, Variable,name) == name) {
+	undoVariableWrite(var);
 	set(var, Variable,value, value);
 	return var;
       }
@@ -1226,6 +1229,7 @@ static void fatal(char *reason, ...)
       FILE *f= fmemopen(maru_fatal_message, sizeof(maru_fatal_message) - 1, "w");
       if (f) { va_start(ap, reason);  vfprintf(f, reason, ap);  va_end(ap);  fclose(f); }
   }
+  else maru_fatal_message[0]= 0;		/* its text went straight to stderr */
   if (reason) {
     va_list ap;
     va_start(ap, reason);
@@ -1665,6 +1669,9 @@ static subr(define)
     fatal(0);
   }
   oop value= eval(cadr(args), ctx);
+  GC_PROTECT(value);
+  undoNote(var, UNDO_VARIABLE, 0, get(var, Variable,value));
+  GC_UNPROTECT(value);
   set(var, Variable,value, value);
   oop expr= value;
   if (is(Form, expr)) expr= get(value, Form,function);

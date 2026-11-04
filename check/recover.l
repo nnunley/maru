@@ -88,6 +88,32 @@
   (expect "the string's later write" (string-at t 40) ?y)
   (expect "no stale character" (string-at t 20) 0))
 
+;; a definition is a write
+(define defined-before 1)
+(try (let ()
+       (eval '(define defined-before 2))
+       (eval '(define defined-in-world 3))
+       (error "stop"))
+     (lambda (c) c))
+(expect "a redefinition undone" defined-before 1)
+(expect "a new name gone, or valueless where the encoder made it first"
+	(if (defined? 'defined-in-world) (eval 'defined-in-world) ()) ())
+;; unwind-protect's marker can't be thrown to
+(expect "no one can name unwind-protect"
+	(car (failure (lambda () (unwind-protect (throw 'unwind-protect 1) 0)))) 'error)
+;; a fatal error with its text gone straight to stderr has no message, not an old one
+(failure (lambda () (set-car)))
+(expect "no stale message" (cadr (failure (lambda () (array-length 5)))) "")
+;; a throw puts the evaluator's call depth back: read at one depth, so only the failures can make it differ
+(define depth-cell (stub-symbol "traceDepth"))
+(define-function deep-failure (n) (if (= n 0) (error "deep") (+ 1 (deep-failure (- n 1)))))
+(define-function depth-moved-by (times)
+  (let* ((before (stub-word-at depth-cell 0))
+	 (_ (for (i 0 times) (failure (lambda () (deep-failure 5)))))
+	 (after (stub-word-at depth-cell 0)))
+    (- after before)))
+(expect "the call depth" (depth-moved-by 200) (depth-moved-by 0))
+
 ;; nesting: an inner commit is still undone by the outer failure, an inner failure leaves the outer's writes
 (set global 0)
 (try (let ()

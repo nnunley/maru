@@ -92,25 +92,33 @@ typedef struct _gcfinaliser
 static gcheader  gcbase= { 0, { -1 }, &gcbase };
 
 static size_t	gcQuantum= GC_QUANTUM;
-static int	gcCount=   ALLOCS_PER_GC;
-static int	gcAllocs=  ALLOCS_PER_GC;
+static long	gcCount=   ALLOCS_PER_GC;
+static long	gcAllocs=  ALLOCS_PER_GC;
 static size_t	gcHeap=    0;
 static size_t	gcLive=    0;
+static size_t	gcUsed=    0;			/* bytes of live and not yet collected blocks, headers included */
 static int	gcFixedPace= 0;
 
 static gcfinaliser *finalisable= 0;
 
 //static void bkpt() {}
 
-/* The heap may be bounded, and running out needn't be the end: the program is told, with a reserve released to run in. */
+/* Memory may be bounded, and running out needn't be the end.  When what's in use reaches the limit and a collection doesn't
+ * help, the program is told, with a reserve beyond the limit to run its handlers in.  If that's used up too, or it happens
+ * again before a collection has made room for a whole reserve under the limit, the program exits.  The same holds when the
+ * system refuses memory, for which a real block is held back.
+ */
 #define GC_RESERVE	(1024 * 1024)
+#define GC_HEADROOM	(GC_RESERVE / 4)
+#define GC_EXIT_OUT_OF_MEMORY	70			/* not 1, which any error ends a program with */
 GC_API size_t GC_heap_limit= 0;				/* 0: as much as the system gives */
 GC_API void (*GC_out_of_memory_function)(void)= 0;	/* expected not to return */
 static void *gcReserve= 0;
-static size_t gcReleased= 0;				/* reserves now in the heap, outside the limit */
+static int   gcEmergency= 0;
 
 /* Free blocks wait in lists by size, linked through their first word, so an allocation doesn't walk the heap: every
- * block stays on the address-ordered list sweep walks, and sweep rebuilds these lists, merging neighbours as it goes.
+ * block stays on the list sweep walks, in address order within each chunk, and sweep rebuilds these lists, merging
+ * neighbours as it goes.  Blocks over a thousand bytes share the last list, which is searched for one big enough.
  */
 #define GC_BIN_STEP	GC_ALIGN		/* a bin of small blocks holds one size, so taking from it is one step */
 #define GC_BINS		128			/* the last holds everything too big for the others */
@@ -163,17 +171,29 @@ static void GC_collectAndPace(void)
 #if VERBOSE >= 1
   fprintf(stderr, "GC: collecting\n");
 #endif
-  gcLive= 0;
   GC_gcollect();
   /* no fewer allocations than there are live objects before the next: marking stays in proportion to allocating */
-  gcAllocs= (!gcFixedPace && gcLive > (size_t)gcCount) ? (int)gcLive : gcCount;
-  if (!gcReserve) gcReserve= malloc(GC_RESERVE);	/* ready for next time, once there's room again */
+  gcAllocs= (!gcFixedPace && gcLive > (size_t)gcCount) ? (long)gcLive : gcCount;
+}
+
+static void GC_giveUp(void)
+{
+  fprintf(stderr, "GC: out of memory\n");
+  exit(GC_EXIT_OUT_OF_MEMORY);
+}
+
+static void GC_emergency(void)
+{
+  if (gcEmergency || !GC_out_of_memory_function) GC_giveUp();
+  gcEmergency= 1;
+  GC_out_of_memory_function();
+  GC_giveUp();						/* no handler took it */
 }
 
 GC_API void *GC_malloc(size_t lbs)
 {
   gcheader *hdr;
-  size_t split;
+  size_t split, need;
   int collected= 0;
   if (!--gcAllocs) GC_collectAndPace();
   lbs= (lbs + GC_ALIGN-1) & ~(GC_ALIGN-1);
@@ -181,33 +201,41 @@ GC_API void *GC_malloc(size_t lbs)
 #if VERBOSE > 1
   fprintf(stderr, "malloc %i\n", (int)lbs);
 #endif
+  need= lbs + sizeof(gcheader);
+  if (GC_heap_limit && gcUsed + need > GC_heap_limit + (gcEmergency ? GC_RESERVE : 0)) {
+    /* a collection has to win real room: one that frees a few bytes at a time would repeat on every allocation */
+    GC_collectAndPace();
+    if (gcUsed + need + GC_HEADROOM > GC_heap_limit + (gcEmergency ? GC_RESERVE : 0)) GC_emergency();
+  }
   split= lbs + sizeof(gcheader) + GC_ALIGN;
   while (!(hdr= GC_binTake(lbs))) {
-    /* grow in proportion to the heap */
+    /* grow in proportion to the heap, and no further than a limit could ever use */
     size_t incr= gcHeap / 4 > gcQuantum ? gcHeap / 4 : gcQuantum;
-    size_t req= sizeof(gcheader) + lbs;
-    while (incr <= req) incr *= 2;
-    if (GC_heap_limit && gcHeap + incr > GC_heap_limit && gcHeap + req + gcQuantum <= GC_heap_limit)
-      incr= GC_heap_limit - gcHeap;			/* what's left under the limit */
+    void *chunk;
+    while (incr <= need) incr *= 2;
+    if (GC_heap_limit) {
+      size_t most= GC_heap_limit + GC_RESERVE + gcQuantum;
+      size_t room= most > gcHeap ? most - gcHeap : 0;
+      if (incr > room) incr= room > need + GC_ALIGN ? room : need + GC_ALIGN;
+    }
     incr &= ~(GC_ALIGN-1);
-    hdr= (GC_heap_limit && gcHeap + incr > GC_heap_limit) ? 0 : (gcheader *)malloc(incr);
-    if (hdr) {
-      GC_addChunk(hdr, incr);
+    chunk= malloc(incr);
+    if (chunk) {
+      GC_addChunk(chunk, incr);
       gcHeap += incr;
     }
-    else if (!collected) {				/* no more to be had: see what a collection frees first */
+    else if (!collected) {				/* the system has no more: see what a collection frees first */
       collected= 1;
       GC_collectAndPace();
     }
-    else if (gcReserve && GC_out_of_memory_function) {	/* room for a handler to run in, then tell the program */
-      void *reserve= gcReserve;
+    else if (gcReserve) {				/* room for a handler to run in, then tell the program */
+      chunk= gcReserve;
       gcReserve= 0;
-      gcReleased += GC_RESERVE;
-      GC_addChunk(reserve, GC_RESERVE);
-      GC_out_of_memory_function();
-      goto full;					/* no handler took it */
+      GC_addChunk(chunk, GC_RESERVE);
+      gcHeap += GC_RESERVE;
+      GC_emergency();
     }
-    else goto full;
+    else GC_giveUp();
   }
   if (hdr->size >= split) {
     gcheader *ins= (gcheader *)(hdr2ptr(hdr) + lbs);
@@ -224,11 +252,8 @@ GC_API void *GC_malloc(size_t lbs)
   fprintf(stderr, "MALLOC %p -> %p + %i\n", hdr2ptr(hdr), hdr, (int)GC_size(hdr2ptr(hdr)));
 #endif
   memset(hdr2ptr(hdr), 0, hdr->size);
+  gcUsed += sizeof(gcheader) + hdr->size;
   return hdr2ptr(hdr);
- full:
-  fprintf(stderr, "GC: out of memory\n");
-  abort();
-  return 0;
 }
 
 /* how often to collect: every allocation finds what a collection at the wrong moment would, whenever it falls */
@@ -242,14 +267,16 @@ GC_API void GC_collect_every(int allocations)
 GC_API long GC_check_heap(void)
 {
   gcheader *hdr;
-  size_t bytes= 0, freeBlocks= 0, binned= 0;
+  size_t bytes= 0, used= 0, freeBlocks= 0, binned= 0;
   int bin;
   for (hdr= gcbase.next;  hdr != &gcbase;  hdr= hdr->next) {
     if (hdr->size & (GC_ALIGN - 1)) return 1;
     bytes += sizeof(gcheader) + hdr->size;
-    if (!hdr->flags) ++freeBlocks;
+    if (hdr->flags) used += sizeof(gcheader) + hdr->size;
+    else ++freeBlocks;
   }
-  if (bytes != gcHeap + gcReleased) return 2;
+  if (bytes != gcHeap) return 2;
+  if (used != gcUsed) return 6;
   for (bin= 0;  bin < GC_BINS;  ++bin)
     for (hdr= gcBins[bin];  hdr;  hdr= *(gcheader **)hdr2ptr(hdr)) {
       if (hdr->flags) return 3;
@@ -258,6 +285,21 @@ GC_API long GC_check_heap(void)
     }
   if (binned != freeBlocks) return 5;
   return 0;
+}
+
+GC_API void GC_set_heap_limit(size_t bytes)
+{
+  GC_heap_limit= bytes;
+}
+
+GC_API size_t GC_bytes_used(void)
+{
+  return gcUsed;
+}
+
+GC_API size_t GC_heap_bytes(void)
+{
+  return gcHeap;
 }
 
 GC_API void *GC_malloc_atomic(size_t lbs)
@@ -294,6 +336,7 @@ static gcheader *GC_freeHeader(gcheader *hdr)
 
 GC_API void GC_free(void *ptr)
 {
+  gcUsed -= sizeof(gcheader) + ptr2hdr(ptr)->size;
   GC_binAdd(GC_freeHeader(ptr2hdr(ptr)));
 }
 
@@ -361,6 +404,8 @@ GC_API void GC_sweep(void)
 {
   gcheader *hdr= gcbase.next;
   memset(gcBins, 0, sizeof(gcBins));
+  gcLive= 0;
+  gcUsed= 0;
   do {
 #if VERBOSE > 3
     fprintf(stderr, "sweep? %p %d\n", hdr, hdr->flags);
@@ -370,6 +415,7 @@ GC_API void GC_sweep(void)
 	if (hdr->mark) {
 	  hdr->mark= 0;
 	  ++gcLive;
+	  gcUsed += sizeof(gcheader) + hdr->size;
 	}
 	else {
 	  if (hdr->finalisers) {
@@ -379,6 +425,7 @@ GC_API void GC_sweep(void)
 	      gcf->next= finalisable;
 	      finalisable= gcf;
 	    }
+	    gcUsed += sizeof(gcheader) + hdr->size;
 	  }
 	  else {
 	    if (GC_free_function) GC_free_function(hdr2ptr(hdr));
@@ -395,6 +442,9 @@ GC_API void GC_sweep(void)
     }
     hdr= hdr->next;
   } while (hdr != &gcbase);
+  /* ready for next time, once there's room again */
+  if (!gcReserve) gcReserve= malloc(GC_RESERVE);
+  if (gcEmergency && gcReserve && (!GC_heap_limit || gcUsed + GC_RESERVE <= GC_heap_limit)) gcEmergency= 0;
   while (finalisable)
     {
       gcfinaliser *gcf= finalisable;
@@ -686,12 +736,13 @@ GC_API int GC_load(FILE *in, void (*loader)(FILE *, void*))
     get32(in, &numObjs);
     get32(in, &numBytes);
     //printf("loading %i bytes, %i objects\n", (int)numBytes, (int)numObjs);
-    gcheader *hdr= (gcheader *)malloc(numBytes + sizeof(gcheader));
-    memset(hdr, 0, numBytes + sizeof(gcheader));
+    size_t heapBytes= numBytes + sizeof(gcheader);
+    gcheader *hdr= (gcheader *)malloc(heapBytes + GC_ALIGN);	/* the empty block at the end still holds a free list's link */
     if (!hdr) {
 	fprintf(stderr, "GC_load: could not allocate %i bytes\n", numBytes);
 	exit(1);
     }
+    memset(hdr, 0, heapBytes + GC_ALIGN);
     gcbase.next= hdr;
     hdr->flags= 0;
     hdr->next= &gcbase;
@@ -716,6 +767,12 @@ GC_API int GC_load(FILE *in, void (*loader)(FILE *, void*))
 	exit(1);
     }
     for (i= 0;  i < numRoots;  ++i)  getobj(in, roots[i]);
+    gcHeap= heapBytes;						/* the heap is now the image, and its books start from it */
+    gcUsed= 0;
+    memset(gcBins, 0, sizeof(gcBins));
+    for (hdr= gcbase.next;  hdr != &gcbase;  hdr= hdr->next)
+      if (hdr->flags) gcUsed += sizeof(gcheader) + hdr->size;
+      else GC_binAdd(hdr);
     get32(in, &tmp32);
     assert(tmp32 == GC_MAGIC + 2);
     return 1;

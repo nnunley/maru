@@ -130,7 +130,7 @@
 		 (list-do c cells (or (= (car c) i) (set good ())) (set i (- i 1)))
 		 good)))))
 
-;; a tally of what the generators drew, printed when the run ends, so a passing law can't be passing on nothing
+;; a tally of what the generators drew: draw_for_tally only collects it, and every_kind is the law that can fail on it
 (define *drawn* ())
 (define-function tally (term)
   (when (pair? term)
@@ -142,10 +142,15 @@
       (let () (tally-atoms (car term)) (tally-atoms (cdr term)))
     (and (symbol? term) (let ((hit (assq term *drawn*)))
 			  (if hit (set-cdr hit (+ 1 (cdr hit))) (push *drawn* (cons term 1)))))))
-(define-function generated_kinds (p a)
+(define-function draw_for_tally (p a)
   (tally-atoms p) (tally-atoms a)
-  (dumpln *drawn*)
   0)
+;; every operation has been drawn by the coverage law before this one runs; how many haven't
+(define-function kinds_missing (n)
+  (let ((missing 0))
+    (list-do kind '(global car cdr slot char captured Collect Churn ended failed thrown Keep Drop Waste)
+      (or (assq kind *drawn*) (let () (println "never generated: " kind) (set missing (+ missing 1)))))
+    missing))
 
 ;;; the allocator: objects of every size kept and dropped in any order, and each stays what it was made as
 (define-function fill (n)

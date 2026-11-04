@@ -1,7 +1,7 @@
 ;;; catch.l: non-local exit, in native code and Maru.  (catch tag thunk) answers thunk's value, or the value thrown to
 ;;; tag; (throw tag value) unwinds to it.  (unwind-protect body cleanup...) runs cleanup however body ends.
 ;;;
-;;; %catch saves what C expects preserved, and the collector's root stack, in a frame on the stack, and applies its
+;;; %catch saves what C expects preserved, the collector's root stack and the evaluator's call depth, in a frame on the stack, and applies its
 ;;; arguments; %throw drops the stack to the newest frame, restores from it and returns from %catch.  A throw stops at
 ;;; each catch, which throws again if the tag isn't its own, so a cleanup between the two runs on the way.
 (require "osdefs.k")
@@ -14,6 +14,7 @@
 (define catch-top ((subr "malloc" "l>p") 8))
 (stub-set-word-at catch-top 0 0)
 (define catch-roots (stub-symbol "GC_stack_roots"))
+(define catch-trace (stub-symbol "traceDepth"))		; how deep the evaluator's record of its calls is
 
 (define %catch
   (stub-primitive
@@ -21,9 +22,12 @@
      (constant s0 ,catch-top) (load s1 s0 0)
      (constant s2 ,catch-roots) (load s3 s2 0)
      (push2 s1 s3)
+     (constant s2 ,catch-trace) (load s3 s2 0)
+     (push2 s3 s3)
      (sp-to s1) (store s1 s0 0)
      (constant s4 ,stub-apply) (call s4)
      (constant s0 ,catch-top)
+     (pop2 s1 s3)
      (pop2 s1 s3) (store s1 s0 0)
      (restore)
      (return))))
@@ -31,6 +35,8 @@
   (stub-primitive
    `((constant s0 ,catch-top) (load s1 s0 0)
      (sp-from s1)
+     (pop2 s1 s3)
+     (constant s2 ,catch-trace) (store s3 s2 0)
      (pop2 s1 s3) (store s1 s0 0)
      (constant s2 ,catch-roots) (store s3 s2 0)
      (result-from-arg)
@@ -65,7 +71,7 @@
 (define-function unwind-protect-call (body cleanup)
   (let* ((tags *catch-tags*)
 	 (handlers *handlers*)
-	 (_ (set *catch-tags* (cons 'unwind-protect tags)))
+	 (_ (set *catch-tags* (cons (cons 'unwind-protect ()) tags)))	; a tag no thrower can name
 	 (answer (%catch body ())))
     (set *catch-tags* tags)
     (set *handlers* handlers)

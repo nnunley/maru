@@ -183,7 +183,7 @@ static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(
 static char *argv0;
 
 static oop symbols= nil, globals= nil, globalNamespace= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil, backtrace= nil, arguments= nil, input= nil, output= nil;
-static int traceDepth= 0;
+long traceDepth= 0;			/* restored by a throw, through dlsym */
 static oop traceStack= nil, currentPath= nil, currentLine= nil, currentSource= nil;
 static oop s_locals= nil, s_set= nil, s_define= nil, s_let= nil, s_lambda= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_etc= nil, s_bracket= nil, s_brace= nil, s_main= nil;
 // static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
@@ -1487,6 +1487,7 @@ static void fatal(char *reason, ...)
         FILE *f= fmemopen(maru_fatal_message, sizeof(maru_fatal_message) - 1, "w");
         if (f) { va_start(ap, reason);  vfoprintf(f, reason, ap);  va_end(ap);  fclose(f); }
     }
+    else maru_fatal_message[0]= 0;		/* its text went straight to stderr */
     if (reason) {
 	va_list ap;
 	va_start(ap, reason);
@@ -1815,6 +1816,7 @@ static void arity3(oop args, char *name)
 
 #define subr(NAME)	oop subr_##NAME(oop args, oop env)
 #define UNDO_CONS cons
+#define UNDO_FORGET_GLOBALS()	memset((oop *)_globalCache, 0, sizeof(oop) * GLOBAL_CACHE_SIZE)
 #include "undo.c"
 
 static subr(if)
@@ -1931,10 +1933,15 @@ static subr(define)
     oop sym= car(args);
     oop val= eval(cadr(args), env);			GC_PROTECT(val);
     oop var= findNamespaceVariable(env, sym);
-    if (nil == var)
+    if (nil == var) {
+	oop space= findEnvironment(env);
+	if (space) undoNote(space, UNDO_BINDING, 0, getTail(space));
 	var= define(env, sym, val);
-    else
+    }
+    else {
+	undoNote(var, UNDO_TAIL, 0, getTail(var));
 	setTail(var, val);
+    }
     if (is(Form, val)) val= get(val, Form,function);
     if (is(Expr, val) && (nil == get(val, Expr,name)))
 	set(val, Expr,name, sym);			GC_UNPROTECT(val);

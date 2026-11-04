@@ -293,11 +293,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `recover` (`check/recover.l`): `recover.l`. `error` and C's `fatal` signal a condition a handler sees where it happened, and
   `try` runs its body in a world, an undo log (`undo.c`): if it fails, every write through a primitive is undone (Warth's
   Worlds, 3.1). Reads cost nothing and C sees current values; raw memory, the evaluators' tables, files and foreign state
-  aren't covered. A value leaving a failed world keeps what it was made with. With no handler, errors end the program as before.
+  aren't covered. A definition is undone like a write, though on `eval` a name new in the world stays bound. A value leaving a failed
+  world keeps what it was made with. With no handler, errors end the program as before. `gc_image` checks a loaded image's heap.
 - `gc_laws` (`check/laws/gc.law`): over graphs rules generate, in a forked child per question, on every evaluator: what's
   reachable survives and what isn't is freed, sharing and cycles hold, marking can't overflow the stack, the heap's books balance
   (`GC_check_heap`), worlds and throws keep all that, and `(set-heap-limit bytes)` reached is an error that can be recovered from,
-  repeatedly. Free blocks are in lists by size, so an allocation walks nothing.
+  repeatedly, without the reserve creeping, and running out again with no room made is a final exit. Free blocks are in lists by
+  size, so a small allocation walks nothing; blocks over a thousand bytes share one list.
 - `gc_model` (`check/laws/gc-model.law`, `gc-model-paced.law`): generated programs (writes to a few slots, nested worlds that
   end, fail or are thrown out of, collections) run on real objects and on a pure model, and must agree in everything observable,
   with an empty log and balanced heap after; allocation sequences of many sizes; collections every allocation and every seventh.

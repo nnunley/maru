@@ -240,7 +240,7 @@
     (when (= 0 pid) (law-quiet) (run))
     (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
 (define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
-  (let ((st (law-child (lambda () (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+  (let ((st (law-child (lambda () ((subr "alarm" "i>i") 60) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
     (cond ((< st 0) 'crash) ((= 0 st) 1))))
 (define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))

@@ -1,12 +1,13 @@
 /* undo.c -- the undo log behind worlds: while one is active, each write through a primitive records what it overwrites,
  * so the world can be dropped by replaying the log backwards.  Included by each evaluator, which defines UNDO_CONS.
- * Raw memory (set-byte-at and the like) and the evaluator's own tables are outside it: reads never pay anything,
+ * Raw memory (set-byte-at and the like) and the evaluator's own tables are outside it (on eval, whose encoder makes a
+ * variable before anything runs, a name defined in a failed world stays, valued as before): reads never pay anything,
  * writes pay one test when no world is active, and C always sees the current value.
  *
  * As in Warth's worlds, a world keeps one record per slot, however often it's written: rollback needs only the value from
  * before the first write.  A commit hands the parent the records it doesn't already have, and drops the rest.
  */
-enum { UNDO_HEAD, UNDO_TAIL, UNDO_ARRAY, UNDO_ARRAY_SIZE, UNDO_OOP, UNDO_CHAR, UNDO_STRING_SIZE, UNDO_VARIABLE };
+enum { UNDO_HEAD, UNDO_TAIL, UNDO_ARRAY, UNDO_ARRAY_SIZE, UNDO_OOP, UNDO_CHAR, UNDO_STRING_SIZE, UNDO_VARIABLE, UNDO_BINDING };
 
 static oop  undoLog=    nil;
 static long undoDepth=  0;
@@ -97,6 +98,15 @@ static void undoRecord(oop object, long kind, long index, oop old)
 #define undoNote(OBJECT, KIND, INDEX, OLD)						\
     do { if (undoLogging() && undoSlotAdd(OBJECT, KIND, INDEX, undoDepth)) undoRecord(OBJECT, KIND, INDEX, OLD); } while (0)
 
+#ifdef UNDO_VARIABLE_WRITE
+static void undoVariableWrite(oop var)
+{
+    GC_PROTECT(var);
+    undoNote(var, UNDO_VARIABLE, 0, get(var, Variable,value));
+    GC_UNPROTECT(var);
+}
+#endif
+
 static void undoArrayWrite(oop array, int index)
 {
     if (undoLogging() && is(Array, array)) {
@@ -137,6 +147,9 @@ static void undoReplay(oop entry)
 	    set(object, String,size, old);
 	    break;
 	}
+#ifdef UNDO_FORGET_GLOBALS
+	case UNDO_BINDING:	setTail(object, old);  UNDO_FORGET_GLOBALS();	break;	/* the name goes, from the cache too */
+#endif
 #ifdef UNDO_VARIABLE_WRITE
 	case UNDO_VARIABLE:	UNDO_VARIABLE_WRITE(object, old);		break;
 #endif

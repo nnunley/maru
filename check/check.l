@@ -304,12 +304,20 @@
 (check "recover"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "recover" (concat-strings evaluator " check/recover.l") 300)) "recover ok"))))
+;; a saved image's heap has its books in order once it's loaded (only eval saves images)
+(check "gc_image"
+  (let ((image (concat-strings tmp "/image")) (saver (concat-strings tmp "/save-image.l")) (reader (concat-strings tmp "/read-image.l")))
+    (run "gc_image_write" (concat-strings "printf '(define keep (list 1 2 3))\\n(save \"" image "\")\\n' > " saver))
+    (run "gc_image_write2" (concat-strings "printf '(println ((subr \"GC_check_heap\" \">l\")))\\n(println keep)\\n' > " reader))
+    (run "gc_image_save" (concat-strings "./eval " saver))
+    (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)")))))
 (define-function law-file-holds (name evaluator support file)
   (= 0 (run-status 500 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>&1; exec " evaluator " check/law.l " support " " file))))
 (define this-host-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))	; these laws are the collector's, not an instruction set's
 (check "gc_laws"
   (list-do evaluator this-host-evaluators
-    (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law"))))
+    (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law"))
+    (unit-assert (law-file-holds "gc_every" evaluator "check/laws/gc-reference.l" "check/laws/gc-every.law"))))
 ;; generated programs against a model of what they should do, and generated allocations; collecting on every allocation
 ;; is slow, so that runs on one evaluator with tagged integers and one without
 (check "gc_model"

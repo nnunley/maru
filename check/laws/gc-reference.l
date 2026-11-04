@@ -126,12 +126,19 @@
 		       (and (= 0 (gc-check-heap))
 			    (let () (collect 1) (= 0 (gc-check-heap)))
 			    (let () (set kept ()) (collect 2) (= 0 (gc-check-heap)))))))))
+;; a limit this much above what's in use now, whatever this evaluator and the law runner already hold
+(define gc-bytes-used (subr "GC_bytes_used" ">l"))
+(define-function limit-above-use (megabytes)
+  (collect 1)
+  (let ((limit (+ (gc-bytes-used) (* megabytes (* 1024 1024)))))
+    (set-heap-limit limit)
+    limit))
 ;; running out of memory is an error like any other, more than once, and what's left works
 (define-function unbounded () (let ((l ())) (while 1 (set l (cons 0 l)))))
 (define-function gc_out_of_memory (megabytes)
   (gc-verdict (lambda ()
 		(let ((x (list 1 2 3)))
-		  (set-heap-limit (* megabytes (* 1024 1024)))
+		  (limit-above-use megabytes)
 		  (let ((first (try (unbounded) (lambda (c) c)))
 			(second (try (unbounded) (lambda (c) c))))
 		    (collect 1)
@@ -139,6 +146,30 @@
 			 (= 0 (gc-check-heap))
 			 (equal x '(1 2 3))
 			 (= 1000 (list-length (let ((l ())) (for (i 0 1000) (set l (cons i l))) l)))))))))
+;; the reserve can't creep: however many times it runs out, the heap stays near the limit
+(define gc-heap-bytes (subr "GC_heap_bytes" ">l"))
+(define-function gc_oom_is_bounded (megabytes)
+  (gc-verdict (lambda ()
+		(limit-above-use megabytes)
+		(for (i 0 3) (try (unbounded) (lambda (c) c)))
+		;; the first times grow the heap as far as the limit and the reserve take it; after that it must not grow at all
+		(let ((after-one (gc-heap-bytes)))
+		  (for (i 0 5) (try (unbounded) (lambda (c) c)))
+		  (collect 1)
+		  (and (= 0 (gc-check-heap))
+		       (= (gc-heap-bytes) after-one))))))
+;; what truly can't be recovered ends the program, with a status of its own, since an ordinary unhandled error exits 1:
+;; running out again while all of it is still held makes no room
+(define *held* ())
+(define-function gc_oom_final_exit (megabytes)
+  (let ((status (law-child (lambda ()
+			     ((subr "alarm" "i>i") 60)
+			     (limit-above-use megabytes)
+			     (define-function hold-forever () (while 1 (set *held* (cons 0 *held*))))
+			     (catch 'room (lambda () (with-handler (lambda (c) (throw 'room 0)) hold-forever)))
+			     (catch 'room (lambda () (with-handler (lambda (c) (throw 'room 0)) hold-forever)))
+			     (_exit 3)))))
+    (if (= status (<< 70 8)) accept (if (= status (<< 3 8)) reject (list 'crash status)))))
 ;; a collection can fall on any allocation, so make it fall on every one: what's held only by C at that moment is lost,
 ;; and nothing else shows it, since it depends on where the collections happen to land
 (define gc-collect-every (subr "GC_collect_every" "i"))

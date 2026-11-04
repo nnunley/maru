@@ -3,15 +3,16 @@
 ;;;   (with-handler handler thunk)  runs thunk; a condition signalled in it calls handler where it happened, with the
 ;;;                                 stack intact.  Returning declines; to go on from elsewhere, a handler throws.
 ;;;   (signal condition)            offers it to each handler, newest first, and returns if all decline
-;;;   (set-heap-limit bytes)        bounds the heap, 0 for none.  Reaching it collects, and if that's not enough signals
-;;;                                 (fatal "out of memory") with a reserve released for handlers to run in.  If none takes
-;;;                                 it, or it happens again before a collection has made room, the program exits.
+;;;   (set-heap-limit bytes)        bounds what's in use, 0 for no bound.  Reaching it collects, and if that's not enough
+;;;                                 signals (fatal "out of memory") with a reserve beyond the limit for handlers to run in.
+;;;                                 If none takes it, or it happens again before a collection has made a reserve's room
+;;;                                 under the limit, the program exits.
 ;;;   (try body handler)            body in a world (Warth, "Worlds", 3.1): if it ends normally its writes stay.  If it
 ;;;                                 fails, or a throw leaves it, they're undone, and on a failure handler gets the condition.
 ;;;
 ;;; error and the evaluators' own fatal errors signal (error . args) and (fatal message).  With no handler they end the
 ;;; program as they always did.  Worlds cover Maru's heap: files, the screen, what C holds and raw memory aren't undone,
-;;; so those need unwind-protect.  A value that leaves a failed world keeps what it was made with: writes into it there
+;;; so those need unwind-protect.  A definition is undone like a write; on eval, a name new in the world stays bound.  A value that leaves a failed world keeps what it was made with: writes into it there
 ;;; are undone like any others.
 (require "catch.l")
 
@@ -49,8 +50,8 @@
 		   (signal (list 'fatal (recover-fatal-text)))
 		   (and recover-default-backtrace (recover-default-backtrace stack depth))))
 
-(define recover-heap-limit (stub-symbol "GC_heap_limit"))
-(define-function set-heap-limit (bytes) (stub-set-word-at recover-heap-limit 0 bytes))
+;; one store: writing it a byte at a time from here would allocate, against a limit that's only partly written
+(define set-heap-limit (subr "GC_set_heap_limit" "l"))
 
 (define-function try-call (body handler)
   (let* ((mark (undo-begin))

@@ -1,0 +1,13 @@
+-- A collection on every allocation, over worlds and throws, on a small sample: it costs a full mark per allocation
+reference gc_every_allocation(s, t)
+under test: shape
+let numerals = [0, 1, 2, 7, 31]
+defaults trials = 8
+
+rule s_number: number(n)            => shape(n)
+rule s_text:   number(n)            => shape(text(n))
+rule s_pair:   shape(a), shape(b)   => shape(pair(a, b))
+rule s_array:  shape(a), shape(b)   => shape(arr(a, b))
+rule s_box:    shape(a)             => shape(box(a))
+
+law every_allocation: all s: shape(s), t: shape(t). gc_every_allocation(s, t) = accept
