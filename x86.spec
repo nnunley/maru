@@ -309,6 +309,7 @@ C9			LEAVE				V V
 90			NOP				V V
 F4			HLT				V V
 CD ib u			INT imm8			V V
+0F 05			SYSCALL				V I
 E6 ib u			OUT imm8, AL			V V
 
 # Carry, borrow, widening multiply and double shifts: 64-bit integers as

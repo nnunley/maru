@@ -39,6 +39,7 @@
 1 011010 1 imm19 Rt			CBNZ Xt, pc+simm19*4
 1101011 0 0 01 11111 0000 0 0 Rn 00000	BLR Xn
 1101011 0 0 10 11111 0000 0 0 11110 00000	RET
+11010100 000 imm16 00001		SVC #imm16
 1101010100 0 00 011 0010 0000 000 11111	NOP
 
 # Conditional branches, compare-and-branch, test-and-branch, PC-relative

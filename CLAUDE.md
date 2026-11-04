@@ -279,6 +279,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).
+- `exe` (`check/exe.l`): `exe.l` writes executables with no compiler, linker or codesign, for `linux-i386`, `linux-x64`,
+  `linux-arm64`, `macos-arm64` and `macos-x64`, from an assembly buffer, as `code-region.l` runs one in-process. ELF is
+  static; Mach-O keeps dyld and signs itself ad hoc (`sha256.l`, FIPS 180-4's vectors). Each program prints a message
+  and exits 42, the bytes are the same from all three evaluators, and each runs where it can: natively, under Rosetta,
+  or in Colima's Linux VM, and a target with nowhere to run says so. One piece of arm64 code returns 42 from a file and
+  through the JIT.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
@@ -336,6 +342,8 @@ done and the next step, running nothing. `notes/plan/LOOP.md` holds the loop's r
 ## Roadmap
 
 1. An `ir-gen-arm64.k` backend beside `ir-gen-c.k` and `ir-gen-x86.k`.
+   Its output goes through `exe.l` to a file or `code-region.l` to the JIT. x86-64 needs the same: `emit.l` and
+   `ir-gen-x86.k` emit 32-bit code, so hand-assembled programs are the only native x86-64 binaries so far.
 2. Carry over refactor work from `refactor-main` case by case, with tests.
    - First: the UTF-8 grammar, `grammars/unicode/utf8.g` on `refactor-main`.
      It was never run. Its actions read the lead byte as hex text, and it
