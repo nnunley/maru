@@ -64,6 +64,24 @@
     (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
     (expect "KSWorld.ks: the paths it draws, shapes then each character" (list-length (drawn doc 1024 768)) 934)))
 
+;; fonts fall through as a browser's do: Palatino Linotype to Palatino (macOS's, a collection) to the generic serif to
+;; the last resort, and a character a font lacks to the next that has it
+(expect "a family's fallbacks" (ks-font-chain 'PalatinoLinotype)
+	'(PalatinoLinotype Palatino serif TimesNewRoman DejaVuSerif DejaVuSans sans-serif))
+(define-function fonts-as-browsers-do (dir)
+  (expect "a snowman, which Times New Roman lacks, from DejaVu Sans"
+	  (ttf-full-name (ks-char-font (ks-fonts 'TimesNewRoman ks-plain) 9731)) "DejaVu Sans")
+  (expect "an unknown family, from the last resort" (map ttf-full-name (ks-fonts 'Nonesuch ks-plain)) '("DejaVu Sans"))
+  (when (ks-font-file 'Palatino ks-bold)
+    (expect "Palatino Linotype bold, from Palatino's collection" (ttf-full-name (ks-font 'PalatinoLinotype ks-bold)) "Palatino Bold"))
+  ;; the front page's text boxes in a font this system has are laid out as KSWorld did, but for 411, a centred line with
+  ;; tabs; those in Palatino Linotype aren't (Palatino's metrics are its own)
+  (let ((matched ()))
+    (array-do o (cadr (ksworld-load (concat-string dir "/Front page Onward Full v8.ks/index.pp")))
+      (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o) (laid-out-as-kept o)
+	   (push matched (<ks-object>-ref o))))
+    (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 479))))
+
 (require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
 (expect "the library Gezira is one" (type-of (gezira-library 0 0)) <gezira-library>)
 (let ((path (car (drawn "check/ksworld/scene.pp" 200 150))))
@@ -98,7 +116,7 @@
 		    ("KScript: no method handleButtonDown for KSTextLayout" . 5)))
 	  (set *ks-font-path* (cons (concat-string dir "/fonts") *ks-font-path*))
 	  (if (ks-font-file 'TimesNewRoman ks-bold)
-	      (text-as-kept (at r 'table) doc)
+	      (let () (text-as-kept (at r 'table) doc) (fonts-as-browsers-do dir))
 	    (println "KSWorld.ks's text: skipped, no Times New Roman in " *ks-font-path*)))))))
 
 (println (if ok "ksworld ok" "ksworld FAILED"))

@@ -9,7 +9,7 @@
 (define ttf-close	(subr "close" "i>i"))
 (define ttf-malloc	(subr "malloc" "l>p"))
 
-(define-structure <ttf> (bytes size upem loca-long glyf loca hmtx metrics cmap ascent descent))
+(define-structure <ttf> (bytes size base upem loca-long glyf loca hmtx metrics cmap ascent descent))
 
 ;; the file's bytes in C memory, read whole; byte-at reads them
 (define-function ttf-file-bytes (path)
@@ -33,9 +33,9 @@
 
 ;; a table's offset, by its four-letter tag, or ()
 (define-function ttf-table (f tag)
-  (let ((n (ttf-u16 f 4)) (found ()))
+  (let ((n (ttf-u16 f (+ (<ttf>-base f) 4))) (found ()))
     (for (i 0 n)
-      (let ((entry (+ 12 (* 16 i))) (same 1))
+      (let ((entry (+ (<ttf>-base f) (+ 12 (* 16 i)))) (same 1))
 	(for (k 0 4) (or (= (ttf-u8 f (+ entry k)) (string-at tag k)) (set same ())))
 	(and same (not found) (set found (ttf-u32 f (+ entry 8))))))
     found))
@@ -52,20 +52,52 @@
 	     (set found sub))))
     (or found (error "truetype: no Unicode cmap"))))
 
-(define-function ttf-load (path)
-  (let* ((file (ttf-file-bytes path))
-	 (f (new <ttf> (car file) (cdr file) 0 () 0 0 0 0 0 0 0)))
-    (let ((head (ttf-table f "head")) (hhea (ttf-table f "hhea")))
-      (set (<ttf>-upem f) (ttf-u16 f (+ head 18)))
-      (set (<ttf>-loca-long f) (= 1 (ttf-i16 f (+ head 50))))
-      (set (<ttf>-ascent f) (ttf-i16 f (+ hhea 4)))
-      (set (<ttf>-descent f) (ttf-i16 f (+ hhea 6)))
-      (set (<ttf>-metrics f) (ttf-u16 f (+ hhea 34))))
-    (set (<ttf>-glyf f) (ttf-table f "glyf"))
-    (set (<ttf>-loca f) (ttf-table f "loca"))
-    (set (<ttf>-hmtx f) (ttf-table f "hmtx"))
-    (set (<ttf>-cmap f) (ttf-cmap4 f))
-    f))
+(define-function ttf-init (f)
+  (let ((head (ttf-table f "head")) (hhea (ttf-table f "hhea")))
+    (set (<ttf>-upem f) (ttf-u16 f (+ head 18)))
+    (set (<ttf>-loca-long f) (= 1 (ttf-i16 f (+ head 50))))
+    (set (<ttf>-ascent f) (ttf-i16 f (+ hhea 4)))
+    (set (<ttf>-descent f) (ttf-i16 f (+ hhea 6)))
+    (set (<ttf>-metrics f) (ttf-u16 f (+ hhea 34))))
+  (set (<ttf>-glyf f) (or (ttf-table f "glyf") (error "truetype: no TrueType outlines (glyf)")))
+  (set (<ttf>-loca f) (ttf-table f "loca"))
+  (set (<ttf>-hmtx f) (ttf-table f "hmtx"))
+  (set (<ttf>-cmap f) (ttf-cmap4 f))
+  f)
+
+(define-function ttf-file (path)
+  (let ((file (ttf-file-bytes path))) (new <ttf> (car file) (cdr file) 0 0 () 0 0 0 0 0 0 0)))
+
+;; a face's full name (name 4), from its Macintosh (bytes) or Windows (UTF-16, ASCII kept) record
+(define-function ttf-full-name (f)
+  (let* ((name (ttf-table f "name")) (strings (+ name (ttf-u16 f (+ name 4)))) (found ()))
+    (for (i 0 (ttf-u16 f (+ name 2)))
+      (let* ((rec (+ name (+ 6 (* 12 i)))) (platform (ttf-u16 f rec)))
+	(when (and (not found) (= 4 (ttf-u16 f (+ rec 6))) (or (= platform 1) (= platform 3)))
+	  (let* ((at (+ strings (ttf-u16 f (+ rec 10)))) (step (if (= platform 3) 2 1))
+		 (n (/ (ttf-u16 f (+ rec 8)) step)) (out (string n)))
+	    (for (k 0 n) (set-string-at out k (ttf-u8 f (+ at (+ (* k step) (- step 1))))))
+	    (set found out)))))
+    found))
+
+;; a TrueType Collection's faces start where its header says, each table offset from the file's start as in one font
+(define-function ttf-face-bases (f)
+  (if (= "ttcf" (let ((t (string 4))) (for (k 0 4) (set-string-at t k (ttf-u8 f k))) t))
+      (let ((out ())) (for (i 0 (ttf-u32 f 8)) (push out (ttf-u32 f (+ 12 (* 4 i))))) (list-reverse! out))
+    '(0)))
+
+(define-function ttf-load (path) (ttf-init (ttf-file path)))
+
+;; the face of a font or collection whose full name is name
+(define-function ttf-load-face (path name)
+  (let ((f (ttf-file path)) (found ()))
+    (list-do base (ttf-face-bases f)
+      (unless found
+	(set (<ttf>-base f) base)
+	(and (equal name (ttf-full-name f)) (set found base))))
+    (or found (error "truetype: no face " name " in " path))
+    (set (<ttf>-base f) found)
+    (ttf-init f)))
 
 ;; a character's glyph number, 0 (the missing glyph) if the font hasn't one
 (define-function ttf-glyph (f code)

@@ -9,43 +9,90 @@
 (require "ksworld-pp.l")
 (require "truetype.l")
 
-;; fonts: a family's files by style, found in the first directory of *ks-font-path* that has one
+;; fonts, as a browser finds them: a family falls through to its alternatives, then its generic family, then the last
+;; resort, and each of those that has a file (its style's, or else its plain one) in a directory of *ks-font-path* is
+;; tried in turn for each character, the first with a glyph for it drawing it
 (define ks-font-files
   (list (cons 'TimesNewRoman
 	      (list (cons ks-plain	 "Times New Roman")
 		    (cons ks-bold	 "Times New Roman Bold")
 		    (cons ks-italic	 "Times New Roman Italic")
 		    (cons ks-bold-italic "Times New Roman Bold Italic")))
+	(cons 'PalatinoLinotype
+	      (list (cons ks-plain	 "pala")
+		    (cons ks-bold	 "palab")
+		    (cons ks-italic	 "palai")
+		    (cons ks-bold-italic "palabi")))
+	(cons 'Palatino	; a collection: its file, and the face in it
+	      (list (cons ks-plain	 '("Palatino" "Palatino"))
+		    (cons ks-bold	 '("Palatino" "Palatino Bold"))
+		    (cons ks-italic	 '("Palatino" "Palatino Italic"))
+		    (cons ks-bold-italic '("Palatino" "Palatino Bold Italic"))))
+	(cons 'DejaVuSerif
+	      (list (cons ks-plain	 "DejaVuSerif")
+		    (cons ks-bold	 "DejaVuSerif-Bold")
+		    (cons ks-italic	 "DejaVuSerif-Italic")
+		    (cons ks-bold-italic "DejaVuSerif-BoldItalic")))
 	(cons 'DejaVuSans
 	      (list (cons ks-plain	 "DejaVuSans")
 		    (cons ks-bold	 "DejaVuSans-Bold")
 		    (cons ks-italic	 "DejaVuSans-Oblique")
 		    (cons ks-bold-italic "DejaVuSans-BoldOblique")))))
-(define *ks-font-path* '("/System/Library/Fonts/Supplemental" "/Library/Fonts"
+(define ks-font-alternatives	; a family, what stands in for it, and its generic family
+  '((TimesNewRoman serif) (PalatinoLinotype Palatino serif) (Palatino serif) (DejaVuSerif serif) (DejaVuSans sans-serif)
+    (serif TimesNewRoman DejaVuSerif) (sans-serif DejaVuSans)))
+(define ks-font-last-resort '(DejaVuSans))
+(define *ks-font-path* '("/System/Library/Fonts/Supplemental" "/System/Library/Fonts" "/Library/Fonts"
 			 "/usr/share/fonts/truetype/msttcorefonts" "/usr/share/fonts/truetype/dejavu"))
 (define *ks-fonts* ())	; (path . font), each loaded once
 
 (define-function ks-readable? (path) (= 0 ((subr "access" "si>i") path 4)))
 
-;; the file for a family and style, or () if no directory has it
+;; the file for a family and style, a .ttf's path or a .ttc's path and face, or () if no directory has it
 (define-function ks-font-file (family style)
   (let ((name (cdr (assq style (cdr (assq family ks-font-files))))) (found ()))
     (and name
 	 (list-do dir *ks-font-path*
-	   (let ((path (concat-strings dir "/" name ".ttf")))
-	     (and (not found) (ks-readable? path) (set found path)))))
+	   (let ((path (if (pair? name) (concat-strings dir "/" (car name) ".ttc") (concat-strings dir "/" name ".ttf"))))
+	     (and (not found) (ks-readable? path) (set found (if (pair? name) (cons path (cadr name)) path))))))
     found))
 
-(define-function ks-font (family style)
+;; the families a family falls through to, in order, each once
+(define-function ks-font-chain (family)
+  (let ((out ()))
+    (let ((visit ()))
+      (set visit (lambda (f)
+		   (unless (member? f out)
+		     (push out f)
+		     (list-do g (cdr (assq f ks-font-alternatives)) (visit g)))))
+      (visit family)
+      (list-do f ks-font-last-resort (visit f)))
+    (list-reverse! out)))
+
+(define-function ks-load-font (path)
+  (let ((found ()))
+    (list-do p *ks-fonts* (and (equal path (car p)) (set found (cdr p))))
+    (or found
+	(let ((f (if (pair? path) (ttf-load-face (car path) (cdr path)) (ttf-load path))))
+	  (set *ks-fonts* (cons (cons path f) *ks-fonts*))
+	  f))))
+
+;; every font a family and style can draw with, best first
+(define-function ks-fonts (family style)
   (list-do flag ks-emphasis
     (or (= 0 (& style (cdr flag))) (not (= 0 (& (cdr flag) ks-bold-italic))) (error "ksworld-text: no " (car flag) " text yet")))
-  (let ((path (or (ks-font-file family style) (error "ksworld-text: no font for " family " in style " style))))
-    (let ((found ()))
-      (list-do p *ks-fonts* (and (equal path (car p)) (set found (cdr p))))
-      (or found
-	  (let ((f (ttf-load path)))
-	    (set *ks-fonts* (cons (cons path f) *ks-fonts*))
-	    f)))))
+  (let ((out ()))
+    (list-do f (ks-font-chain family)
+      (let ((path (or (ks-font-file f style) (ks-font-file f ks-plain))))
+	(and path (push out (ks-load-font path)))))
+    (or (list-reverse! out) (error "ksworld-text: no font for " family " in style " style ", nor anything to stand in for it"))))
+(define-function ks-font (family style) (car (ks-fonts family style)))
+
+;; the font that draws a character: the first with a glyph for it, or the best, with its missing glyph
+(define-function ks-char-font (fonts code)
+  (let ((found ()))
+    (list-do f fonts (and (not found) (< 0 (ttf-glyph f code)) (set found f)))
+    (or found (car fonts))))
 
 ;; a span's fill, "red green blue alpha" from 0 to 255, as ksworld-paint answers one
 (define-function ks-span-paint (fill)
@@ -60,12 +107,12 @@
   (let ((out ()))
     (list-do s spans
       (let* ((pl (cdr s))
-	     (font (ks-font (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
-	     (scale (/ (string->double (ks-plist-get pl ':size)) (<ttf>-upem font)))
+	     (fonts (ks-fonts (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
+	     (size (string->double (ks-plist-get pl ':size)))
 	     (paint (ks-span-paint (ks-plist-get pl ':fill)))
 	     (text (ks-plist-get pl ':data)))
 	(for (i 0 (string-length text))
-	  (let ((code (string-at text i)))
+	  (let* ((code (string-at text i)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
 	    (push out (new <ks-char> code font scale paint
 			   (* scale (ttf-advance font (ttf-glyph font code))) 0))))))
     (list-reverse! out)))

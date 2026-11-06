@@ -226,8 +226,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `ksworld-text.l` lays a text box's spans out as KSWorld did (its KSTextLayout's margins, justification, tab stops and
   wrapping; lines ascent plus descent plus 2 apart; a centred line's width adding its first glyph's left bearing), and
   `ksworld-render.l` draws each character's outline after the box's shape: each of KSWorld.ks's five text boxes puts the
-  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 934 paths. A family
-  with no `.ttf` (Palatino Linotype; macOS has only a `.ttc`) or an emphasis other than bold and italic is an error.
+  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 934 paths.
+  Fonts are found as a browser finds them: a family falls through to its alternatives, its generic family (`serif`,
+  `sans-serif`) and a last resort (DejaVu Sans, which `fetch-dbjr` fetches), and a character a font lacks to the next
+  font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
+  `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
+  KSWorld put them, but for 411, a centred line with tabs. An emphasis other than bold and italic is an error, and so is a
+  fill other than a uniform colour (the front page's `GeziraFillImage`).
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
