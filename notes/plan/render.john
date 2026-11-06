@@ -43,7 +43,7 @@ make Case nile_text_layout untested.
 ; what draws, and where
 make Case gezira_image untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
 make Case sdl3_window untested.			; a window shows a pixel buffer, and mouse events come back
-make Case ksworld_headless untested.		; a document's streams run, and its boxes' paths are fed to Gezira pipelines
+make Case ksworld_headless untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
 make Case ksworld_text untested.		; a document's spans laid out as TrueType glyph paths
 make Case ksworld_render untested.		; a document rendered through Gezira to pixels, against its bundle's preview
 make Case ksworld_mouse untested.		; a click lands on the box under it, fires its streams, and the redraw shows it
@@ -68,7 +68,7 @@ make Capability GeziraImage "Gezira's kernels, compiled through Maru, render a s
   "gezira/, the Nile runtime" [ gezira_image ] [ NileEndToEnd ] no.
 make Capability Sdl3Window "an SDL3 window shows a pixel buffer each frame and hands back mouse and key events"
   "sdl3.osdefs, sdl3.k" [ sdl3_window ] [ ] no.
-make Capability DocumentScene "a document's boxes feed their shapes' paths to libgezira pipelines, each placed by its matrix and painted in its fill"
+make Capability DocumentScene "a document's boxes ask a Gezira to fill their shapes' paths, each placed by its matrix and painted in its fill"
   "ksworld-render.l" [ ksworld_headless ] [ ] no.
 make Capability DocumentText "a document's text spans are laid out with TrueType glyph outlines, quadratic Béziers Gezira draws"
   "a TrueType byte grammar, ksworld-text.l" [ ksworld_text ] [ DocumentScene ] no.

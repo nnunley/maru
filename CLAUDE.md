@@ -210,14 +210,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
   `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
   is a failure; unset, it says it skipped them.
-  `ksworld-render.l`'s `(ksworld-render box image process width height)` draws a document with libgezira and libnile
-  (`libgezira.k`, `libnile.k`): walking the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it
-  feeds each shape's path, as its FloatArray holds it, to a pipeline of `TransformBeziers` (the matrix composed from every
-  transformation above it), `ClipBeziers`, `Rasterize` and a composite in the fill's colour: the geometry is Gezira's, in
-  Nile. Matrices are Gezira's (x' = a x + c y + e); a document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's
-  rows, read once into those fields. The check stands a recording in for the libraries: the fixture's one pipeline and feed,
-  and KSWorld.ks's 7 paths before its text, which is kept as `span` records (string, font, fill, size) to be laid out with
-  TrueType glyphs.
+  `ksworld-render.l`'s `(ksworld-render box gezira width height)` draws a document with whatever Gezira it's given: walking
+  the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it asks `(gezira-fill-path gezira matrix
+  width height paint floats count)` of each shape's path, as its FloatArray holds it, placed by the matrix composed from every
+  transformation above it. The geometry is Gezira's, in Nile. `gezira-library.l`'s Gezira is libgezira and libnile
+  (`libgezira.k`, `libnile.k`: a `TransformBeziers`, `ClipBeziers`, `Rasterize`, composite pipeline); Gezira compiled into the
+  image would answer the same message, so neither need be a library. Matrices are Gezira's (x' = a x + c y + e); a
+  document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
+  a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
+  `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

@@ -17,26 +17,25 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("KScript: no method blink for KSBox" . 1))))
 
-;; what a document draws, handed to libgezira and libnile as pipelines and feeds: here they're stood in for by a recording
-;; of each call, so the walk is checked without the libraries
-(define *drawn* ())
-(define-function gezira_TransformBeziers (process a b c d e f) (list 'transform a b c d e f))
-(define-function gezira_ClipBeziers (process x0 y0 x1 y1) (list 'clip x0 y0 x1 y1))
-(define-function gezira_Rasterize (process) '(rasterize))
-(define-function gezira_CompositeUniformColorOverImage_ARGB32 (process image a r g b) (list 'paint a r g b))
-(define-function nile_Process_pipe stages (let ((out ())) (list-do s stages (or (= 0 s) (push out s))) (list-reverse! out)))	; 0 ends the list
-(define-function nile_Process_feed (pipeline floats n)
-  (let ((fs ())) (for (i 0 n) (push fs (float-at floats i))) (push *drawn* (cons pipeline (list-reverse! fs)))))
+;; what a document draws, asked of a Gezira: here one that records each path it's asked to fill, so the walk is checked
+;; with no Gezira built
+(define-structure <gezira-recording> (paths))
+(define-method gezira-fill-path <gezira-recording> (m width height paint floats count)
+  (let ((fs ())) (for (i 0 count) (push fs (float-at floats i)))
+    (push self.paths (list (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m))
+			   (list width height) paint (list-reverse! fs)))))
 (define-function drawn (doc width height)
-  (set *drawn* ())
-  (ksworld-render (car (ksworld-load doc)) 'image 'process width height)
-  (list-reverse! *drawn*))
+  (let ((g (new <gezira-recording> ())))
+    (ksworld-render (car (ksworld-load doc)) g width height)
+    (list-reverse! (<gezira-recording>-paths g))))
 
-(let ((scene (drawn "check/ksworld/scene.pp" 200 150)))
-  (expect "one path drawn: placed by both transformations composed, clipped to the image, rasterised, painted red"
-	  (car (car scene)) '((transform 2.0 0.0 0.0 2.0 105.0 57.0) (clip 0.0 0.0 200.0 150.0) (rasterize) (paint 1.0 1.0 0.0 0.0)))
-  (expect "fed the shape's Béziers as it holds them: transforming them is Gezira's"
-	  (cdr (car scene))
+(require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
+(expect "the library Gezira is one" (type-of (gezira-library 0 0)) <gezira-library>)
+(let ((path (car (drawn "check/ksworld/scene.pp" 200 150))))
+  (expect "one path, placed by both transformations composed, clipped to the image, painted red"
+	  (list (car path) (cadr path) (caddr path)) '((2.0 0.0 0.0 2.0 105.0 57.0) (200 150) (uniform 1.0 1.0 0.0 0.0)))
+  (expect "given as the shape holds it: transforming it is Gezira's"
+	  (cadddr path)
 	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
 
 (expect "Color's class and its colours answer apart"
