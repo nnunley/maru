@@ -8,7 +8,7 @@
 ;; no question can hang a run: past its limit the child dies by the alarm, which is reported as a crash
 (define alarm (subr "alarm" "i>i"))
 (define-function verdict (ask)
-  (let ((status (law-child (lambda () (alarm 60) (_exit (if (ask) 0 3))))))
+  (let ((status (law-child (lambda () (law-limit 60) (_exit (if (ask) 0 3))))))
     (cond ((= 0 status) accept) ((= (<< 3 8) status) reject) (else (list 'crash status)))))
 
 ;;; the real system

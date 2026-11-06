@@ -244,6 +244,13 @@
 (define waitpid	(subr "waitpid" "ipi>i"))
 (define _exit	(subr "_exit" "i"))
 (define status-word ((subr "malloc" "l>p") 8))
+;; a question's limit is CPU time, so contention can't make it inconclusive: RLIMIT_CPU (0 on Darwin and Linux; a
+;; struct of two 64-bit limits) ends it with SIGXCPU, status 24, and an alarm at four times as long ends one that blocks
+(define law-rlimit ((subr "malloc" "l>p") 16))
+(define-function law-limit (secs)
+  (for (k 0 16) (set-byte-at law-rlimit k (& 255 (>> secs (* 8 (% k 8))))))
+  ((subr "setrlimit" "ip>i") 0 law-rlimit)
+  ((subr "alarm" "i>i") (* 4 secs)))
 (define-function law-quiet ()	; the child's output, an error's backtrace included, goes nowhere
   (let ((fd ((subr "open" "si>i") "/dev/null" 1))) ((subr "dup2" "ii>i") fd 1) ((subr "dup2" "ii>i") fd 2)))
 (define-function law-child (run)	; run in a forked, silenced child that exits: its wait status, or -1 if fork or waitpid failed
@@ -251,7 +258,7 @@
     (when (= 0 pid) (law-quiet) (run))
     (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
 (define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
-  (let ((st (law-child (lambda () ((subr "alarm" "i>i") 60) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+  (let ((st (law-child (lambda () (law-limit 60) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
     (cond ((< st 0) 'crash) ((= 0 st) 1))))
 (define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))

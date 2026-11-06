@@ -25,7 +25,7 @@
 (define-function collect (n) (for (i 0 n) (gc-collect)))
 ;; asks a question in a child: its body answers true to accept
 (define-function gc-verdict (ask)
-  (let ((status (law-child (lambda () ((subr "alarm" "i>i") 60) (_exit (if (ask) 0 3))))))
+  (let ((status (law-child (lambda () (law-limit 60) (_exit (if (ask) 0 3))))))
     (cond ((= 0 status) accept) ((= (<< 3 8) status) reject) (else (list 'crash status)))))
 (define-function churn (n) (for (i 0 n) (cons i i)))
 
@@ -163,7 +163,7 @@
 (define *held* ())
 (define-function gc_oom_final_exit (megabytes)
   (let ((status (law-child (lambda ()
-			     ((subr "alarm" "i>i") 60)
+			     (law-limit 60)
 			     (limit-above-use megabytes)
 			     (define-function hold-forever () (while 1 (set *held* (cons 0 *held*))))
 			     (catch 'room (lambda () (with-handler (lambda (c) (throw 'room 0)) hold-forever)))

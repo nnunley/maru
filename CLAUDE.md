@@ -400,8 +400,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   A world keeps one record per slot however often it writes it, and a commit hands its parent only what the parent lacks, so a
   loop in a `try` doesn't grow the log, though each call that sets a fresh local still adds a record. Generators are aimed by
   deliberate bugs: reintroduce one and count the seeds that catch it.
-  A law file's limit is CPU time (300 s, `RLIMIT_CPU`, with an alarm at four times as long for a run that blocks), so
-  cases or agents running beside it can't fail it by contention; each run keeps its own output, and a failure prints its
+  A law file's limit is CPU time (300 s, `RLIMIT_CPU`, with an alarm at four times as long for a run that blocks), and so
+  is each question's (`law.l`'s `law-limit`, 60 s, 10 s for Nile's), so cases or agents running beside them can't fail
+  them by contention; each run keeps its own output, and a failure prints its
   last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
   forked question inherits from the law runner.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
