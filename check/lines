@@ -208,7 +208,6 @@
 +83 test/leaks.k: the nile_leaks driver: 200 DupZip pipelines on one worker, then nile_print_leaks, which must write nothing (R-leaks); a driver, so it counts (nile/runtimes/maru/test)
 +3 nile-builtins.k: the Zip epilogue deactivates before it activates, as C's does, so the second zipper's heap isn't overwritten and its blocks lost (nile/runtimes/maru)
 +60 test/zip-stream.k: the nile_zip_stream driver: DupZip fed in two pieces, output checked before the second (R-zip-stream); a driver, so it counts (nile/runtimes/maru/test)
-+32 check/ksworld-pixels.l: the ksworld_pixels script, in progress: KSWorld.ks in a window on a <gezira-maru> (check/ksworld-pixels.l)
 +14 check.l: the nile_leaks and nile_zip_stream cases (check/check.l)
 +1 gezira-maru.l: the require of ksworld-pp.l, which its matrix accessors need (gezira-maru.l)
 +46 nile-builtins.k: Dup copies to each branch in step and makes the fuller branch its consumer at quota, as C's nile_Dup_body does; its epilogue releases the first branch and makes the second the consumer (nile/runtimes/maru)
@@ -220,3 +219,5 @@
 +14 check.l: the ksworld_rerender case, ASan and UBSan by default and ThreadSanitizer under MARU_SANITIZE=thread (check/check.l)
 +4 ksworld-render.l: a path's floats are whole elements, since gezira_fill refuses a partial one (ksworld-render.l)
 +4 gezira-api.k: gezira_fill refuses a count that isn't whole elements, as nile_Process_feed does (nile/runtimes/maru)
++95 ksworld-pixels.l: KSWorld.ks in an SDL3 window on a painting Gezira: the bar's composite, the page, a filled shape, and the selection and its glyphs after a press and a drag through sdl3-push (check/ksworld-pixels.l)
++7 check.l: the ksworld_pixels case (check/check.l)

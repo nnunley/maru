@@ -408,6 +408,13 @@
 	(unit-assert (equal (last (run "ksworld_window" "SDL_VIDEO_DRIVER=dummy ./eval check/ksworld-window.l")) "ksworld window ok")))
       (println "SKIP ksworld_window: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
 
+;; KSWorld.ks's pixels in that window: the bar, the background, a filled shape, the glyphs and the selection after a press and
+;; a drag through sdl3-push (check/ksworld-pixels.l)
+(check "ksworld_pixels"
+  (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
+      (unit-assert (equal (last (run "ksworld_pixels" "SDL_VIDEO_DRIVER=dummy ./eval check/ksworld-pixels.l")) "ksworld pixels ok"))
+      (println "SKIP ksworld_pixels: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
+
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
 ;; call by meaning: answers from a scripted model held to probes and examples, and the Ollama client against a forked server
