@@ -99,12 +99,12 @@
   (let ((v (map (lambda (x) (/ (ks-parse-num x) 255.0)) (ks-split fill 32))))
     (list 'uniform (cadddr v) (car v) (cadr v) (caddr v))))
 
-(define-structure <ks-char> (code font scale paint advance x))
+(define-structure <ks-char> (code font scale paint advance x index))
 (define-structure <ks-glyph> (font glyph scale x y paint))
 
-;; the spans' characters, each knowing its font, scale and paint
+;; the spans' characters, each knowing its font, scale, paint and place in the text
 (define-function ks-span-chars (spans)
-  (let ((out ()))
+  (let ((out ()) (index 0))
     (list-do s spans
       (let* ((pl (cdr s))
 	     (fonts (ks-fonts (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
@@ -114,7 +114,8 @@
 	(for (i 0 (string-length text))
 	  (let* ((code (string-at text i)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
 	    (push out (new <ks-char> code font scale paint
-			   (* scale (ttf-advance font (ttf-glyph font code))) 0))))))
+			   (* scale (ttf-advance font (ttf-glyph font code))) 0 index))
+	    (set index (+ index 1))))))
     (list-reverse! out)))
 
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
@@ -172,7 +173,9 @@
     (and (pair? d) (pair? (car d)) (= 'span (caar d))
 	 (ks-object? layout) (= 'KSTextLayout (<ks-object>-class layout)))))
 
-(define-function ks-text-glyphs (box)
+;; a text box laid out: its glyphs, and its lines, each (top bottom start cells), start the index its first character
+;; would have and each cell (index left right) a character's place, spaces too
+(define-function ks-text-layout (box)
   (let* ((layout (ks-slot box 'handler))
 	 (left (ks-slot layout 'leftMargin)) (top (ks-slot layout 'topMargin))
 	 (width (- (- (<ks-point>-x (ks-val box 'extent)) left) (ks-slot layout 'rightMargin)))
@@ -180,7 +183,7 @@
 	 (interval (ks-slot layout 'tabArray))
 	 (tabs (and (ks-object? interval) (list (ks-slot interval 'start) (ks-slot interval 'stop) (ks-slot interval 'step))))
 	 (chars (ks-span-chars (<ks-object>-data box)))
-	 (y top) (out ()))
+	 (y top) (out ()) (lines ()) (next 0))
     (list-do line (ks-break-lines chars width tabs (not (= 'true (ks-slot layout 'noWrap))) left)
       (let* ((hard (car line)) (origin (cadr line)) (chars (cddr line)) (ink (ks-line-ink chars))
 	     (used (if ink (+ (ks-line-width ink tabs origin) (ks-left-bearing (car ink))) 0))
@@ -189,17 +192,49 @@
 			   ((= justification 'right) (- width used))
 			   (else 0)))
 	     (spread (if (and (= justification 'full) (not hard) (< 0 spaces)) (/ (- width (ks-line-width ink tabs origin)) spaces) 0))
-	     (ascent 0) (descent 0) (extra 0))
+	     (ascent 0) (descent 0) (extra 0) (cells ()))
 	(list-do c chars
 	  (set ascent (max ascent (* (<ks-char>-scale c) (<ttf>-ascent (<ks-char>-font c)))))
 	  (set descent (max descent (* (<ks-char>-scale c) (- (<ttf>-descent (<ks-char>-font c)))))))
-	(list-do c ink
-	  (let ((glyph (ttf-glyph (<ks-char>-font c) (<ks-char>-code c))))
-	    (or (ks-space? c)
-		(push out (new <ks-glyph> (<ks-char>-font c) glyph (<ks-char>-scale c)
-			       (+ (+ left offset) (+ (<ks-char>-x c) extra)) (+ y ascent) (<ks-char>-paint c))))
-	    (and (= 32 (<ks-char>-code c)) (set extra (+ extra spread)))))
+	(list-do c chars
+	  (let ((x (+ (+ left offset) (+ (<ks-char>-x c) extra))))
+	    (push cells (list (<ks-char>-index c) x (+ x (ks-char-width c (<ks-char>-x c) tabs origin))))
+	    (or (ks-space? c) (not (memq c ink))
+		(push out (new <ks-glyph> (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)) (<ks-char>-scale c)
+			       x (+ y ascent) (<ks-char>-paint c))))
+	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
+	(push lines (list y (+ (+ y ascent) descent) next (list-reverse! cells)))
+	(and chars (set next (+ 1 (<ks-char>-index (car (last-pair chars))))))
+	(and hard (set next (+ next 1)))	; past the carriage return, which no line holds
 	(set y (+ (+ y ascent) (+ descent 2)))))
+    (cons (list-reverse! out) (list-reverse! lines))))
+(define-function ks-text-glyphs (box) (car (ks-text-layout box)))
+
+;; the gap a point is nearest, in the box: its line the one it's in (or the nearest), then the first character whose
+;; middle is past it
+(define-function ks-text-gap (box point)
+  (let* ((lines (cdr (ks-text-layout box))) (line (car lines)) (x (<ks-point>-x point)) (y (<ks-point>-y point)) (gap ()))
+    (list-do l lines (and (<= (car l) y) (set line l)))
+    (set gap (caddr line))
+    (list-do cell (cadddr line)
+      (and (< (* 0.5 (+ (cadr cell) (caddr cell))) x) (set gap (+ 1 (car cell)))))
+    gap))
+
+;; where a selection of the gaps from to to shows: a rectangle (left top right bottom) on each line it covers, a caret
+;; one point wide where from is to
+(define-function ks-text-selection-rects (box from to)
+  (let ((out ()))
+    (list-do l (cdr (ks-text-layout box))
+      (let ((top (car l)) (bottom (cadr l)) (left ()) (right ()) (end (caddr l)))
+	(list-do cell (cadddr l)
+	  (when (and (<= from (car cell)) (< (car cell) to))
+	    (or left (set left (cadr cell)))
+	    (set right (caddr cell)))
+	  (and (= (car cell) from) (= from to) (set left (cadr cell)) (set right (+ (cadr cell) 1)))
+	  (set end (caddr cell)))
+	(and (= from to) (not left) (cadddr l) (= from (+ 1 (car (car (last-pair (cadddr l))))))
+	     (set left end) (set right (+ end 1)))
+	(and left (push out (list left top right bottom)))))
     (list-reverse! out)))
 
 ;; where KSWorld put a glyph's own box: at its bounding box's top left

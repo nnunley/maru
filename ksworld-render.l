@@ -35,6 +35,21 @@
     (and floats
 	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill)) floats (/ (data-length floats) 4)))))
 
+;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
+(define-function ksworld-render-selection (box m gezira width height)
+  (let ((layout (ks-slot box 'handler)) (sel ()))
+    (when (and (= 'true (ks-val box 'showSelection)) (ks-object? (set sel (ks-val layout 'selection))))
+      (let ((c (ks-slot layout 'selectionColor)))
+	(list-do r (ks-text-selection-rects box (ks-slot sel 'start) (- (ks-slot sel 'stop) 1))
+	  (let ((floats (data (* 4 24))) (i 0)
+		(corners (list (car r) (cadr r) (caddr r) (cadr r) (caddr r) (cadddr r) (car r) (cadddr r) (car r) (cadr r))))
+	    (for (k 0 4)	; each side a straight segment: start, start, end
+	      (let ((x0 (car corners)) (y0 (cadr corners)) (x1 (caddr corners)) (y1 (cadddr corners)))
+		(list-do v (list x0 y0 x0 y0 x1 y1) (set-float-at floats i (* 1.0 v)) (set i (+ i 1))))
+	      (set corners (cddr corners)))
+	    (gezira-fill-path gezira m width height
+			      (list 'uniform (<ks-color>-a c) (<ks-color>-r c) (<ks-color>-g c) (<ks-color>-b c)) floats 24)))))))
+
 (define-function ksworld-render-box (box m gezira width height)
   (when (and (ks-object? box) (not (= 'false (ks-val box 'visible))))
     (let* ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation))))
@@ -45,6 +60,7 @@
 	    (and (ks-object? element) (= 'GeziraPath (<ks-object>-class element))
 		 (ksworld-render-path element sm gezira width height)))))
       (when (ks-text-box? box)
+	(ksworld-render-selection box here gezira width height)
 	(list-do g (ks-text-glyphs box)
 	  (let ((floats (ks-glyph-floats g)))
 	    (and (< 0 (data-length floats))

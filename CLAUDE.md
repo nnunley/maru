@@ -200,16 +200,17 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   read held values, and layout and rendering don't exist yet.
   Methods are defined per kind of receiver (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), and
   a send no method answers is an error naming kind and selector; a KSWorld object's send sets or reads a field it already has, but
-  never makes one, which would hide a missing method.
+  never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
   counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
-  520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
-  `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
-  is a failure; unset, it says it skipped them.
+  520 objects, 346 streams (281 setters), every stream's code read, and nothing it names missing: `KSTextLayout`'s
+  `installSelection`, `handleButtonDown` and `handlePointerMotion` were Squeak methods in an image that didn't survive (no
+  `.changes` file in dbjr holds them), so `ksworld-events.l`'s are ours. Named but missing is a failure; unset, it says it
+  skipped them.
   `ksworld-render.l`'s `(ksworld-render box gezira width height)` draws a document with whatever Gezira it's given: walking
   the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it asks `(gezira-fill-path gezira matrix
   width height paint floats count)` of each shape's path, as its FloatArray holds it, placed by the matrix composed from every
@@ -226,7 +227,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `ksworld-text.l` lays a text box's spans out as KSWorld did (its KSTextLayout's margins, justification, tab stops and
   wrapping; lines ascent plus descent plus 2 apart; a centred line's width adding its first glyph's left bearing), and
   `ksworld-render.l` draws each character's outline after the box's shape: each of KSWorld.ks's five text boxes puts the
-  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 934 paths.
+  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 937 paths (the three
+  carets it kept showing among them).
   Fonts are found as a browser finds them: a family falls through to its alternatives, its generic family (`serif`,
   `sans-serif`) and a last resort (DejaVu Sans, which `fetch-dbjr` fetches), and a character a font lacks to the next
   font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
@@ -234,6 +236,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error, and so is a
   fill other than a uniform colour (the front page's `GeziraFillImage`).
+- `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
+  motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
+  left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
+  renderer composes), a motion or release to the box the hand holds if that stream is awake, then one tick runs. The
+  handlers are ours: a press puts the caret at the nearest gap, wakes `buttonUp` and `pointerMotion` and has the hand hold
+  the box; a drag selects from the press; a release, by the document's own stream, puts them back to sleep. A selection is
+  an Interval of gaps, `(from to: to + 1)`, as every one the documents kept is one wide, and the redraw asks the Gezira for
+  it in the layout's `selectionColor` under the text. No window yet: SDL3 and pixels wait on Gezira rendering.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

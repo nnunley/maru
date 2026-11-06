@@ -62,7 +62,8 @@
 	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s last line, laid out as KSWorld did")
 		(laid-out-as-kept o) 1)))
     (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
-    (expect "KSWorld.ks: the paths it draws, shapes then each character" (list-length (drawn doc 1024 768)) 934)))
+    ;; its shapes, the carets of the three text boxes it kept showing their selection, and each character
+    (expect "KSWorld.ks: the paths it draws, shapes, carets and characters" (list-length (drawn doc 1024 768)) 937)))
 
 ;; fonts fall through as a browser's do: Palatino Linotype to Palatino (macOS's, a collection) to the generic serif to
 ;; the last resort, and a character a font lacks to the next that has it
@@ -109,11 +110,7 @@
 	(let ((r (ksworld-run doc 3)))
 	  (expect "KSWorld.ks: objects and streams" (list (at r 'objects) (at r 'streams) (at r 'setters) (at r 'code) (at r 'unreadable))
 		  '(520 346 281 65 0))
-	  (expect "KSWorld.ks: what's missing"
-		  (at r 'failures)
-		  '(("KScript: no method installSelection for KSTextLayout" . 10)
-		    ("KScript: no method handlePointerMotion for KSTextLayout" . 5)
-		    ("KScript: no method handleButtonDown for KSTextLayout" . 5)))
+	  (expect "KSWorld.ks: nothing it names is missing (KSTextLayout's handlers are ksworld-events.l's)" (at r 'failures) ())
 	  (set *ks-font-path* (cons (concat-string dir "/fonts") *ks-font-path*))
 	  (if (ks-font-file 'TimesNewRoman ks-bold)
 	      (let () (text-as-kept (at r 'table) doc) (fonts-as-browsers-do dir))

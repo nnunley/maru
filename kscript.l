@@ -398,7 +398,7 @@
 	((pair? obj)
 	 (let ((p (assq field obj)))
 	   (if p (cdr p) 'nil)))
-	(else 'nil)))
+	(else (ks-send obj field () () ()))))	; a value's field is a message with no arguments, answered or an error
 
 (define-function ks-index (obj idx)
   (cond ((and (pair? obj) (number? idx))
