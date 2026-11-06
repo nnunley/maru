@@ -31,3 +31,35 @@ integer	RTLD_DEFAULT RTLD_NOW RTLD_GLOBAL
 header	sys/mman.h	(!defined __WIN32__)
 default	MAP_JIT 0
 integer	PROT_READ PROT_WRITE PROT_EXEC MAP_PRIVATE MAP_ANON MAP_JIT
+
+// TCP through subr (socket.l): the constants, and where sockaddr_in's fields are.  BSDs put a length byte before
+// sin_family, which is then one byte; Linux's is two, little-endian on every host here.
+header	sys/socket.h netinet/in.h	(!defined __WIN32__)
+default	SO_NOSIGPIPE 0
+default	MSG_NOSIGNAL 0
+integer	AF_INET SOCK_STREAM SOL_SOCKET SO_REUSEADDR SO_RCVTIMEO SO_NOSIGPIPE MSG_NOSIGNAL
+value	sockaddr_in_size	sizeof(struct sockaddr_in)
+value	sockaddr_in_family	offsetof(struct sockaddr_in, sin_family)
+value	sockaddr_in_family_size	sizeof(((struct sockaddr_in *)0)->sin_family)
+value	sockaddr_in_port	offsetof(struct sockaddr_in, sin_port)
+value	sockaddr_in_addr	offsetof(struct sockaddr_in, sin_addr)
+
+// What wait4 reports (check/jobs.l), and the struct timeval in it and in SO_RCVTIMEO.
+header	sys/time.h sys/resource.h	(!defined __WIN32__)
+value	timeval_size		sizeof(struct timeval)
+value	timeval_usec		offsetof(struct timeval, tv_usec)
+value	rusage_size		sizeof(struct rusage)
+value	rusage_utime		offsetof(struct rusage, ru_utime)
+value	rusage_stime		offsetof(struct rusage, ru_stime)
+value	rusage_maxrss		offsetof(struct rusage, ru_maxrss)
+value	rusage_minflt		offsetof(struct rusage, ru_minflt)
+value	rusage_majflt		offsetof(struct rusage, ru_majflt)
+value	rusage_inblock		offsetof(struct rusage, ru_inblock)
+value	rusage_oublock		offsetof(struct rusage, ru_oublock)
+value	rusage_nvcsw		offsetof(struct rusage, ru_nvcsw)
+value	rusage_nivcsw		offsetof(struct rusage, ru_nivcsw)
+
+// uname's fields (stub.l): each is the same size, and the machine's name is one of them.
+header	sys/utsname.h	(!defined __WIN32__)
+value	utsname_size		sizeof(struct utsname)
+value	utsname_machine		offsetof(struct utsname, machine)

@@ -15,6 +15,7 @@
 (define-function do-float	(x)	(println "  defflt("x");"))
 (define-function do-string	(x)	(println "  defstr("x");"))
 (define-function do-size	(i)	(println "  defsao("i");"))
+(define-function do-value	(i e)	(println "  printf(\"(define-constant %s %ld)\\n\", \""i"\", (long)("e"));"))
 
 (define-function def-headers  (i)	(list-do x i (array-append *headers*  (list do-header  x  ))))
 (define-function def-alt      (i e)		     (array-append *prologue* (list do-default i e)) )
@@ -23,6 +24,7 @@
 (define-function def-floats   (i)	(list-do x i (array-append *program*  (list do-float   x  ))))
 (define-function def-strings  (i)	(list-do x i (array-append *program*  (list do-string  x  ))))
 (define-function def-sizes    (i)	(list-do x i (array-append *program*  (list do-size    x  ))))
+(define-function def-value    (i e)		     (array-append *program*  (list do-value   i e)) )
 
 (require "osdefs.g.l")
 

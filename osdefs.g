@@ -36,6 +36,7 @@ definition	= "header"  keyword header*:i				 eol __	-> (def-headers  i)
 		| "string"  keyword qualified_id*:i			 eol __	-> (def-strings  i)
 		| "type"    keyword identifier:i _ (!eol .)*@$:t	 eol __	-> (def-type   i t)
 		| "sizes"   keyword identifier*:i _ (!eol .)*@$:t	 eol __	-> (def-sizes    i)
-		| "default" keyword identifier:i dnl:e			     __	-> (def-alt    i e) ;
+		| "default" keyword identifier:i dnl:e			     __	-> (def-alt    i e)
+		| "value"   keyword identifier:i dnl:e			     __	-> (def-value  i e) ;
 
-file		= __ definition* (!. ~"'header', 'integer', 'float' or 'type'") ;
+file		= __ definition* (!. ~"'header', 'integer', 'float', 'string', 'type', 'sizes', 'default' or 'value'") ;

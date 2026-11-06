@@ -5,17 +5,16 @@
 ;;;
 ;;;   (stub-isa)                       the instruction set this process runs
 ;;;   (stub-primitive intents)         a primitive that runs them, with no C
+(require "osdefs.k")
 (require "source-parser.l")
 (require "text-parser.l")
 (require "abi.g.l")
 
-;; uname's fields are 256 bytes on macOS and 65 on Linux, and the machine is the fifth
+;; the machine uname names, where osdefs.k says its field is
 (define stub-host-isa
-  (let* ((u ((subr "malloc" "l>p") 4096))
-	 (_ ((subr "uname" "p>i") u))
-	 (width (if (= ?D (byte-at u 0)) 256 65))
-	 (first (byte-at u (* 4 width))))
-    (if (= first ?a) 'arm64 'x64)))		; arm64, aarch64; x86_64
+  (let* ((u ((subr "malloc" "l>p") utsname_size))
+	 (_ ((subr "uname" "p>i") u)))
+    (if (= ?a (byte-at u utsname_machine)) 'arm64 'x64)))	; arm64, aarch64; x86_64
 (define-function stub-isa () stub-host-isa)
 
 (define stub-abi-rows (parse-string <abispec> $file (contents-of-file-named "abi.spec")))
