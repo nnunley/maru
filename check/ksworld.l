@@ -35,7 +35,7 @@
 ;; ksworld-text.l puts its first character: Times New Roman, which KSWorld.ks's are, where this system has it.
 (define-function shape-beziers (shape)
   (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (<ks-object>-data (ks-slot path 'floats))) (out ()))
-    (for (i 0 (/ (/ (data-length floats) 4) 6))
+    (for (i 0 (/ (<ks-object>-count (ks-slot path 'floats)) 6))
       (let ((z ())) (for (k 0 6) (push z (float-at floats (+ (* 6 i) k)))) (push out (list-reverse! z))))
     (list-reverse! out)))
 (define-function box-style (box) (ks-slot (ks-slot (ks-val box 'font) 'face) 'style))
