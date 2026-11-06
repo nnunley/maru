@@ -19,12 +19,14 @@
 	  (at r 'failures) '(("KScript: no method blink for KSBox" . 1))))
 
 ;; the characters a document kept (each its own box, its shape a glyph from TrueType) against what truetype.l reads of the
-;; same character from the same font: Times New Roman, which KSWorld.ks's are, where this system has it.  A face's style is
-;; Squeak's emphasis: 0 plain, 1 bold, 2 italic, 3 both.
-(define times-new-roman '("Times New Roman" "Times New Roman Bold" "Times New Roman Italic" "Times New Roman Bold Italic"))
+;; same character from the same font: Times New Roman, which KSWorld.ks's are, where this system has it, in the face's style.
+(define times-new-roman
+  (list (cons ks-plain		"Times New Roman")
+	(cons ks-bold		"Times New Roman Bold")
+	(cons ks-italic		"Times New Roman Italic")
+	(cons ks-bold-italic	"Times New Roman Bold Italic")))
 (define-function times-file (style)
-  (let ((name (car times-new-roman)) (k style)) (let ((l times-new-roman)) (while (< 0 k) (set l (cdr l)) (set k (- k 1))) (set name (car l)))
-    (concat-strings "/System/Library/Fonts/Supplemental/" name ".ttf")))
+  (concat-strings "/System/Library/Fonts/Supplemental/" (cdr (assq style times-new-roman)) ".ttf"))
 (define-function shape-beziers (shape)
   (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (<ks-object>-data (ks-slot path 'floats))) (out ()))
     (for (i 0 (/ (/ (data-length floats) 4) 6))
@@ -32,8 +34,8 @@
     (list-reverse! out)))
 (define-function box-style (box) (ks-slot (ks-slot (ks-val box 'font) 'face) 'style))
 (define-function glyphs-as-kept (table)
-  (if (not (= 0 ((subr "access" "si>i") (times-file 1) 4)))
-      (println "KSWorld.ks's glyphs: skipped, no Times New Roman at " (times-file 0))
+  (if (not (= 0 ((subr "access" "si>i") (times-file ks-bold) 4)))
+      (println "KSWorld.ks's glyphs: skipped, no Times New Roman at " (times-file ks-plain))
     (let ((seen 0))
       (array-do o table
 	(when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (< 0 (or (ks-val o 'unicode) 0)) (ks-object? (ks-val o 'shape)))

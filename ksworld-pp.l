@@ -20,6 +20,17 @@
 (define-function ks-matrix-rows (a11 a12 a13 a21 a22 a23)	(ks-matrix a11 a21 a12 a22 a13 a23))
 (define-function ks-color (r g b a)		(new <ks-color> (* 1.0 r) (* 1.0 g) (* 1.0 b) (* 1.0 a)))
 
+;; (define-enum name a b c ...) defines a as 0, b as 1, and so on, counted in order, and name as the list of them
+(define-form define-enum (name . members)
+  (let ((n 0) (values ()))
+    (list-do m members
+      (push values `(define ,m ,n))
+      (set n (+ n 1)))
+    `(let () ,@(list-reverse! values) (define ,name ',members))))
+
+;; a face's style, as Squeak counts its emphasis
+(define-enum ks-emphasis ks-plain ks-bold ks-italic ks-bold-italic)
+
 (define-method do-print <ks-object> ()	(print "<" self.class "#" self.ref ">"))
 (define-method do-print <ks-point> ()	(print "(" self.x "@" self.y ")"))
 (define-method do-print <ks-rect> ()	(print "(" self.left "@" self.top " corner: " self.right "@" self.bottom ")"))
