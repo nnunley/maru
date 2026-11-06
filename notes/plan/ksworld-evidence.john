@@ -5,3 +5,6 @@ KSWorldHeadless do observed passed(tree: "bbad2a7cf8b2").
 DbjrDocuments do observed passed(tree: "72e431c280e8").
 KSWorldHeadless do observed passed(tree: "72e431c280e8").
 WholeSuite do observed passed(tree: "72e431c280e8").
+DbjrDocuments do observed passed(tree: "262ef90ee8e3").
+KSWorldHeadless do observed passed(tree: "262ef90ee8e3").
+WholeSuite do observed passed(tree: "262ef90ee8e3").
