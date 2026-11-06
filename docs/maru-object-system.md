@@ -414,7 +414,7 @@ In `eval` these three are C objects (eval.c:90-92) and the boot file has matchin
 
 `*expanders*`, `*encoders*`, `*evaluators*` and `*applicators*` are arrays indexed by type number (boot.l:245-248, `define-expand`, `define-encode`, `define-eval` and `define-apply`).
 
-- In `eval`, `expand` (eval.c:1057), `encode` (eval.c:1186), the evaluator default (eval.c:1314) and `apply` (eval.c:1400) all read their table.
+- In `eval`, `expand` (eval.c:1057), `encode` (eval.c:1186), the evaluator default (eval.c:1313) and `apply` (eval.c:1400) all read their table.
 - In `eval2` and `eval3`, only `apply` reads `*applicators*` (eval2.c:1662; eval3.c:1671). The other three tables exist, but nothing reads them. Probe in both: `(define-eval <pt> (obj) (quote E))` raised no error, and `*evaluators*` grew without effect.
 
 ---
