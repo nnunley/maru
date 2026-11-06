@@ -211,3 +211,7 @@
 +32 check/ksworld-pixels.l: the ksworld_pixels script, in progress: KSWorld.ks in a window on a <gezira-maru> (check/ksworld-pixels.l)
 +14 check.l: the nile_leaks and nile_zip_stream cases (check/check.l)
 +1 gezira-maru.l: the require of ksworld-pp.l, which its matrix accessors need (gezira-maru.l)
++46 nile-builtins.k: Dup copies to each branch in step and makes the fuller branch its consumer at quota, as C's nile_Dup_body does; its epilogue releases the first branch and makes the second the consumer (nile/runtimes/maru)
++77 test/gezira-many.k: the gezira_many driver, 1200 fills of three shapes through the Gezira entry points on any worker count, with nile_print_leaks (nile/runtimes/maru/test)
++13 check.l: the gezira_many case, and gezira-kernels, which gezira_image and gezira_many share (check/check.l)
++28 ksworld-show.l: runnable window on a KSWorld document, for a person to try (ksworld-show.l)
