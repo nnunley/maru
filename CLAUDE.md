@@ -211,8 +211,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
   is a failure; unset, it says it skipped them.
   `ksworld-scene.l`'s `(ksworld-scene box)` is what a document draws: walking the box tree (`backgroundParts`, `contents`,
-  `parts`; a hidden box draws nothing), each shape's paths, their quadratic Béziers composed through every transformation
-  into window coordinates, with their fills, in drawing order. KSWorld.ks's boxes draw 7 paths before its text, which is
+  `parts`; a hidden box draws nothing), each shape's paths with their fills, in drawing order: the Béziers as the shape holds
+  them and the matrix composed from every transformation above them, in Gezira's order, since transforming the points is
+  Gezira's `TransformBeziers`, in Nile. KSWorld.ks's boxes draw 7 paths before its text, which is
   kept as `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,

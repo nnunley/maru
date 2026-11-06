@@ -20,10 +20,10 @@
 ;; what a document draws: a box's shape through its transformation and its container's, a hidden box drawing nothing
 (let ((scene (ksworld-scene (car (ksworld-load "check/ksworld/scene.pp")))))
   (expect "one path drawn, its fill" (list (list-length scene) (<ks-object>-class (caar scene))) '(1 GeziraFillUniform))
-  (expect "its Béziers in the window, through both transformations"
-	  (cdar scene)
-	  '((105.0 57.0 105.0 57.0 125.0 57.0) (125.0 57.0 125.0 57.0 125.0 97.0)
-	    (125.0 97.0 125.0 97.0 105.0 97.0) (105.0 97.0 105.0 97.0 105.0 57.0))))
+  (expect "the matrix placing it, both transformations composed, in Gezira's order" (cadar scene) '(2.0 0.0 0.0 2.0 105.0 57.0))
+  (expect "its Béziers as the shape holds them: transforming them is Gezira's"
+	  (cddr (car scene))
+	  '((0.0 0.0 0.0 0.0 10.0 0.0) (10.0 0.0 10.0 0.0 10.0 20.0) (10.0 20.0 10.0 20.0 0.0 20.0) (0.0 20.0 0.0 20.0 0.0 0.0))))
 
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send 'Color 'white () () ())) (try (ks-send 'Color 'lighter () () ()) (lambda (c) (ksw-message c))))
