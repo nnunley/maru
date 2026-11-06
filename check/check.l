@@ -308,6 +308,10 @@
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "catch" (concat-strings evaluator " check/catch.l") 300)) "catch ok"))))
 ;; errors are survivable and leave state as it was, on every evaluator; the collector's laws hold (check/laws/gc.law)
+;; the undo log's logic is undo.irl; the C every evaluator includes, undo-irl.c, is what it compiles to (make undo-irl)
+(check "undo_irl"
+  (unit-assert (= 0 (run-status 300 (concat-strings "exec </dev/null >/dev/null 2>&1; ./eval2 compile-irl-library.l undo.irl > " tmp
+						    "/undo-irl.c && cmp -s undo-irl.c " tmp "/undo-irl.c")))))
 (check "recover"
   (list-do evaluator (native-evaluators)
     (unit-assert (equal (last (run "recover" (concat-strings evaluator " check/recover.l") 300)) "recover ok"))))

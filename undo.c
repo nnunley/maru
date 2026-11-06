@@ -1,84 +1,31 @@
-/* undo.c -- the undo log behind worlds: while one is active, each write through a primitive records what it overwrites,
- * so the world can be dropped by replaying the log backwards.  Included by each evaluator, which defines UNDO_CONS.
- * Raw memory (set-byte-at and the like) and the evaluator's own tables are outside it (on eval, whose encoder makes a
- * variable before anything runs, a name defined in a failed world stays, valued as before): reads never pay anything,
- * writes pay one test when no world is active, and C always sees the current value.
- *
- * As in Warth's worlds, a world keeps one record per slot, however often it's written: rollback needs only the value from
- * before the first write.  A commit hands the parent the records it doesn't already have, and drops the rest.
+/* undo.c -- what the undo log needs from an evaluator: a record's parts, making one, and putting a value back.  The log's
+ * logic (worlds, which slots each has recorded, commit, rollback) is undo.irl, compiled to undo-irl.c and included here.
+ * Included by each evaluator, which defines UNDO_CONS.  Raw memory (set-byte-at and the like) and the evaluator's own
+ * tables are outside it (on eval, whose encoder makes a variable before anything runs, a name defined in a failed world
+ * stays, valued as before): reads never pay anything, writes pay one test when no world is active, and C always sees the
+ * current value.
  */
+#include <stdint.h>
+
 enum { UNDO_HEAD, UNDO_TAIL, UNDO_ARRAY, UNDO_ARRAY_SIZE, UNDO_OOP, UNDO_CHAR, UNDO_STRING_SIZE, UNDO_VARIABLE, UNDO_BINDING };
 
-static oop  undoLog=    nil;
-static long undoDepth=  0;
-static long undoPaused= 0;
+static void    *undo_calloc(int64_t n, int64_t size)	{ return calloc(n, size); }
+static void    *undo_realloc(void *p, int64_t size)	{ return realloc(p, size); }
+static void     undo_free(void *p)			{ free(p); }
+static void     undo_fatal(char *reason)		{ fatal(reason); }
+static void    *undo_head(void *l)			{ oop o= l;  return getHead(o); }
+static void    *undo_tail(void *l)			{ oop o= l;  return getTail(o); }
+static void     undo_set_tail(void *l, void *t)		{ oop o= l;  setTail(o, (oop)t); }
+static int64_t  undo_kind(void *entry)			{ oop o= entry;  return getLong(getHead(getTail(o))); }
+static int64_t  undo_index(void *entry)			{ oop o= entry;  return getLong(getHead(getTail(getTail(o)))); }
+static void     undo_replay(void *entry);
 
-/* which slots each open world has a record for: a set of (object, kind, index, world).  A world's number is never reused,
- * so an entry for a world no longer open is simply dead: it's ignored, and rehashing drops it.  An entry for an open
- * world is backed by a log entry, which keeps its object alive, so a dead object's address can't match one.
- */
-struct undoSlot { oop object;  long index;  long world;  int kind;  int depth; };
+#include "undo-irl.c"
 
-static struct undoSlot *undoSlots=     0;
-static size_t           undoSlotsSize= 0;
-static size_t           undoSlotsUsed= 0;
-static long            *undoWorlds=    0;		/* the number of the open world at each depth */
-static long             undoWorldsMax= 0;
-static long             undoNextWorld= 1;
+#define undoLog		(*(oop *)&v_undo__log)
+#define undoLogging()	(v_undo__depth && !v_undo__paused)
 
-static int undoSlotOpen(struct undoSlot *s)
-{
-    return s->depth <= undoDepth && undoWorlds[s->depth] == s->world;
-}
-
-static struct undoSlot *undoSlotFind(oop object, int kind, long index, long world, struct undoSlot **free)
-{
-    size_t mask= undoSlotsSize - 1;
-    size_t at= (((size_t)object >> 3) * 31 + (size_t)kind * 7 + (size_t)index * 131 + (size_t)world * 2654435761UL) & mask;
-    *free= 0;
-    for (;;  at= (at + 1) & mask) {
-	struct undoSlot *s= &undoSlots[at];
-	if (!s->world) { if (!*free) *free= s;  return 0; }
-	if (s->world == world && s->object == object && s->kind == kind && s->index == index) return s;
-	if (!*free && !undoSlotOpen(s)) *free= s;
-    }
-}
-
-static void undoSlotsGrow(void)
-{
-    struct undoSlot *old= undoSlots;
-    size_t oldSize= undoSlotsSize, i, open= 0;
-    for (i= 0;  i < oldSize;  ++i) if (old[i].world && undoSlotOpen(&old[i])) ++open;
-    size_t size= oldSize ? oldSize : 1024;
-    while (open * 4 >= size) size *= 2;
-    undoSlots= calloc(size, sizeof(struct undoSlot));
-    if (!undoSlots) fatal("out of memory for the undo log");
-    undoSlotsSize= size;
-    undoSlotsUsed= 0;
-    for (i= 0;  i < oldSize;  ++i)
-	if (old[i].world && undoSlotOpen(&old[i])) {
-	    struct undoSlot *free;
-	    undoSlotFind(old[i].object, old[i].kind, old[i].index, old[i].world, &free);
-	    *free= old[i];
-	    ++undoSlotsUsed;
-	}
-    free(old);
-}
-
-/* notes that the world at depth has a record of this slot; true if it's the first */
-static int undoSlotAdd(oop object, int kind, long index, long depth)
-{
-    struct undoSlot *free;
-    long world= undoWorlds[depth];
-    if ((undoSlotsUsed + 1) * 4 >= undoSlotsSize * 3) undoSlotsGrow();
-    if (undoSlotFind(object, kind, index, world, &free)) return 0;
-    if (!free->world) ++undoSlotsUsed;
-    free->object= object;  free->kind= kind;  free->index= index;  free->world= world;  free->depth= depth;
-    return 1;
-}
-
-#define undoLogging()	(undoDepth && !undoPaused)
-
+/* a record, (object kind index . old), onto the log */
 static void undoRecord(oop object, long kind, long index, oop old)
 {
     GC_PROTECT(object);
@@ -95,8 +42,9 @@ static void undoRecord(oop object, long kind, long index, oop old)
     GC_UNPROTECT(object);
 }
 
+/* OLD is only made if this is the slot's first write in the world */
 #define undoNote(OBJECT, KIND, INDEX, OLD)						\
-    do { if (undoLogging() && undoSlotAdd(OBJECT, KIND, INDEX, undoDepth)) undoRecord(OBJECT, KIND, INDEX, OLD); } while (0)
+    do { if (undoLogging() && undo_first(OBJECT, KIND, INDEX)) undoRecord(OBJECT, KIND, INDEX, OLD); } while (0)
 
 #ifdef UNDO_VARIABLE_WRITE
 static void undoVariableWrite(oop var)
@@ -123,8 +71,9 @@ static void undoStringWrite(oop string, int index)
     }
 }
 
-static void undoReplay(oop entry)
+static void undo_replay(void *record)
 {
+    oop  entry=  (oop)record;
     oop  object= getHead(entry);	entry= getTail(entry);
     long kind=   getLong(getHead(entry));	entry= getTail(entry);
     long index=  getLong(getHead(entry));
@@ -157,71 +106,13 @@ static void undoReplay(oop entry)
 }
 
 /* for the laws: how many entries the log holds */
-long maru_undo_log_size(void)
-{
-    long n= 0;
-    oop l= undoLog;
-    while (nil != l) { ++n;  l= getTail(l); }
-    return n;
-}
+long maru_undo_log_size(void)	{ return undo_log_size(); }
 
-/* a world is the log as it stood when it began */
-static subr(undo_begin)
-{
-    if (++undoDepth >= undoWorldsMax) {
-	undoWorldsMax= undoWorldsMax ? undoWorldsMax * 2 : 64;
-	undoWorlds= realloc(undoWorlds, sizeof(long) * undoWorldsMax);
-	if (!undoWorlds) fatal("out of memory for the undo log");
-    }
-    undoWorlds[undoDepth]= undoNextWorld++;
-    return undoLog;
-}
-
-/* a world's writes stay.  An enclosing world can still drop them, so it takes the records it doesn't already have */
-static subr(undo_commit)
-{
-    oop mark= getHead(args);
-    if (1 == undoDepth) undoLog= nil;
-    else {
-	oop l= undoLog, previous= nil;
-	while (l != mark && nil != l) {
-	    oop entry= getHead(l), rest= getTail(entry);
-	    long kind= getLong(getHead(rest));
-	    long index= getLong(getHead(getTail(rest)));
-	    if (undoSlotAdd(getHead(entry), kind, index, undoDepth - 1)) previous= l;
-	    else if (nil == previous) undoLog= getTail(l);
-	    else setTail(previous, getTail(l));
-	    l= getTail(l);
-	}
-    }
-    --undoDepth;
-    return nil;
-}
-
-static subr(undo_rollback)
-{
-    oop mark= getHead(args);
-    while (undoLog != mark && nil != undoLog) {
-	undoReplay(getHead(undoLog));
-	undoLog= getTail(undoLog);
-    }
-    --undoDepth;
-    undoPaused= 0;
-    return nil;
-}
-
-/* a fresh object has nothing to undo, and whatever a failing world makes to report it must outlast the world */
-static subr(undo_pause)
-{
-    ++undoPaused;
-    return nil;
-}
-
-static subr(undo_resume)
-{
-    --undoPaused;
-    return nil;
-}
+static subr(undo_begin)		{ return (oop)undo_begin(); }
+static subr(undo_commit)	{ undo_commit(getHead(args));  return nil; }
+static subr(undo_rollback)	{ undo_rollback(getHead(args));  return nil; }
+static subr(undo_pause)		{ undo_pause();  return nil; }
+static subr(undo_resume)	{ undo_resume();  return nil; }
 
 static void undoOutOfMemory(void)
 {
