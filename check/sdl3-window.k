@@ -46,6 +46,7 @@
 (define-function main int ((argc int) (argv char * *))
   (let (((win struct <sdl3-window>) (sdl3-open "sdl3 window" W H)))
     (expect "the window opens" (!= 0 (cast (member win window) long)))
+    (expect "with a renderer and a texture" (and (!= 0 (cast (member win renderer) long)) (!= 0 (cast (member win texture) long))))
     (let (((pixels int32 *) (cast (malloc (cast (* 4 (* W H)) long)) int32 *)))
       (fill-frame pixels)
       (sdl3-draw win (cast pixels void *))

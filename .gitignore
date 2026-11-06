@@ -31,3 +31,5 @@ osdefs.k
 *.so
 *~
 .DS_Store
+/sdl3.osdefs.k
+*.osdefs.exe

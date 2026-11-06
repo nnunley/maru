@@ -616,10 +616,11 @@
 
 ;; sdl3.k (typed; sdl3.osdefs.k measured from SDL3's headers) opens a window on SDL's dummy video driver,
 ;; draws a known frame, reads it back and round-trips synthetic mouse and key events (check/sdl3-window.k).
-;; Without SDL3 (pkg-config finds no sdl3) it says it skipped and passes.
+;; Without SDL3 (pkg-config, or pkg-config itself, finds no sdl3) it says it skipped and passes.
 (check "sdl3_window"
   (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
       (let ((prog (concat-strings tmp "/sdl3-window")))
+	(run "sdl3-osdefs-built" "make -q sdl3.osdefs.k")	; measured from these headers, not stale
 	(run "sdl3-window-src" (concat-strings "cat sdl3.osdefs.k sdl3.k check/sdl3-window.k > " tmp "/sdl3-window.k"))
 	(run "sdl3-window-gen" (concat-strings "./eval2 ir-gen-c.k maru.k " tmp "/sdl3-window.k > " prog ".c"))
 	(run "sdl3-window-cc" (concat-strings "cc -fno-builtin -w -o " prog " " prog ".c $(pkg-config --libs sdl3)"))

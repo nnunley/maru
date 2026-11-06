@@ -43,7 +43,7 @@
 (define-struct <sdl3-event> ((kind int) (x int) (y int) (button int) (key int)))
 
 ;; A window of WIDTH x HEIGHT pixels with a streaming ARGB8888 texture.  Its
-;; window is null if SDL couldn't start or open one; sdl3-error says why.
+;; window, renderer or texture is null if SDL couldn't make it; sdl3-error says why.
 (define-function sdl3-open (struct <sdl3-window>) ((title char *) (width int) (height int))
   (let (((win struct <sdl3-window>)))
     (set (member win width) width)
@@ -57,9 +57,10 @@
 	  (if (member win window)
 	      (let ()
 		(set (member win renderer) (SDL_CreateRenderer (member win window) "software"))
-		(set (member win texture)
-		     (SDL_CreateTexture (member win renderer) SDL_PIXELFORMAT_ARGB8888
-					SDL_TEXTUREACCESS_STREAMING width height))))))
+		(and (member win renderer)	; no renderer, no texture: sdl3-error says why
+		     (set (member win texture)
+			  (SDL_CreateTexture (member win renderer) SDL_PIXELFORMAT_ARGB8888
+					     SDL_TEXTUREACCESS_STREAMING width height)))))))
     (return win)))
 
 (define-function sdl3-error (char *) ()

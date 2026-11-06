@@ -275,13 +275,14 @@ osdefs.g.l : osdefs.g tpeg.l | eval
 
 # SDL3's headers and library from pkg-config: sdl3.osdefs measures SDL3's macros and structs, so it needs them.
 SDL3_FLAGS = $(shell pkg-config --cflags --libs sdl3 2>/dev/null)
-sdl3.osdefs.exe : sdl3.osdefs.c
+SDL3_HEADERS = $(wildcard $(patsubst -I%,%/SDL3/SDL_events.h,$(filter -I%,$(SDL3_FLAGS))))
+sdl3.osdefs.exe : sdl3.osdefs.c $(SDL3_HEADERS)
 	$(CC) -o $@ $< $(SDL3_FLAGS)
 
 %.osdefs.k : %.osdefs.exe
 	./$< > $@
 
-OSDEFS = $(wildcard *.osdefs) $(wildcard net/*.osdefs)
+OSDEFS = $(filter-out sdl3.osdefs,$(wildcard *.osdefs)) $(wildcard net/*.osdefs)	# sdl3.osdefs needs SDL3: built by check
 OSKEFS = $(OSDEFS:.osdefs=.osdefs.k)
 
 osdefs : osdefs.g.l $(OSKEFS) .force
