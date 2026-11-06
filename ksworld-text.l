@@ -248,7 +248,7 @@
 	 (floats (data (* 24 (list-length beziers)))) (i 0))
     (list-do z beziers (list-do v z (set-float-at floats i (* 1.0 v)) (set i (+ i 1))))
     floats))
-;; the floats ks-glyph-floats writes: a glyph's outline, counted (data-length would report the block, not these)
+;; the floats ks-glyph-floats writes: a glyph's outline, counted
 (define-function ks-glyph-count (g)
   (let ((n 0))
     (list-do z (ttf-outline (<ks-glyph>-font g) (<ks-glyph>-glyph g)) (set n (+ n (list-length z))))

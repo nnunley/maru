@@ -320,10 +320,11 @@
 ;; a saved image's heap has its books in order once it's loaded (only eval saves images)
 (check "gc_image"
   (let ((image (concat-strings tmp "/image")) (saver (concat-strings tmp "/save-image.l")) (reader (concat-strings tmp "/read-image.l")))
-    (run "gc_image_write" (concat-strings "printf '(define keep (list 1 2 3))\\n(save \"" image "\")\\n' > " saver))
-    (run "gc_image_write2" (concat-strings "printf '(println ((subr \"GC_check_heap\" \">l\")))\\n(println keep)\\n' > " reader))
+    ;; a Data keeps the length it was made with, and its bytes, across the image
+    (run "gc_image_write" (concat-strings "printf '(define keep (list 1 2 3))\\n(define bytes (data 8))\\n(set-byte-at bytes 7 42)\\n(save \"" image "\")\\n' > " saver))
+    (run "gc_image_write2" (concat-strings "printf '(println ((subr \"GC_check_heap\" \">l\")))\\n(println keep)\\n(println (data-length bytes) \" \" (byte-at bytes 7))\\n' > " reader))
     (run "gc_image_save" (concat-strings "./eval " saver))
-    (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)")))))
+    (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)" "8 42")))))
 ;; a law file's limit is CPU time, not wall time, so cases running beside it can't fail it: RLIMIT_CPU (0 on Darwin and
 ;; Linux) is set in the child and inherited by each question it forks, with an alarm at four times as long behind it
 ;; for a run that blocks without using the CPU.  Each run keeps its own output, and a failure prints its last lines.
@@ -863,7 +864,7 @@
 	     (san   (if (env-var "MARU_SANITIZE") "-g -O1 -fsanitize=thread" "-g -O1 -fsanitize=address,undefined"))
 	     (bin   (nile-build "nile-gezira-rerender" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "gezira-api.k") (concat-strings nile-dir "test/gezira-rerender.k")) san)))
 	;; every fill is whole path elements, and the first is the 26-float rectangle's 24 floats (four quadratic Béziers: the
-	;; floats the document's array holds, not the block's 26 that data-length reported)
+	;; floats the document's array holds)
 	(unit-assert (equal (last (run "ksworld-frame-summary" (concat-strings "tail -1 " frame))) "calls 937 whole 937 first 24"))
 	(list-do n '("1" "4")
 	  (unit-assert (equal (run (concat-strings "nile-gezira-rerender-" n) (concat-strings bin " " n " 2 " frame " && test ! -s " tmp "/nile-gezira-rerender-" n ".err") 600)

@@ -2440,7 +2440,8 @@ static void valtype(oop args, char *who)
 static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned long eltsize, oop args, char *who)
 {
     if (isLong(obj)) return getLong(obj) + offset;
-    if (offset + eltsize > (is(Data, obj) ? ptr2hdr(obj)->length : GC_size(obj))) {
+    unsigned long limit= is(Data, obj) ? ptr2hdr(obj)->length : GC_size(obj);
+    if (offset > limit || eltsize > limit - offset) {	/* no sum to wrap: a negative index is a huge offset */
 	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
 	fdumpln(stderr, args);
 	fatal(0);
@@ -2457,10 +2458,10 @@ static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned l
 	unsigned long off= getLong(idx);										\
 	if (isPair(arg)) {												\
 	    oop mul= getHead(arg);				if (!isLong(mul)) idxtype(args, #name"-at");		\
-	    off *= getLong(mul);				if (nil != getTail(arg)) arity(args, #name"-at");	\
+	    if (__builtin_mul_overflow(off, (unsigned long)getLong(mul), &off)) off= ~0UL;				if (nil != getTail(arg)) arity(args, #name"-at");	\
 	}														\
 	else														\
-	    off *= sizeof(ctype);											\
+	    if (__builtin_mul_overflow(off, sizeof(ctype), &off)) off= ~0UL;	/* a wrapped offset is out of range */											\
 	return new##otype(*(ctype *)checkRange(obj, off, sizeof(ctype), args, #name"-at"));				\
     }															\
 															\
@@ -2472,11 +2473,11 @@ static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned l
 	oop val= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, "set-"#name"-at");	\
 	unsigned long off= getLong(idx);										\
 	if (isPair(arg)) {					if (!isLong(val)) idxtype(args, "set-"#name"-at");	\
-	    off *= getLong(val);											\
+	    if (__builtin_mul_overflow(off, (unsigned long)getLong(val), &off)) off= ~0UL;											\
 	    val= getHead(arg);					if (nil != getTail(arg)) arity(args, "set-"#name"-at");	\
 	}														\
 	else														\
-	    off *= sizeof(ctype);				if (!is##otype(val)) valtype(args, "set-"#name"-at");	\
+	    if (__builtin_mul_overflow(off, sizeof(ctype), &off)) off= ~0UL;	/* a wrapped offset is out of range */				if (!is##otype(val)) valtype(args, "set-"#name"-at");	\
 	*(ctype *)checkRange(obj, off, sizeof(ctype), args, "set-"#name"-at")= get##otype(val);				\
 	return val;													\
     }
@@ -2827,6 +2828,11 @@ static void saver(FILE *out, void *ptr)
 	    }
 	    break;
 	}
+	case Data: {		// the length it was made with, which the header holds, then its bytes as any atom's
+	    if (out) put32(out, ptr2hdr(ptr)->length);
+	    GC_saver(out, ptr);
+	    break;
+	}
 	default:
 	    GC_saver(out, ptr);
 	    break;
@@ -2840,6 +2846,11 @@ static void loader(FILE *in, void *ptr)
     int type= get32(in, &tmp32);
     ptr2hdr(ptr)->type= type;
     switch (type) {
+	case Data: {
+	    ptr2hdr(ptr)->length= get32(in, &tmp32);
+	    GC_loader(in, ptr);
+	    break;
+	}
 	case Symbol: {
 	    int      len= get32(in, &tmp32);
 	    wchar_t *str= (wchar_t *)alloca(4 * len + 4);

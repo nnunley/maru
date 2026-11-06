@@ -385,7 +385,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil), variadic
   calls and raw byte access.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
-  kept in the object's header, not the collector's block size (often larger); reads and writes past it are out of range.
+  kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
+  Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose
+  byte offset overflows; the bounds check compares without a sum that could wrap.
 - `asm_interface` (`check/asm-interface.l`): the one encoder interface
   (`asm`, `asm-forms`, `asm-decode`, refusals) answers the same way for arm64
   and x64, under both evaluators.

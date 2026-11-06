@@ -175,9 +175,7 @@
 		(set-byte-at out (+ d 3) (byte-at tmp (+ s 0)))))))
 	out))))
 
-;; A FloatArray's length in floats, from the first word of its base64 (the count the document gives, not the size of the
-;; block data allocates: data-length reports the block, which is rounded up, so the words past the count would read as
-;; points of the path).
+;; A FloatArray's length in floats, from the first word of its base64: the count the document gives.
 (define-function b64-word-count (str)
   (let ((acc 0) (bits 0) (got 0) (i 0))
     (while (and (< got 4) (< i (string-length str)))

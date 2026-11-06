@@ -1,5 +1,21 @@
 ;;; data-length answers the length a Data was made with, not the size of the collector's block holding it (eval, eval3;
-;;; eval2 has no data-length).
-(let ((wrong ()))
-  (for (n 0 3000) (let ((d (data n))) (or (= n (data-length d)) (set wrong (cons (cons n (data-length d)) wrong)))))
-  (println (if wrong (concat-string "FAIL data-length, asked and answered: " (long->string (list-length wrong))) "data-length ok")))
+;;; eval2 has no data-length), and byte access is held to that length: past its end, or before its start (a negative index,
+;;; which would reach the object's header), is refused.
+(require "recover.l")
+(define ok 1)
+(define-function expect (what got want)
+  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(let ((wrong 0))
+  (for (n 0 3000) (or (= n (data-length (data n))) (set wrong (+ wrong 1))))
+  (expect "lengths answered otherwise than asked" wrong 0))
+(define-function refused? (thunk) (try (let () (thunk) ()) (lambda (c) 't)))
+(let ((d (data 8)))
+  (expect "the last byte is read" (refused? (lambda () (byte-at d 7))) ())
+  (expect "a byte past the end is refused" (refused? (lambda () (byte-at d 8))) 't)
+  (expect "a write past the end is refused" (refused? (lambda () (set-byte-at d 8 1))) 't)
+  (expect "a byte before the start is refused" (refused? (lambda () (byte-at d -1))) 't)
+  (expect "a write before the start is refused" (refused? (lambda () (set-byte-at d -1 255))) 't)
+  (expect "a far negative index is refused" (refused? (lambda () (byte-at d -9223372036854775807))) 't)
+  (expect "an index whose offset would wrap to 0 is refused" (refused? (lambda () (int32-at d 4611686018427387904))) 't)
+  (expect "and the length is untouched" (data-length d) 8))
+(println (if ok "data-length ok" "data-length FAILED"))
