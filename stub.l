@@ -82,9 +82,9 @@
     word))
 (define-function stub-set-word-at (object i value)
   (for (j 0 8) (set-byte-at object (+ (* i 8) j) (& (>> value (* 8 j)) 255))))
-(define-function stub-symbol (name)
-  (let ((address ((subr "dlsym" "ps>p") -2 name)))	; RTLD_DEFAULT
-    (or address (error "stub: no symbol " name))))
+(define-function stub-symbol (name)		; RTLD_DEFAULT is -2 on macOS and 0 on Linux; a symbol not found is 0
+  (let ((address ((subr "dlsym" "ps>p") RTLD_DEFAULT name)))
+    (if (= 0 address) (error "stub: no symbol " name) address)))
 
 ;; the primitive: a copy of apply's object, not scanned by the collector, with the stub as its function
 (define-function stub-primitive (intents)
