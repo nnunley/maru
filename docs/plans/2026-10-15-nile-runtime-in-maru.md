@@ -8,7 +8,7 @@
 
 **Tech Stack:** Typed Maru (`maru.k`, `ir2.k`, `ir-gen-c.k`) under `eval2`; untyped Maru under `eval` for `check/check.l`; POSIX threads; clang/cc with ThreadSanitizer; git submodules; `gh`.
 
-**Spec:** `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md`. Read it before any task. Requirement IDs below (`[R-…]`) are its markers.
+**Spec:** `docs/rfc/draft-ndn-nile-runtime-in-maru-02.md`. Read it before any task. Requirement IDs below (`[R-…]`) are its markers.
 
 ## Global Constraints
 
@@ -18,7 +18,7 @@
 - Each commit that changes the source line count adds a `check/lines` entry with its delta and reason, so `./eval check/check.l lines` passes after every commit.
 - Commit messages are Conventional Commits. No `Co-Authored-By` or other Claude attribution (a hook blocks it).
 - Work happens on short-lived branches (`nile-runtime` in `maru`, `maru-runtime` in the forks), merged into `main` and deleted when done; no stale branches. Push `main` and the forks' branches as work lands.
-- A task is done when its `maru-check` cases print `PASS` and `make check` stays green. `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-nile-runtime-in-maru-01.md` keeps reporting "red as declared" until Task 11, after which the RFC's `**Corpus:**` line is removed and it reports green.
+- A task is done when its `maru-check` cases print `PASS` and `make check` stays green. `~/.claude/skills/authoring-rfcs/rfc-run --expect docs/rfc/draft-ndn-nile-runtime-in-maru-02.md` keeps reporting "red as declared" until Task 11, after which the RFC's `**Corpus:**` line is removed and it reports green.
 - Runs on arm64 macOS by default. Task 12 repeats `make check` on `ndn.lan` (x86-64 Linux, fish shell).
 
 ## Review Focus
@@ -238,7 +238,7 @@ The full set `eval2` dropped and `boot2.l` lacks is: `allocate-atomic array-comp
 **Files:**
 - Create: `check/nile-text-layout.out` (the reference output)
 - In `nile`: create `runtimes/maru/test/print.k` (kernel `test_Print (parent, quantum)` printing each element's floats as `%.4f ` and a newline, as `test/nile-print.h`'s `PrintToFile` does), `runtimes/maru/test/text-layout-main.k`
-- Modify: `check/check.l` (case `nile_text_layout`), `check/lines`, `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md` (remove the `**Corpus:**` line), `CLAUDE.md` (Verify list entries for every `nile_*` case; remove "Gezira/GL demos need `libnile`…" only if Gezira is not yet affected, otherwise leave it)
+- Modify: `check/check.l` (case `nile_text_layout`), `check/lines`, `docs/rfc/draft-ndn-nile-runtime-in-maru-02.md` (remove the `**Corpus:**` line), `CLAUDE.md` (Verify list entries for every `nile_*` case; remove "Gezira/GL demos need `libnile`…" only if Gezira is not yet affected, otherwise leave it)
 
 **Interfaces:**
 - Consumes: Task 3's compiler script, Task 4's interface, every runtime file.

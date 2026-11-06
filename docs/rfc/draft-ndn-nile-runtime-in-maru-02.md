@@ -1,4 +1,4 @@
-# draft-ndn-nile-runtime-in-maru-01: A Nile Runtime in Typed Maru
+# draft-ndn-nile-runtime-in-maru-02: A Nile Runtime in Typed Maru
 
 **Status:** DRAFT
 **Corpus:** red (spec-first: the checks named below are the acceptance criteria)
@@ -52,8 +52,11 @@ definition of its interface, and the compiler port needed to build against
 Maru's `main`. It is the first of three steps toward the windowed Nile
 demos: (1) this runtime and `text-layout.nl` end to end; (2) Gezira's
 kernels through Maru, rendering a scene to an image file that matches the
-old C runtime's; (3) typed GLFW 3 and GL bindings and the snow demo, in a
-window on both hosts.
+old C runtime's; (3) typed SDL3 bindings and Gezira's demos, the snow demo
+first, in a window on macOS and Linux. SDL3 rather than GLFW and GL: Gezira
+renders into a buffer of pixels, so the third step needs a window to show a
+buffer in and the input events, not a GL context, and SDL3 gives both on
+both hosts from one library.
 
 ## Terminology
 
@@ -644,5 +647,8 @@ not reach the build unreviewed.
 - `CLAUDE.md` roadmap items 1 and 4, and the 20k line budget.
 - Table-driven assemblers and disassemblers (x86, A64):
   `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
+- SDL3: https://wiki.libsdl.org/SDL3/
+- Tracking issues: nnunley/maru #17 (Nile and Gezira running natively on
+  Linux and macOS), with this runtime as #11 and the SDL3 window as #15.
 - STEPS 2011 report, on Nothing running the Nile runtime:
   `notes/sources/`.

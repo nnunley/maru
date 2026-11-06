@@ -437,5 +437,5 @@ run it.
   (`~/pkm/raw/vpri/steps-2010-report.txt`).
 - Y. Ohshima et al., *KScript and KSWorld*, VPRI TR-2012-001, in the 2012
   STEPS final report (`~/pkm/raw/vpri/steps-2012-final-report.txt`).
-- RFC 0001 (table assemblers), draft-ndn-nile-runtime-in-maru-01: the
+- RFC 0001 (table assemblers), draft-ndn-nile-runtime-in-maru-02: the
   `maru-check` evidence adapter used here.

@@ -401,9 +401,10 @@ under `sat` the evidence is constant. `notes/plan/LOOP.md` holds the loop's rule
    (RFC 0001, `docs/rfc/0001-table-assemblers.md`) as part C of the 2026-10-14
    assembler design.
 5. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
-   POSIX mutexes, arm64 and x86-64), then Gezira, then the windowed demos.
+   POSIX mutexes, arm64 and x86-64), then Gezira, then its demos in an SDL3
+   window on macOS and Linux.
    Nile and Gezira come in as submodules of forks, and count toward the 20k.
-   Spec: `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md`.
+   Spec: `docs/rfc/draft-ndn-nile-runtime-in-maru-02.md`.
    - Array types in `maru.k`/`ir2`, replacing the runtime's `long` field runs.
    - Blocks sized to a stream's element size, so kernels over large tensors
      can run (one 512-byte block size caps an element at about 118 floats).
