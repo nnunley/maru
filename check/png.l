@@ -41,6 +41,19 @@
 (expect "an unknown critical chunk" (refusal "check/png/critical.png") "an unknown critical chunk")
 (expect "an ancillary chunk's CRC" (refusal "check/png/ancillary-crc.png") "a chunk's CRC doesn't match")
 
+;; hostile input (check/png/bad/, each made to break one rule) is refused, for its own reason, never read past
+(list-do case '(("truncated" "the file ends early") ("chunk-length" "the file ends early")
+		("no-ihdr" "IHDR isn't the first chunk") ("idat-first" "IHDR isn't the first chunk")
+		("ihdr-short" "IHDR isn't 13 bytes") ("zero-width" "the width or height is 0")
+		("huge" "the image is too large") ("compression" "a compression or filter method other than 0")
+		("filter-method" "a compression or filter method other than 0") ("no-iend" "there is no IEND")
+		("fdict" "the image data asks for a preset dictionary") ("no-adler" "the file ends early")
+		("stored-nlen" "a stored block's length doesn't match its complement") ("stored-long" "the file ends early")
+		("length-286" "a length or distance code no stream may use")
+		("distance-30" "a length or distance code no stream may use")
+		("oversubscribed" "a Huffman code with more codes than its lengths allow"))
+  (expect (concat-string "bad/" (car case)) (refusal (concat-string "check/png/bad/" (concat-string (car case) ".png"))) (cadr case)))
+
 ;; the round trip: random images, every filter and both block kinds, IDATs of 1 to 64 bytes, read back pixel for pixel
 (define seed 12345)
 (define-function random (n) (set seed (% (+ (* seed 1103515245) 12345) 2147483648)) (% (>> seed 8) n))

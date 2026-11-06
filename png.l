@@ -21,7 +21,11 @@
     (6 . "the image data isn't zlib's deflate") (7 . "the file ends early") (8 . "a Huffman code no table holds")
     (9 . "a distance past the start") (10 . "a deflate block of an unknown type") (11 . "the image data is the wrong size")
     (12 . "the image data's Adler-32 doesn't match") (13 . "a row has an unknown filter")
-    (14 . "a repeat with no length before it") (15 . "an unknown critical chunk")))
+    (14 . "a repeat with no length before it") (15 . "an unknown critical chunk")
+    (16 . "IHDR isn't the first chunk") (17 . "IHDR isn't 13 bytes") (18 . "the width or height is 0")
+    (19 . "the image is too large") (20 . "a compression or filter method other than 0") (21 . "there is no IEND")
+    (22 . "the image data asks for a preset dictionary") (23 . "a stored block's length doesn't match its complement")
+    (24 . "a Huffman code with more codes than its lengths allow") (25 . "a length or distance code no stream may use")))
 
 ;; the PNG held at address, size bytes long; what names it says where it came from
 (define-function png-decode (address size what)

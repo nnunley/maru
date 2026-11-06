@@ -51,14 +51,18 @@ long bits(struct Inflate* s, long n) {
   return v & ((cast(1, long) << cast(n, int)) - 1);
 }
 
-void huffman(struct Huff* h, long* lengths, long n) {
+// a canonical code from its lengths; answers 0, or 24 for more codes than the lengths allow (zlib's puff refuses it too)
+long huffman(struct Huff* h, long* lengths, long n) {
   let long* offsets := longs(16);
   let long i := 0;
+  let long left := 1;
   h.counts := longs(16);
   h.symbols := longs(n);
   while i < 16 do { h.counts[i] := 0; i := i + 1; }
   i := 0;
   while i < n do { h.counts[lengths[i]] := h.counts[lengths[i]] + 1; i := i + 1; }
+  i := 1;
+  while i < 16 do { left := (left << 1) - h.counts[i]; if left < 0 then { free(offsets); return 24; } i := i + 1; }
   offsets[1] := 0;
   i := 1;
   while i < 15 do { offsets[i + 1] := offsets[i] + h.counts[i]; i := i + 1; }
@@ -71,8 +75,14 @@ void huffman(struct Huff* h, long* lengths, long n) {
     i := i + 1;
   }
   free(offsets);
+  return 0;
 }
-struct Huff* huff() return cast(malloc(cast(sizeof(struct Huff), long)), struct Huff*);
+struct Huff* huff() {
+  let struct Huff* h := cast(malloc(cast(sizeof(struct Huff), long)), struct Huff*);
+  h.counts := cast(0, long*);
+  h.symbols := cast(0, long*);
+  return h;
+}
 void huffman_free(struct Huff* h) { free(h.counts); free(h.symbols); free(h); }
 
 // a symbol, or -1 with err 8 for a code its table doesn't hold
@@ -119,11 +129,17 @@ void codes(struct Inflate* s, struct Huff* lengths, struct Huff* distances) {
     if sym < 256 then put(s, sym);
     else {
       let long i := sym - 257;
-      let long len := length_base(i) + bits(s, length_extra(i));
-      let long d := decode(s, distances);
-      let long dist := dist_base(d) + bits(s, dist_extra(d));
-      if dist > s.at then s.err := 9;
-      while len > 0 && s.err == 0 do { put(s, u8(s.out, s.at - dist)); len := len - 1; }
+      if i > 28 then s.err := 25;	// 286 and 287 are in the table but no stream may use them
+      else {
+        let long len := length_base(i) + bits(s, length_extra(i));
+        let long d := decode(s, distances);
+        if d > 29 then s.err := 25;	// so are distance codes 30 and 31
+        else if s.err == 0 then {
+          let long dist := dist_base(d) + bits(s, dist_extra(d));
+          if dist > s.at then s.err := 9;
+          while len > 0 && s.err == 0 do { put(s, u8(s.out, s.at - dist)); len := len - 1; }
+        }
+      }
     }
     if s.err == 0 then sym := decode(s, lengths);
   }
@@ -131,15 +147,15 @@ void codes(struct Inflate* s, struct Huff* lengths, struct Huff* distances) {
 
 void fixed(struct Inflate* s) {
   let long* l := longs(288);
-  let long* d := longs(30);
+  let long* d := longs(32);	// all 32 five-bit codes (RFC 1951 3.2.6), so 30 and 31 decode and are refused
   let long i := 0;
   let struct Huff* hl := huff();
   let struct Huff* hd := huff();
   while i < 288 do { l[i] := i < 144 ? cast(8, long) : i < 256 ? cast(9, long) : i < 280 ? cast(7, long) : cast(8, long); i := i + 1; }
   i := 0;
-  while i < 30 do { d[i] := 5; i := i + 1; }
+  while i < 32 do { d[i] := 5; i := i + 1; }
   huffman(hl, l, 288);
-  huffman(hd, d, 30);
+  huffman(hd, d, 32);
   codes(s, hl, hd);
   huffman_free(hl); huffman_free(hd); free(l); free(d);
 }
@@ -161,7 +177,7 @@ void dynamic(struct Inflate* s) {
   while i < 19 do { cl[i] := 0; i := i + 1; }
   i := 0;
   while i < ncode do { cl[order[i]] := bits(s, 3); i := i + 1; }
-  huffman(hc, cl, 19);
+  s.err := huffman(hc, cl, 19);
   i := 0;
   while i < nlen + ndist && s.err == 0 do {
     let long sym := decode(s, hc);
@@ -173,12 +189,10 @@ void dynamic(struct Inflate* s) {
       while n > 0 && i < nlen + ndist && s.err == 0 do { lengths[i] := prev; i := i + 1; n := n - 1; }
     }
   }
-  if s.err == 0 then {
-    huffman(hl, lengths, nlen);
-    huffman(hd, lengths + nlen * cast(sizeof(long), long), ndist);
-    codes(s, hl, hd);
-    huffman_free(hl); huffman_free(hd);
-  }
+  if s.err == 0 then s.err := huffman(hl, lengths, nlen);
+  if s.err == 0 then s.err := huffman(hd, lengths + nlen * cast(sizeof(long), long), ndist);
+  if s.err == 0 then codes(s, hl, hd);
+  huffman_free(hl); huffman_free(hd);
   huffman_free(hc); free(order); free(cl); free(lengths);
 }
 
@@ -188,17 +202,26 @@ long inflate(char* src, long from, long to, char* out, long size) {
   let long last := 0;
   s.src := src; s.pos := from + 2; s.end := to; s.bitbuf := 0; s.bitcnt := 0; s.err := 0;
   s.out := out; s.at := 0; s.size := size;
-  if (u8(src, from) & 15) != 8 || ((u8(src, from) << 8) + u8(src, from + 1)) % 31 != 0 then return 6;
+  if to - from < 2 then { free(s); return 7; }
+  if (u8(src, from) & 15) != 8 || ((u8(src, from) << 8) + u8(src, from + 1)) % 31 != 0 then { free(s); return 6; }
+  if (u8(src, from + 1) & 32) != 0 then { free(s); return 22; }	// FDICT: a preset dictionary this stream doesn't have
   while last == 0 && s.err == 0 do {
     last := bits(s, 1);
     let long type := bits(s, 2);
     if type == 0 then {
       s.bitbuf := 0; s.bitcnt := 0;
-      let long len := u8(src, s.pos) + (u8(src, s.pos + 1) << 8);
-      let long k := 0;
-      s.pos := s.pos + 4;
-      while k < len && s.err == 0 do { put(s, u8(src, s.pos + k)); k := k + 1; }
-      s.pos := s.pos + len;
+      if s.end - s.pos < 4 then s.err := 7;
+      else {
+        let long len := u8(src, s.pos) + (u8(src, s.pos + 1) << 8);
+        let long k := 0;
+        if (u8(src, s.pos + 2) + (u8(src, s.pos + 3) << 8)) != (65535 - len) then s.err := 23;
+        else if s.end - s.pos - 4 < len then s.err := 7;
+        else {
+          s.pos := s.pos + 4;
+          while k < len && s.err == 0 do { put(s, u8(src, s.pos + k)); k := k + 1; }
+          s.pos := s.pos + len;
+        }
+      }
     }
     else if type == 1 then fixed(s);
     else if type == 2 then dynamic(s);
@@ -213,6 +236,7 @@ long inflate(char* src, long from, long to, char* out, long size) {
   let long b := 0;
   let long i := 0;
   while i < at do { a := (a + u8(out, i)) % 65521; b := (b + a) % 65521; i := i + 1; }
+  if to - end < 4 then return 7;
   if be32(src, end) != ((b << 16) | a) then return 12;
   return 0;
 }
@@ -261,22 +285,34 @@ long png_decode(char* src, long n, long* info) {
   let long err := 0;
   if n < 8 || u8(src, 0) != 137 || u8(src, 1) != 80 || u8(src, 2) != 78 || u8(src, 3) != 71 then err := 1;
   // the chunks: CRCs, the header, and how much image data
-  while err == 0 && at + 12 <= n do {
-    let long len := be32(src, at);
-    if at + 12 + len > n then err := 7;
-    else if be32(src, at + 8 + len) != crc(table, src, at + 4, at + 8 + len) then err := 2;
+  let long ended := 0;
+  while err == 0 && ended == 0 do {
+    if n - at < 12 then err := 7;
     else {
-      if u8(src, at + 4) == 73 && u8(src, at + 5) == 72 then {		// IHDR
+    let long len := be32(src, at);
+    let long type := be32(src, at + 4);
+    if len > n - at - 12 then err := 7;		// a length past the bytes there, compared without a sum to overflow
+    else if be32(src, at + 8 + len) != crc(table, src, at + 4, at + 8 + len) then err := 2;
+    else if (at == 8) != (type == 1229472850) then err := 16;	// IHDR, first and only first
+    else {
+      if type == 1229472850 then {
         w := be32(src, at + 8); h := be32(src, at + 12); colour := u8(src, at + 17);
-        if u8(src, at + 16) != 8 then err := 3;
+        if len != 13 then err := 17;
+        else if w == 0 || h == 0 then err := 18;
+        else if w > 16777216 || h > 16777216 || w * h > 268435456 then err := 19;
+        else if u8(src, at + 16) != 8 then err := 3;
         else if colour != 6 && colour != 2 then err := 4;
+        else if u8(src, at + 18) != 0 || u8(src, at + 19) != 0 then err := 20;
         else if u8(src, at + 20) != 0 then err := 5;
       }
-      if u8(src, at + 4) == 73 && u8(src, at + 5) == 68 then zsize := zsize + len;	// IDAT
+      if type == 1229209940 then zsize := zsize + len;	// IDAT
+      if type == 1229278788 then ended := 1;		// IEND
       // a critical chunk (its name's first letter upper case) other than IHDR, PLTE, IDAT and IEND can't be skipped
       if (u8(src, at + 4) & 32) == 0 && be32(src, at + 4) != 1229472850 && be32(src, at + 4) != 1347179589
          && be32(src, at + 4) != 1229209940 && be32(src, at + 4) != 1229278788 then err := 15;
       at := at + 12 + len;
+      if ended == 0 && err == 0 && at == n then err := 21;	// the chunks end with no IEND
+    }
     }
   }
   free(table);
@@ -286,9 +322,9 @@ long png_decode(char* src, long n, long* info) {
   let char* z := cast(malloc(zsize + 1), char*);
   let long zat := 0;
   at := 8;
-  while at + 12 <= n do {
+  while at + 12 <= n && be32(src, at + 4) != 1229278788 do {
     let long len := be32(src, at);
-    if u8(src, at + 4) == 73 && u8(src, at + 5) == 68 then {
+    if be32(src, at + 4) == 1229209940 then {
       let long k := 0;
       while k < len do { z[zat + k] := src[at + 8 + k]; k := k + 1; }
       zat := zat + len;
