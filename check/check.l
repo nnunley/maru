@@ -651,7 +651,7 @@
 
 ;; The runtime's files, in the order they're compiled; later tasks append theirs.
 (define nile-dir "nile/runtimes/maru/")
-(define nile-runtime '("nile-sync.k"))
+(define nile-runtime '("nile-sync.k" "nile-heap.k" "nile-deque.k" "nile-thread.k"))
 
 (define-function unique (items)
   (let ((out ()))
@@ -688,6 +688,14 @@
 				     tmp "/nile-osdefs-c"))))
     (unit-assert (equal typed c))
     (unit-assert (and typed (not (cdr typed))))))
+
+;; Startup, sync and shutdown with 1, 2 and 8 workers and with too little memory; the driver
+;; prints one line per case and nothing to stderr, so no block leaked (R-startup).
+(check "nile_startup"
+  (let* ((bin (nile-build "nile-startup" (list (concat-strings nile-dir "test/startup.k")) ""))
+	 (out (run "nile-startup-run"
+		   (concat-strings bin " && test ! -s " tmp "/nile-startup-run.err"))))
+    (unit-assert (equal out '("startup 1 ok" "startup 2 ok" "startup 8 ok" "startup small ok")))))
 
 ;;; ---------------------------------------------------------------- budget
 
