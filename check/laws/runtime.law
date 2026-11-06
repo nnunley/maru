@@ -1,13 +1,19 @@
--- the Nile runtime's built-ins and text-layout.nl, run through the batch driver (check/laws/runtime.l)
--- Lengths and seeds come from the block boundary: a block takes about 122 floats, so 121 to 123 and 244 to 245
--- cross one and two of them, and 0 is the empty stream.
+-- the Nile runtime's built-ins and text-layout.nl, run through the batch driver (check/laws/runtime.l), every law by
+-- exhaustion over its domains.  A buffer holds 122 floats (a 512-byte block less its 24-byte nile_Buffer, nile-kernel.k's
+-- nile_Buffer_capacity) in whole elements of its quantum.  So for a stream of floats (rt_input) lengths 121 to 123 cross
+-- one buffer and 244 and 245 two; for a stream of pairs (rt_pairs, rt_glyphs, and dupcat's and dupzip's doubled output)
+-- 60 to 62 cross one (61 pairs fill it) and 121 to 123 two; Words (3 floats) fill 40 to a buffer, wherever MakeWords puts
+-- them.  0 is the empty stream.
 under test: run_on, layout
-defaults trials = 30
-let numerals = [0, 1, 2, 3, 5, 121, 122, 123, 244, 245]
+let numerals = [0, 1, 2, 3, 5, 60, 61, 62, 121, 122, 123, 244, 245]
 
 fact workers(1)
 fact workers(4)
 fact workers(8)
+fact many(4)
+fact many(8)
+fact seed(1)
+fact seed(7)
 fact builtin("pass")
 fact builtin("reverse")
 fact builtin("sort")
@@ -17,32 +23,37 @@ fact layoutkind("words")
 fact layoutkind("breaks")
 fact layoutkind("points")
 fact lwidth(5)
-fact lwidth(10)
 fact lwidth(12)
+fact lwidth(30)
 
 -- built-ins, each against its definition (nile/runtimes/maru/nile-builtins.k, and the names as the test drivers use them)
-law pass_identity:     all w: workers(w), n: number(n), s: number(s). run_on("pass", w, rt_input(n, s)) = rt_input(n, s)
-law reverse_backwards: all w: workers(w), n: number(n), s: number(s). run_on("reverse", w, rt_input(n, s)) = rt_reverse(rt_input(n, s))
-law reverse_involution: all w: workers(w), n: number(n), s: number(s). run_on("reverse", w, run_on("reverse", w, rt_input(n, s))) = rt_input(n, s)
-law dupcat_is_twice:   all w: workers(w), n: number(n), s: number(s). run_on("dupcat", w, rt_input(n, s)) = rt_append(rt_input(n, s), rt_input(n, s))
-law dupzip_pairs:      all w: workers(w), n: number(n), s: number(s). run_on("dupzip", w, rt_input(n, s)) = rt_interleave(rt_input(n, s), rt_input(n, s))
-law sort_keys_ordered: all w: workers(w), n: number(n), s: number(s). rt_keys_ordered(run_on("sort", w, rt_pairs(n, s)), rt_pairs(n, s)) = 1
-law sort_permutation:  all w: workers(w), n: number(n), s: number(s). rt_sorted(rt_codes(run_on("sort", w, rt_pairs(n, s)))) = rt_sorted(rt_codes(rt_pairs(n, s)))
+law pass_identity:      all w: workers(w), n: number(n), s: seed(s). run_on("pass", w, rt_input(n, s)) = rt_input(n, s) by exhaustion
+law reverse_backwards:  all w: workers(w), n: number(n), s: seed(s). run_on("reverse", w, rt_input(n, s)) = rt_reverse(rt_input(n, s)) by exhaustion
+law reverse_involution: all w: workers(w), n: number(n), s: seed(s). run_on("reverse", w, run_on("reverse", w, rt_input(n, s))) = rt_input(n, s) by exhaustion
+law dupcat_is_twice:    all w: workers(w), n: number(n), s: seed(s). run_on("dupcat", w, rt_input(n, s)) = rt_append(rt_input(n, s), rt_input(n, s)) by exhaustion
+law dupzip_pairs:       all w: workers(w), n: number(n), s: seed(s). run_on("dupzip", w, rt_input(n, s)) = rt_interleave(rt_input(n, s), rt_input(n, s)) by exhaustion
+law sort_keys_ordered:  all w: workers(w), n: number(n), s: seed(s). rt_keys_ordered(run_on("sort", w, rt_pairs(n, s)), rt_pairs(n, s)) = 1 by exhaustion
+law sort_permutation:   all w: workers(w), n: number(n), s: seed(s). rt_sorted(rt_codes(run_on("sort", w, rt_pairs(n, s)))) = rt_sorted(rt_codes(rt_pairs(n, s))) by exhaustion
 
--- the same output for every worker count (the runtime's determinism, over pairs, which every built-in takes)
-law deterministic:     all k: builtin(k), w: workers(w), n: number(n), s: number(s). run_on(k, w, rt_pairs(n, s)) = run_on(k, 1, rt_pairs(n, s)) && rt_count_is(run_on(k, 1, rt_pairs(n, s)), k, rt_pairs(n, s)) = 1
+-- the same output on 4 and 8 workers as on one (the runtime's determinism, over pairs, which every built-in takes)
+law deterministic:      all k: builtin(k), w: many(w), n: number(n), s: seed(s). run_on(k, w, rt_pairs(n, s)) = run_on(k, 1, rt_pairs(n, s)) && rt_count_is(run_on(k, 1, rt_pairs(n, s)), k, rt_pairs(n, s)) = 1 by exhaustion
 
--- text-layout.nl: MakeWords (Glyph >> Word) keeps the total width and the glyph count of its input
-law words_width:       all w: workers(w), lw: lwidth(lw), n: number(n), s: number(s). rt_word_width(layout("words", w, lw, rt_glyphs(n, s))) = rt_glyph_width(rt_glyphs(n, s))
-law words_glyphs:      all w: workers(w), lw: lwidth(lw), n: number(n), s: number(s). rt_word_glyphs(layout("words", w, lw, rt_glyphs(n, s))) = rt_glyph_count(rt_glyphs(n, s))
+-- text-layout.nl:8, MakeWords: "if G.s ≠ W.s ∨ W.s = 2 ∨ (W.w + G.w > w)" starts a new word.  The words partition the glyphs
+-- into runs of one style, each as wide as its glyphs and, past one glyph, at most w; each run's first glyph splits from the
+-- word before it, and the initial (0, 0, 0) is output only if the first glyph splits from it or there is none
+law words_partition:    all w: workers(w), lw: lwidth(lw), n: number(n), s: seed(s). rt_words_partition(layout("words", w, lw, rt_glyphs(n, s)), rt_glyphs(n, s), lw) = 1 by exhaustion
 
--- text-layout.nl: InsertLineBreaks. A line of two or more words is at most the width, unless a word in it is style 1 (that
--- style never breaks: "else if (W.s = 1) ∨ (o + W.w ≤ w)"); a single word may be longer than the line
-law breaks_fit:        all w: workers(w), lw: lwidth(lw), n: number(n), s: number(s). rt_lines_fit(layout("breaks", w, lw, rt_glyphs(n, s)), lw) = 1 && rt_word_glyphs(layout("breaks", w, lw, rt_glyphs(n, s))) = rt_glyph_count(rt_glyphs(n, s))
+-- text-layout.nl:21, InsertLineBreaks: "else if (W.s = 1) ∨ (o + W.w ≤ w)" continues the line, else a marker (style 2) comes
+-- first.  Its output less the markers is MakeWords' words; a word that continues a line is style 1 or fits; and a marker comes
+-- only before a word that is not style 1 and doesn't fit after the line before it (never last, never twice)
+law breaks_keep_words:  all w: workers(w), lw: lwidth(lw), n: number(n), s: seed(s). rt_unbroken(layout("breaks", w, lw, rt_glyphs(n, s))) = layout("words", w, lw, rt_glyphs(n, s)) by exhaustion
+law breaks_fit:         all w: workers(w), lw: lwidth(lw), n: number(n), s: seed(s). rt_breaks_fit(layout("breaks", w, lw, rt_glyphs(n, s)), lw) = 1 by exhaustion
+law breaks_maximal:     all w: workers(w), lw: lwidth(lw), n: number(n), s: seed(s). rt_breaks_maximal(layout("breaks", w, lw, rt_glyphs(n, s)), lw) = 1 by exhaustion
 
--- text-layout.nl: PlaceWords sets x' = x + W.w within a line, and PlaceGlyphs is the one that offsets each glyph along it;
--- a glyph after another on the same line starts where that one ends
-law points_contiguous: all w: workers(w), lw: lwidth(lw), n: number(n), s: number(s). rt_points_contiguous(layout("points", w, lw, rt_glyphs(n, s)), rt_glyphs(n, s)) = 1
+-- text-layout.nl:29-55, PlaceWords, RepeatPlacement and PlaceGlyphs at b = (0, 0), h = 1: "x' = b.x, y' = y + h" at a marker,
+-- "x' = x + W.w" after a word, and each glyph offset by those before it in its word.  So a glyph's point is the width of the
+-- glyphs before it on its line, and its line's number, the lines as InsertLineBreaks gives them
+law points_placed:      all w: workers(w), lw: lwidth(lw), n: number(n), s: seed(s). layout("points", w, lw, rt_glyphs(n, s)) = rt_placed(layout("breaks", w, lw, rt_glyphs(n, s)), rt_glyphs(n, s)) by exhaustion
 
--- one worker and more agree for every layout stage
-law layout_deterministic: all k: layoutkind(k), w: workers(w), lw: lwidth(lw), n: number(n), s: number(s). layout(k, w, lw, rt_glyphs(n, s)) = layout(k, 1, lw, rt_glyphs(n, s)) && rt_layout_count(k, layout(k, 1, lw, rt_glyphs(n, s)), rt_glyphs(n, s)) = 1
+-- 4 and 8 workers agree with one for every layout stage
+law layout_deterministic: all k: layoutkind(k), w: many(w), lw: lwidth(lw), n: number(n), s: seed(s). layout(k, w, lw, rt_glyphs(n, s)) = layout(k, 1, lw, rt_glyphs(n, s)) && rt_layout_count(k, layout(k, 1, lw, rt_glyphs(n, s)), rt_glyphs(n, s)) = 1 by exhaustion

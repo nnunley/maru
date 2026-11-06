@@ -327,7 +327,8 @@
     (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)" "8 42")))))
 ;; a law file's limit is CPU time, not wall time, so cases running beside it can't fail it: RLIMIT_CPU (0 on Darwin and
 ;; Linux) is set in the child and inherited by each question it forks, with an alarm at four times as long behind it
-;; for a run that blocks without using the CPU.  Each run keeps its own output, and a failure prints its last lines.
+;; for a run that blocks without using the CPU.  Each run keeps its own output, the path law-file-holds answers, and a failure
+;; prints its last lines.
 (define-function run-cpu-status (secs cmd)
   (let ((pid (fork)))
     (when (= 0 pid)
@@ -343,7 +344,8 @@
   (set law-runs (+ law-runs 1))
   (let* ((out (concat-strings tmp "/" name "-" (long->string law-runs) ".out"))
 	 (status (run-cpu-status 300 (concat-strings "exec </dev/null >" out " 2>&1; exec " evaluator " check/law.l " support " " file))))
-    (or (= 0 status)
+    (if (= 0 status)
+	out
 	(let ((all (lines (contents-of-file-named out))))
 	  (println "law file " file " on " evaluator ": status " status " (a signal of 24 is the CPU limit, 14 the alarm); last lines:")
 	  (while (< 10 (list-length all)) (set all (cdr all)))
@@ -940,14 +942,15 @@
 	 (bin (nile-build "nile-law-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/law-runtime.k")) ""))
 	 (dir (concat-strings tmp "/nile-laws"))
 	 (_   (run "nile-laws-dir" (concat-strings "mkdir -p " dir)))
-	 (st  (run-status 900 (concat-strings "exec </dev/null >" tmp "/nile_laws.out 2>" tmp "/nile_laws.err; NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval check/law.l check/laws/runtime.l check/laws/runtime.law"))))
-    (unit-assert (equal st 0))
-    (unit-assert (equal (lines (contents-of-file-named (concat-strings tmp "/nile_laws.out")))
-			'("law pass_identity: TESTED 30" "law reverse_backwards: TESTED 30" "law reverse_involution: TESTED 30"
-			  "law dupcat_is_twice: TESTED 30" "law dupzip_pairs: TESTED 30" "law sort_keys_ordered: TESTED 30"
-			  "law sort_permutation: TESTED 30" "law deterministic: TESTED 30" "law words_width: TESTED 30"
-			  "law words_glyphs: TESTED 30" "law breaks_fit: TESTED 30" "law points_contiguous: TESTED 30"
-			  "law layout_deterministic: TESTED 30")))))
+	 (out (law-file-holds "nile_laws" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
+			      "check/laws/runtime.l" "check/laws/runtime.law")))
+    (unit-assert out)
+    (unit-assert (equal (and out (lines (contents-of-file-named out)))
+			'("law pass_identity: PROVED 78" "law reverse_backwards: PROVED 78" "law reverse_involution: PROVED 78"
+			  "law dupcat_is_twice: PROVED 78" "law dupzip_pairs: PROVED 78" "law sort_keys_ordered: PROVED 78"
+			  "law sort_permutation: PROVED 78" "law deterministic: PROVED 260" "law words_partition: PROVED 234"
+			  "law breaks_keep_words: PROVED 234" "law breaks_fit: PROVED 234" "law breaks_maximal: PROVED 234"
+			  "law points_placed: PROVED 234" "law layout_deterministic: PROVED 468")))))
 
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")

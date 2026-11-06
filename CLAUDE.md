@@ -528,11 +528,21 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `gezira/nile/gezira.nl` and the runtime) through `gezira-maru.l`'s `<gezira-maru>` selectors renders the `gezira_image`
   rectangle with a matrix, on 1 and 4 workers. `check/gezira-scene.l` draws `check/ksworld/scene.pp` the same way; it is
   verified in a scratch copy with main's KSWorld stack and is not registered on this branch.
-- `nile_laws` (`check/laws/runtime.law`, `check/laws/runtime.l`): the runtime's built-ins against their definitions (pass,
-  reverse, sort, dupcat, dupzip, over lengths 0, 1, 2, 3, 5, 121 to 123 and 244 to 245), each built-in deterministic for 1, 4
-  and 8 workers, and text-layout.nl's invariants (MakeWords keeps width and glyph count; InsertLineBreaks' lines fit unless
-  a style-1 word is in them; a glyph after another on its line starts where that one ends), through the batch driver
-  `nile/runtimes/maru/test/law-runtime.k` built with text-layout.nl's module. Thirteen laws, TESTED 30 each.
+- `nile_laws` (`check/laws/runtime.law`, `check/laws/runtime.l`): through the batch driver `nile/runtimes/maru/test/law-runtime.k`,
+  built with text-layout.nl's module, every law by exhaustion over lengths 0, 1, 2, 3, 5, 60 to 62, 121 to 123, 244 and 245
+  (a buffer holds 122 floats: one and two buffers crossed for streams of floats and of pairs) and seeds 1 and 7. The
+  built-ins hold to their definitions on 1, 4 and 8 workers (pass is the identity, reverse reverses and twice is the identity,
+  dupcat is its input twice, dupzip interleaves it with itself, sort orders keys and permutes its pairs: 78 cases each), and
+  give on 4 and 8 workers what they give on one (260). text-layout.nl's own conditions, at line widths 5, 12 and 30 (234
+  each): MakeWords' words partition the glyphs (runs of one style as wide as their glyphs, past one glyph at most the width,
+  each run's first glyph splitting from the word before, the initial empty word output only when the first glyph splits from
+  it); InsertLineBreaks keeps the words, a word continuing a line is style 1 or fits, and a break comes only before a word not
+  of style 1 that doesn't fit after the line before it; and each glyph's point is the width of the glyphs before it on its line
+  and the line's number. All three stages agree on 4 and 8 workers with one (468). Glyph styles and widths come from a
+  linear congruential sequence, so neither style's runs have a fixed length. A no-op InsertLineBreaks fails `breaks_fit`, one
+  that breaks before every word `breaks_maximal`, MakeWords without its width split `words_partition`, and PlaceWords
+  without its line feed or its return to the margin `points_placed`. The driver exits 2 on a missing or unknown mode or a
+  worker count outside 1 to 64. `make check-sweep` runs the file once on each evaluator.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change

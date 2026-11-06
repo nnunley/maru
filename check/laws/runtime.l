@@ -17,6 +17,9 @@
 (define system (subr "system" "s>i"))
 (define-function rt_shell (cmd)
   (or (= 0 (system cmd)) (error "runtime: nonzero exit running " cmd)))
+(define fopen (subr "fopen" "ss>p"))
+(define fprintf (subr "fprintf" "ps.>i"))
+(define fclose (subr "fclose" "p>i"))
 
 ;; the output's integers, one per line
 (define-function rt_numbers (text)
@@ -30,13 +33,15 @@
       (set i (+ i 1)))
     (list-reverse! out)))
 
+;; the integers go in through a file written with fprintf: concat-strings over a long input cost 60 ms a run
 (define-function rt_run (mode workers w ints)
   (let* ((dir (rt_env "NILE_LAW_TMP"))
 	 (in (concat-strings dir "/in"))
 	 (out (concat-strings dir "/out"))
-	 (args ""))
-    (list-do x ints (set args (concat-strings args " " (long->string x))))
-    (rt_shell (concat-strings "printf '%s\\n'" args " > " in))
+	 (f (fopen in "w")))
+    (or (and f (!= 0 f)) (error "runtime: can't write " in))
+    (list-do x ints (fprintf f "%ld\n" x))
+    (fclose f)
     (rt_shell (concat-strings (rt_env "NILE_LAW_RUNTIME") " " (long->string workers) " " mode " " (long->string w)
 			      " < " in " > " out))
     (rt_numbers (contents-of-file-named out))))
@@ -75,11 +80,14 @@
       (push out k)
       (set k (+ k 1)))
     (list-reverse! out)))
+;; glyphs from a linear congruential sequence started at s, x' = (75 x + 74) mod 65537: a glyph's style is 1 when x mod 10
+;; is under 3, its width 1 + (x / 10) mod 7, so runs of either style have no fixed length
 (define-function rt_glyphs (n s)
-  (let ((out ()) (k 0))
+  (let ((out ()) (k 0) (x s))
     (while (< k n)
-      (push out (+ 1 (% (+ (+ (* k s) k) 3) 7)))
-      (push out (if (= 0 (% (+ k s) 3)) 1 0))
+      (set x (% (+ (* 75 x) 74) 65537))
+      (push out (+ 1 (% (/ x 10) 7)))
+      (push out (if (< (% x 10) 3) 1 0))
       (set k (+ k 1)))
     (list-reverse! out)))
 
@@ -90,42 +98,76 @@
       (if (= at (% i step)) (set s (+ s x)))
       (set i (+ i 1)))
     s))
-(define-function rt_word_width (words) (rt_every words 3 0))
 (define-function rt_word_glyphs (words) (rt_every words 3 2))
-(define-function rt_glyph_width (glyphs) (rt_every glyphs 2 0))
 (define-function rt_glyph_count (glyphs) (/ (list-length glyphs) 2))
 
-;; the words of a line: none of style 1 (those never break), or two or more with a total of at most lw
-(define-function rt_line_fits (line lw)
-  (let ((total 0) (count 0) (styled ()))
-    (list-do t line
-      (set total (+ total (car t)))
-      (set count (+ count 1))
-      (if (= 1 (cadr t)) (set styled 1)))
-    (if (or styled (< count 2) (<= total lw)) 1 ())))
-
-;; InsertLineBreaks' output, split at its markers (style 2), each line fits
-(define-function rt_lines_fit (words lw)
-  (let ((line ()) (ok 1))
-    (list-do t (rt_chunks words 3)
-      (if (= 2 (cadr t))
-	  (let () (if (rt_line_fits line lw) () (set ok ())) (set line ()))
-	  (set line (cons t line))))
-    (if (rt_line_fits line lw) () (set ok ()))
+;; MakeWords, text-layout.nl:8: a glyph G starts a new word after W when G.s /= W.s, W.s = 2 or W.w + G.w > w
+(define-function rt_splits (W G lw)
+  (or (not (= (cadr G) (cadr W))) (= 2 (cadr W)) (> (+ (car W) (car G)) lw)))
+;; the words partition the glyphs: each word is the next n of them, all of its style, its width their sum; a word of
+;; two or more is at most lw wide (each glyph joined it with W.w + G.w <= w); the first glyph of each word splits from the
+;; word before it; and the initial (0, 0, 0) is output only if the first glyph splits from it, or there are no glyphs
+(define-function rt_words_partition (words glyphs lw)
+  (let ((gs (rt_chunks glyphs 2)) (prev '(0 0 0)) (first 1) (ok 1))
+    (or words (set ok ()))
+    (list-do W (rt_chunks words 3)
+      (if (= 0 (caddr W))
+	  (or (and first (equal W '(0 0 0)) (or (not gs) (rt_splits prev (car gs) lw))) (set ok ()))
+	  (let ((n (caddr W)) (width 0))
+	    (if first
+		(and gs (rt_splits prev (car gs) lw) (set ok ()))
+		(or (and gs (rt_splits prev (car gs) lw)) (set ok ())))
+	    (while (and ok (< 0 n))
+	      (if (and gs (= (cadr (car gs)) (cadr W)))
+		  (let () (set width (+ width (car (car gs)))) (set gs (cdr gs)))
+		  (set ok ()))
+	      (set n (- n 1)))
+	    (or (= width (car W)) (set ok ()))
+	    (and (< 1 (caddr W)) (> (car W) lw) (set ok ()))))
+      (set prev W)
+      (set first ()))
+    (and gs (set ok ()))
     (if ok 1 ())))
 
-;; each glyph after one on its line starts where that one ends: x' = x + w, the same y
-(define-function rt_contiguous (ps gs)
-  (if (and (pair? ps) (pair? (cdr ps)) (pair? gs))
-      (if (or (not (= (cadr (car ps)) (cadr (cadr ps))))
-	      (= (car (cadr ps)) (+ (car (car ps)) (car (car gs)))))
-	  (rt_contiguous (cdr ps) (cdr gs))
-	  ())
-      1))
-(define-function rt_points_contiguous (points glyphs)
-  (if (= (list-length points) (list-length glyphs))
-      (if (rt_contiguous (rt_chunks points 2) (rt_chunks glyphs 2)) 1 ())
-      ()))
+;; InsertLineBreaks, text-layout.nl:21: over the line's offset o, a word that continues its line (no marker, style 2, just
+;; before it) is style 1 or fits, o + W.w <= w; a marker comes before a word that is not style 1 and doesn't fit, and only
+;; there: never last, never twice.  Its output is never empty, and either way the word adds to o, from 0 after a marker
+(define-function rt_breaks_walk (words lw nofit nomax)	; nofit, nomax: 1 leaves that half unchecked
+  (let ((o 0) (marked ()) (ok (and (pair? words) (= 0 (% (list-length words) 3)))))	; MakeWords outputs a word at least
+    (list-do W (rt_chunks words 3)
+      (cond
+	((= 2 (cadr W))	(and marked (not nomax) (set ok ())) (set marked 1))
+	(marked		(or (and (not (= 1 (cadr W))) (> (+ o (car W)) lw)) nomax (set ok ()))
+			(set o (car W))
+			(set marked ()))
+	(else		(or (= 1 (cadr W)) (<= (+ o (car W)) lw) nofit (set ok ()))
+			(set o (+ o (car W))))))
+    (and marked (not nomax) (set ok ()))
+    (if ok 1 ())))
+(define-function rt_breaks_fit (words lw) (rt_breaks_walk words lw () 1))
+(define-function rt_breaks_maximal (words lw) (rt_breaks_walk words lw 1 ()))
+;; the words without InsertLineBreaks' markers
+(define-function rt_unbroken (words)
+  (let ((out ()))
+    (list-do W (rt_chunks words 3)
+      (or (= 2 (cadr W)) (set out (concat-list (rt_reverse W) out))))
+    (list-reverse! out)))
+
+;; PlaceWords, RepeatPlacement and PlaceGlyphs, text-layout.nl:29-55, at b = (0, 0) and h = 1: each glyph's point is
+;; (the width of the glyphs before it on its line, the line's number), a marker starting the next line
+(define-function rt_placed (words glyphs)
+  (let ((gs (rt_chunks glyphs 2)) (x 0) (y 0) (out ()))
+    (list-do W (rt_chunks words 3)
+      (if (= 2 (cadr W))
+	  (let () (set x 0) (set y (+ y 1)))
+	  (let ((n (caddr W)))
+	    (while (and gs (< 0 n))
+	      (push out x)
+	      (push out y)
+	      (set x (+ x (car (car gs))))
+	      (set gs (cdr gs))
+	      (set n (- n 1))))))
+    (list-reverse! out)))
 
 ;; keys (field 0 of each pair) nondecreasing; the pairs as codes key * 1000 + payload, and sorted codes
 (define-function rt_keys_ordered (out xs)	; out holds xs' pairs, in key order, and no more or fewer
