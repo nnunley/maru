@@ -119,24 +119,34 @@
 
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
 
-;; how far a character moves the pen from x: a tab to the next stop (start, stop, step from the left margin)
-(define-function ks-char-width (c x tabs)
+;; how far a glyph's ink starts from its pen
+(define-function ks-left-bearing (c)
+  (* (<ks-char>-scale c) (car (ttf-bounds (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c))))))
+
+;; how far a character moves the pen from x: a tab to the next stop.  The stops (start, stop, step) are from the box's
+;; edge, and KSWorld's pen starts at the line's first glyph's left bearing, so origin, where x is 0, is the left margin
+;; plus that bearing
+(define-function ks-char-width (c x tabs origin)
   (if (and (= 9 (<ks-char>-code c)) tabs)
-      (let ((stop (car tabs)))
-	(while (and (<= stop x) (<= stop (cadr tabs))) (set stop (+ stop (caddr tabs))))
-	(if (> stop x) (- stop x) (<ks-char>-advance c)))
+      (let ((stop (car tabs)) (at (+ x origin)))
+	(while (and (<= stop at) (<= stop (cadr tabs))) (set stop (+ stop (caddr tabs))))
+	(if (> stop at) (- stop at) (<ks-char>-advance c)))
     (<ks-char>-advance c)))
 
-;; characters into lines, each (hard chars...) with chars in order and their pen x set: a carriage return ends a line
-;; hard, and a word that runs past width (unless wrapping is off) starts the next one, the space before it ending this
-(define-function ks-break-lines (chars width tabs wrap)
-  (let ((lines ()) (line ()) (pen 0))
-    (let ((finish (lambda (hard) (push lines (cons hard (list-reverse! line))) (set line ()) (set pen 0)))
-	  (place (lambda (c) (set (<ks-char>-x c) pen) (set pen (+ pen (ks-char-width c pen tabs))) (push line c))))
+;; characters into lines, each (hard origin chars...) with chars in order and their pen x set: a carriage return ends a
+;; line hard, and a word that runs past width (unless wrapping is off) starts the next one, the space before it ending this
+(define-function ks-break-lines (chars width tabs wrap left)
+  (let ((lines ()) (line ()) (pen 0) (origin left))
+    (let ((finish (lambda (hard) (push lines (cons hard (cons origin (list-reverse! line)))) (set line ()) (set pen 0)))
+	  (place (lambda (c)
+		   (or line (set origin (+ left (ks-left-bearing c))))
+		   (set (<ks-char>-x c) pen)
+		   (set pen (+ pen (ks-char-width c pen tabs origin)))
+		   (push line c))))
       (list-do c chars
 	(cond ((= 13 (<ks-char>-code c)) (finish 1))
 	      (else
-	       (when (and wrap (not (ks-space? c)) (> (+ pen (ks-char-width c pen tabs)) width))
+	       (when (and wrap (not (ks-space? c)) (> (+ pen (ks-char-width c pen tabs origin)) width))
 		 (let ((tail ()) (rest line))
 		   (while (and rest (not (ks-space? (car rest)))) (push tail (car rest)) (set rest (cdr rest)))
 		   (when rest
@@ -153,10 +163,8 @@
     (list-do c chars (push backwards c))
     (list-do c backwards (and (or seen (not (ks-space? c))) (let () (set seen 1) (push ink c))))
     ink))
-(define-function ks-line-width (ink tabs)
-  (if ink (let ((c (car (last-pair ink)))) (+ (<ks-char>-x c) (ks-char-width c (<ks-char>-x c) tabs))) 0))
-(define-function ks-left-bearing (c)
-  (* (<ks-char>-scale c) (car (ttf-bounds (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c))))))
+(define-function ks-line-width (ink tabs origin)
+  (if ink (let ((c (car (last-pair ink)))) (+ (<ks-char>-x c) (ks-char-width c (<ks-char>-x c) tabs origin))) 0))
 
 ;; a box holding text: its data are spans and its handler lays them out
 (define-function ks-text-box? (box)
@@ -173,16 +181,16 @@
 	 (tabs (and (ks-object? interval) (list (ks-slot interval 'start) (ks-slot interval 'stop) (ks-slot interval 'step))))
 	 (chars (ks-span-chars (<ks-object>-data box)))
 	 (y top) (out ()))
-    (list-do line (ks-break-lines chars width tabs (not (= 'true (ks-slot layout 'noWrap))))
-      (let* ((hard (car line)) (ink (ks-line-ink (cdr line)))
-	     (used (if ink (+ (ks-line-width ink tabs) (ks-left-bearing (car ink))) 0))
+    (list-do line (ks-break-lines chars width tabs (not (= 'true (ks-slot layout 'noWrap))) left)
+      (let* ((hard (car line)) (origin (cadr line)) (chars (cddr line)) (ink (ks-line-ink chars))
+	     (used (if ink (+ (ks-line-width ink tabs origin) (ks-left-bearing (car ink))) 0))
 	     (spaces (let ((n 0)) (list-do c ink (and (= 32 (<ks-char>-code c)) (set n (+ n 1)))) n))
 	     (offset (cond ((= justification 'center) (/ (- width used) 2))
 			   ((= justification 'right) (- width used))
 			   (else 0)))
-	     (spread (if (and (= justification 'full) (not hard) (< 0 spaces)) (/ (- width (ks-line-width ink tabs)) spaces) 0))
+	     (spread (if (and (= justification 'full) (not hard) (< 0 spaces)) (/ (- width (ks-line-width ink tabs origin)) spaces) 0))
 	     (ascent 0) (descent 0) (extra 0))
-	(list-do c (cdr line)
+	(list-do c chars
 	  (set ascent (max ascent (* (<ks-char>-scale c) (<ttf>-ascent (<ks-char>-font c)))))
 	  (set descent (max descent (* (<ks-char>-scale c) (- (<ttf>-descent (<ks-char>-font c)))))))
 	(list-do c ink

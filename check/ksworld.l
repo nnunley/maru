@@ -74,13 +74,13 @@
   (expect "an unknown family, from the last resort" (map ttf-full-name (ks-fonts 'Nonesuch ks-plain)) '("DejaVu Sans"))
   (when (ks-font-file 'Palatino ks-bold)
     (expect "Palatino Linotype bold, from Palatino's collection" (ttf-full-name (ks-font 'PalatinoLinotype ks-bold)) "Palatino Bold"))
-  ;; the front page's text boxes in a font this system has are laid out as KSWorld did, but for 411, a centred line with
-  ;; tabs; those in Palatino Linotype aren't (Palatino's metrics are its own)
+  ;; the front page's text boxes in a font this system has are laid out as KSWorld did (411 a centred line with tabs);
+  ;; those in Palatino Linotype aren't (Palatino's metrics are its own)
   (let ((matched ()))
     (array-do o (cadr (ksworld-load (concat-string dir "/Front page Onward Full v8.ks/index.pp")))
       (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o) (laid-out-as-kept o)
 	   (push matched (<ks-object>-ref o))))
-    (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 479))))
+    (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 411 479))))
 
 (require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
 (expect "the library Gezira is one" (type-of (gezira-library 0 0)) <gezira-library>)
