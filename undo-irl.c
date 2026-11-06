@@ -1,7 +1,7 @@
 #include <stdint.h>
 #define __USE_GNU
 #include <dlfcn.h>
-struct Slot {
+struct UndoSlot {
   int64_t object;
   int64_t index;
   int64_t world;
@@ -21,16 +21,16 @@ void (*v_undo__replay)(void *);
 void *v_undo__log;
 int64_t v_undo__depth;
 int64_t v_undo__paused;
-struct Slot *v_slots;
-int64_t v_slots__size;
-int64_t v_slots__used;
-int64_t *v_worlds;
-int64_t v_worlds__max;
-int64_t v_last__world;
-int64_t (*v_live)(struct Slot *, int64_t);
-int64_t (*v_find)(int64_t, int64_t, int64_t, int64_t, int64_t *);
-void (*v_grow)();
-int64_t (*v_add)(void *, int64_t, int64_t, int64_t);
+struct UndoSlot *v_undo__slots;
+int64_t v_undo__slots__size;
+int64_t v_undo__slots__used;
+int64_t *v_undo__worlds;
+int64_t v_undo__worlds__max;
+int64_t v_undo__last__world;
+int64_t (*v_undo__slot__live)(struct UndoSlot *, int64_t);
+int64_t (*v_undo__slot__find)(int64_t, int64_t, int64_t, int64_t, int64_t *);
+void (*v_undo__slots__grow)();
+int64_t (*v_undo__slot__add)(void *, int64_t, int64_t, int64_t);
 int64_t (*v_undo__first)(void *, int64_t, int64_t);
 void *(*v_undo__begin)();
 void (*v_undo__commit)(void *);
@@ -111,7 +111,7 @@ void undo_commit(void *v_mark)
                                 {
                   void *v_entry;
                   (v_entry=(v_undo__head)(v_l));
-                  if (((int32_t)(((v_add)((v_undo__head)(v_entry), (v_undo__kind)(v_entry), (v_undo__index)(v_entry), ((int64_t)((v_undo__depth)-(1)))))!=(0))))
+                  if (((int32_t)(((v_undo__slot__add)((v_undo__head)(v_entry), (v_undo__kind)(v_entry), (v_undo__index)(v_entry), ((int64_t)((v_undo__depth)-(1)))))!=(0))))
                   {
 (v_previous=v_l);
                   }
@@ -151,12 +151,12 @@ void *undo_begin()
 {
     {
     (v_undo__depth=((int64_t)((v_undo__depth)+(1))));
-    if (((int32_t)((v_undo__depth)>=(v_worlds__max))))
+    if (((int32_t)((v_undo__depth)>=(v_undo__worlds__max))))
     {
       {
-        (v_worlds__max=(((int32_t)((v_worlds__max)==(0)))?64:((int64_t)((v_worlds__max)*(2)))));
-        (v_worlds=((int64_t *)((v_undo__realloc)(v_worlds, ((int64_t)((v_worlds__max)*(((int64_t)(8)))))))));
-        if (((int32_t)(((void *)v_worlds)==(0))))
+        (v_undo__worlds__max=(((int32_t)((v_undo__worlds__max)==(0)))?64:((int64_t)((v_undo__worlds__max)*(2)))));
+        (v_undo__worlds=((int64_t *)((v_undo__realloc)(v_undo__worlds, ((int64_t)((v_undo__worlds__max)*(((int64_t)(8)))))))));
+        if (((int32_t)(((void *)v_undo__worlds)==(0))))
         {
 (v_undo__fatal)("out of memory for the undo log");
         }
@@ -173,17 +173,17 @@ void *undo_begin()
 ;
     }
 ;
-    (v_last__world=((int64_t)((v_last__world)+(1))));
-    ((v_worlds)[v_undo__depth]=(v_last__world));
+    (v_undo__last__world=((int64_t)((v_undo__last__world)+(1))));
+    ((v_undo__worlds)[v_undo__depth]=(v_undo__last__world));
     return v_undo__log;
   }
 ;
 }
 int64_t undo_first(void *v_object, int64_t v_kind, int64_t v_index)
 {
-  return ((int64_t)(((((int32_t)((v_undo__depth)!=(0))) && ((int32_t)((v_undo__paused)==(0)))) && ((int32_t)(((v_add)(v_object, v_kind, v_index, v_undo__depth))!=(0))))));
+  return ((int64_t)(((((int32_t)((v_undo__depth)!=(0))) && ((int32_t)((v_undo__paused)==(0)))) && ((int32_t)(((v_undo__slot__add)(v_object, v_kind, v_index, v_undo__depth))!=(0))))));
 }
-static int64_t f_add(void *v_object, int64_t v_kind, int64_t v_index, int64_t v_d)
+static int64_t f_undo__slot__add(void *v_object, int64_t v_kind, int64_t v_index, int64_t v_d)
 {
     {
         {
@@ -191,20 +191,20 @@ static int64_t f_add(void *v_object, int64_t v_kind, int64_t v_index, int64_t v_
       (v_o=((int64_t)(v_object)));
             {
         int64_t v_world;
-        (v_world=(v_worlds[v_d]));
+        (v_world=(v_undo__worlds[v_d]));
                 {
           int64_t v_spot;
           (v_spot=0);
-          if (((int32_t)((((int64_t)((((int64_t)((v_slots__used)+(1))))*(4))))>=(((int64_t)((v_slots__size)*(3)))))))
+          if (((int32_t)((((int64_t)((((int64_t)((v_undo__slots__used)+(1))))*(4))))>=(((int64_t)((v_undo__slots__size)*(3)))))))
           {
-(v_grow)();
+(v_undo__slots__grow)();
           }
           else
           {
 ;
           }
 ;
-          if (((int32_t)(((v_find)(v_o, v_kind, v_index, v_world, (&v_spot)))>=(0))))
+          if (((int32_t)(((v_undo__slot__find)(v_o, v_kind, v_index, v_world, (&v_spot)))>=(0))))
           {
 return 0;
           }
@@ -213,20 +213,20 @@ return 0;
 ;
           }
 ;
-          if (((int32_t)((((v_slots[v_spot]).world))==(0))))
+          if (((int32_t)((((v_undo__slots[v_spot]).world))==(0))))
           {
-(v_slots__used=((int64_t)((v_slots__used)+(1))));
+(v_undo__slots__used=((int64_t)((v_undo__slots__used)+(1))));
           }
           else
           {
 ;
           }
 ;
-          ((v_slots[v_spot]).object=v_o);
-          ((v_slots[v_spot]).kind=v_kind);
-          ((v_slots[v_spot]).index=v_index);
-          ((v_slots[v_spot]).world=v_world);
-          ((v_slots[v_spot]).depth=v_d);
+          ((v_undo__slots[v_spot]).object=v_o);
+          ((v_undo__slots[v_spot]).kind=v_kind);
+          ((v_undo__slots[v_spot]).index=v_index);
+          ((v_undo__slots[v_spot]).world=v_world);
+          ((v_undo__slots[v_spot]).depth=v_d);
           return 1;
         }
 ;
@@ -237,15 +237,15 @@ return 0;
   }
 ;
 }
-static void f_grow()
+static void f_undo__slots__grow()
 {
     {
         {
-      struct Slot *v_old;
-      (v_old=v_slots);
+      struct UndoSlot *v_old;
+      (v_old=v_undo__slots);
             {
         int64_t v_n;
-        (v_n=v_slots__size);
+        (v_n=v_undo__slots__size);
                 {
           int64_t v_count;
           (v_count=0);
@@ -255,7 +255,7 @@ static void f_grow()
             while (((int32_t)((v_j)<(v_n))))
             {
               {
-                if ((v_live)(v_old, v_j))
+                if ((v_undo__slot__live)(v_old, v_j))
                 {
 (v_count=((int64_t)((v_count)+(1))));
                 }
@@ -277,8 +277,8 @@ static void f_grow()
 (v_size=((int64_t)((v_size)*(2))));
               }
 ;
-              (v_slots=((struct Slot *)((v_undo__calloc)(v_size, ((int64_t)(40))))));
-              if (((int32_t)(((void *)v_slots)==(0))))
+              (v_undo__slots=((struct UndoSlot *)((v_undo__calloc)(v_size, ((int64_t)(40))))));
+              if (((int32_t)(((void *)v_undo__slots)==(0))))
               {
 (v_undo__fatal)("out of memory for the undo log");
               }
@@ -287,8 +287,8 @@ static void f_grow()
 ;
               }
 ;
-              (v_slots__size=v_size);
-              (v_slots__used=0);
+              (v_undo__slots__size=v_size);
+              (v_undo__slots__used=0);
                             {
                 int64_t v_spot;
                 (v_spot=0);
@@ -296,12 +296,12 @@ static void f_grow()
                 while (((int32_t)((v_j)<(v_n))))
                 {
                   {
-                    if ((v_live)(v_old, v_j))
+                    if ((v_undo__slot__live)(v_old, v_j))
                     {
                       {
-                        (v_find)(((v_old[v_j]).object), ((v_old[v_j]).kind), ((v_old[v_j]).index), ((v_old[v_j]).world), (&v_spot));
-                        ((v_slots)[v_spot]=((v_old[v_j])));
-                        (v_slots__used=((int64_t)((v_slots__used)+(1))));
+                        (v_undo__slot__find)(((v_old[v_j]).object), ((v_old[v_j]).kind), ((v_old[v_j]).index), ((v_old[v_j]).world), (&v_spot));
+                        ((v_undo__slots)[v_spot]=((v_old[v_j])));
+                        (v_undo__slots__used=((int64_t)((v_undo__slots__used)+(1))));
                       }
 ;
                     }
@@ -339,12 +339,12 @@ static void f_grow()
   }
 ;
 }
-static int64_t f_find(int64_t v_object, int64_t v_kind, int64_t v_index, int64_t v_world, int64_t *v_spot)
+static int64_t f_undo__slot__find(int64_t v_object, int64_t v_kind, int64_t v_index, int64_t v_world, int64_t *v_spot)
 {
     {
         {
       int64_t v_mask;
-      (v_mask=((int64_t)((v_slots__size)-(1))));
+      (v_mask=((int64_t)((v_undo__slots__size)-(1))));
             {
         int64_t v_at;
         (v_at=((int64_t)((((int64_t)((((int64_t)((((int64_t)((((int64_t)((((int64_t)((v_object)>>(3))))*(31))))+(((int64_t)((v_kind)*(7)))))))+(((int64_t)((v_index)*(131)))))))+(((int64_t)((v_world)*(2654435761)))))))&(v_mask))));
@@ -352,7 +352,7 @@ static int64_t f_find(int64_t v_object, int64_t v_kind, int64_t v_index, int64_t
         while (1)
         {
           {
-            if (((int32_t)((((v_slots[v_at]).world))==(0))))
+            if (((int32_t)((((v_undo__slots[v_at]).world))==(0))))
             {
               {
                 if (((int32_t)(((v_spot[0]))<(0))))
@@ -373,7 +373,7 @@ static int64_t f_find(int64_t v_object, int64_t v_kind, int64_t v_index, int64_t
 ;
             }
 ;
-            if ((((((int32_t)((((v_slots[v_at]).world))==(v_world))) && ((int32_t)((((v_slots[v_at]).object))==(v_object)))) && ((int32_t)((((v_slots[v_at]).kind))==(v_kind)))) && ((int32_t)((((v_slots[v_at]).index))==(v_index)))))
+            if ((((((int32_t)((((v_undo__slots[v_at]).world))==(v_world))) && ((int32_t)((((v_undo__slots[v_at]).object))==(v_object)))) && ((int32_t)((((v_undo__slots[v_at]).kind))==(v_kind)))) && ((int32_t)((((v_undo__slots[v_at]).index))==(v_index)))))
             {
 return v_at;
             }
@@ -382,7 +382,7 @@ return v_at;
 ;
             }
 ;
-            if ((((int32_t)(((v_spot[0]))<(0))) && (!((int64_t)((v_live)(v_slots, v_at))))))
+            if ((((int32_t)(((v_spot[0]))<(0))) && (!((int64_t)((v_undo__slot__live)(v_undo__slots, v_at))))))
             {
 ((v_spot)[0]=(v_at));
             }
@@ -404,9 +404,9 @@ return v_at;
   }
 ;
 }
-static int64_t f_live(struct Slot *v_s, int64_t v_at)
+static int64_t f_undo__slot__live(struct UndoSlot *v_s, int64_t v_at)
 {
-  return ((int64_t)(((((int32_t)((((v_s[v_at]).world))!=(0))) && ((int32_t)((((v_s[v_at]).depth))<=(v_undo__depth)))) && ((int32_t)(((v_worlds[((v_s[v_at]).depth)]))==(((v_s[v_at]).world)))))));
+  return ((int64_t)(((((int32_t)((((v_s[v_at]).world))!=(0))) && ((int32_t)((((v_s[v_at]).depth))<=(v_undo__depth)))) && ((int32_t)(((v_undo__worlds[((v_s[v_at]).depth)]))==(((v_s[v_at]).world)))))));
 }
 int64_t (*v_undo__log__size)() = undo_log_size;
 void (*v_undo__resume)() = undo_resume;
@@ -415,16 +415,16 @@ void (*v_undo__rollback)(void *) = undo_rollback;
 void (*v_undo__commit)(void *) = undo_commit;
 void *(*v_undo__begin)() = undo_begin;
 int64_t (*v_undo__first)(void *, int64_t, int64_t) = undo_first;
-int64_t (*v_add)(void *, int64_t, int64_t, int64_t) = f_add;
-void (*v_grow)() = f_grow;
-int64_t (*v_find)(int64_t, int64_t, int64_t, int64_t, int64_t *) = f_find;
-int64_t (*v_live)(struct Slot *, int64_t) = f_live;
-int64_t v_last__world;
-int64_t v_worlds__max;
-int64_t *v_worlds;
-int64_t v_slots__used;
-int64_t v_slots__size;
-struct Slot *v_slots;
+int64_t (*v_undo__slot__add)(void *, int64_t, int64_t, int64_t) = f_undo__slot__add;
+void (*v_undo__slots__grow)() = f_undo__slots__grow;
+int64_t (*v_undo__slot__find)(int64_t, int64_t, int64_t, int64_t, int64_t *) = f_undo__slot__find;
+int64_t (*v_undo__slot__live)(struct UndoSlot *, int64_t) = f_undo__slot__live;
+int64_t v_undo__last__world;
+int64_t v_undo__worlds__max;
+int64_t *v_undo__worlds;
+int64_t v_undo__slots__used;
+int64_t v_undo__slots__size;
+struct UndoSlot *v_undo__slots;
 int64_t v_undo__paused;
 int64_t v_undo__depth;
 void *v_undo__log;

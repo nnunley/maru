@@ -21,6 +21,7 @@ static int64_t  undo_index(void *entry)			{ oop o= entry;  return getLong(getHea
 static void     undo_replay(void *entry);
 
 #include "undo-irl.c"
+#undef __USE_GNU
 
 #define undoLog		(*(oop *)&v_undo__log)
 #define undoLogging()	(v_undo__depth && !v_undo__paused)

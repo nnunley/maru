@@ -24,50 +24,50 @@ long undo_paused := 0;		// while above 0, writes aren't recorded
 // Which slots each open world has a record for: (object, kind, index, world) in an open-addressed table.  A world's
 // number is never reused, so an entry for a world no longer open is simply dead: it's ignored, and growing drops it.
 // An open world's entry is backed by a record, which keeps its object alive, so a dead object's address can't match.
-struct Slot { long object, index, world, kind, depth; };
-struct Slot* slots := 0;
-long slots_size := 0;
-long slots_used := 0;
-long* worlds := 0;		// the number of the open world at each depth
-long worlds_max := 0;
-long last_world := 0;		// worlds are numbered from 1, never reused
+struct UndoSlot { long object, index, world, kind, depth; };
+struct UndoSlot* undo_slots := 0;
+long undo_slots_size := 0;
+long undo_slots_used := 0;
+long* undo_worlds := 0;		// the number of the open world at each depth
+long undo_worlds_max := 0;
+long undo_last_world := 0;		// worlds are numbered from 1, never reused
 
-long live(struct Slot* s, long at) return cast(s[at].world != 0 && s[at].depth <= undo_depth && worlds[s[at].depth] == s[at].world, long);
+long undo_slot_live(struct UndoSlot* s, long at) return cast(s[at].world != 0 && s[at].depth <= undo_depth && undo_worlds[s[at].depth] == s[at].world, long);
 
 // the slot's place, or -1 with a free place in spot[0]
-long find(long object, long kind, long index, long world, long* spot) {
-  let long mask := slots_size - 1;
+long undo_slot_find(long object, long kind, long index, long world, long* spot) {
+  let long mask := undo_slots_size - 1;
   let long at := ((object >> 3) * 31 + kind * 7 + index * 131 + world * 2654435761) & mask;
   spot[0] := -1;
   while 1 do {
-    if slots[at].world == 0 then { if spot[0] < 0 then spot[0] := at; return -1; }
-    if slots[at].world == world && slots[at].object == object && slots[at].kind == kind && slots[at].index == index
+    if undo_slots[at].world == 0 then { if spot[0] < 0 then spot[0] := at; return -1; }
+    if undo_slots[at].world == world && undo_slots[at].object == object && undo_slots[at].kind == kind && undo_slots[at].index == index
     then return at;
-    if spot[0] < 0 && !live(slots, at) then spot[0] := at;
+    if spot[0] < 0 && !undo_slot_live(undo_slots, at) then spot[0] := at;
     at := (at + 1) & mask;
   }
   return -1;
 }
 
-void grow() {
-  let struct Slot* old := slots;
-  let long n := slots_size;
+void undo_slots_grow() {
+  let struct UndoSlot* old := undo_slots;
+  let long n := undo_slots_size;
   let long count := 0;
   let long j := 0;
-  while j < n do { if live(old, j) then count := count + 1; j := j + 1; }
+  while j < n do { if undo_slot_live(old, j) then count := count + 1; j := j + 1; }
   let long size := n == 0 ? 1024 : n;
   while count * 4 >= size do size := size * 2;
-  slots := cast(undo_calloc(size, cast(sizeof(struct Slot), long)), struct Slot*);
-  if slots == 0 then undo_fatal("out of memory for the undo log");
-  slots_size := size;
-  slots_used := 0;
+  undo_slots := cast(undo_calloc(size, cast(sizeof(struct UndoSlot), long)), struct UndoSlot*);
+  if undo_slots == 0 then undo_fatal("out of memory for the undo log");
+  undo_slots_size := size;
+  undo_slots_used := 0;
   let long spot := 0;
   j := 0;
   while j < n do {
-    if live(old, j) then {
-      find(old[j].object, old[j].kind, old[j].index, old[j].world, &spot);
-      slots[spot] := old[j];
-      slots_used := slots_used + 1;
+    if undo_slot_live(old, j) then {
+      undo_slot_find(old[j].object, old[j].kind, old[j].index, old[j].world, &spot);
+      undo_slots[spot] := old[j];
+      undo_slots_used := undo_slots_used + 1;
     }
     j := j + 1;
   }
@@ -75,32 +75,32 @@ void grow() {
 }
 
 // notes that the world at depth d has a record of this slot; 1 if it's the first
-long add(void* object, long kind, long index, long d) {
+long undo_slot_add(void* object, long kind, long index, long d) {
   let long o := cast(object, long);
-  let long world := worlds[d];
+  let long world := undo_worlds[d];
   let long spot := 0;
-  if (slots_used + 1) * 4 >= slots_size * 3 then grow();
-  if find(o, kind, index, world, &spot) >= 0 then return 0;
-  if slots[spot].world == 0 then slots_used := slots_used + 1;
-  slots[spot].object := o; slots[spot].kind := kind; slots[spot].index := index;
-  slots[spot].world := world; slots[spot].depth := d;
+  if (undo_slots_used + 1) * 4 >= undo_slots_size * 3 then undo_slots_grow();
+  if undo_slot_find(o, kind, index, world, &spot) >= 0 then return 0;
+  if undo_slots[spot].world == 0 then undo_slots_used := undo_slots_used + 1;
+  undo_slots[spot].object := o; undo_slots[spot].kind := kind; undo_slots[spot].index := index;
+  undo_slots[spot].world := world; undo_slots[spot].depth := d;
   return 1;
 }
 
 // whether a write to this slot needs recording now: a world is open, recording isn't paused, and it's the first
 long undo_first(void* object, long kind, long index)
-  return cast(undo_depth != 0 && undo_paused == 0 && add(object, kind, index, undo_depth) != 0, long);
+  return cast(undo_depth != 0 && undo_paused == 0 && undo_slot_add(object, kind, index, undo_depth) != 0, long);
 
 // a world is the log as it stood when it began
 void* undo_begin() {
   undo_depth := undo_depth + 1;
-  if undo_depth >= worlds_max then {
-    worlds_max := worlds_max == 0 ? 64 : worlds_max * 2;
-    worlds := cast(undo_realloc(worlds, worlds_max * cast(sizeof(long), long)), long*);
-    if worlds == 0 then undo_fatal("out of memory for the undo log");
+  if undo_depth >= undo_worlds_max then {
+    undo_worlds_max := undo_worlds_max == 0 ? 64 : undo_worlds_max * 2;
+    undo_worlds := cast(undo_realloc(undo_worlds, undo_worlds_max * cast(sizeof(long), long)), long*);
+    if undo_worlds == 0 then undo_fatal("out of memory for the undo log");
   }
-  last_world := last_world + 1;
-  worlds[undo_depth] := last_world;
+  undo_last_world := undo_last_world + 1;
+  undo_worlds[undo_depth] := undo_last_world;
   return undo_log;
 }
 
@@ -112,7 +112,7 @@ void undo_commit(void* mark) {
     let void* previous := 0;
     while l != mark && l != 0 do {
       let void* entry := undo_head(l);
-      if add(undo_head(entry), undo_kind(entry), undo_index(entry), undo_depth - 1) != 0 then previous := l;
+      if undo_slot_add(undo_head(entry), undo_kind(entry), undo_index(entry), undo_depth - 1) != 0 then previous := l;
       else if previous == 0 then undo_log := undo_tail(l);
       else undo_set_tail(previous, undo_tail(l));
       l := undo_tail(l);
