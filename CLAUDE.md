@@ -359,6 +359,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `nile_compile` (`check/check.l`): `nile/compilers/maru/nile-to-maru-compiler.sh`
   runs Nile's compiler on `eval2` and `boot2.l`, and writes the same Maru
   for `nile/examples/text-layout.nl` as `eval` and `boot.l` do.
+- `nile_text_layout` (`check/check.l`): `text-layout.nl`, compiled by `nile-to-maru-compiler.sh` as module `text_layout`,
+  runs through the Maru runtime (`nile/runtimes/maru/test/text-layout.k`) with 1 and 8 workers and lays four glyphs out
+  as (0,0) (3,0) (6,0) (0,1).
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change
