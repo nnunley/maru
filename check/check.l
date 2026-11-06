@@ -704,17 +704,32 @@
 	 (out (run "nile-oom-run" (concat-strings bin " && test ! -s " tmp "/nile-oom-run.err") 120)))
     (unit-assert (equal out '("oom ok")))))
 
+;; Pushing back at a buffer's start, and an empty stream through a prologue and epilogue
+;; (R-prefix, review focus 3), with 1 and 2 workers.
+(check "nile_prefix"
+  (let ((bin (nile-build "nile-prefix" (list (concat-strings nile-dir "test/prefix.k")) "")))
+    (list-do n '("1" "2")
+      (unit-assert (equal (run (concat-strings "nile-prefix-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-prefix-" n ".err") 300)
+			  '("prefix ok" "empty ok"))))))
+
+;; A rerouted pipeline gives the kernel's output, then the sub-pipeline's (R-reroute), with 1 and 2 workers.
+(check "nile_reroute"
+  (let ((bin (nile-build "nile-reroute" (list (concat-strings nile-dir "test/reroute.k")) "")))
+    (list-do n '("1" "2")
+      (unit-assert (equal (run (concat-strings "nile-reroute-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-reroute-" n ".err") 300)
+			  '("reroute ok"))))))
+
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")
 	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
     (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
 			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
-    ;; The link half: interface.k, with the runtime, asks dlsym for each call. Task 7 defines
-    ;; every call but prefix_input and reroute (Task 8) and the builtins Reverse, SortBy, DupZip
-    ;; and DupCat (Task 9), so those six are the missing ones.
+    ;; The link half: interface.k, with the runtime, asks dlsym for each call. Task 8 defines
+    ;; prefix_input and reroute, so the four builtins Reverse, SortBy, DupZip and DupCat (Task 9)
+    ;; are the missing ones.
     (unit-assert (equal (run "nile-iface" (concat-strings (nile-build "nile-iface" (list (concat-strings nile-dir "test/interface.k")) "") " && test ! -s " tmp "/nile-iface.err"))
-			'("nile interface: 26 calls, 6 missing")))
+			'("nile interface: 26 calls, 4 missing")))
     (run "nile-iface-text" (concat-strings "R=$PWD; mkdir -p " tmp "/iface && cd " tmp "/iface && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
     (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
 			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
