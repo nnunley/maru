@@ -15,6 +15,7 @@
 
 (if (not (sdl3-library))
     (println "SKIP ksworld clock: no SDL3 library in " *sdl3-libraries*)
+  (let ()
   (let* ((r (ksworld-run "check/ksworld/tiny.pp" 1))	; the start-up evaluation, time 0, and no more
 	 (s (ksworld-session r))
 	 (count (ks-slot (cdr (assq 'root r)) 'count))
@@ -33,5 +34,29 @@
     (set now 8)
     (ksworld-window-step win)
     (expect "one more millisecond" (list (<ksworld-window>-frames win) (ks-stream-curr count)) '(3 3))
-    (ksworld-window-close win)
-    (println (if ok "ksworld clock ok" "ksworld clock FAILED"))))
+    (expect "the fixture's failing stream, reported once over four steps" (list-length (<ksworld-window>-failed win)) 1)
+    ;; events in a burst, the clock held still: each happens at its own time, but within this millisecond, so they
+    ;; neither run ahead of the clock nor fire the timer (a press on the root box, given an extent and a buttonDown)
+    (let ((root (<ksworld-session>-root s)))
+      (ks-set-slot root 'extent (ks-point 64 48))
+      (ks-set-slot root 'buttonDown (ks-make-stream root "exprE" "nil" ()))
+      (for (i 0 50) (sdl3-push '(down 5 5 1)))
+      (ksworld-window-step win)
+      (expect "fifty presses with the clock held: the timer unfired" (ks-stream-curr count) 3)
+      (expect "and document time within the clock's millisecond" (< (<ksworld-session>-time s) 10) 't))
+    (ksworld-window-close win))
+  ;; a timer fires when time passes a multiple of its step, though no evaluation lands on one: check/ksworld/timer.pp's
+  ;; timerE(1000) and timerE(2.5), the clock read at milliseconds that skip their multiples (document time is the clock
+  ;; plus the start-up evaluation's tick)
+  (let* ((r (ksworld-run "check/ksworld/timer.pp" 1))
+	 (root (cdr (assq 'root r)))
+	 (now 0)
+	 (win (ksworld-window (ksworld-session r) (new <gezira-counting> 0 ((subr "calloc" "ll>p") (* 64 48) 4)) 64 48)))
+    (set (<ksworld-window>-clock win) (lambda () now))
+    (ksworld-window-start win)
+    (list-do t '(1 3 6) (set now t) (ksworld-window-step win))	; document times 2, 4, 7: past 2.5 and past 5
+    (expect "timerE(2.5) at 2, 4 and 7" (ks-stream-curr (ks-slot root 'halfCount)) 2)
+    (list-do t '(15 32 49 1000 1015 2000) (set now t) (ksworld-window-step win))	; 16 … 1001 … 2001
+    (expect "timerE(1000) past 1000 and past 2000" (ks-stream-curr (ks-slot root 'slowCount)) 2)
+    (ksworld-window-close win))
+  (println (if ok "ksworld clock ok" "ksworld clock FAILED"))))

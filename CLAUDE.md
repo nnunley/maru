@@ -281,10 +281,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `ksworld_clock` (`check/ksworld-clock.l`): a document in a window runs as it runs on its own. After its start-up evaluation
   (time 0), logical time is the window's clock in milliseconds from when it started (`SDL_GetTicks`, or any clock put in
   its `clock` field), each step evaluates what is due then, an event happens no earlier than the clock says, and a step in
-  which something fired draws a frame. `timerE(n)` fires when time passes a multiple of n since the last evaluation, once
-  however many it passed (headless, with whole ticks, that's every nth tick, as before). A stream that fails is reported
-  once and the rest run on. Our fixture `check/ksworld/tiny.pp` in a window on the dummy driver: with the clock held still
-  nothing runs or draws; seven milliseconds on, its timer fires once and one frame is drawn. `ksworld-show.l` runs only the
+  which something fired draws a frame. `timerE(n)` fires when time passes a multiple of n since the evaluator's last
+  evaluation, once however many it passed, n whole or fractional (headless, with whole ticks, that's every nth tick, as
+  before); time evaluated again passes nothing. In a window an event takes 1/1024 of a millisecond, so events keep their
+  order without running ahead of the clock (headless they take a whole tick). A stream that fails is reported once and
+  the rest run on. Our fixture `check/ksworld/tiny.pp` in a window on the dummy driver: with the clock held still nothing
+  runs or draws; seven milliseconds on, its timer fires once and one frame is drawn; fifty presses with the clock held
+  neither fire it nor leave the millisecond; its failing stream is reported once. `check/ksworld/timer.pp`'s timerE(1000)
+  and timerE(2.5), read at times that skip their multiples, fire as time passes them. `ksworld-show.l` runs only the
   start-up evaluation before the window, then the clock.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,

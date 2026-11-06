@@ -114,12 +114,16 @@
 ;;; ---------------------------------------------------------------- environments & streams
 
 (define *ks-logical-time* 0)
-;; the time of the evaluation before: whole ticks headless, milliseconds in a window (ksworld-window.l), so a timer
-;; fires for each multiple of its step that time passes, once however many it passed
+;; the time of the evaluation before, the evaluator's own (ks-sort-and-evaluate-at sets it from the one evaluating): whole
+;; ticks headless, milliseconds in a window (ksworld-window.l), so a timer fires for each multiple of its step that time
+;; passes, once however many it passed.  Time evaluated again passes nothing; time gone back counts from the tick before.
 (define *ks-previous-time* -1)
-;; a run that starts over (time not past the last evaluation's) counts from the tick before
-(define-function ks-time-before () (if (< *ks-previous-time* *ks-logical-time*) *ks-previous-time* (- *ks-logical-time* 1)))
-(define-function ks-floor-div (a b) (let ((q (/ a b))) (if (and (< a 0) (!= (* q b) a)) (- q 1) q)))
+(define-function ks-time-before ()
+  (if (<= *ks-previous-time* *ks-logical-time*) *ks-previous-time* (- *ks-logical-time* 1)))
+;; the largest whole number at most a / b, for whole or fractional steps and times
+(define-function ks-floor-div (a b)
+  (let* ((q (/ (* 1.0 a) b)) (n (double->long q)))
+    (if (< q (long->double n)) (- n 1) n)))
 
 (define-function ks-make-stream (home type code init-val)
   (let ((s (new <ks-object> 'KSEventStream 0
@@ -707,10 +711,10 @@
 
 ;;; ---------------------------------------------------------------- Evaluator (Figure 2, TR-2012-001)
 
-(define-structure <ks-evaluator> (streams))
+(define-structure <ks-evaluator> (streams previous))	; previous: the time it last evaluated at
 
 (define-function ks-evaluator-new ()
-  (new <ks-evaluator> ()))
+  (new <ks-evaluator> () -1))
 
 (define-function ks-stream-ast (s)
   (or (ks-attr s ':__ast__)
@@ -829,6 +833,7 @@
 
 (define-function ks-sort-and-evaluate-at (ev logical-time)
   (set *ks-logical-time* logical-time)
+  (set *ks-previous-time* (<ks-evaluator>-previous ev))
   (let ((sorted (ks-topologically-sorted-streams ev)))
     ;; Snapshot previous values for lagged references (') at this logical tick
     (list-do s sorted
@@ -838,5 +843,5 @@
       (let ((ast (ks-stream-ast s))
 	    (home (ks-attr s ':__home__)))
 	(and ast (ks-due? ast home) (ks-evaluate-stream s ast home))))
-    (set *ks-previous-time* logical-time)
+    (set (<ks-evaluator>-previous ev) logical-time)
     sorted))

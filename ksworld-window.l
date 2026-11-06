@@ -42,7 +42,7 @@
   (let* ((s (<ksworld-window>-session win)) (now (ksworld-window-now win)) (ev (<ksworld-session>-evaluator s)))
     (when (>= now (<ksworld-session>-time s))
       (ks-sort-and-evaluate-at ev now)
-      (set (<ksworld-session>-time s) (+ 1 now))
+      (set (<ksworld-session>-time s) (+ *ks-event-step* now))	; the next event's time, within this millisecond
       (ks-any-fired? (<ks-evaluator>-streams ev)))))
 
 (define-function ksworld-window-draw (win)
@@ -70,6 +70,10 @@
     (and dirty (<ksworld-window>-running win) (ksworld-window-draw win))
     (<ksworld-window>-running win)))
 
-(define-function ksworld-window-step (win) (ksworld-window-guarded win (lambda () (ksworld-window-step-guarded win))))
+(define-function ksworld-window-step (win)
+  (let ((step *ks-event-step*))
+    (set *ks-event-step* (/ 1.0 1024))		; an event takes 1/1024 of the clock's millisecond
+    (unwind-protect (ksworld-window-guarded win (lambda () (ksworld-window-step-guarded win)))
+      (set *ks-event-step* step))))
 
 (define-function ksworld-window-close (win) (sdl3-close (<ksworld-window>-sdl win)))

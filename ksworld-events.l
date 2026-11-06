@@ -53,6 +53,9 @@
 (define-function ks-awake? (stream) (and (ks-stream? stream) (not (= (ks-attr stream ':__dormant__) "true"))))
 
 (define-structure <ksworld-session> (root evaluator time hand))
+;; how far an event moves the session's time: a whole tick headless; in a window, whose time is its clock's milliseconds,
+;; a small fraction (ksworld-window.l), so events keep their order without running ahead of the clock
+(define *ks-event-step* 1)
 (define-function ksworld-session (run)
   (new <ksworld-session> (cdr (assq 'root run)) (cdr (assq 'evaluator run)) (cdr (assq 'time run)) (new <ks-hand> 'nil)))
 
@@ -66,7 +69,7 @@
       (set *ks-logical-time* (<ksworld-session>-time session))
       (ks-fire stream (new <ks-event> (ks-local-point root box point) hand))
       (ks-sort-and-evaluate-at (<ksworld-session>-evaluator session) *ks-logical-time*)
-      (set (<ksworld-session>-time session) (+ 1 *ks-logical-time*))
+      (set (<ksworld-session>-time session) (+ *ks-event-step* *ks-logical-time*))
       box)))
 
 ;; a text layout's selection, from gap to gap
