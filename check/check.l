@@ -719,17 +719,35 @@
       (unit-assert (equal (run (concat-strings "nile-reroute-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-reroute-" n ".err") 300)
 			  '("reroute ok"))))))
 
+;; Reverse, SortBy, and DupCat and DupZip, with 1 and 2 workers (R-reverse, R-sort, R-dupcat).
+(check "nile_reverse"
+  (let ((bin (nile-build "nile-reverse" (list (concat-strings nile-dir "test/reverse.k")) "")))
+    (list-do n '("1" "2")
+      (unit-assert (equal (run (concat-strings "nile-reverse-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-reverse-" n ".err") 300)
+			  '("reverse ok"))))))
+
+(check "nile_sort"
+  (let ((bin (nile-build "nile-sort" (list (concat-strings nile-dir "test/sort.k")) "")))
+    (list-do n '("1" "2")
+      (unit-assert (equal (run (concat-strings "nile-sort-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-sort-" n ".err") 300)
+			  '("sort ok"))))))
+
+(check "nile_dupcat"
+  (let ((bin (nile-build "nile-dupcat" (list (concat-strings nile-dir "test/dupcat.k")) "")))
+    (list-do n '("1" "2")
+      (unit-assert (equal (run (concat-strings "nile-dupcat-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-dupcat-" n ".err") 300)
+			  '("dupcat ok" "dupzip ok"))))))
+
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")
 	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
     (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
 			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
-    ;; The link half: interface.k, with the runtime, asks dlsym for each call. Task 8 defines
-    ;; prefix_input and reroute, so the four builtins Reverse, SortBy, DupZip and DupCat (Task 9)
-    ;; are the missing ones.
+    ;; The link half: interface.k, with the runtime, asks dlsym for each call. Every call of
+    ;; the table is defined once Task 9 adds Reverse, SortBy, DupZip and DupCat.
     (unit-assert (equal (run "nile-iface" (concat-strings (nile-build "nile-iface" (list (concat-strings nile-dir "test/interface.k")) "") " && test ! -s " tmp "/nile-iface.err"))
-			'("nile interface: 26 calls, 4 missing")))
+			'("nile interface: 26 calls, 0 missing")))
     (run "nile-iface-text" (concat-strings "R=$PWD; mkdir -p " tmp "/iface && cd " tmp "/iface && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
     (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
 			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
