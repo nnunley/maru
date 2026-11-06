@@ -629,6 +629,8 @@
 (check "data_length"
   (list-do e '("./eval" "./eval3")
     (unit-assert (equal (last (run "data_length" (concat-strings e " check/data-length.l"))) "data-length ok"))))
+;; typed Maru compiled to native code in-process and called by address (check/native.l, native.l)
+(check "native_ir2" (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l")) "native ok")))
 (check "maru_test"
   (let* ((out (run "maru_test" (concat-strings (ir2-build "maru-test" "maru-test.k") " 32")))
 	 (primes ()))
