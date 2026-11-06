@@ -339,6 +339,12 @@
     (*ir-gen-c-main*	(println "int main(int argc, char **argv)")	(ir-gen-c-begin self))
     (*ir-gen-c-init*	(println "static void _init(void)")		(ir-gen-c-begin self))))
 
+;; what C can initialise a global with, at its definition: a literal (sizeof among them), negated or cast
+(define-selector ir-gen-c-constant? args		())
+(define-method ir-gen-c-constant? <ir-lit> ()		1)
+(define-method ir-gen-c-constant? <ir-cast> ()		(ir-gen-c-constant? (car self.operands)))
+(define-method ir-gen-c-constant? <ir-neg> ()		(ir-gen-c-constant? (car self.operands)))
+
 (define-method ir-gen-initialisation <ir-gen-c> (value)
   (if *ir-gen-c-main*
       (let ()
@@ -360,6 +366,11 @@
 	((= kind <ir-function>)	(print-c-declaration type (ir-gen-c-variable-name name))
 				(print " = ")
 				(print (ir-gen-c-function-name init))
+				(println ";"))
+	((ir-gen-c-constant? init)
+				(print-c-declaration type (ir-gen-c-variable-name name))
+				(print " = ")
+				(ir-gen-c init self)
 				(println ";"))
 	(else			(error "cannot initialise: "name" with: "value)))))))
 

@@ -185,7 +185,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   untyped Maru opens by its path in the tree and calls by address. A library is compiled in
   one process, `./eval2 compile-irl-library.l A.irl B.irl > build/lib.c`: the irl is read to
   forms that stay in memory, then ir-gen-c.k and maru.k compile them; only `cc` runs after. `cast(e, type)` and
-  `sizeof(type)` read to maru.k's own forms.
+  `sizeof(type)` read to maru.k's own forms. A global's constant initialiser (a literal, negated or cast) is C's initialiser at
+  its definition, in irl and typed Maru alike; a computed one would need a `main`, so it's an error in a library.
 - `kscript` (`check/kscript.l`): `kscript.g` (inheriting `cexpr.g`) reads the 39 KScript listings
   transcribed from TR-2012-001, and `kscript.l` runs streams tick by tick, as the report says: a
   stream recomputes when a stream it depends on fires, a primed name isn't a dependency (so

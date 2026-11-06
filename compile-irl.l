@@ -63,9 +63,16 @@
     (else			(map irl-expand form))))
 
 (define-function irl-literal? (e)	(or (long? e) (double? e) (string? e)))
+;; what a global can be initialised with at its definition, where maru.k evaluates it as it compiles: a literal,
+;; negated, or cast (C converts it there anyway, so the cast is dropped)
+(define-function irl-constant? (e)
+  (or (irl-literal? e)
+      (and (pair? e) (= '- (car e)) (not (cddr e)) (irl-constant? (cadr e)))
+      (and (pair? e) (= 'cast (car e)) (irl-constant? (cadr e)))))
+(define-function irl-constant (e) (if (and (pair? e) (= 'cast (car e))) (irl-constant (cadr e)) e))
 
-;; Definitions stay at top level, in order; every other statement, and the
-;; assignment of each computed initialiser, goes in main.  A library has no main, so there
+;; Definitions stay at top level, in order, a global's constant initialiser with it; every other
+;; statement, and the assignment of each computed initialiser, goes in main.  A library has no main, so there
 ;; either is an error naming the file.
 (define *irl-library* ())	; the file being read in library mode, or ()
 (define-function irl-main (form)
@@ -90,10 +97,8 @@
 					  (if seen (or (equal (cdr seen) decl) (error "irl: " (car decl) " imported with two types"))
 					    (push *irl-imports* (cons (car decl) decl))
 					    (push defs `(define ,decl ,(caddr f))))))
-	  ((and (= head 'define) (= 0 (caddr f)))	; a global starts at zero (check zero_global), as ir2 can't initialise one
-					(push defs `(define ,(cadr f))))
-	  ((and (= head 'define) (irl-literal? (caddr f)))
-					(push defs f))
+	  ((and (= head 'define) (irl-constant? (caddr f)))
+					(push defs `(define ,(cadr f) ,(irl-constant (caddr f)))))
 	  ((= head 'define)		(push defs `(define ,(cadr f)))
 					(push main (irl-main `(set ,(car (cadr f)) ,(irl-expand (caddr f))))))
 	  (else				(push main (irl-main f))))))

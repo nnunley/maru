@@ -31,7 +31,10 @@
 	(let ((size (dlsym lib "pair_size")) (view (dlsym lib "view")))
 	  (expect "sizeof a two-long struct is 16" (and (not (= 0 size)) (= 16 ((subr size ">l")))))
 	  (expect "a cast view of malloc's memory"
-		  (and (not (= 0 view)) (= 13 ((subr view "l>l") 5))))))))
+		  (and (not (= 0 view)) (= 13 ((subr view "l>l") 5)))))
+	;; globals initialised by literals, casts and sizeof: 42 - 5 + 8 + 1 + 'i'
+	(let ((init (dlsym lib "initialised")))
+	  (expect "globals keep their initialisers" (and (not (= 0 init)) (= (+ 46 ?i) ((subr init ">l")))))))))
 ;; a library has no main, so a statement at its top level would never run
 (system (concat-strings "printf 'printf(\"x\");\\n' > " dir "/irl-lib-bad.irl"))
 (system (concat-strings "./eval compile-irl.l --library "

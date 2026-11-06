@@ -1,3 +1,12 @@
 // The other half of check/irl-library.l's shared library.
 long add3(long a, long b, long c) return a + b + c;
 export add3;
+
+// globals initialised by constants, with no main to set them: each is a C initialiser
+long answer := 42;
+long below := -5;
+long word := cast(8, long);
+long* nothing := cast(0, long*);
+char* greeting := "hi";
+long initialised() return answer + below + word + cast(nothing == cast(0, long*), long) + cast(greeting[1], long);
+export initialised;
