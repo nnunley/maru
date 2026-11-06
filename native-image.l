@@ -12,11 +12,23 @@
 
 (define native-region (code-region-allocate 4194304))
 
-;; this process's instruction set and system, (ISA . OS), as uname names them
+;; this process's instruction set and system, (ISA . OS), from uname's machine and system names, whole: arm64 (aarch64
+;; on Linux) or x86_64, and Darwin or Linux; any other is refused
+(define-function native-host-of (machine system)
+  (cons (cond ((or (= machine "arm64") (= machine "aarch64")) 'arm64)
+	      ((= machine "x86_64") 'x64)
+	      (else (error "native: no code for the machine " machine)))
+	(cond ((= system "Darwin") 'darwin)
+	      ((= system "Linux") 'linux)
+	      (else (error "native: no code for the system " system)))))
+(define-function native-c-string (p)	; the NUL-ended bytes at p
+  (let ((chars ()) (i 0))
+    (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
+    (list->string (list-reverse! chars))))
 (define native-host
   (let ((u ((subr "malloc" "l>p") utsname_size)))
     ((subr "uname" "p>i") u)
-    (cons (if (= ?a (byte-at u utsname_machine)) 'arm64 'x64) (if (= ?D (byte-at u 0)) 'darwin 'linux))))
+    (native-host-of (native-c-string (+ u utsname_machine)) (native-c-string u))))
 
 ;; the globals' storage: (name . address) …, in one zeroed block the image keeps
 (define-function native-data (globals)

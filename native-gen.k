@@ -84,12 +84,24 @@
 (define-method native-allocate <ir-set-var> (gen)
   (native-allocate (car self.operands) gen)
   (set self.location (if (native-global? self) (native-slot gen self.type) (<ir-variable>-location self.parameters))))
-;; a struct over 16 bytes by value, as an argument or a result, is refused: C passes it by reference and returns it
-;; through a hidden pointer, conventions not yet written
+;; a struct by value, as an argument or a result, is refused where general registers in 8- and 4-byte pieces, the one
+;; convention written, aren't C's: over 16 bytes (C passes it by reference and returns it through a hidden pointer), with a
+;; floating member anywhere in it (the AAPCS64's homogeneous aggregates and System V's SSE eightbytes go in vector
+;; registers), or a size not a multiple of 4 (no piece carries the rest)
+(define-function native-floating-member? (type)
+  (let ((found ()))
+    (list-do m (<ir-struct-type>-members type)
+      (let ((t (<ir-struct-member>-type (cdr m))))
+	(and (or (ir-floating-type? t) (and (ir-struct-type? t) (native-floating-member? t))) (set found 1))))
+    found))
 (define-function native-by-value (gen type role whom)
-  (and (ir-struct-type? type) (< 16 (<ir-type>-size type))
-       (error "native: struct " (<ir-type>-name type) " of " (<ir-type>-size type) " bytes " role " " whom " by value, in "
-	      (<native-gen>-name gen) ": over 16 bytes needs C's by-reference convention, not yet written")))
+  (and (ir-struct-type? type)
+       (let ((why (cond ((< 16 (<ir-type>-size type)) "over 16 bytes needs C's by-reference convention")
+			((native-floating-member? type) "a floating member needs C's vector registers")
+			((!= 0 (% (<ir-type>-size type) 4)) "a size not a multiple of 4 needs pieces under 4 bytes"))))
+	 (and why
+	      (error "native: struct " (<ir-type>-name type) " of " (<ir-type>-size type) " bytes " role " " whom " by value, in "
+		     (<native-gen>-name gen) ": " why ", not yet written")))))
 (define-function native-callee-name (callee)
   (if (inherits-from (type-of callee) <ir-get-var>) (<ir-variable>-name (<ir-insn>-parameters callee)) "a function pointer"))
 ;; a callee's parameter types, and how many of its arguments are named: those before ..., or all of them for a function
@@ -162,7 +174,9 @@
 (define-method native-lower <ir-extern> (gen)
   (native-emit gen (list 'extern-address 's0 (car self.parameters)))
   (native-out gen self 's0))
-(define-method native-lower <ir-define-label> (gen) (native-emit gen (list 'label (native-user-label self.var))))
+(define-method native-lower <ir-define-label> (gen)	; ir2 declares only a function's or a let's top-level labels
+  (or self.var (error "native: label " (car self.parameters) " in " (<native-gen>-name gen) " isn't at the top level of a function or let"))
+  (native-emit gen (list 'label (native-user-label self.var))))
 (define-method native-lower <ir-goto> (gen)
   (let ((target (car self.operands)))
     (if (native-label-var? target)

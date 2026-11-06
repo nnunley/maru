@@ -83,7 +83,8 @@
 		  ,(native-x64-from-x d f0 (w to)))))))
 
 ;; System V: six integer argument registers, eight vector ones; a struct of up to 16 bytes in general registers if they
-;; all fit, else on the stack; every stack argument in an 8-byte slot, the first at [RBP + 16] on entry
+;; all fit, else on the stack (C's rule only for integers and pointers: native-gen.k refuses a struct with a floating
+;; member by value); every stack argument in an 8-byte slot, the first at [RBP + 16] on entry
 (define-function native-x64-arg (n) (native-nth (abi 'x64 'args) n))
 (define-function native-x64-farg (n) (native-nth (abi 'x64 'fargs) n))
 (define-function native-x64-params (ps)

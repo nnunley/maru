@@ -99,11 +99,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   branch is a short branch over `B`, so its reach is `B`'s. Globals live in a zeroed block the image owns, set by an
   `__init` function run at install; externs resolve through `dlsym`, string literals are copied out of Maru's heap, and
   calls follow the AAPCS64 with Apple's rules (stack arguments at natural alignment, variadic ones in 8-byte slots,
-  structs of 16 bytes or fewer in registers, and none after a struct that spills). A named argument is passed as its
+  structs of integers and pointers, 16 bytes or fewer, in registers, and none after a struct that spills). A named argument is passed as its
   parameter's type (zero to a pointer is the whole pointer), a float with no parameter is promoted to double, and a
-  function type with no prototype (`()` or `(...)` alone) is called as if it had one. A struct over 16 bytes by value,
-  argument or result, is refused naming it and the function, until C's by-reference conventions are written; each call's
-  stack arguments must fit the area the frame keeps for them (8 bytes a scalar, a struct's size rounded to 8), which the
+  function type with no prototype (`()` or `(...)` alone) is called as if it had one. A struct by value goes in general
+  registers, which is C's rule only for integers and pointers, at most 16 bytes, a multiple of 4: any other by value,
+  argument or result (over 16 bytes, a floating member anywhere in it, a size not a multiple of 4), is refused naming it,
+  its size and the function, until C's conventions for it are written; so is a label ir2 never declared (an `if`'s
+  branch). Each call's stack arguments must fit the area the frame keeps for them (8 bytes a scalar, a struct's size rounded to 8), which the
   lowering checks. `label` and `goto`, direct or computed, lower to labels and branches, each label its scope's own (two
   functions, or two sibling lets, may each have a `done`); a value of type label takes a pointer's slot.
   `check/native/calls.k` (ten arguments, `printf` with ints, doubles and a float, a global), `zero-global.k`,
@@ -135,7 +137,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   on any evaluator, filling the table (globals' storage, `dlsym`, string bytes) before installing and running `__init`.
   `native-install` is loading the image held in memory. `add.k` and `flow.k`, saved on `eval2`, give Tasks 1 and 2's
   answers on `eval` and `eval3`; `image.k`'s global, `strlen` and string reach them through the table; and an image
-  for the other instruction set, or the other system, is refused. A string literal must be ASCII.
+  for the other instruction set, or the other system, is refused. The host is uname's whole names (arm64 or aarch64,
+  x86_64; Darwin, Linux), and any other is refused. A string literal must be ASCII.
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.

@@ -118,13 +118,20 @@
 (let ((r (car (asm 'arm64 (asm-buffer 0) '(B (reloc))))))
   (expect "B's reach" (asm-field-range 'arm64 (caddr r) (car r) 0) '(-134217728 134217724 4)))
 
-;; what isn't written yet is refused when compiled, naming it: a struct over 16 bytes by value, a -0.0 literal
+;; what isn't written yet is refused when compiled, naming it: a struct by value over 16 bytes, with a floating member
+;; or of a size not a multiple of 4, a label ir2 never declared, a -0.0 literal
 (refuses "a struct over 16 bytes taken by value" (lambda () (native-compile-file "check/native/big-argument.k"))
 	 "struct <big> of 24 bytes taken as s by value, in first-of")
 (refuses "a struct over 16 bytes returned by value" (lambda () (native-compile-file "check/native/big-result.k"))
 	 "struct <big> of 24 bytes returned from make-big by value, in make-big")
 (refuses "a struct over 16 bytes passed by value" (lambda () (native-compile-file "check/native/big-call.k"))
 	 "struct <big> of 24 bytes passed to consume by value, in hand-over")
+(refuses "a struct with a floating member passed by value" (lambda () (native-compile-file "check/native/float-struct.k"))
+	 "struct <cpx> of 16 bytes passed to cabs by value, in modulus: a floating member")
+(refuses "a struct of 3 bytes taken by value" (lambda () (native-compile-file "check/native/odd-struct.k"))
+	 "struct <rgb> of 3 bytes taken as c by value, in red: a size not a multiple of 4")
+(refuses "a label ir2 didn't declare" (lambda () (native-compile-file "check/native/nested-label.k"))
+	 "label again in count-up isn't at the top level")
 (refuses "a -0.0 literal" (lambda () (native-compile-file "check/native/negative-zero.k")) "no literal for -0.0")
 ;; and the lowerings hold to what the generator promises: a struct result in two registers, a call's stack arguments in
 ;; the area the frame keeps for them

@@ -80,7 +80,8 @@
 		  (FCVT ,(native-arm64-f 0 (width to)) ,(native-arm64-f 0 (width from)))
 		  (FMOV ,(native-arm64-view d (width to)) ,(native-arm64-f 0 (width to))))))))
 ;; the calling convention: AAPCS64, with Apple's rules on Darwin (a stack argument at its natural alignment, a variadic
-;; one in an 8-byte stack slot); a struct of up to 16 bytes goes in general registers, in 8- and 4-byte pieces
+;; one in an 8-byte stack slot).  A struct goes in general registers, in 8- and 4-byte pieces: C's rule only for one of
+;; integers and pointers, at most 16 bytes, its size a multiple of 4, and native-gen.k refuses any other by value
 (define native-darwin (= 'darwin (cdr native-host)))
 (define-function native-x (n) (string->symbol (concat-string "X" (long->string n))))
 (define-function native-function-label (name) (string->symbol (concat-string "fn." (symbol->string name))))

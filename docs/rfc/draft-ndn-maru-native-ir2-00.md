@@ -124,9 +124,12 @@ rows are the only ones used. [R-checked-rows]
 
 A named argument is passed as its parameter's type, and a float with no parameter is promoted to double, as C does; a
 function type with no prototype (`()`, or `(...)` alone) is called as one with a prototype, as C calls it on Apple's
-arm64. A struct over 16 bytes by value, as an argument or a result, MUST be refused at compile time, naming the struct
-and the function, until the conventions C uses for one (a copy passed by reference, a hidden result pointer) are
-written. Each call's stack arguments fit the area at the frame's bottom the lowering of `ir2` reserves (8 bytes a
+arm64. A struct by value goes in general registers, in 8- and 4-byte pieces, or on the stack. That is this lowering's
+own convention, not C's, which agrees with it only for a struct of integers and pointers, at most 16 bytes, its size a
+multiple of 4. Any other struct by value, as an argument or a result, MUST be refused at compile time, naming the struct,
+its size and the function: over 16 bytes, with a floating member anywhere in it (nested structs included), or of a size
+not a multiple of 4. A label ir2 never declared (one that is an `if`'s branch, not at the top level of a function's or a
+`let`'s body) is refused too. Each call's stack arguments fit the area at the frame's bottom the lowering of `ir2` reserves (8 bytes a
 scalar, a struct's size rounded up to 8: a bound for every convention here), and the lowering checks it.
 
 ```maru-check @R-checked-rows
@@ -183,8 +186,18 @@ native_gezira
 | An extern not found | a misspelt C function | Installation stops, naming it; nothing is installed. |
 | A displacement that doesn't fit | a branch farther than a row's field allows | The encoder refuses it (RFC 0001); a conditional branch is lowered as the inverted test over an unconditional one, whose reach is the widest. |
 | A struct over 16 bytes by value | `(define-function f long ((s struct <big>)) …)` | Compilation stops, naming the struct, its size and the function. |
+| A struct by value with a floating member | `(cabs z)`, `z` a `struct <cpx>` of two doubles | Compilation stops, naming the struct, its size and the function. |
+| A struct by value of a size not a multiple of 4 | a `struct <rgb>` of three chars | Compilation stops, naming the struct, its size and the function. |
+| A label ir2 never declared | `(if c (label x))` | Compilation stops, naming the label and the function. |
 | A literal that can't be written | `-0.0`, a subnormal, an infinity, a NaN | Compilation stops, naming it. |
 | An image for another machine | an arm64 image loaded on x86-64, or a Darwin one on Linux | Loading stops, naming both; nothing is installed. |
+
+## Still open
+
+**C's struct conventions.** A struct over 16 bytes by value is passed by C as a copy by reference and returned through
+a hidden result pointer; a struct with floating members goes in vector registers (the AAPCS64's homogeneous floating-point
+aggregates, up to four floats or doubles in V registers; System V's SSE eightbytes in XMM registers); a struct whose size
+isn't a multiple of 4 needs pieces under 4 bytes. Until each is written, such a struct by value is refused (above).
 
 ## Out of Scope
 

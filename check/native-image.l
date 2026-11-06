@@ -23,4 +23,9 @@
     (refuses "an image for another machine"
 	     (lambda () (native-load-image (cons 'native-image (concat-list other (cdddr image)))))
 	     "can't run on")))
+;; the host is known by uname's whole names, and no other machine or system is taken for one
+(expect "the hosts' names" (list (native-host-of "arm64" "Darwin") (native-host-of "aarch64" "Linux") (native-host-of "x86_64" "Linux"))
+	'((arm64 . darwin) (arm64 . linux) (x64 . linux)))
+(refuses "another machine" (lambda () (native-host-of "armv7l" "Linux")) "no code for the machine armv7l")
+(refuses "another system" (lambda () (native-host-of "arm64" "FreeBSD")) "no code for the system FreeBSD")
 (println (if ok "image ok" "image FAILED"))
