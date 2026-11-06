@@ -226,3 +226,7 @@
 -4 ksworld-render.l: the whole-element rounding is gone; paths and glyphs pass their logical counts (ksworld-render.l)
 +3 check.l: the ksworld_rerender assertion that every fill is whole elements and the first is the 24-float rectangle (check/check.l)
 +2 check/ksworld-frame-dump.l: the summary line the rerender check reads (check/ksworld-frame-dump.l)
++8 nile-kernel.k: the scratch area is 16 floats, the fallbacks report out of memory, and nile_Process_scratch gives its pointer (nile/runtimes/maru)
++19 nile-thread.k: the process record's scratch area is 16 contiguous floats, so a kernel's fallback writes can't reach the lock or the input deque (nile/runtimes/maru)
++64 test/gezira-oom.k: the gezira_oom driver: Gezira fills on a runtime with a tiny block quota, and the out-of-memory statuses it must report (nile/runtimes/maru/test)
++9 check.l: the gezira_oom case (check/check.l)

@@ -831,6 +831,15 @@
 	  (unit-assert (equal (run (concat-strings "nile-gezira-rerender-" n) (concat-strings bin " " n " 2 " frame " && test ! -s " tmp "/nile-gezira-rerender-" n ".err") 600)
 			      '("gezira rerender ok")))))))
 
+; Gezira fills on a runtime with 70000 bytes a worker: the out-of-memory path runs, and each fill that can't get a block reports
+; it and stops, writing only inside its scratch area (under ASan, which found the overflow this fixes), and never stalls
+; (test/gezira-oom.k; the leak report on stderr is not checked, see the notes).
+(check "gezira_oom"
+  (let ((bin (nile-build "nile-gezira-oom" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "gezira-api.k") (concat-strings nile-dir "test/gezira-oom.k")) "-g -O1 -fsanitize=address,undefined")))
+    (list-do n '("1" "4")
+      (unit-assert (equal (run (concat-strings "nile-gezira-oom-" n) (concat-strings bin " " n " 70000 3") 300)
+			  '("gezira oom ok"))))))
+
 ; Zip streams: DupZip's output holds pairs before its input's second piece is poured, and every pair is right (R-zip-stream).
 (check "nile_zip_stream"
   (let ((bin (nile-build "nile-zip-stream" (list (concat-strings nile-dir "test/zip-stream.k")) "")))
