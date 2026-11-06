@@ -219,6 +219,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
   a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
+  `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
+  quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
+  KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being Squeak's
+  emphasis) is identical to what it reads from this system's Times New Roman, where macOS has it.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
