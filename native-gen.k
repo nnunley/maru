@@ -10,7 +10,10 @@
 ;;;   (load size slot s) (store size slot s)       a slot of size bytes to or from a scratch register (loads sign-extend:
 ;;;                                                ir2's integers are signed)
 ;;;   (constant s value) (result-from s)           a value into a scratch register; a scratch register as the result
-;;;   (op kind d a b)                              d := a kind b, kind add or sub
+;;;   (op kind d a b)                              d := a kind b: add sub mul div mod and or xor shl shr (division and
+;;;                                                right shift signed), or com (d := ~a)
+;;;   (address slot s)                             s := the slot's address
+;;;   (load-at size base s) (store-at size base s) through the address in register base
 ;;;   (compare cond d a b)                         d := 1 if a cond b else 0; cond eq ne lt le gt ge, or lo ls hi hs
 ;;;                                                for pointers, which compare unsigned
 ;;;   (label L) (branch L) (branch-if s L) (branch-unless s L)   within a function
@@ -70,6 +73,69 @@
     (native-out gen insn 's0)))
 (define-method native-lower <ir-add> (gen) (native-binary gen self 'add))
 (define-method native-lower <ir-sub> (gen) (native-binary gen self 'sub))
+(define-method native-lower <ir-mul> (gen) (native-binary gen self 'mul))
+(define-method native-lower <ir-div> (gen) (native-binary gen self 'div))
+(define-method native-lower <ir-mod> (gen) (native-binary gen self 'mod))
+(define-method native-lower <ir-bitand> (gen) (native-binary gen self 'and))
+(define-method native-lower <ir-bitor> (gen) (native-binary gen self 'or))
+(define-method native-lower <ir-bitxor> (gen) (native-binary gen self 'xor))
+(define-method native-lower <ir-shl> (gen) (native-binary gen self 'shl))
+(define-method native-lower <ir-shr> (gen) (native-binary gen self 'shr))
+(define-method native-lower <ir-com> (gen)
+  (let ((a (car self.operands)))
+    (native-lower a gen)
+    (native-into gen a 's0)
+    (native-emit gen '(op com s0 s0 s0))
+    (native-out gen self 's0)))
+;; an integer or pointer cast: loaded at the source's size (sign-extended), stored at the target's (truncated)
+(define-method native-lower <ir-cast> (gen)
+  (let ((a (car self.operands)))
+    (native-lower a gen)
+    (native-into gen a 's0)
+    (native-out gen self 's0)))
+
+;;; places: the address of what an instruction names into register s, for reading, writing or addressof
+(define-function native-pointee-size (ptr) (<ir-type>-size (<ir-pointer-type>-referent (<ir-insn>-type ptr))))
+(define-selector native-address (insn gen s) (error "native: no address for " insn))
+(define-method native-address <ir-get-var> (gen s)
+  (native-emit gen (list 'address (native-offset (<ir-variable>-location self.parameters)) s)))
+(define-method native-address <ir-indir> (gen s)	; p + i * the element's size
+  (let ((p (car self.operands)) (i (cadr self.operands)))
+    (native-lower p gen) (native-lower i gen)
+    (native-into gen p s) (native-into gen i 's3)
+    (native-emit gen (list 'constant 's4 (native-pointee-size p)))
+    (native-emit gen '(op mul s3 s3 s4))
+    (native-emit gen (list 'op 'add s s 's3))))
+(define-method native-address <ir-member> (gen s)	; a pointer's or a struct place's address, plus the field's offset
+  (let ((base (car self.operands)))
+    (if (ir-pointer-type? (<ir-insn>-type base))
+	(let () (native-lower base gen) (native-into gen base s))
+      (native-address base gen s))
+    (native-emit gen (list 'constant 's4 (<ir-struct-member>-offset (car self.parameters))))
+    (native-emit gen (list 'op 'add s s 's4))))
+(define-function native-read (gen insn)
+  (native-address insn gen 's2)
+  (native-emit gen (list 'load-at (native-size insn) 's2 's0))
+  (native-out gen insn 's0))
+(define-method native-lower <ir-indir> (gen) (native-read gen self))
+(define-method native-lower <ir-member> (gen) (native-read gen self))
+(define-method native-lower <ir-addressof> (gen)
+  (native-address (car self.operands) gen 's2)
+  (native-out gen self 's2))
+;; a write: the value first, then the place's address, then the store; the value is the write's value
+(define-function native-write (gen insn place value)
+  (native-lower value gen)
+  (native-address place gen 's2)
+  (native-into gen value 's0)
+  (native-emit gen (list 'store-at (native-size value) 's2 's0))
+  (native-out gen insn 's0))
+(define-method native-lower <ir-set-indir> (gen)
+  (let ((p (car self.operands)) (i (cadr self.operands)) (value (caddr self.operands)))
+    (native-write gen self (new <ir-indir> () (list p i) (native-size-type p) () ()) value)))
+(define-method native-lower <ir-set-member> (gen)
+  (let ((base (car self.operands)) (value (cadr self.operands)))
+    (native-write gen self (new <ir-member> self.parameters (list base) (<ir-struct-member>-type (car self.parameters)) () ()) value)))
+(define-function native-size-type (ptr) (<ir-pointer-type>-referent (<ir-insn>-type ptr)))
 (define-method native-lower <ir-neg> (gen)
   (let ((a (car self.operands)))
     (native-lower a gen)
