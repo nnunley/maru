@@ -101,6 +101,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `eval3`: `eval3` runs `boot2.l` with the `boot2_strings` and `asm_interface`
   cases, and `dlextern` (`check/dlextern.l`, as `libsdl2.k` uses it) calls libc
   through `subr` in `eval3` and `eval2` alike.
+- `sdl3_window` (`check/sdl3-window.k`, `sdl3.k`): `sdl3.k`, typed SDL3 over its C functions (measured in `sdl3.osdefs`), opens a
+  window on SDL's dummy video driver, draws a known frame, reads its pixels back at four points and round-trips a mouse button,
+  a motion and a key event. Offscreen fails on macOS (no GL), so the case sets `SDL_VIDEO_DRIVER=dummy`; without SDL3 it prints
+  `SKIP` and passes.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed

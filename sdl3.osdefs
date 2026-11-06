@@ -1,0 +1,24 @@
+header	stddef.h
+header	SDL3/SDL.h
+
+integer	SDL_INIT_VIDEO
+integer	SDL_EVENT_QUIT SDL_EVENT_KEY_DOWN SDL_EVENT_MOUSE_MOTION
+integer	SDL_EVENT_MOUSE_BUTTON_DOWN SDL_EVENT_MOUSE_BUTTON_UP
+integer	SDL_PIXELFORMAT_ARGB8888 SDL_PIXELFORMAT_XRGB8888 SDL_TEXTUREACCESS_STREAMING
+integer	SDL_WINDOW_HIDDEN
+integer	SDLK_ESCAPE
+
+value	event_size sizeof(SDL_Event)
+value	event_type offsetof(SDL_Event, type)
+value	mouse_button_button offsetof(SDL_MouseButtonEvent, button)
+value	mouse_button_down offsetof(SDL_MouseButtonEvent, down)
+value	mouse_button_x offsetof(SDL_MouseButtonEvent, x)
+value	mouse_button_y offsetof(SDL_MouseButtonEvent, y)
+value	mouse_motion_x offsetof(SDL_MouseMotionEvent, x)
+value	mouse_motion_y offsetof(SDL_MouseMotionEvent, y)
+value	keyboard_key offsetof(SDL_KeyboardEvent, key)
+value	keyboard_down offsetof(SDL_KeyboardEvent, down)
+value	surface_w offsetof(SDL_Surface, w)
+value	surface_pitch offsetof(SDL_Surface, pitch)
+value	surface_pixels offsetof(SDL_Surface, pixels)
+value	surface_format offsetof(SDL_Surface, format)

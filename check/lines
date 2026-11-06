@@ -145,3 +145,8 @@
 +27 what the review of headless KSWorld found: List sort and String match came back (match as Squeak's, the pattern receiving it), Color the class and colours answer apart, a send never makes a field or sets a stream, the driver's wrapper comes off however the ticks end, unreadable streams count as failed, and the check holds the counts and these (kscript.l, ksworld-run.l, check/ksworld.l)
 +2 the KSWorld check reads the dbjr documents only where MARU_DBJR names a copy laid out as tinlizzie.org/dbjr, and fails rather than skips when that copy is missing; notes/plan/ksworld.john (not counted) fetches it first (check/ksworld.l)
 +11 make check fetches the dbjr documents the KSWorld check reads into a fresh mktemp -d directory, removed after, unless MARU_DBJR names a copy already (Makefile)
++155 sdl3.k: SDL3 for typed Maru, the C functions it calls declared with their SDL3 types, a window with a streaming ARGB8888 texture, frame draw and readback, event poll and the synthetic pushes (sdl3-window's check runs it)
++79 check/sdl3-window.k: the sdl3_window check's typed program, a 64x48 frame compared at four pixels after readback, then a mouse button, a motion and a key event round-tripped
++24 sdl3.osdefs: what sdl3.k needs measured from SDL3's headers, constants, event and surface offsets, built to sdl3.osdefs.k by make
++14 check.l: the sdl3_window case, which builds sdl3.k and runs it on SDL's dummy driver, or says it skipped where pkg-config finds no sdl3
++6 Makefile: sdl3.osdefs.exe compiled with SDL3's pkg-config flags, and sdl3.osdefs.k in CHECK_LIBS so a missing SDL3 skips the case instead of failing the run
