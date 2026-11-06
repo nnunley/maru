@@ -20,7 +20,9 @@ relative to the current directory, so run everything from the repo root.
 The end goal is to synthesize the rest of VPRI's work into something that runs on modern
 machines. [tinlizzie.org](https://tinlizzie.org/), the archived VPRI site, is a core reference
 for that: the papers (`/VPRIPapers/`) and the top-down system's own dump (`/dbjr/`, including
-the KSWorld `.pp` bundles). Keep third-party texts in `~/pkm`, not in this tree.
+the KSWorld `.pp` bundles). Keep third-party texts in `~/pkm`, not in this tree, with one exception: `ksworld/` is
+KSWorld's own source, every KS class as Frank's image last had it (`ksworld/README.md` says where it comes from), kept
+here as the reference for the KSWorld work. Its `.st` files aren't counted in `lines`.
 
 ## Other history (tags)
 
@@ -208,9 +210,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
   520 objects, 346 streams (281 setters), every stream's code read, and nothing it names missing: `KSTextLayout`'s
-  `installSelection`, `handleButtonDown` and `handlePointerMotion` were Squeak methods in an image that didn't survive (no
-  `.changes` file in dbjr holds them), so `ksworld-events.l`'s are ours. Named but missing is a failure; unset, it says it
-  skipped them.
+  `installSelection`, `handleButtonDown` and `handlePointerMotion` are class methods, which documents don't keep, and
+  `ksworld-events.l`'s stand in for KSWorld's own (KScript, in `ksworld/KSTextLayout.st`). Named but missing is a failure;
+  unset, it says it skipped them.
   `ksworld-render.l`'s `(ksworld-render box gezira width height)` draws a document with whatever Gezira it's given: walking
   the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it asks `(gezira-fill-path gezira matrix
   width height paint floats count)` of each shape's path, as its FloatArray holds it, placed by the matrix composed from every
@@ -240,7 +242,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
   left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
   renderer composes), a motion or release to the box the hand holds if that stream is awake, then one tick runs. The
-  handlers are ours: a press puts the caret at the nearest gap, wakes `buttonUp` and `pointerMotion` and has the hand hold
+  handlers are ours, written before KSWorld's own turned up in `ksworld/KSTextLayout.st`: a press puts the caret at the nearest gap, wakes `buttonUp` and `pointerMotion` and has the hand hold
   the box; a drag selects from the press; a release, by the document's own stream, puts them back to sleep. A selection is
   an Interval of gaps, `(from to: to + 1)`, as every one the documents kept is one wide, and the redraw asks the Gezira for
   it in the layout's `selectionColor` under the text. No window yet: SDL3 and pixels wait on Gezira rendering.
