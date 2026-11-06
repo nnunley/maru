@@ -400,6 +400,13 @@
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
 (check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
+;; KSWorld.ks in an SDL3 window on the dummy driver: SDL's mouse events reach the document, each change drawn (check/ksworld-window.l)
+(check "ksworld_window"
+  (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
+      (let ()
+	(run "ksworld-window-osdefs" "make -q sdl3.osdefs.k")	; measured from these headers, not stale
+	(unit-assert (equal (last (run "ksworld_window" "SDL_VIDEO_DRIVER=dummy ./eval check/ksworld-window.l")) "ksworld window ok")))
+      (println "SKIP ksworld_window: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))

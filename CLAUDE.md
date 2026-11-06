@@ -245,7 +245,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   handlers are ours, written before KSWorld's own turned up in `ksworld/KSTextLayout.st`: a press puts the caret at the nearest gap, wakes `buttonUp` and `pointerMotion` and has the hand hold
   the box; a drag selects from the press; a release, by the document's own stream, puts them back to sleep. A selection is
   an Interval of gaps, `(from to: to + 1)`, as every one the documents kept is one wide, and the redraw asks the Gezira for
-  it in the layout's `selectionColor` under the text. No window yet: SDL3 and pixels wait on Gezira rendering.
+  it in the layout's `selectionColor` under the text.
+- `ksworld_window` (`check/ksworld-window.l`): `ksworld-window.l` puts a running document in an SDL3 window through `sdl3.l`
+  (SDL3 for untyped Maru, through `subr`, with `sdl3.osdefs.k`'s constants and offsets; the library is the first of
+  `*sdl3-libraries*` that opens). Each `(ksworld-window-step win)` reads SDL's events, hands button 1's presses and
+  releases and every motion to `ksworld-pointer` (window points are document points), and draws a frame when one reached a
+  box, or first: it clears the Gezira, renders the document and shows `(gezira-image gezira)`, width x height ARGB pixels a
+  painting Gezira answers. Escape or a quit stops it. On the dummy driver the check queues a press, a drag and a release as
+  the window system would, and each reaches KSWorld.ks's title and draws a frame; its Gezira counts paths and paints
+  nothing, so pixels wait on a Gezira that paints (GeziraImage). Where `pkg-config` finds no SDL3 it prints `SKIP`.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
