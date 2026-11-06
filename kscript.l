@@ -114,6 +114,12 @@
 ;;; ---------------------------------------------------------------- environments & streams
 
 (define *ks-logical-time* 0)
+;; the time of the evaluation before: whole ticks headless, milliseconds in a window (ksworld-window.l), so a timer
+;; fires for each multiple of its step that time passes, once however many it passed
+(define *ks-previous-time* -1)
+;; a run that starts over (time not past the last evaluation's) counts from the tick before
+(define-function ks-time-before () (if (< *ks-previous-time* *ks-logical-time*) *ks-previous-time* (- *ks-logical-time* 1)))
+(define-function ks-floor-div (a b) (let ((q (/ a b))) (if (and (< a 0) (!= (* q b) a)) (- q 1) q)))
 
 (define-function ks-make-stream (home type code init-val)
   (let ((s (new <ks-object> 'KSEventStream 0
@@ -524,9 +530,9 @@
 		     (when (ks-defined? v) (set res v)))
 		   (set items (cdr items)))
 		 res))
-	      ((= fn 'timerE)
+	      ((= fn 'timerE)	; fires when a multiple of its step was reached since the last evaluation
 	       (let ((step (ks-num (ks-stream-curr (ks-eval (car raw-args) env this)))))
-		 (if (or (<= step 0) (= 0 (% *ks-logical-time* step)))
+		 (if (or (<= step 0) (> (ks-floor-div *ks-logical-time* step) (ks-floor-div (ks-time-before) step)))
 		     *ks-logical-time*
 		   'undefined)))
 	      ((or (= fn 'streamOf) (= fn 'streamof))
@@ -832,4 +838,5 @@
       (let ((ast (ks-stream-ast s))
 	    (home (ks-attr s ':__home__)))
 	(and ast (ks-due? ast home) (ks-evaluate-stream s ast home))))
+    (set *ks-previous-time* logical-time)
     sorted))

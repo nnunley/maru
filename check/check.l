@@ -427,6 +427,11 @@
 ;; png.l: our fixtures (every deflate block and row filter), and with MARU_DBJR the front page's image (check/png.l)
 (check "png" (unit-assert (equal (last (run "png" "./eval check/png.l")) "png ok")))
 ;; KSWorld.ks in an SDL3 window on the dummy driver: SDL's mouse events reach the document, each change drawn (check/ksworld-window.l)
+;; a document in a window runs on the window's clock: a timer fires as time passes, and only then is a frame drawn
+(check "ksworld_clock"
+  (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
+      (unit-assert (equal (last (run "ksworld_clock" "SDL_VIDEO_DRIVER=dummy ./eval check/ksworld-clock.l")) "ksworld clock ok"))
+    (println "SKIP ksworld_clock: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
 (check "ksworld_window"
   (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
       (let ()

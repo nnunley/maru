@@ -27,9 +27,11 @@
 		 (cons 'present (subr "SDL_RenderPresent" "p>i"))
 		 (cons 'poll (subr "SDL_PollEvent" "p>i"))
 		 (cons 'push (subr "SDL_PushEvent" "p>i"))
+		 (cons 'ticks (subr "SDL_GetTicks" ">l"))
 		 (cons 'destroy-window (subr "SDL_DestroyWindow" "p"))
 		 (cons 'quit (subr "SDL_Quit" ""))))))
 (define-function sdl3 (name) (cdr (assq name (sdl3-bind))))
+(define-function sdl3-ticks () ((sdl3 'ticks)))	; milliseconds since SDL started
 
 (define-function sdl3-open (title width height)
   (or (sdl3-library) (error "sdl3: no SDL3 library in " *sdl3-libraries*))

@@ -273,6 +273,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   painting Gezira answers. Escape or a quit stops it. On the dummy driver the check queues a press, a drag and a release as
   the window system would, and each reaches KSWorld.ks's title and draws a frame; its Gezira counts paths and paints
   nothing, so pixels wait on a Gezira that paints (GeziraImage). Where `pkg-config` finds no SDL3 it prints `SKIP`.
+- `ksworld_clock` (`check/ksworld-clock.l`): a document in a window runs as it runs on its own. After its start-up evaluation
+  (time 0), logical time is the window's clock in milliseconds from when it started (`SDL_GetTicks`, or any clock put in
+  its `clock` field), each step evaluates what is due then, an event happens no earlier than the clock says, and a step in
+  which something fired draws a frame. `timerE(n)` fires when time passes a multiple of n since the last evaluation, once
+  however many it passed (headless, with whole ticks, that's every nth tick, as before). A stream that fails is reported
+  once and the rest run on. Our fixture `check/ksworld/tiny.pp` in a window on the dummy driver: with the clock held still
+  nothing runs or draws; seven milliseconds on, its timer fires once and one frame is drawn. `ksworld-show.l` runs only the
+  start-up evaluation before the window, then the clock.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
