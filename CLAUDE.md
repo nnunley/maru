@@ -528,6 +528,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `gezira/nile/gezira.nl` and the runtime) through `gezira-maru.l`'s `<gezira-maru>` selectors renders the `gezira_image`
   rectangle with a matrix, on 1 and 4 workers. `check/gezira-scene.l` draws `check/ksworld/scene.pp` the same way; it is
   verified in a scratch copy with main's KSWorld stack and is not registered on this branch.
+- `nile_laws` (`check/laws/runtime.law`, `check/laws/runtime.l`): the runtime's built-ins against their definitions (pass,
+  reverse, sort, dupcat, dupzip, over lengths 0, 1, 2, 3, 5, 121 to 123 and 244 to 245), each built-in deterministic for 1, 4
+  and 8 workers, and text-layout.nl's invariants (MakeWords keeps width and glyph count; InsertLineBreaks' lines fit unless
+  a style-1 word is in them; a glyph after another on its line starts where that one ends), through the batch driver
+  `nile/runtimes/maru/test/law-runtime.k` built with text-layout.nl's module. Thirteen laws, TESTED 30 each.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change

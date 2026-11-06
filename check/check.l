@@ -932,6 +932,22 @@
   (let ((bin (nile-build "nile-leaks" (list (concat-strings nile-dir "test/leaks.k")) "")))
     (unit-assert (equal (run "nile-leaks" (concat-strings bin " 1 && test ! -s " tmp "/nile-leaks.err") 300)
 			'("leaks ok")))))
+;; the runtime's built-ins and text-layout.nl's pipeline as laws (check/laws/runtime.law): the batch driver
+;; (nile/runtimes/maru/test/law-runtime.k), built with text-layout.nl's module, runs one pipeline per question
+(check "nile_laws"
+  (let* ((gen (concat-strings tmp "/nile-laws-gen"))
+	 (_   (run "nile-laws-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh text_layout $R/nile/examples/text-layout.nl")))
+	 (bin (nile-build "nile-law-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/law-runtime.k")) ""))
+	 (dir (concat-strings tmp "/nile-laws"))
+	 (_   (run "nile-laws-dir" (concat-strings "mkdir -p " dir)))
+	 (st  (run-status 900 (concat-strings "exec </dev/null >" tmp "/nile_laws.out 2>" tmp "/nile_laws.err; NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval check/law.l check/laws/runtime.l check/laws/runtime.law"))))
+    (unit-assert (equal st 0))
+    (unit-assert (equal (lines (contents-of-file-named (concat-strings tmp "/nile_laws.out")))
+			'("law pass_identity: TESTED 30" "law reverse_backwards: TESTED 30" "law reverse_involution: TESTED 30"
+			  "law dupcat_is_twice: TESTED 30" "law dupzip_pairs: TESTED 30" "law sort_keys_ordered: TESTED 30"
+			  "law sort_permutation: TESTED 30" "law deterministic: TESTED 30" "law words_width: TESTED 30"
+			  "law words_glyphs: TESTED 30" "law breaks_fit: TESTED 30" "law points_contiguous: TESTED 30"
+			  "law layout_deterministic: TESTED 30")))))
 
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
