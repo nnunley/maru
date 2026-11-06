@@ -122,7 +122,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   (as `maru_gc` asks them) and `check/gc.k` pass natively, and the refusals fail naming what they refuse. Results are
   held to each program's own assertions and stated outputs, never to `ir-gen-c.k`'s. A struct of floats is passed in
   general registers, not as the AAPCS64's homogeneous aggregate. Children (`check/native-child.l`) write to the check's
-  own directory, have a minute, and leave by `_exit`, an error too (exit would move the loader's shared input).
+  own directory, have 120 s, and leave by `_exit`, an error too (exit would move the loader's shared input).
 - `native_ir2_x64`: the same programs lowered to x86-64 by `native-x64.g` (System V, `native-x64.l`'s actions: slots
   RSP-relative, R11 holding the callee, AL a variadic call's vector count, floats through `fscratch` by MOVQ and MOVD,
   float equality checking PF), run under Rosetta through `bin/x86_64/eval2` as a smoke test only; the real run is

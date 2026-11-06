@@ -1,5 +1,6 @@
 ;;; Structs by value compiled natively (check/native.l): 12 and 16 bytes passed and returned both ways, a 16-byte one
-;;; returned by C (ldiv), one that spills to the stack after seven longs, and 8-byte pieces at slots 4 past a multiple of 8.
+;;; returned by C (ldiv), one that spills to the stack after seven longs, and 8-byte pieces at slots 4 past a multiple of 8
+;;; (the 12-byte <three> has them too).
 (define-struct <three> ((a int) (b int) (c int)))
 (define-struct <two> ((p long) (q long)))
 (define-struct <foo> ((x int) (y int)))
@@ -38,7 +39,8 @@
     (set (. s q) 3)
     (return (spill 1 1 1 1 1 1 1 s 4))))
 
-;; an int before a struct <foo>, or three int locals before one, put its 8-byte piece at a slot 4 past a multiple of 8
+;; an int parameter before a struct <foo> puts its 8-byte piece at a slot 4 past a multiple of 8; three int locals don't
+;; (ir2 lays slots out in zones by type), and are kept as a case that passes either way
 (define-function foo-after-int long ((i int) (s struct <foo>)) (return (cast (+ i (+ (* 10 (. s x)) (* 100 (. s y)))) long)))
 (define-function foo-locals long ((s struct <foo>))
   (let (((i int) 1) ((j int) 2) ((k int) 3) ((t struct <foo>) s))

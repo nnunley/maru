@@ -19,9 +19,10 @@
 	(or (= i from) (push out (string-copy text from (- i from))))
 	(set from (+ i 1))))
     (list-reverse! out)))
-;; thunk run in a forked child, its standard output and error in a file of this check's own, and a minute to finish
-;; (an alarm ends it): (status line …), the status as waitpid gives it, 0 for an exit of 0.  The child leaves by _exit,
-;; an error too: exit would flush the input this file is loaded from, which the child shares, and move it
+;; thunk run in a forked child, its standard output and error in a file of this check's own, and 120 s to finish, as
+;; check.l's run gives a command (an alarm ends it): (status line …), the status as waitpid gives it, 0 for an exit of 0.
+;; The child leaves by _exit, an error too: exit would flush the input this file is loaded from, which the child shares,
+;; and move it.  An evaluator's own fatal error still exits so, and would.
 (define-function native-child (thunk)
   (let ((path (concat-string check-tmp (concat-string "/native-child." (long->string ((subr "getpid" ">i"))))))
 	(status ((subr "calloc" "ll>p") 1 8))
@@ -30,7 +31,7 @@
       (let ((fd ((subr "open" "si.i>i") path (| O_WRONLY (| O_CREAT O_TRUNC)) 420)))
 	((subr "dup2" "ii>i") fd 1)
 	((subr "dup2" "ii>i") fd 2))
-      ((subr "alarm" "i>i") 60)
+      ((subr "alarm" "i>i") 120)
       (set error (lambda args
 		   (print "error: ") (apply print args) (print "\n")
 		   ((subr "fflush" "p>i") (native-stdout))
