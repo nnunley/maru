@@ -1,0 +1,91 @@
+;;; THROWAWAY SPIKE.  A replica: an operation set, a causal delivery queue in front of it (Automerge's change queue), and a
+;;; store defined as Datalog over the set (Stewen's two rules).  The queue keeps the query free of causal recursion.
+;;; An operation is (actor ctr deps key value preds):
+;;;   deps   the (actor ctr) heads it was made on, what must arrive first
+;;;   preds  the (actor ctr) writes of this key it overwrites
+;;; ctr is a Lamport clock: one more than anything seen, ties broken by actor.
+(require "spike/datalog.l")
+(define-structure <replica> (id clock heads ops pending present facts cached))
+(define *bypass-queue* ())		; mutations a law must catch
+(define *forget-drain* ())
+(define *no-clock-advance* ())
+(define store-rules
+  '(((overwritten $r $c) (pred $r $c $tor $toc))
+    ((leaf $k $r $c) (set $r $c $k $v) (not overwritten $r $c))
+    ((store $k $v) (set $r $c $k $v) (not overwritten $r $c))
+    ;; last writer wins, among what isn't overwritten: the highest (ctr, actor), as Automerge reads a property
+    ((beaten $r $c) (leaf $k $r $c) (leaf $k $r2 $c2) (> $c2 $c))
+    ((beaten $r $c) (leaf $k $r $c) (leaf $k $r2 $c) (> $r2 $r))
+    ((winner $k $v) (set $r $c $k $v) (leaf $k $r $c) (not beaten $r $c))))
+(define-function replica-new (id)
+  (let ((r (new <replica>)))
+    (set (<replica>-id r) id)
+    (set (<replica>-clock r) 0)
+    (set (<replica>-facts r) (dl-db-new))
+    r))
+(define-function op-actor (op) (car op))
+(define-function op-ctr (op) (cadr op))
+(define-function op-deps (op) (caddr op))
+(define-function op-key (op) (cadddr op))
+(define-function op-value (op) (car (cddddr op)))
+(define-function op-preds (op) (cadr (cddddr op)))
+(define-function op-id (op) (list (op-actor op) (op-ctr op)))
+(define-function replica-has? (r id) (dl-has? (dl-rel-of (<replica>-facts r) 'op) id))
+(define-function replica-ready? (r op)
+  (let ((ready 1))
+    (list-do d (op-deps op) (or (replica-has? r d) (set ready ())))
+    ready))
+(define-function replica-apply (r op)
+  (let ((facts (<replica>-facts r)) (id (op-id op)) (heads ()))
+    (dl-fact facts 'op id)
+    (dl-fact facts 'set (list (op-actor op) (op-ctr op) (op-key op) (op-value op)))
+    (list-do p (op-preds op) (dl-fact facts 'pred (list (car p) (cadr p) (op-actor op) (op-ctr op))))
+    (list-do h (<replica>-heads r) (or (has-equal? h (op-deps op)) (push heads h)))
+    (set (<replica>-heads r) (cons id heads))
+    (set (<replica>-ops r) (cons op (<replica>-ops r)))
+    (set (<replica>-cached r) ())
+    (or *no-clock-advance*
+	(and (> (op-ctr op) (<replica>-clock r)) (set (<replica>-clock r) (op-ctr op))))))
+(define-function replica-drain (r)		; apply what's now ready, and what that makes ready
+  (let ((progress 1))
+    (while progress
+      (set progress ())
+      (let ((waiting ()))
+	(list-do op (<replica>-pending r)
+	  (if (replica-ready? r op)
+	      (let () (replica-apply r op) (set progress 1))
+	    (push waiting op)))
+	(set (<replica>-pending r) waiting)))))
+(define-function replica-receive (r op)
+  (cond
+    ((replica-has? r (op-id op)) ())		; delivered twice
+    (*bypass-queue* (replica-apply r op))
+    ((replica-ready? r op) (replica-apply r op) (or *forget-drain* (replica-drain r)))
+    (else (or (has-equal? op (<replica>-pending r)) (push (<replica>-pending r) op)))))
+(define-function replica-db (r)
+  (or (<replica>-cached r)
+      (let ((db (dl-run store-rules (<replica>-facts r))))
+	(set (<replica>-cached r) db)
+	db)))
+(define-function replica-write (r key value)	; a local write overwrites what this replica sees for the key
+  (let ((preds ()))
+    (list-do l (dl-tuples (replica-db r) 'leaf)
+      (and (equal (car l) key) (push preds (cdr l))))
+    (let* ((ctr (+ 1 (<replica>-clock r)))
+	   (op (list (<replica>-id r) ctr (<replica>-heads r) key value preds)))
+      (set (<replica>-clock r) ctr)
+      (replica-apply r op)
+      op)))
+(define-function replica-state (r) (dl-state-text (replica-db r) 'store))
+(define-function replica-winners (r) (dl-state-text (replica-db r) 'winner))
+(define-function replica-read (r key)		; the winning value of a key, or ()
+  (let ((v ()))
+    (list-do t (dl-tuples (replica-db r) 'winner) (and (equal (car t) key) (set v (cadr t))))
+    v))
+(define-function replica-values (r key)		; every value of a key not overwritten
+  (let ((vs ()))
+    (list-do t (dl-tuples (replica-db r) 'store) (and (equal (car t) key) (push vs (cadr t))))
+    vs))
+;; sync in memory: everything a has reaches b
+(define-function replica-sync-into (a b)
+  (list-do op (<replica>-ops a) (replica-receive b op)))

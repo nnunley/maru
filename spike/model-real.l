@@ -1,0 +1,27 @@
+;;; THROWAWAY SPIKE.  The model strategy against a real model, on puzzles whose shortest plans are known.  What's in these files goes
+;;; to a cloud model: public puzzles only.  Everything John says is the report; nothing here is believed without replay.
+(require "spike/john-model.l")
+(define-function no-satisfy (fs) (let ((out ())) (list-do f fs (or (= 'satisfy (car f)) (push out f))) (list-reverse! out)))
+(define now (let ((b ((subr "malloc" "l>p") 16)) (clock (subr "gettimeofday" "pp>i")))
+  (lambda () (clock b 0) (+ (byte-at b 0) (+ (<< (byte-at b 1) 8) (+ (<< (byte-at b 2) 16) (<< (byte-at b 3) 24)))))))
+(define-function run-one (label text class goal object)
+  (set *model-program-text* text)
+  (set *john-replica* (replica-new 'a))
+  (set *llm-calls* 0)
+  (let* ((t0 (now))
+	 (out (john-run (concat-list (no-satisfy (john-read-text text))
+			  (john-read-text (concat-strings "goal-strategy " class " " goal " model. " object " satisfy " goal "."))))))
+    (println "--- " label ": " *llm-calls* " calls, " (- (now) t0) " s")
+    (list-do l out (println "  " (if (> (string-length l) 400) (concat-string (string-from l 0 400) "...") l)))))
+(define-function file-text (f) (contents-of-file-named f))
+;; the same disks with a goal the rules forbid: a big disk on a small one
+(define-function replace-text (s from to)
+  (let ((at (text-find s from 0)))
+    (or at (error "no " from))
+    (concat-strings (string-from s 0 at) to (string-from s (+ at (string-length from)) (string-length s)))))
+(run-one "hanoi2, shortest 3" (file-text "check/john/hanoi2.john") "Towers" "win" "Hanoi")
+(run-one "hanoi3, shortest 7" (file-text "check/john/hanoi3.john") "Towers" "win" "Hanoi")
+(run-one "impossible: B on A"
+	 (replace-text (file-text "check/john/hanoi2.john") "try B supporter = Peg3 and A supporter = B" "try B supporter = A")
+	 "Towers" "win" "Hanoi")
+(run-one "hanoi4, shortest 15" (file-text "check/john/hanoi4-ours.john") "Towers" "win" "Hanoi")

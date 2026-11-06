@@ -1,0 +1,32 @@
+;;; THROWAWAY SPIKE: the engine alone, on what Datalog is known to answer.
+(require "spike/datalog.l")
+(define failures 0)
+(define-function check-that (name ok) (println (if ok "ok   " "FAIL ") name) (or ok (set failures (+ failures 1))))
+(define-function facts (pred tuples) (let ((db (dl-db-new))) (list-do t tuples (dl-fact db pred t)) db))
+(define reach '(((path $a $b) (edge $a $b))
+		((path $a $c) (path $a $b) (edge $b $c))))
+(let ((db (dl-run reach (facts 'edge '((1 2) (2 3) (3 1) (4 5))))))
+  (check-that "transitive closure, through a cycle" (= 10 (list-length (dl-tuples db 'path))))
+  (check-that "what's reachable" (dl-has? (dl-rel-of db 'path) '(1 1)))
+  (check-that "what isn't" (not (dl-has? (dl-rel-of db 'path) '(1 4)))))
+(let ((db (dl-run '(((unreached $x) (node $x) (not seen $x))
+		    ((seen $x) (start $x)))
+		  (let ((f (facts 'node '((1) (2) (3))))) (dl-fact f 'start '(2)) f))))
+  (check-that "negation waits for its stratum, whatever the rule order"
+	      (equal "1 \n3 \n" (dl-state-text db 'unreached))))
+(let ((db (dl-run '(((bigger $a $b) (n $a) (n $b) (> $a $b))) (facts 'n '((1) (2) (3))))))
+  (check-that "comparison" (= 3 (list-length (dl-tuples db 'bigger)))))
+;; what must be refused runs in a child, since an error ends the program
+(define fork (subr "fork" ">i"))  (define waitpid (subr "waitpid" "ipi>i"))  (define quit (subr "_exit" "i"))
+(define status ((subr "malloc" "l>p") 8))
+(define-function refuses (thunk)
+  (let ((pid (fork)))
+    (if (= 0 pid)
+	(let () (thunk) (quit 0))
+      (let () (waitpid pid status 0) (or (!= 0 (byte-at status 0)) (!= 0 (byte-at status 1)))))))
+(check-that "a rule that depends on its own negation is refused"
+	    (refuses (lambda () (dl-run '(((p $x) (n $x) (not q $x)) ((q $x) (n $x) (not p $x))) (facts 'n '((1)))))))
+(check-that "a variable no positive atom binds is refused"
+	    (refuses (lambda () (dl-run '(((p $y) (n $x))) (facts 'n '((1)))))))
+(println "failures " failures)
+(exit (if (= 0 failures) 0 1))

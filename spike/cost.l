@@ -1,0 +1,17 @@
+;;; THROWAWAY SPIKE: what one naive query costs as a chain of writes grows.
+(require "spike/ops.l")
+(define now (let ((b ((subr "malloc" "l>p") 16)) (clock (subr "gettimeofday" "pp>i")))
+  (lambda () (clock b 0)
+    (+ (* 1000000 (+ (byte-at b 0) (+ (<< (byte-at b 1) 8) (+ (<< (byte-at b 2) 16) (<< (byte-at b 3) 24)))))
+       (+ (byte-at b 8) (+ (<< (byte-at b 9) 8) (<< (byte-at b 10) 16)))))))
+(list-do n '(50 100 200 400)
+  (let ((r (replica-new 'a)) (keys '("k1" "k2" "k3")) (facts ()))
+    ;; add facts directly, so only the query at the end is timed
+    (let ((prev ()))
+      (for (i 1 (+ n 1))
+	(let ((op (list 'a i (if prev (list prev) ()) "k" i (if prev (list prev) ()))))
+	  (replica-apply r op)
+	  (set prev (list 'a i)))))
+    (let ((t0 (now)))
+      (replica-state r)
+      (println n " ops: one query " (/ (- (now) t0) 1000) " ms"))))
