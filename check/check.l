@@ -647,6 +647,48 @@
     (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
 			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
 
+;;; ---------------------------------------------------------------- nile runtime in maru
+
+;; The runtime's files, in the order they're compiled; later tasks append theirs.
+(define nile-dir "nile/runtimes/maru/")
+(define nile-runtime '("nile-sync.k"))
+
+(define-function unique (items)
+  (let ((out ()))
+    (list-do x items (or (member? x out) (push out x)))
+    (list-reverse! out)))
+
+;; Compiles FILES (paths from the root) with nile.osdefs measured for this host and the runtime's
+;; files, in one ir-gen-c run, then cc -pthread.  -L lets a generated kernel's (load "nile.k")
+;; resolve against the runtime directory, so nile.k is never named here; a file named twice loads
+;; once.  Returns the binary's path.
+(define-function nile-build (name files cflags)
+  (let* ((osdefs  (concat-strings tmp "/" name ".osdefs"))
+	 (listed  ())
+	 (inputs  ""))
+    (list-do f nile-runtime (push listed (concat-strings nile-dir f)))
+    (list-do f files (push listed f))
+    (list-do f (unique (list-reverse! listed)) (set inputs (concat-strings inputs " " f)))
+    (run (concat-strings name "-osdefs")
+	 (concat-strings "./eval compile-osdefs.l " nile-dir "nile.osdefs > " osdefs ".c"
+			 " && cc -o " osdefs ".exe " osdefs ".c && " osdefs ".exe > " osdefs ".k"))
+    (run (concat-strings name "-build")
+	 (concat-strings "./eval2 -L " nile-dir " ir-gen-c.k maru.k " osdefs ".k" inputs
+			 " > " tmp "/" name ".c && cc -pthread -fno-builtin -w " cflags
+			 " -o " tmp "/" name " " tmp "/" name ".c"))
+    (concat-strings tmp "/" name)))
+
+;; The pthread types nile.osdefs measures are the sizes nile-sync.k's opaque structs have: the typed
+;; driver and the C driver print the same line (R-opaque-pthread).
+(check "nile_osdefs"
+  (let* ((typed (run "nile-osdefs-typed"
+		     (nile-build "nile-osdefs" (list (concat-strings nile-dir "test/osdefs.k")) "")))
+	 (c     (run "nile-osdefs-c"
+		     (concat-strings "cc -pthread -w -o " tmp "/nile-osdefs-c " nile-dir "test/osdefs.c && "
+				     tmp "/nile-osdefs-c"))))
+    (unit-assert (equal typed c))
+    (unit-assert (and typed (not (cdr typed))))))
+
 ;;; ---------------------------------------------------------------- budget
 
 ;; Derived code and code outside the stack (marked derived or unused in
