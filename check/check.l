@@ -760,6 +760,10 @@
 
 ;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
 ;; its selectors, the same rectangle as gezira_image, on one worker and four.
+;; ir-gen-c's library mode: a unit with no main, built as a shared library and opened from untyped Maru (library-mode.l)
+(check "library_mode"
+  (unit-assert (equal (last (run "library_mode" "./eval check/library-mode.l" 120)) "library mode ok")))
+
 (check "gezira_maru"
   (unit-assert (equal (last (run "gezira_maru" "./eval check/gezira-maru.l" 300)) "gezira maru ok")))
 

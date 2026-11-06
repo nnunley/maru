@@ -345,12 +345,25 @@
 (define-method ir-gen-c-constant? <ir-cast> ()		(ir-gen-c-constant? (car self.operands)))
 (define-method ir-gen-c-constant? <ir-neg> ()		(ir-gen-c-constant? (car self.operands)))
 
+;; A library unit has no main to set its globals in, so each global is defined where it is declared, once: a
+;; runtime's function that the unit also declares as an extern (nile_PassThrough, say) is one global, not two.
+(define *ir-gen-c-library-globals* ())
+
+(define-function ir-gen-c-library-global-new? (name)
+  (if (member? name *ir-gen-c-library-globals*)
+      ()
+    (let ()
+      (set *ir-gen-c-library-globals* (cons name *ir-gen-c-library-globals*))
+      1)))
+
 (define-method ir-gen-initialisation <ir-gen-c> (value)
   (if *ir-gen-c-main*
       (let ()
 	(ir-gen-c-bol   self)
 	(ir-gen-c value self)
 	(ir-gen-c-eol   self))
+    (if (not (ir-gen-c-library-global-new? (<ir-global>-name (<ir-define>-var value))))
+	()
     (if (ir-nop? (car (<ir-define>-operands value)))
 	(ir-gen-global-declaration self (<ir-define>-var value))
     (let* ((setter (car (<ir-define>-operands value)))
@@ -372,7 +385,7 @@
 				(print " = ")
 				(ir-gen-c init self)
 				(println ";"))
-	(else			(error "cannot initialise: "name" with: "value)))))))
+	(else			(error "cannot initialise: "name" with: "value))))))))
 
 (define-function ir-gen-c-variable-name (name)	(concat-string "v_" (c-mangle (symbol->string name))))
 

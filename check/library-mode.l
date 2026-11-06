@@ -1,0 +1,23 @@
+;;; check/library-mode.l -- ir-gen-c's library mode (a unit with no main): build/library-mode.dylib, made by make from
+;;; check/library-unit.k, opens from untyped Maru and its exports answer as their C says. Prints "library mode ok".
+(define system (subr "system" "s>i"))
+(define dlopen (subr "dlopen" "si>p"))
+(define dlsym (subr "dlsym" "ps>p"))
+(define failures 0)
+(define-function expect (what ok)
+  (if (not ok)
+      (let () (set failures (+ failures 1)) (println "FAIL " what))))
+(define path (if (= 0 (system "test `uname` = Darwin")) "build/library-mode.dylib" "build/library-mode.so"))
+(define lib (dlopen path 2))		; RTLD_NOW
+(expect "the library opens" (not (= 0 lib)))
+(if (not (= 0 lib))
+    (let ((twice (dlsym lib "twice_add1")) (base (dlsym lib "base_value")) (strlen (dlsym lib "strlen_of")))
+      (expect "twice_add1 is exported" (not (= 0 twice)))
+      (expect "base_value is exported" (not (= 0 base)))
+      (expect "strlen_of is exported" (not (= 0 strlen)))
+      (expect "add1 twice through the unit's own add1 is 7" (= 7 ((subr twice "i>i") 5)))
+      (expect "the literal global plus an argument is 42" (= 42 ((subr base "i>i") 2)))
+      (expect "strlen_ext reaches libc" (= 5 ((subr strlen "s>l") "hello")))))
+(if (= 0 failures)
+    (println "library mode ok")
+    (println failures " failures"))
