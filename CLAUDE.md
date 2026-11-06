@@ -112,6 +112,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   compiles once a process. `check/native/floats.k`, `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
   (as `maru_gc` asks them) and `check/gc.k` pass natively. A struct of floats is passed in general registers, not as
   the AAPCS64's homogeneous aggregate.
+- `native_ir2_x64`: the same programs lowered to x86-64 by `native-x64.g` (System V, `native-x64.l`'s actions: slots
+  RSP-relative, R11 holding the callee, AL a variadic call's vector count, floats through `fscratch` by MOVQ and MOVD,
+  float equality checking PF), run under Rosetta through `bin/x86_64/eval2` as a smoke test only; the real run is
+  `native_ir2` on an x86-64 host (ndn.lan). Where `bin/x86_64/eval2` isn't built it prints `SKIP`.
 - `native_image` (`check/native-image-save.l`, `check/native-image.l`): a unit compiled natively is a code image, a
   Maru form (`native-link.l`'s `native-image-of`): position-independent code, then a table of 8-byte slots through
   which it reaches each global, C function and string literal (ADR to the slot, then a load), the functions' offsets

@@ -177,6 +177,8 @@
   (let ((past (string->symbol (concat-string "skip" (long->string (set native-skips (+ native-skips 1)))))))
     (list (list skip r (list 'label past)) (list 'B (list 'label l)) (list 'at past))))
 (require "native-arm64.g.l")
+(require "native-x64.l")
+(require "native-x64.g.l")
 (require "native-link.l")
 
 ;; a unit is one compilation: maru.k's declarations (structs, types, exports) accumulate, as it compiles once a process,

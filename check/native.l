@@ -32,7 +32,7 @@
       (let ((p ((subr "strdup" "s>p") a))) (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) (& 255 (>> p (* 8 j)))))) (set k (+ k 1)))
     (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) 0))
     (when (= 0 pid)
-      ((subr "dup2" "ii>i") ((subr "open" "si.i>i") path 1537 420) 1)	; O_WRONLY|O_CREAT|O_TRUNC
+      ((subr "dup2" "ii>i") ((subr "open" "si.i>i") path (| O_WRONLY (| O_CREAT O_TRUNC)) 420) 1)
       (and code-region-write-protect (code-region-write-protect 1))	; a forked thread's JIT pages may start writable, not executable
       (let ((status ((fn image 'main "ip>i") (+ 1 (list-length args)) argv)))
 	((subr "fflush" "p>i") (native-stdout))	; stdout only: fflush(NULL) would reposition the loader's shared input

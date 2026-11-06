@@ -59,6 +59,10 @@ value	rusage_oublock		offsetof(struct rusage, ru_oublock)
 value	rusage_nvcsw		offsetof(struct rusage, ru_nvcsw)
 value	rusage_nivcsw		offsetof(struct rusage, ru_nivcsw)
 
+// open's flags, for a file a child writes (check/native.l)
+header	fcntl.h		(!defined __WIN32__)
+integer	O_WRONLY O_CREAT O_TRUNC
+
 // uname's fields (stub.l): each is the same size, and the machine's name is one of them.
 header	sys/utsname.h	(!defined __WIN32__)
 value	utsname_size		sizeof(struct utsname)

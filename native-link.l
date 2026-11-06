@@ -6,8 +6,23 @@
 ;;;   (native-install unit)      => ((name . address) …), each function callable by subr
 ;;;   (native-save unit path)    the image written to a file, for (native-load path) on any evaluator
 (require "native-image.l")
-(define native-lowerings (list (cons 'arm64 (lambda (intents) (parse-source <native-arm64> $program intents)))))
+(define native-lowerings (list (cons 'arm64 (lambda (intents) (parse-source <native-arm64> $program intents)))
+			       (cons 'x64 (lambda (intents) (parse-source <native-x64> $program intents)))))
 
+;; a form's (label L) operand, or one that is a memory operand's displacement (x64's RIP-relative LEA), and the form
+;; with it a placeholder
+(define-function native-label? (op) (and (pair? op) (= 'label (car op))))
+(define-function native-form-label (form)
+  (let ((found ()))
+    (list-do op (cdr form)
+      (cond ((native-label? op) (set found op))
+	    ((and (pair? op) (native-label? (cadr op))) (set found (cadr op)))))
+    found))
+(define-function native-form-reloc (form label)
+  (cons (car form) (map (lambda (op) (cond ((= op label) '(reloc))
+					   ((and (pair? op) (= (cadr op) label)) (cons (car op) (cons '(reloc) (cddr op))))
+					   (else op)))
+			(cdr form))))
 ;; each intent's forms into the buffer: (at L) marks where L is, a (label L) operand is a placeholder patched to it, and
 ;; the table's labels name 8-byte slots from the first 8-byte boundary after the code; answers the labels, (L . address) …
 (define-function native-table-label (k) (string->symbol (concat-string "tab." (long->string k))))
@@ -17,8 +32,8 @@
       (list-do form forms
 	(if (= 'at (car form))
 	    (push labels (cons (cadr form) (asm-buffer-pc buffer)))
-	  (let* ((label (list-detect op (cdr form) (and (pair? op) (= 'label (car op)))))
-		 (reports (asm isa buffer (if label (map (lambda (op) (if (= op label) '(reloc) op)) form) form))))
+	  (let* ((label (native-form-label form))
+		 (reports (asm isa buffer (if label (native-form-reloc form label) form))))
 	    (and label (push fixups (cons (car reports) (cadr label))))))))
     (let ((table (align (asm-buffer-pc buffer) 8)))
       (for (k 0 nslots) (push labels (cons (native-table-label k) (+ table (* 8 k))))))
