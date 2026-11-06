@@ -1,28 +1,36 @@
 ;;; (run-jobs JOBS DIR ENTRIES): runs each entry, (name . shell command), a few at a time, its output in DIR/name.log, and
-;;; prints that output whole as each ends.  Answers the names of those that failed, and prints the slowest.
+;;; prints that output whole as each ends.  Answers the names of those that failed, and prints the six slowest.
 (define jobs-fork	(subr "fork" ">i"))
 (define jobs-execl	(subr "execl" "ss.>i"))
 (define jobs-wait4	(subr "wait4" "ipip>i"))
 (define jobs-exit	(subr "_exit" "i"))
 (define jobs-status ((subr "malloc" "l>p") 8))
 (define jobs-usage ((subr "malloc" "l>p") 512))	; a struct rusage
-(define-function jobs-word (at)		; the low bytes of a field, at its offset in the struct
-  (+ (byte-at jobs-usage at)
-     (+ (<< (byte-at jobs-usage (+ at 1)) 8)
-	(+ (<< (byte-at jobs-usage (+ at 2)) 16) (<< (byte-at jobs-usage (+ at 3)) 24)))))
+(define-function jobs-word-in (buffer at)	; the low four bytes of a field, at its offset in the struct
+  (+ (byte-at buffer at)
+     (+ (<< (byte-at buffer (+ at 1)) 8)
+	(+ (<< (byte-at buffer (+ at 2)) 16) (<< (byte-at buffer (+ at 3)) 24)))))
+(define-function jobs-word (at) (jobs-word-in jobs-usage at))
+(define-function jobs-ms-in (buffer at)		; a struct timeval in milliseconds: seconds, then microseconds 8 bytes on
+  (+ (* 1000 (jobs-word-in buffer at)) (/ (jobs-word-in buffer (+ at 8)) 1000)))
+(define-function jobs-ms (at) (jobs-ms-in jobs-usage at))
 (define jobs-time
   (let ((buffer ((subr "malloc" "l>p") 16)) (clock (subr "gettimeofday" "pp>i")))
     (lambda ()
       (clock buffer 0)
-      (+ (byte-at buffer 0) (+ (<< (byte-at buffer 1) 8) (+ (<< (byte-at buffer 2) 16) (<< (byte-at buffer 3) 24)))))))
+      (jobs-ms-in buffer 0))))
 ;; where a case's time went, so waiting can be told from working: wall against CPU, and of the waiting, what it blocked on
-;; (voluntary switches, disk blocks, page faults) against being made to give up a core (involuntary switches)
+;; (voluntary switches, disk blocks, page faults, minor and major) against being made to give up a core (involuntary switches).
+;; times are in milliseconds.  peak is the largest single process in the case, not their sum: bytes on macOS, kilobytes on Linux, as the kernel counts it
+(define-function jobs-peak () (+ (jobs-word 32) (<< (jobs-word 36) 32)))
 (define-function jobs-times-line (name wall)
   (concat-strings name
-		  " wall " (long->string wall)
-		  " user " (long->string (jobs-word 0))
-		  " sys " (long->string (jobs-word 16))
-		  " faults " (long->string (jobs-word 72))
+		  " wall-ms " (long->string wall)
+		  " user-ms " (long->string (jobs-ms 0))
+		  " sys-ms " (long->string (jobs-ms 16))
+		  " peak " (long->string (jobs-peak))
+		  " minor-faults " (long->string (jobs-word 64))
+		  " major-faults " (long->string (jobs-word 72))
 		  " blocks-in " (long->string (jobs-word 88))
 		  " blocks-out " (long->string (jobs-word 96))
 		  " blocked " (long->string (jobs-word 128))
@@ -53,7 +61,7 @@
 	       (rest ()))
 	  (list-do e running (or (= (car e) pid) (push rest e)))
 	  (set running rest)
-	  (push times (cons (+ (jobs-word 0) (jobs-word 16)) name))
+	  (push times (cons (+ (jobs-ms 0) (jobs-ms 16)) name))
 	  (push lines (jobs-times-line name (- (jobs-time) (cddr found))))
 	  (print (contents-of-file-named (concat-strings dir "/" name ".log")))
 	  (or (= 0 status) (let () (push failed name) (println "FAILED " name " (" dir "/" name ".log)"))))))
@@ -62,7 +70,7 @@
     (for (i 0 6)
       (when times
 	(let ((best (jobs-slowest times)) (rest ()))
-	  (print " " (cdr best) " " (car best) "s")
+	  (print " " (cdr best) " " (car best) "ms")
 	  (list-do e times (or (= e best) (push rest e)))
 	  (set times rest))))
     (println)

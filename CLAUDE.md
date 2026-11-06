@@ -55,7 +55,7 @@ sizes by definition.
 
     make check
 
-`make check` runs the cases four at a time (`check/parallel.l`, `MARU_CHECK_JOBS` to change it), and says which were slowest, in CPU time; `times` in its directory has each case's wall and CPU time, disk blocks, faults and switches;
+`make check` runs the cases four at a time (`check/parallel.l`, `MARU_CHECK_JOBS` to change it), and says which were slowest, in CPU time; `times` in its directory has each case's wall and CPU time in milliseconds, peak memory (bytes on macOS, kilobytes on Linux), disk blocks, minor and major faults, and switches;
 `make check-quick` leaves out the slowest, for everyday edits. Everything runs before a merge. `make check-sweep` looks for new
 corner cases: the generated laws on fresh seeds, more trials and every evaluator; a failure names its seed, and `MARU_LAW_SEED`
 reruns it. A checkout writes under `/tmp/maru-check/` in a directory of its own, so two can run at once.
