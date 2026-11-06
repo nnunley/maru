@@ -92,7 +92,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   runs `maru.k`) compiles a unit through `native-gen.k`, the generator `maru.k` drives in place of `ir-gen-c.k`, to
   architecture-neutral intents on ir2's frame slots; `native-arm64.g` lowers them by tree matching to arm64 forms, with
   `abi.spec`'s registers; `native-link.l` encodes them into a code region; and each function is called by address
-  through `subr`. So far: parameters, literals, add, subtract, negate, return.
+  through `subr`. So far: parameters, literals, add, subtract, negate, return; `if` (with or without a value), `while`, `and`,
+  `or`, `not` and every comparison (integers signed, pointers unsigned), on slots of 1, 2, 4 and 8 bytes. A conditional
+  branch is a short branch over `B`, so its reach is `B`'s.
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.

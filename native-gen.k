@@ -6,21 +6,29 @@
 ;;;
 ;;; Intents (slots are byte offsets in the frame):
 ;;;   (enter size) (leave size) (return)          the frame, and returning from it
-;;;   (arg i slot)                                 the ith argument, as it arrives, into its slot
-;;;   (load slot s) (store slot s)                 a slot to or from a scratch register
+;;;   (arg i slot size)                            the ith argument, as it arrives, into its slot
+;;;   (load size slot s) (store size slot s)       a slot of size bytes to or from a scratch register (loads sign-extend:
+;;;                                                ir2's integers are signed)
 ;;;   (constant s value) (result-from s)           a value into a scratch register; a scratch register as the result
 ;;;   (op kind d a b)                              d := a kind b, kind add or sub
+;;;   (compare cond d a b)                         d := 1 if a cond b else 0; cond eq ne lt le gt ge, or lo ls hi hs
+;;;                                                for pointers, which compare unsigned
+;;;   (label L) (branch L) (branch-if s L) (branch-unless s L)   within a function
 (require "ir2.k")
 
-(define-structure <native-gen> (frame intents functions))
+(define-structure <native-gen> (frame intents functions labels))
 (define-structure <native-unit> (functions))	; ((name intents frame-size) …)
 (define *native-unit* ())
 
-(define-function ir-gen-new () (new <native-gen> () () ()))
+(define-function ir-gen-new () (new <native-gen> () () () 0))
+(define-function native-label (gen)
+  (set (<native-gen>-labels gen) (+ 1 (<native-gen>-labels gen)))
+  (string->symbol (concat-string "L" (long->string (<native-gen>-labels gen)))))
 
 (define-function native-emit (gen intent) (set (<native-gen>-intents gen) (cons intent (<native-gen>-intents gen))))
 (define-function native-slot (gen type) (ir-frame-allocate (<native-gen>-frame gen) type))
 (define-function native-offset (location) (<ir-location>-offset location))
+(define-function native-size (insn) (<ir-type>-size (<ir-insn>-type insn)))
 
 ;;; slots: each instruction's value gets one, a variable read uses the variable's, a let's value is its last operand's
 (define-selector native-allocate (insn gen) (error "native: no slots for " insn))
@@ -37,11 +45,12 @@
     (list-do expr self.operands (native-allocate (set last expr) gen))
     (set self.location (and last (<ir-insn>-location last)))))
 (define-method native-allocate <ir-return> (gen) (list-do opd self.operands (native-allocate opd gen)))
+(define-method native-allocate <ir-nop> (gen) ())
 
 ;;; intents
 (define-selector native-lower (insn gen) (error "native: no lowering for " insn))
-(define-function native-into (gen insn s) (native-emit gen (list 'load (native-offset (<ir-insn>-location insn)) s)))
-(define-function native-out (gen insn s) (native-emit gen (list 'store (native-offset (<ir-insn>-location insn)) s)))
+(define-function native-into (gen insn s) (native-emit gen (list 'load (native-size insn) (native-offset (<ir-insn>-location insn)) s)))
+(define-function native-out (gen insn s) (native-emit gen (list 'store (native-size insn) (native-offset (<ir-insn>-location insn)) s)))
 
 (define-method native-lower <ir-lit> (gen)
   (native-emit gen (list 'constant 's0 (car self.parameters)))
@@ -68,6 +77,73 @@
     (native-emit gen '(constant s0 0))
     (native-emit gen '(op sub s0 s0 s1))
     (native-out gen self 's0)))
+(define-method native-lower <ir-nop> (gen) ())
+;; comparisons: integers are signed, pointers unsigned
+(define-function native-condition (kind insn)
+  (if (ir-pointer-type? (<ir-insn>-type (car (<ir-insn>-operands insn))))
+      (cdr (assq kind '((eq . eq) (ne . ne) (lt . lo) (le . ls) (gt . hi) (ge . hs))))
+    kind))
+(define-function native-relation (gen insn kind)
+  (let ((a (car (<ir-insn>-operands insn))) (b (cadr (<ir-insn>-operands insn))))
+    (native-lower a gen) (native-lower b gen)
+    (native-into gen a 's0) (native-into gen b 's1)
+    (native-emit gen (list 'compare (native-condition kind insn) 's0 's0 's1))
+    (native-out gen insn 's0)))
+(define-method native-lower <ir-eq> (gen) (native-relation gen self 'eq))
+(define-method native-lower <ir-ne> (gen) (native-relation gen self 'ne))
+(define-method native-lower <ir-lt> (gen) (native-relation gen self 'lt))
+(define-method native-lower <ir-le> (gen) (native-relation gen self 'le))
+(define-method native-lower <ir-gt> (gen) (native-relation gen self 'gt))
+(define-method native-lower <ir-ge> (gen) (native-relation gen self 'ge))
+(define-method native-lower <ir-not> (gen)
+  (let ((a (car self.operands)))
+    (native-lower a gen)
+    (native-into gen a 's0)
+    (native-emit gen '(constant s1 0))
+    (native-emit gen '(compare eq s0 s0 s1))
+    (native-out gen self 's0)))
+;; a value of 1 or 0 into an instruction's slot, when it has one
+(define-function native-set (gen insn v)
+  (unless (= IR-VOID (<ir-insn>-type insn))
+    (native-emit gen (list 'constant 's0 v))
+    (native-out gen insn 's0)))
+(define-method native-lower <ir-if> (gen)
+  (let ((test (car self.operands)) (then (cadr self.operands)) (else (caddr self.operands))
+	(other (native-label gen)) (end (native-label gen)) (valued (not (= IR-VOID self.type))))
+    (native-lower test gen)
+    (native-into gen test 's0)
+    (native-emit gen (list 'branch-unless 's0 other))
+    (native-lower then gen)
+    (when valued (native-into gen then 's0) (native-out gen self 's0))
+    (native-emit gen (list 'branch end))
+    (native-emit gen (list 'label other))
+    (when else
+      (native-lower else gen)
+      (when valued (native-into gen else 's0) (native-out gen self 's0)))
+    (native-emit gen (list 'label end))))
+(define-method native-lower <ir-while> (gen)
+  (let ((test (car self.operands)) (body (cadr self.operands)) (top (native-label gen)) (end (native-label gen)))
+    (native-emit gen (list 'label top))
+    (native-lower test gen)
+    (native-into gen test 's0)
+    (native-emit gen (list 'branch-unless 's0 end))
+    (native-lower body gen)
+    (native-emit gen (list 'branch top))
+    (native-emit gen (list 'label end))))
+;; and: the first false operand decides it, 0; or: the first true one, 1
+(define-function native-logical (gen insn decide decided)
+  (let ((out (native-label gen)) (end (native-label gen)))
+    (list-do opd (<ir-insn>-operands insn)
+      (native-lower opd gen)
+      (native-into gen opd 's0)
+      (native-emit gen (list decide 's0 out)))
+    (native-set gen insn (- 1 decided))
+    (native-emit gen (list 'branch end))
+    (native-emit gen (list 'label out))
+    (native-set gen insn decided)
+    (native-emit gen (list 'label end))))
+(define-method native-lower <ir-logand> (gen) (native-logical gen self 'branch-unless 0))
+(define-method native-lower <ir-logor> (gen) (native-logical gen self 'branch-if 1))
 (define-method native-lower <ir-return> (gen)
   (let ((value (car self.operands)))
     (when value
@@ -99,7 +175,8 @@
     (let ((size (align (ir-frame-finalise self.frame 0) 16)) (last ()))
       (native-emit self (list 'enter size))
       (list-do arg (cadr (<ir-function>-parameters value))	; in order: a scope's bindings are most recent first
-	(native-emit self (list 'arg i (native-offset (<ir-variable>-location (cdr (assq arg params))))))
+	(let ((var (cdr (assq arg params))))
+	  (native-emit self (list 'arg i (native-offset (<ir-variable>-location var)) (<ir-type>-size (<ir-variable>-type var)))))
 	(set i (+ i 1)))
       (list-do insn body (native-lower (set last insn) self))
       (unless (and last (ir-returns? last)) (native-emit self (list 'leave '*frame*)) (native-emit self '(return)))
