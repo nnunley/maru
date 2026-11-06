@@ -355,8 +355,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
-  by name or address, with typed results (`"dd>d"`), variadic calls and raw
-  byte access.
+  by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil), variadic
+  calls and raw byte access.
 - `asm_interface` (`check/asm-interface.l`): the one encoder interface
   (`asm`, `asm-forms`, `asm-decode`, refusals) answers the same way for arm64
   and x64, under both evaluators.

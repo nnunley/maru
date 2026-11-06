@@ -202,9 +202,9 @@
 
 ;; Each evaluator calls C alike: subr by name or address, typed results, byte access.
 (check "eval2_subr"
-  (unit-assert (equal (last (run "subr" "./eval check/eval2-subr.l")) "subr ok"))
-  (unit-assert (equal (last (run "subr2" "./eval2 -b boot2.l check/eval2-subr.l")) "subr ok"))
-  (unit-assert (equal (last (run "subr3" "./eval3 -b boot2.l check/eval2-subr.l")) "subr ok")))
+  (unit-assert (equal (last (run "subr" "MARU_SUBR_STRING=returned ./eval check/eval2-subr.l")) "subr ok"))
+  (unit-assert (equal (last (run "subr2" "MARU_SUBR_STRING=returned ./eval2 -b boot2.l check/eval2-subr.l")) "subr ok"))
+  (unit-assert (equal (last (run "subr3" "MARU_SUBR_STRING=returned ./eval3 -b boot2.l check/eval2-subr.l")) "subr ok")))
 
 ;; eval3 (Piumarta, 2013) beside eval2 for comparison: it runs boot2.l and the
 ;; same cases, and calls C by libffi (dlextern) where eval2 uses subr.
