@@ -1,47 +1,24 @@
 ;;; Typed Maru to native code in-process (draft-ndn-maru-native-ir2-00): each unit compiled by native.l, installed in a
 ;;; code region, and its functions called by address through subr.  Runs on eval2, which runs maru.k.
 (require "native.l")
-(define ok 1)
-(define-function expect (what got want)
-  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(require "check/native-child.l")
 (define-function fn (image name signature) (subr (cdr (assq name image)) signature))
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
-;; C's stdout, a FILE * held in __stdoutp (Darwin) or stdout (Linux)
-(define-function native-stdout ()
-  (let ((cell (or (let ((a ((subr "dlsym" "ps>p") RTLD_DEFAULT "__stdoutp"))) (and (not (= 0 a)) a))
-		  ((subr "dlsym" "ps>p") RTLD_DEFAULT "stdout")))
-	(p 0))
-    (for (k 0 8) (set p (+ p (<< (byte-at cell k) (* 8 k)))))
-    p))
-;; the pieces of a string between separators, empty ones dropped
-(define-function pieces (text sep)
-  (let ((out ()) (from 0))
-    (for (i 0 (+ 1 (string-length text)))
-      (when (or (= i (string-length text)) (= sep (string-at text i)))
-	(or (= i from) (push out (string-copy text from (- i from))))
-	(set from (+ i 1))))
-    (list-reverse! out)))
-;; a unit's main, run in a forked child with its standard output in a file: the lines it printed
+;; a unit's main, run in a child: the lines it printed
 (define-function native-run-main (image args)
-  (let* ((path (concat-string "/tmp/maru-native-run." (long->string ((subr "getpid" ">i")))))
-	 (status ((subr "calloc" "ll>p") 1 8))
-	 (argv ((subr "malloc" "l>p") (* 8 (+ 2 (list-length args)))))
+  (let* ((argv ((subr "malloc" "l>p") (* 8 (+ 2 (list-length args)))))
 	 (k 0)
-	 (pid ((subr "fork" ">i"))))
-    (list-do a (cons "prog" args)
-      (let ((p ((subr "strdup" "s>p") a))) (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) (& 255 (>> p (* 8 j)))))) (set k (+ k 1)))
-    (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) 0))
-    (when (= 0 pid)
-      ((subr "dup2" "ii>i") ((subr "open" "si.i>i") path (| O_WRONLY (| O_CREAT O_TRUNC)) 420) 1)
-      (and code-region-write-protect (code-region-write-protect 1))	; a forked thread's JIT pages may start writable, not executable
-      (let ((status ((fn image 'main "ip>i") (+ 1 (list-length args)) argv)))
-	((subr "fflush" "p>i") (native-stdout))	; stdout only: fflush(NULL) would reposition the loader's shared input
-	((subr "_exit" "i") status)))
-    (expect "the child waited for" ((subr "waitpid" "ipi>i") pid status 0) pid)
-    (expect "the child's exit status" (list (byte-at status 0) (byte-at status 1)) '(0 0))
-    (let ((text (contents-of-file-named path)))
-      ((subr "unlink" "s>i") path)
-      (pieces text 10))))
+	 (out (native-child
+	       (lambda ()
+		 (list-do a (cons "prog" args)
+		   (let ((p ((subr "strdup" "s>p") a))) (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) (& 255 (>> p (* 8 j)))))) (set k (+ k 1)))
+		 (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) 0))
+		 (and code-region-write-protect (code-region-write-protect 1))	; a forked thread's JIT pages may start writable, not executable
+		 (let ((status ((fn image 'main "ip>i") (+ 1 (list-length args)) argv)))
+		   ((subr "fflush" "p>i") (native-stdout))	; stdout only: fflush(NULL) would reposition the loader's shared input
+		   status)))))
+    (expect "the child's exit status" (car out) 0)
+    (cdr out)))
 
 (let ((image (native-install (native-compile-file "check/native/add.k"))))
   (expect "add3 of 1, 2, 3" ((fn image 'add3 "lll>l") 1 2 3) 6)
@@ -92,9 +69,9 @@
   (expect "nine doubles and two longs" ((fn image 'call-weigh ">d") ) 10.75)
   (expect "a double through a call" ((fn image 'call-fadd "d>d") 0.5) 2.0))
 
-(expect "calls: ten arguments, printf's variadic ones, a global, a string"
+(expect "calls: ten arguments, printf's variadic ones (doubles among them, a float promoted), a global, a string"
 	(native-run-main (native-install (native-compile-file "check/native/calls.k")) ())
-	'("7 ok 385 9" "counter 3"))
+	'("7 ok 385 9" "counter 3" "1 2.50 10 0.125 end 0.5"))
 (expect "zero-global.k" (last (native-run-main (native-install (native-compile-file "check/zero-global.k")) ())) "zero global ok")
 (expect "check/ir2.k" (last (native-run-main (native-install (native-compile-file "check/ir2.k")) ())) "ir2 ok")
 (expect "maru-label.k" (cdr (native-run-main (native-install (native-compile-file "maru-label.k")) ()))
@@ -103,6 +80,61 @@
   (expect "maru-test.k's primes" (pieces (car out) 32) '("2" "3" "5" "7" "11" "13" "17" "19" "23" "29" "31"))
   (expect "maru-test.k's sum" (and (member? "sum is 708" out) 1) 1)
   (expect "maru-test.k's struct" (last out) "print-foo: 84 1332"))
+
+(let ((image (native-install (native-compile-file "check/native/labels.k"))))
+  (expect "a label of one name in two functions" (list ((fn image 'first-done ">l")) ((fn image 'second-done ">l"))) '(10 20))
+  (expect "a label of one name in two sibling lets" ((fn image 'sibling-done ">l")) 1100))
+
+(let ((image (native-install (native-compile-file "check/native/structs.k"))))
+  (expect "a 12-byte struct made and passed" ((fn image 'three-round ">l")) 456)
+  (expect "a 16-byte struct passed and returned" ((fn image 'two-round "ll>l") 3 4) 3997)
+  (expect "a 16-byte struct C returns" ((fn image 'ldiv-of "ll>l") 47 5) 902)
+  (expect "a struct after seven longs, and a long after it, both on the stack" ((fn image 'call-spill ">l")) 43207)
+  (expect "8-byte pieces at slots 4 past a multiple of 8" ((fn image 'call-foos ">l")) 8710876))
+
+(let ((image (native-install (native-compile-file "check/native/stack.k"))))
+  (expect "ints past the eighth argument, from C and natively"
+	  (list ((fn image 'late-ints "lllllllliii>l") 1 0 0 0 0 0 0 1 1 2 3) ((fn image 'call-late-ints ">l"))) '(125 125))
+  (expect "zero passed to a pointer past the eighth" ((fn image 'call-late-pointer ">l")) 0)
+  (expect "a call through an unprototyped function type" ((fn image 'call-unprototyped ">l")) 21)
+  (expect "every relation, on pointers, unsigned"
+	  (map (lambda (ab) (apply (fn image 'pointer-relations "pp>l") ab)) '((-8 16) (16 -8) (16 16))) '(44 35 26)))
+
+;; a frame of 9760 bytes: check/native/frame.k after a struct of 600 longs, which ir2 can't build from smaller ones
+(let ((path (concat-string check-tmp "/native-frame.k")) (fields ""))
+  (for (i 0 600) (set fields (concat-string fields (concat-string " (f" (concat-string (long->string i) " long)")))))
+  (contents-to-file-named (concat-string "(define-struct <wide> (" (concat-string fields (concat-string "))\n" (contents-of-file-named "check/native/frame.k"))))
+			  path)
+  (let* ((unit (native-compile-file path)) (image (native-install unit)))
+    ((subr "unlink" "s>i") path)
+    (expect "a frame over 4096 bytes" (< 4096 (caddr (assq 'far-frame (<native-unit>-functions unit)))) 't)
+    (expect "slots past a load's reach" ((fn image 'far-frame "l>l") 10) 46)))
+
+;; a conditional branch reaches as far as B, 128 MB, not CBZ's 1 MB: it is lowered as the inverted test over a B.  (A
+;; while body past 1 MB would take minutes to compile on eval2.)
+(expect "a conditional branch as a short one over B"
+	(map (lambda (i) (map car (car (parse-source <native-arm64> $program (list (list i 's0 'far)))))) '(branch-if branch-unless))
+	'((CBZ B at) (CBNZ B at)))
+(let ((r (car (asm 'arm64 (asm-buffer 0) '(B (reloc))))))
+  (expect "B's reach" (asm-field-range 'arm64 (caddr r) (car r) 0) '(-134217728 134217724 4)))
+
+;; what isn't written yet is refused when compiled, naming it: a struct over 16 bytes by value, a -0.0 literal
+(refuses "a struct over 16 bytes taken by value" (lambda () (native-compile-file "check/native/big-argument.k"))
+	 "struct <big> of 24 bytes taken as s by value, in first-of")
+(refuses "a struct over 16 bytes returned by value" (lambda () (native-compile-file "check/native/big-result.k"))
+	 "struct <big> of 24 bytes returned from make-big by value, in make-big")
+(refuses "a struct over 16 bytes passed by value" (lambda () (native-compile-file "check/native/big-call.k"))
+	 "struct <big> of 24 bytes passed to consume by value, in hand-over")
+(refuses "a -0.0 literal" (lambda () (native-compile-file "check/native/negative-zero.k")) "no literal for -0.0")
+;; and the lowerings hold to what the generator promises: a struct result in two registers, a call's stack arguments in
+;; the area the frame keeps for them
+(list-do isa (list <native-arm64> <native-x64>)
+  (refuses "a struct result of 24 bytes" (lambda () (parse-source isa $program '((result 24 0 struct))))
+	   "a struct result of 24 bytes is more than two registers")
+  (refuses "stack arguments past the outgoing area"
+	   (lambda () (parse-source isa $program '((enter 32 0) (call 0 9 ((8 0 int) (8 0 int) (8 0 int) (8 0 int) (8 0 int)
+								    (8 0 int) (8 0 int) (8 0 int) (8 0 int)) ()))))
+	   "bytes of stack arguments overrun the frame's 0"))
 
 ;; maru-check.k, upstream's own test: each section prints its "ok"
 (let ((out (native-run-main (native-install (native-compile-file "maru-check.k")) ())))
@@ -130,7 +162,7 @@
 ;; check/gc.k in place of maru-gc.k's main: the heap grows when needed and adjacent free chunks merge
 (let* ((gc (contents-of-file-named "maru-gc.k"))
        (main (let ((i 0)) (while (not (prefix-at? "(define-function main " gc i)) (set i (+ i 1))) i))
-       (path (concat-string "/tmp/maru-native-gc." (concat-string (long->string ((subr "getpid" ">i"))) ".k"))))
+       (path (concat-string check-tmp "/native-gc.k")))
   (contents-to-file-named (concat-string (string-copy gc 0 main) (contents-of-file-named "check/gc.k")) path)
   (let ((out (native-run-main (native-install (native-compile-file path)) ())))
     ((subr "unlink" "s>i") path)

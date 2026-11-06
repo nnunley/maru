@@ -1,7 +1,7 @@
 ;;; native-image.l -- a code image (native-link.l makes one) loaded into a code region, on any evaluator: no maru.k and
 ;;; no grammars.  An image is a Maru form:
-;;;   (native-image ISA BYTES (TABLE-OFFSET ENTRY …) ((NAME . OFFSET) …) ((NAME SIZE ALIGNMENT) …))
-;;; BYTES is the code, position-independent, then a table of 8-byte slots at TABLE-OFFSET; the code reaches each global,
+;;;   (native-image ISA OS BYTES (TABLE-OFFSET ENTRY …) ((NAME . OFFSET) …) ((NAME SIZE ALIGNMENT) …))
+;;; ISA (arm64 or x64) and OS (darwin or linux) are what it was made for, and it loads nowhere else.  BYTES is the code, position-independent, then a table of 8-byte slots at TABLE-OFFSET; the code reaches each global,
 ;;; C function and string literal through its slot.  An ENTRY is (global NAME), (extern NAME) or (string BYTE …), and
 ;;; loading writes each slot's address into the bytes, installs them, and runs __init, which sets the globals.
 ;;;   (native-load-image image)   => ((name . address) …), each function callable by subr
@@ -11,6 +11,12 @@
 (require "code-region.l")
 
 (define native-region (code-region-allocate 4194304))
+
+;; this process's instruction set and system, (ISA . OS), as uname names them
+(define native-host
+  (let ((u ((subr "malloc" "l>p") utsname_size)))
+    ((subr "uname" "p>i") u)
+    (cons (if (= ?a (byte-at u utsname_machine)) 'arm64 'x64) (if (= ?D (byte-at u 0)) 'darwin 'linux))))
 
 ;; the globals' storage: (name . address) …, in one zeroed block the image keeps
 (define-function native-data (globals)
@@ -37,10 +43,14 @@
 
 (define-function native-load-image (image)
   (or (= 'native-image (car image)) (error "native: not a code image"))
-  (let* ((bytes (let ((a (array))) (list-do b (caddr image) (array-append a b)) a))
-	 (table (cadddr image))
-	 (functions (car (cddddr image)))
-	 (data (native-data (cadr (cddddr image))))
+  (let ((isa (cadr image)) (os (caddr image)))	; before anything is installed
+    (or (and (= isa (car native-host)) (= os (cdr native-host)))
+	(error "native: an image for " isa " " os " can't run on " (car native-host) " " (cdr native-host))))
+  (let* ((rest (cdddr image))
+	 (bytes (let ((a (array))) (list-do b (car rest) (array-append a b)) a))
+	 (table (cadr rest))
+	 (functions (caddr rest))
+	 (data (native-data (cadddr rest)))
 	 (slot (car table)))
     (list-do entry (cdr table)	; every address is found before anything is installed
       (let ((a (native-entry-address entry data)))

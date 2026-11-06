@@ -31,7 +31,9 @@
     (list-do forms intents
       (list-do form forms
 	(if (= 'at (car form))
-	    (push labels (cons (cadr form) (asm-buffer-pc buffer)))
+	    (if (assq (cadr form) labels)
+		(error "native: label " (cadr form) " defined twice")
+	      (push labels (cons (cadr form) (asm-buffer-pc buffer))))
 	  (let* ((label (native-form-label form))
 		 (reports (asm isa buffer (if label (native-form-reloc form label) form))))
 	    (and label (push fixups (cons (car reports) (cadr label))))))))
@@ -86,7 +88,7 @@
 	  (bytes (asm-buffer-bytes buffer)))
       (set table (align (array-length bytes) 8))
       (while (< (array-length bytes) (+ table (* 8 (list-length entries)))) (array-append bytes 0))
-      (list 'native-image isa
+      (list 'native-image isa (cdr native-host)
 	    (let ((l ())) (for (i 0 (array-length bytes)) (push l (array-at bytes i))) (list-reverse! l))
 	    (cons table entries)
 	    (let ((fs ())) (list-do f (<native-unit>-functions unit) (push fs (cons (car f) (cdr (assq (native-function-label (car f)) labels))))) fs)

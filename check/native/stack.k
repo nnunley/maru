@@ -1,0 +1,25 @@
+;;; Arguments past the registers compiled natively (check/native.l): 4-byte ones after eight longs (Apple packs them at
+;;; their natural alignment), zero passed to a pointer parameter there (the parameter's size, not the int's), a call
+;;; through an unprototyped function type (arguments as for a function with a prototype), and pointers compared unsigned.
+(define-function late-ints long ((a long) (b long) (c long) (d long) (e long) (f long) (g long) (h long) (i int) (j int) (k int))
+  (return (+ (+ a h) (cast (+ (* 100 i) (+ (* 10 j) k)) long))))
+(define-function call-late-ints long () (return (late-ints 1 0 0 0 0 0 0 1 1 2 3)))
+(define-function late-pointer long ((a long) (b long) (c long) (d long) (e long) (f long) (g long) (h long) (p void *))
+  (return (cast p long)))
+(define-function call-late-pointer long ()
+  (late-pointer 0 0 0 0 0 0 0 0 (cast -1 void *))
+  (return (late-pointer 0 0 0 0 0 0 0 0 0)))
+(define-function add2 long ((a long) (b long)) (return (+ a (* 10 b))))
+(define-function call-unprototyped long ()
+  (let (((f (long ...) *) (cast add2 (long ...) *)))
+    (return (f 1 2))))
+;; each relation a bit, as flow.k's, on pointers
+(define-function pointer-relations long ((a void *) (b void *))
+  (let (((bits long) 0))
+    (if (< a b) (set bits (+ bits 1)))
+    (if (<= a b) (set bits (+ bits 2)))
+    (if (> a b) (set bits (+ bits 4)))
+    (if (>= a b) (set bits (+ bits 8)))
+    (if (= a b) (set bits (+ bits 16)))
+    (if (!= a b) (set bits (+ bits 32)))
+    (return bits)))

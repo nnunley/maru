@@ -2,10 +2,8 @@
 ;;; native-image.l alone and called, on any evaluator.   ./eval check/native-image.l DIR
 (define dir (pop *arguments*))
 (define-function image-path (name) (concat-string dir (concat-string "/" (concat-string name ".image"))))
-(define ok 1)
-(define-function expect (what got want)
-  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
 (load "native-image.l")
+(require "check/native-child.l")
 (let ((add (native-load (image-path "add"))) (flow (native-load (image-path "flow"))))
   (let ((fn (lambda (image name signature) (subr (cdr (assq name image)) signature))))
     (expect "add3 of 1, 2, 3" ((fn add 'add3 "lll>l") 1 2 3) 6)
@@ -15,4 +13,14 @@
     (expect "sum below 100" ((fn flow 'sum-below "l>l") 100) 4950)
     (expect "every relation, signed" (map (lambda (ab) ((fn flow 'relations "ll>l") (car ab) (cadr ab))) '((-3 2) (2 -3) (7 7)))
 	    '(35 44 26))))
+(let ((image (native-load (image-path "image"))))
+  (expect "a global, a C function and a string, through the table"
+	  (list ((subr (cdr (assq 'greet image)) ">l")) ((subr (cdr (assq 'greet image)) ">l"))) '(46 47)))
+;; an image made for another instruction set or system is refused before anything is installed
+(let ((image (car (read (image-path "add")))))
+  (list-do other (list (list (if (= 'arm64 (cadr image)) 'x64 'arm64) (caddr image))
+		       (list (cadr image) (if (= 'darwin (caddr image)) 'linux 'darwin)))
+    (refuses "an image for another machine"
+	     (lambda () (native-load-image (cons 'native-image (concat-list other (cdddr image)))))
+	     "can't run on")))
 (println (if ok "image ok" "image FAILED"))

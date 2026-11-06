@@ -6,29 +6,31 @@
 (require "asm-arm64.l")
 (require "asm-x86.l")
 (require "code-region.l")
+(require "native-image.l")
 (require "stub.l")
 (require "native-gen.k")
 (load "maru.k")		; no arguments left: definitions only
 ;; for native-arm64.g's actions.  X29 holds SP as it was before the frame, so leaving sets SP from it, a frame larger
-;; than an immediate reaches is made from it, and a slot farther than a load's scaled offset reaches is found from it,
-;; through X15 (in neither abi.spec's scratch nor the calls' X17)
+;; than an immediate reaches is made from it, and a slot a load's scaled offset doesn't reach (too far, or not a multiple
+;; of the access's size) has its address made in X15 (in neither abi.spec's scratch nor the calls' X17)
 (define native-arm64-frame 0)	; the size of the frame being lowered
-(define-function native-arm64-enter (n)
+(define native-outgoing 0)	; and of the area at its bottom for calls' stack arguments
+;; a call's stack arguments, out bytes, fit the area the generator reserved
+(define-function native-within-outgoing (out)
+  (or (<= out native-outgoing) (error "native: a call's " out " bytes of stack arguments overrun the frame's " native-outgoing)))
+(define-function native-arm64-enter (n outgoing)
   (set native-arm64-frame n)
+  (set native-outgoing outgoing)
   `((STP X29 X30 (pre SP -16)) (ADD X29 SP 0)
     ,@(cond ((= 0 n) ())
 	    ((< n 4096) `((SUB SP SP ,n)))
 	    (else `(,@(arm64-constant 'X15 n) (SUB X15 X29 X15) (ADD SP X15 0))))))
 (define-function native-arm64-far? (size at) (or (> at (* 4095 size)) (!= 0 (% at size))))
-(define-function native-arm64-slot (base at)	; (forms . place)
-  (if (and (= base 'SP) (native-arm64-far? 1 at) (> at 4095))
-      (cons `(,@(arm64-constant 'X15 (- at native-arm64-frame)) (ADD X15 X29 X15)) (list 'off 'X15 0))
-    (cons () (list 'off base at))))
 (define-function native-arm64-w (r)	; X9 to W9
   (let ((name (symbol->string r))) (string->symbol (concat-string "W" (string-copy name 1 (- (string-length name) 1))))))
 (define-function native-arm64-access (size base at form)	; the forms of an access, its place reached first if far
   (if (and (= base 'SP) (native-arm64-far? size at))
-      (let ((far (native-arm64-slot base at))) (if (car far) `(,@(car far) ,(form (cdr far))) (error "native: slot " at " out of reach")))
+      `(,@(native-arm64-address at 'X15) ,(form '(off X15 0)))
     (list (form (list 'off base at)))))
 (define-function native-arm64-load (size r base at)	; sign-extending: ir2's integers are signed
   (native-arm64-access size base at
@@ -79,8 +81,7 @@
 		  (FMOV ,(native-arm64-view d (width to)) ,(native-arm64-f 0 (width to))))))))
 ;; the calling convention: AAPCS64, with Apple's rules on Darwin (a stack argument at its natural alignment, a variadic
 ;; one in an 8-byte stack slot); a struct of up to 16 bytes goes in general registers, in 8- and 4-byte pieces
-(define native-darwin
-  (let ((u ((subr "malloc" "l>p") utsname_size))) ((subr "uname" "p>i") u) (= ?D (byte-at u 0))))
+(define native-darwin (= 'darwin (cdr native-host)))
 (define-function native-x (n) (string->symbol (concat-string "X" (long->string n))))
 (define-function native-function-label (name) (string->symbol (concat-string "fn." (symbol->string name))))
 (define-function native-pieces (size)	; (offset . bytes) …
@@ -89,6 +90,10 @@
       (let ((n (cond ((>= (- size at) 8) 8) ((>= (- size at) 4) 4) (else (error "native: a struct of " size " bytes isn't 4-byte pieces")))))
 	(push out (cons at n)) (set at (+ at n))))
     (list-reverse! out)))
+;; a struct result's pieces: two registers' worth at most, as the generator refuses a larger one
+(define-function native-result-pieces (size)
+  (let ((pieces (native-pieces size)))
+    (if (< 2 (list-length pieces)) (error "native: a struct result of " size " bytes is more than two registers") pieces)))
 (define-function native-arm64-piece (op n r base at)	; a plain (zero-extending) load or store of 8 or 4 bytes
   (native-arm64-access n base at (lambda (place) (list op (if (= n 8) r (native-arm64-w r)) place))))
 (define-function native-onto (acc forms) (list-do f forms (set acc (cons f acc))) acc)	; pushed in order
@@ -134,6 +139,7 @@
 	    (let ((pieces (native-pieces size)))
 	      (if (and (not variadic) (<= (+ gp (list-length pieces)) 8))
 		  (list-do pc pieces (set forms (native-onto forms (native-arm64-piece 'LDR (cdr pc) (native-x gp) 'SP (+ slot (car pc))))) (set gp (+ gp 1)))
+		(or variadic (set gp 8))	; AAPCS64 C.15: no general register is used after a struct that spills
 		(set out (align out 8))
 		(list-do pc pieces
 		  (set forms (native-onto forms (native-arm64-piece 'LDR (cdr pc) 'X17 'SP (+ slot (car pc)))))
@@ -152,19 +158,20 @@
 	    (set forms (native-onto forms (if variadic (list (list 'STR 'X17 (list 'off 'SP out))) (native-arm64-store size 'X17 'SP out))))
 	    (set out (+ out (if (or variadic (not native-darwin)) 8 size)))))))
       (set i (+ i 1)))
+    (native-within-outgoing out)
     (push forms (list 'LDR 'X17 (list 'off 'SP callee)))
     (push forms '(BLR X17))
     (when ret
       (let ((size (car ret)) (slot (cadr ret)))
 	(if (= 'struct (caddr ret))
-	    (let ((r 0)) (list-do pc (native-pieces size) (set forms (native-onto forms (native-arm64-piece 'STR (cdr pc) (native-x r) 'SP (+ slot (car pc))))) (set r (+ r 1))))
+	    (let ((r 0)) (list-do pc (native-result-pieces size) (set forms (native-onto forms (native-arm64-piece 'STR (cdr pc) (native-x r) 'SP (+ slot (car pc))))) (set r (+ r 1))))
 	  (when (= 'float (caddr ret))
 	    (push forms (list 'FMOV (native-arm64-view 'X0 (* 8 size)) (native-arm64-view (car (abi 'arm64 'fresult)) (* 8 size)))))
 	  (set forms (native-onto forms (native-arm64-store size 'X0 'SP slot))))))
     (list-reverse! forms)))
 (define-function native-arm64-result (size slot kind)
   (if (= kind 'struct)
-      (let ((r 0) (forms ())) (list-do pc (native-pieces size) (set forms (native-onto forms (native-arm64-piece 'LDR (cdr pc) (native-x r) 'SP (+ slot (car pc))))) (set r (+ r 1))) (list-reverse! forms))
+      (let ((r 0) (forms ())) (list-do pc (native-result-pieces size) (set forms (native-onto forms (native-arm64-piece 'LDR (cdr pc) (native-x r) 'SP (+ slot (car pc))))) (set r (+ r 1))) (list-reverse! forms))
     (if (= kind 'float)
 	(concat-list (native-arm64-load size 'X17 'SP slot)
 	      (list (list 'FMOV (native-arm64-view (car (abi 'arm64 'fresult)) (* 8 size)) (native-arm64-view 'X17 (* 8 size)))))

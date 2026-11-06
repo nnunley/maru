@@ -5,7 +5,8 @@
 ;;; convention: those are the lowering grammars' (native-arm64.g).
 ;;;
 ;;; Intents (slots are byte offsets in the frame):
-;;;   (enter size) (leave size) (return)          the frame, and returning from it
+;;;   (enter size outgoing) (leave size) (return) the frame, its bottom outgoing bytes the calls' stack arguments, and
+;;;                                                returning from it
 ;;;   (params ((size slot kind) …))                the arguments, as they arrive, into their slots; kind int or struct
 ;;;   (call slot nfixed (arg …) ret)               call the function whose address is in slot with args (size slot kind),
 ;;;                                                the first nfixed named and the rest variadic; ret is () or (size slot
@@ -28,11 +29,11 @@
 ;;;                                                bytes, a function of the unit
 (require "ir2.k")
 
-(define-structure <native-gen> (frame intents functions labels outgoing inits))
+(define-structure <native-gen> (frame intents functions labels outgoing inits name passing))
 (define-structure <native-unit> (functions globals))	; ((name intents frame-size) …), ((name size alignment) …)
 (define *native-unit* ())
 
-(define-function ir-gen-new () (new <native-gen> () () () 0 0 ()))
+(define-function ir-gen-new () (new <native-gen> () () () 0 0 () () ()))
 (define-function native-label (gen)
   (set (<native-gen>-labels gen) (+ 1 (<native-gen>-labels gen)))
   (string->symbol (concat-string "L" (long->string (<native-gen>-labels gen)))))
@@ -45,14 +46,24 @@
 (define-function native-type-size (type) (<ir-type>-size (if (= IR-LABEL type) IR-VOID* type)))	; a label is an address
 (define-function native-size (insn) (native-type-size (<ir-insn>-type insn)))
 (define-function native-label-var? (insn) (and (inherits-from (type-of insn) <ir-get-var>) (ir-label-var? (<ir-insn>-parameters insn))))
-(define-function native-user-label (name) (string->symbol (concat-string "ul." (symbol->string name))))
+(define-function native-define-label? (insn) (inherits-from (type-of insn) <ir-define-label>))
+;; a user label belongs to its scope: each (label NAME) a scope's body holds takes a label of its own in the unit, kept as
+;; its variable's location, so two functions, or two sibling lets, may each have a label done
+(define-function native-name-labels (gen bindings body)
+  (list-do insn body
+    (when (native-define-label? insn)
+      (let ((var (cdr (assq (car (<ir-insn>-parameters insn)) bindings))))
+	(set (<ir-define-label>-var insn) var)
+	(set (<ir-variable>-location var) (native-label gen))))))
+(define-function native-user-label (var) (<ir-variable>-location var))
 (define-function native-kind (type) (cond ((ir-struct-type? type) 'struct) ((ir-floating-type? type) 'float) (else 'int)))
 (define-function native-float? (insn) (ir-floating-type? (<ir-insn>-type insn)))
 (define-function native-width (insn) (* 8 (<ir-type>-size (<ir-insn>-type insn))))
-;; a double's IEEE 754 bits as a long: sign, exponent biased by 1023, 52 bits of fraction; normal numbers and zero only
+;; a double's IEEE 754 bits as a long: sign, exponent biased by 1023, 52 bits of fraction; normal numbers and zero only,
+;; and not -0.0, which would lose its sign
 (define-function native-double-bits (x)
   (if (= x 0)
-      0
+      (if (< (/ 1.0 x) 0) (error "native: no literal for -0.0: it would compile as 0.0") 0)
     (let ((sign 0) (e 0) (m x))
       (and (< m 0) (let () (set sign 1) (set m (- 0 m))))
       (while (and (>= m 2) (< e 1024)) (set m (/ m 2)) (set e (+ e 1)))
@@ -73,17 +84,54 @@
 (define-method native-allocate <ir-set-var> (gen)
   (native-allocate (car self.operands) gen)
   (set self.location (if (native-global? self) (native-slot gen self.type) (<ir-variable>-location self.parameters))))
-(define-method native-allocate <ir-call> (gen)	; and room at the frame's bottom for its arguments: 16 bytes each at most
+;; a struct over 16 bytes by value, as an argument or a result, is refused: C passes it by reference and returns it
+;; through a hidden pointer, conventions not yet written
+(define-function native-by-value (gen type role whom)
+  (and (ir-struct-type? type) (< 16 (<ir-type>-size type))
+       (error "native: struct " (<ir-type>-name type) " of " (<ir-type>-size type) " bytes " role " " whom " by value, in "
+	      (<native-gen>-name gen) ": over 16 bytes needs C's by-reference convention, not yet written")))
+(define-function native-callee-name (callee)
+  (if (inherits-from (type-of callee) <ir-get-var>) (<ir-variable>-name (<ir-insn>-parameters callee)) "a function pointer"))
+;; a callee's parameter types, and how many of its arguments are named: those before ..., or all of them for a function
+;; type with no prototype, () or (...) alone, which C calls as if it had one
+(define-function native-prototype (callee) (<ir-function-type>-arg-types (<ir-pointer-type>-referent (<ir-insn>-type callee))))
+(define-function native-named (proto nargs)
+  (if (or (not proto) (= IR-VARARGS (car proto)))
+      nargs
+    (let ((n 0)) (while (and proto (not (= IR-VARARGS (car proto)))) (set n (+ n 1)) (set proto (cdr proto))) n)))
+;; the type an argument is passed as: a named one's parameter type (zero, an int, passed to a pointer is the whole
+;; pointer), and a float with none promoted to double, as C's default promotions do
+(define-function native-passing-type (type param)
+  (cond ((ir-struct-type? type) type)
+	((and param (not (= IR-VARARGS param)) (not (= IR-VOID param))) param)
+	((and (ir-floating-type? type) (= 4 (<ir-type>-size type))) IR-DOUBLE)
+	(else type)))
+;; and room at the frame's bottom for its stack arguments: at most 8 bytes for a scalar and its size rounded up to 8 for a
+;; struct, in every convention native.l and native-x64.l follow; the lowering checks a call stays within it.  An argument
+;; passed as another type has a slot of that type, kept in the generator's passing, (insn type . location) …
+(define-method native-allocate <ir-call> (gen)
   (list-do opd self.operands (native-allocate opd gen))
-  (set (<native-gen>-outgoing gen) (max (<native-gen>-outgoing gen) (* 16 (list-length (cdr self.operands)))))
+  (let ((callee (native-callee-name (car self.operands))) (bytes 0) (proto (native-prototype (car self.operands))))
+    (list-do a (cdr self.operands)
+      (let* ((type (<ir-insn>-type a)) (passed (native-passing-type type (car proto))))
+	(native-by-value gen type "passed to" callee)
+	(or (and (= (<ir-type>-size type) (<ir-type>-size passed)) (= (native-kind type) (native-kind passed)))
+	    (push (<native-gen>-passing gen) (cons a (cons passed (native-slot gen passed)))))
+	(set bytes (+ bytes (align (<ir-type>-size passed) 8)))
+	(set proto (cdr proto))))
+    (native-by-value gen self.type "returned from" callee)
+    (set (<native-gen>-outgoing gen) (max (<native-gen>-outgoing gen) bytes)))
   (or (= IR-VOID self.type) (set self.location (native-slot gen self.type))))
 (define-method native-allocate <ir-let> (gen)
   (list-do bind self.parameters (set (<ir-variable>-location (cdr bind)) (native-slot gen (<ir-variable>-type (cdr bind)))))
+  (native-name-labels gen self.parameters self.operands)
   (let ((last ()))
     (list-do expr self.operands (native-allocate (set last expr) gen))
     (set self.location (and last (<ir-insn>-location last)))))
 (define-method native-allocate <ir-return> (gen) (list-do opd self.operands (native-allocate opd gen)))
 (define-method native-allocate <ir-nop> (gen) ())
+(define-method native-allocate <ir-function> (gen)	; a function's value is its address: its body has a frame of its own
+  (set self.location (native-slot gen self.type)))
 
 ;;; intents
 (define-selector native-lower (insn gen) (error "native: no lowering for " insn))
@@ -114,17 +162,17 @@
 (define-method native-lower <ir-extern> (gen)
   (native-emit gen (list 'extern-address 's0 (car self.parameters)))
   (native-out gen self 's0))
-(define-method native-lower <ir-define-label> (gen) (native-emit gen (list 'label (native-user-label (car self.parameters)))))
+(define-method native-lower <ir-define-label> (gen) (native-emit gen (list 'label (native-user-label self.var))))
 (define-method native-lower <ir-goto> (gen)
   (let ((target (car self.operands)))
     (if (native-label-var? target)
-	(native-emit gen (list 'branch (native-user-label (<ir-variable>-name (<ir-insn>-parameters target)))))
+	(native-emit gen (list 'branch (native-user-label (<ir-insn>-parameters target))))
       (native-lower target gen)
       (native-into gen target 's0)
       (native-emit gen '(branch-to s0)))))
 (define-method native-lower <ir-get-var> (gen)
   (when (native-label-var? self)
-    (native-emit gen (list 'label-address 's0 (native-user-label (<ir-variable>-name self.parameters))))
+    (native-emit gen (list 'label-address 's0 (native-user-label self.parameters)))
     (native-out gen self 's0))
   (when (and (native-global? self) (not (native-label-var? self)))
     (native-emit gen (list 'global-address 's2 (<ir-variable>-name self.parameters)))
@@ -143,13 +191,23 @@
 	  (else
 	   (native-into gen value 's0)
 	   (native-emit gen (list 'store size (native-slot-of self) 's0))))))
+;; an argument's place as it's passed: its own, or the slot of the type it's passed as, converted into
+(define-function native-pass (gen arg)
+  (let ((p (cdr (assq arg (<native-gen>-passing gen)))))
+    (if (not p)
+	(native-place arg)
+      (let ((type (car p)) (slot (native-offset (cdr p))))
+	(native-into gen arg 's0)
+	(let ((from (native-numeric-kind arg)) (to (native-type-numeric-kind type)))
+	  (or (= from to) (native-emit gen (list 'convert from to 's0 's0))))
+	(native-emit gen (list 'store (native-type-size type) slot 's0))
+	(list (native-type-size type) slot (native-kind type))))))
 (define-method native-lower <ir-call> (gen)
-  (let* ((callee (car self.operands)) (args (cdr self.operands))
-	 (proto (<ir-function-type>-arg-types (<ir-pointer-type>-referent (<ir-insn>-type callee))))
-	 (nfixed (let ((n 0)) (while (and proto (not (= IR-VARARGS (car proto)))) (set n (+ n 1)) (set proto (cdr proto))) n)))
+  (let* ((callee (car self.operands)) (args (cdr self.operands)))
     (native-lower callee gen)
     (list-do a args (native-lower a gen))
-    (native-emit gen (list 'call (native-offset (<ir-insn>-location callee)) nfixed (map native-place args)
+    (native-emit gen (list 'call (native-offset (<ir-insn>-location callee)) (native-named (native-prototype callee) (list-length args))
+			   (map (lambda (a) (native-pass gen a)) args)
 			   (and (not (= IR-VOID self.type)) (native-place self))))))
 (define-method native-lower <ir-let> (gen) (list-do expr self.operands (native-lower expr gen)))
 (define-function native-binary (gen insn kind)
@@ -176,7 +234,8 @@
     (native-out gen self 's0)))
 ;; an integer or pointer cast: loaded at the source's size (sign-extended), stored at the target's (truncated); a cast to
 ;; or from a float converts, an integer through 64 bits
-(define-function native-numeric-kind (insn) (if (native-float? insn) (if (= 32 (native-width insn)) 'f32 'f64) 's64))
+(define-function native-type-numeric-kind (type) (if (ir-floating-type? type) (if (= 4 (<ir-type>-size type)) 'f32 'f64) 's64))
+(define-function native-numeric-kind (insn) (native-type-numeric-kind (<ir-insn>-type insn)))
 (define-method native-lower <ir-cast> (gen)
   (let* ((a (car self.operands)) (from (native-numeric-kind a)) (to (native-numeric-kind self)))
     (native-lower a gen)
@@ -323,13 +382,19 @@
 
 ;; a function's intents: its parameters' and instructions' slots above the outgoing arguments' area, then its code
 (define-function native-function (self name args params body)
+  (set (<native-gen>-name self) name)
   (set (<native-gen>-frame self) (ir-frame-new))
   (set (<native-gen>-intents self) ())
   (set (<native-gen>-outgoing self) 0)
+  (set (<native-gen>-passing self) ())
   (list-do bind params (set (<ir-variable>-location (cdr bind)) (native-slot self (<ir-variable>-type (cdr bind)))))
+  (list-do arg args (native-by-value self (<ir-variable>-type (cdr (assq arg params))) "taken as" arg))
+  (native-name-labels self params body)
   (list-do insn body (native-allocate insn self))
-  (let ((size (align (ir-frame-finalise (<native-gen>-frame self) (align (<native-gen>-outgoing self) 16)) 16)) (last ()))
-    (native-emit self (list 'enter size))
+  (let* ((outgoing (align (<native-gen>-outgoing self) 16))
+	 (size (align (ir-frame-finalise (<native-gen>-frame self) outgoing) 16))
+	 (last ()))
+    (native-emit self (list 'enter size outgoing))
     (native-emit self (list 'params (map (lambda (arg)	; in order: a scope's bindings are most recent first
 					   (let* ((var (cdr (assq arg params))) (type (<ir-variable>-type var)))
 					     (list (<ir-type>-size type) (native-offset (<ir-variable>-location var)) (native-kind type))))
@@ -361,5 +426,7 @@
 	(or (ir-nop? setter) (= 'main (<ir-variable>-name (<ir-set-var>-parameters setter))) (push setters setter))))
     (native-function self '__init () () (list-reverse! setters))))
 (define-method ir-gen-function-implementation <native-gen> (value)
+  (set self.name (car (<ir-function>-parameters value)))
+  (native-by-value self (<ir-function-type>-ret-type (<ir-pointer-type>-referent (<ir-insn>-type value))) "returned from" self.name)
   (native-function self (car (<ir-function>-parameters value)) (cadr (<ir-function>-parameters value))
 		   (<ir-scope>-bindings (<ir-function>-scope value)) (<ir-function>-operands value)))

@@ -99,30 +99,43 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   branch is a short branch over `B`, so its reach is `B`'s. Globals live in a zeroed block the image owns, set by an
   `__init` function run at install; externs resolve through `dlsym`, string literals are copied out of Maru's heap, and
   calls follow the AAPCS64 with Apple's rules (stack arguments at natural alignment, variadic ones in 8-byte slots,
-  structs of 16 bytes or fewer in registers). `label` and `goto`, direct or computed, lower to labels and branches; a
-  value of type label takes a pointer's slot. `check/native/calls.k` (ten arguments, `printf`, a global), `zero-global.k`,
+  structs of 16 bytes or fewer in registers, and none after a struct that spills). A named argument is passed as its
+  parameter's type (zero to a pointer is the whole pointer), a float with no parameter is promoted to double, and a
+  function type with no prototype (`()` or `(...)` alone) is called as if it had one. A struct over 16 bytes by value,
+  argument or result, is refused naming it and the function, until C's by-reference conventions are written; each call's
+  stack arguments must fit the area the frame keeps for them (8 bytes a scalar, a struct's size rounded to 8), which the
+  lowering checks. `label` and `goto`, direct or computed, lower to labels and branches, each label its scope's own (two
+  functions, or two sibling lets, may each have a `done`); a value of type label takes a pointer's slot.
+  `check/native/calls.k` (ten arguments, `printf` with ints, doubles and a float, a global), `zero-global.k`,
   `check/ir2.k`, `maru-label.k` and `maru-test.k`'s primes and structs run their `main` in a forked child and print what
   they do under `cc`; the child sets its JIT pages executable first (`pthread_jit_write_protect_np` is per thread, and a
   forked one may start with them writable: an instruction abort at the code's entry).
   Floats stay as bits in slots and integer registers and visit `abi.spec`'s `fscratch` registers to be operated on
   (`fop`, `fcompare`, `convert`), and travel in its `fargs` and `fresult`; a literal is its double's bits, worked out in
-  Maru (normal numbers and zero; a subnormal, infinite or NaN literal is an error, and `-0.0` compiles as `0.0`). A write
-  stores at the size of the place it writes, so zero (an `int`) written to a pointer clears all of it. A frame or slot
-  beyond an immediate's reach is found from X29 through X15. Each unit starts from maru.k's own declarations, as maru.k
-  compiles once a process. `check/native/floats.k`, `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
-  (as `maru_gc` asks them) and `check/gc.k` pass natively. A struct of floats is passed in general registers, not as
-  the AAPCS64's homogeneous aggregate.
+  Maru (normal numbers and zero; a subnormal, infinite, NaN or `-0.0` literal is an error). A write
+  stores at the size of the place it writes, so zero (an `int`) written to a pointer clears all of it. A frame beyond an
+  immediate's reach is made from X29, and a slot a load's scaled offset doesn't reach (too far, or not a multiple of the
+  access) has its address made in X15. Each unit starts from maru.k's own declarations, as maru.k
+  compiles once a process. `check/native/floats.k`, `labels.k`, `structs.k` (12 and 16 bytes both ways, C's `ldiv`, a
+  spill after seven longs, 8-byte pieces at slots 4 past a multiple of 8), `stack.k` (ints past the eighth argument,
+  from C too), `frame.k` (a frame of 9760 bytes), `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
+  (as `maru_gc` asks them) and `check/gc.k` pass natively, and the refusals fail naming what they refuse. Results are
+  held to each program's own assertions and stated outputs, never to `ir-gen-c.k`'s. A struct of floats is passed in
+  general registers, not as the AAPCS64's homogeneous aggregate. Children (`check/native-child.l`) write to the check's
+  own directory, have a minute, and leave by `_exit`, an error too (exit would move the loader's shared input).
 - `native_ir2_x64`: the same programs lowered to x86-64 by `native-x64.g` (System V, `native-x64.l`'s actions: slots
   RSP-relative, R11 holding the callee, AL a variadic call's vector count, floats through `fscratch` by MOVQ and MOVD,
   float equality checking PF), run under Rosetta through `bin/x86_64/eval2` as a smoke test only; the real run is
   `native_ir2` on an x86-64 host (ndn.lan). Where `bin/x86_64/eval2` isn't built it prints `SKIP`.
 - `native_image` (`check/native-image-save.l`, `check/native-image.l`): a unit compiled natively is a code image, a
-  Maru form (`native-link.l`'s `native-image-of`): position-independent code, then a table of 8-byte slots through
+  Maru form (`native-link.l`'s `native-image-of`) naming the instruction set and system it was made for, which loading
+  checks before anything is installed: position-independent code, then a table of 8-byte slots through
   which it reaches each global, C function and string literal (ADR to the slot, then a load), the functions' offsets
   and the globals' sizes. `native-save` writes one on `eval2`; `native-image.l` alone (no maru.k, no grammars) loads one
   on any evaluator, filling the table (globals' storage, `dlsym`, string bytes) before installing and running `__init`.
   `native-install` is loading the image held in memory. `add.k` and `flow.k`, saved on `eval2`, give Tasks 1 and 2's
-  answers on `eval` and `eval3`. A string literal must be ASCII.
+  answers on `eval` and `eval3`; `image.k`'s global, `strlen` and string reach them through the table; and an image
+  for the other instruction set, or the other system, is refused. A string literal must be ASCII.
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.

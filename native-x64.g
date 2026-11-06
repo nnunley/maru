@@ -5,7 +5,7 @@
 <native-x64> : <source-parser> ()
 program	= intent*:l !. -> l ;
 reg	= .:r -> (stub-reg 'x64 r) ;
-intent	= `( 'enter .:n )		-> (native-x64-enter n)
+intent	= `( 'enter .:n .:o )		-> (native-x64-enter n o)
 	| `( 'leave .:n )		-> '((MOV RSP RBP) (POP RBP))
 	| `( 'return )			-> '((RET))
 	| `( 'params .:ps )		-> (native-x64-params ps)

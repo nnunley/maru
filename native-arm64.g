@@ -5,7 +5,7 @@
 <native-arm64> : <source-parser> ()
 program	= intent*:l !. -> l ;
 reg	= .:r -> (stub-reg 'arm64 r) ;
-intent	= `( 'enter .:n )		-> (native-arm64-enter n)
+intent	= `( 'enter .:n .:o )		-> (native-arm64-enter n o)
 	| `( 'leave .:n )		-> '((ADD SP X29 0) (LDP X29 X30 (post SP 16)))
 	| `( 'return )			-> '((RET))
 	| `( 'params .:ps )		-> (native-arm64-params ps)

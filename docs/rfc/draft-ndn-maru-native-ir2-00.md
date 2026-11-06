@@ -45,7 +45,8 @@ when, and only when, they appear in all capitals, as shown here.
 - **lowering grammar** — a per-architecture tree-matching grammar from intents to instruction forms, as `stub-arm64.g`.
 - **unit** — the functions and globals of one compilation: what `ir-gen-c.k` turns into one C file.
 - **image** — a unit installed in a code region and linked: its functions callable by address.
-- **reference** — the same unit compiled through `ir-gen-c.k` and `cc`, run as the C back end runs it today.
+- **expected result** — what a program asserts or states it prints (`maru-check.k`, `check/ir2.k` and
+  `check/zero-global.k` check themselves; other values are written in the checks), and `ir2`'s semantics.
 
 ## Specification
 
@@ -57,8 +58,10 @@ value lives in its frame slot, as in `ir-gen-x86.k`, and an allocator is a later
 **Intents are the boundary.** `ir2`'s lowering knows no architecture; a lowering grammar knows no `ir2`. A new
 architecture is a lowering grammar, rows in its `.spec`, and its calling convention in `abi.spec`.
 
-**The C back end is the reference.** Until every check below passes natively, `ir-gen-c.k` stays, and each native
-result is compared with the reference's.
+**Native results are held to each program's own assertions.** `ir-gen-c.k` is not the reference: an earlier model
+wrote it, and it lowers partly from the wrong level. Each native result is held to the program's expected result, with
+`ir-gen-x86.k` (Piumarta) as the design reference, never to `ir-gen-c.k`'s output. `ir-gen-c.k` stays until every check
+below passes natively.
 
 ### Data model
 
@@ -119,6 +122,13 @@ and take registers and conventions from `abi.spec` (the AAPCS64 with Apple's var
 Linux and Darwin). A form MUST be one `asm-coverage.spec` lists for that operation and type, so the encoders' checked
 rows are the only ones used. [R-checked-rows]
 
+A named argument is passed as its parameter's type, and a float with no parameter is promoted to double, as C does; a
+function type with no prototype (`()`, or `(...)` alone) is called as one with a prototype, as C calls it on Apple's
+arm64. A struct over 16 bytes by value, as an argument or a result, MUST be refused at compile time, naming the struct
+and the function, until the conventions C uses for one (a copy passed by reference, a hidden result pointer) are
+written. Each call's stack arguments fit the area at the frame's bottom the lowering of `ir2` reserves (8 bytes a
+scalar, a struct's size rounded up to 8: a bound for every convention here), and the lowering checks it.
+
 ```maru-check @R-checked-rows
 native_coverage
 ```
@@ -128,7 +138,8 @@ native_coverage
 A unit's functions are encoded into one buffer; branches within a function, calls between functions, and addresses of
 globals are placeholders patched once every position is known (`asm-patch`). Globals live after the code, in memory
 the image owns, with their initial bytes. An extern is resolved when the unit is installed, through `dlsym` in this
-process, and called through a table of addresses the image owns.
+process, and called through a table of addresses the image owns. An image names the instruction set and system it was
+made for, and loading refuses one made for another before anything is installed.
 
 `(native-install unit)` MUST install a unit in a code region and answer its functions by name, as addresses that
 untyped Maru calls with `subr`, exactly as it calls a library's. [R-install]
@@ -146,7 +157,7 @@ native_exe
 
 ### Checks
 
-Every ir2 program the C back end runs MUST give the same output natively, on arm64 here and on x86-64 natively on
+Every ir2 program the C back end runs MUST give its expected result natively, on arm64 here and on x86-64 natively on
 `ndn.lan`: `check/ir2.k` (`ir2`), `maru-check.k` (`maru_check`), the primes and structs of `maru_test`,
 `check/zero-global.k`, Piumarta's `maru-label.k`, the typed collector (`maru_gc`, `check/gc.k`), and a unit with
 externs and a variadic call. [R-same-output]
@@ -170,7 +181,10 @@ native_gezira
 | An `ir2` instruction with no lowering | a kind `native-ir2.l` has no method for | Compilation stops, naming the kind and the function. |
 | An intent with no form for an architecture | an operation `asm-coverage.spec` lacks | Compilation stops, naming the intent, width and architecture. |
 | An extern not found | a misspelt C function | Installation stops, naming it; nothing is installed. |
-| A displacement that doesn't fit | a branch farther than a row's field allows | The encoder refuses it (RFC 0001); the lowering uses the long form. |
+| A displacement that doesn't fit | a branch farther than a row's field allows | The encoder refuses it (RFC 0001); a conditional branch is lowered as the inverted test over an unconditional one, whose reach is the widest. |
+| A struct over 16 bytes by value | `(define-function f long ((s struct <big>)) …)` | Compilation stops, naming the struct, its size and the function. |
+| A literal that can't be written | `-0.0`, a subnormal, an infinity, a NaN | Compilation stops, naming it. |
+| An image for another machine | an arm64 image loaded on x86-64, or a Darwin one on Linux | Loading stops, naming both; nothing is installed. |
 
 ## Out of Scope
 
@@ -193,10 +207,10 @@ path removes, and the encoders already check every row against clang.
 drafts, which copied x86's assumptions into arm64 and never assembled. Intents keep each architecture's knowledge in
 its grammar and tables.
 
-**Why not allocate registers now?** Frame slots make every check's first native run comparable with the reference
-with the fewest moving parts; an allocator is a separate change measured against this one.
+**Why not allocate registers now?** Frame slots make every check's first native run checkable against its expected
+result with the fewest moving parts; an allocator is a separate change measured against this one.
 
-**Why not keep the C back end?** It stays as the reference until the checks pass; it can't run where there is no C
+**Why not keep the C back end?** It stays until the checks pass; it can't run where there is no C
 toolchain, and a running image can't compile with it.
 
 ## Security Considerations
@@ -215,7 +229,7 @@ the native path; the Nile runtime and Gezira move to it when `[R-nile-native]` p
 - RFC 2119, RFC 8174: BCP 14 key words.
 - RFC 0001 (`docs/rfc/0001-table-assemblers.md`): the encoders, placeholders and the code region.
 - `asm-coverage.spec`, `abi.spec`, `stub.l`, `stub-arm64.g`, `stub-x64.g`, `exe.l`, `code-region.l`.
-- `ir-gen-x86.k` (Piumarta): the frame-slot model this follows; `ir-gen-c.k`: the reference.
+- `ir-gen-x86.k` (Piumarta): the frame-slot model this follows; `ir-gen-c.k`: what this replaces, not the reference.
 - Arm, "Procedure Call Standard for the Arm 64-bit Architecture" (AAPCS64); Apple, "Writing ARM64 code for Apple
   platforms"; "System V Application Binary Interface, AMD64 Architecture Processor Supplement".
 - draft-ndn-nile-runtime-in-maru-03: the runtime this lets run without `cc`.
