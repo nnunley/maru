@@ -183,8 +183,8 @@
 	 (y (<ks-point>-y pt)))
     (ks-set-val box 'bounds (ks-rect x y (+ x w) (+ y h)))
     (let ((tr (ks-val box 'transformation)))
-      (when (ks-matrix? tr)
-	(set (<ks-matrix>-c tr) (* 1.0 x))
+      (when (ks-matrix? tr)		; its translation
+	(set (<ks-matrix>-e tr) (* 1.0 x))
 	(set (<ks-matrix>-f tr) (* 1.0 y))))
     pt))
 
@@ -506,7 +506,7 @@
 			 (ks-stream-curr (ks-eval (cadr raw-args) env this))))
 	      ((= fn 'M)
 	       (let (( vs (map (lambda (a) (ks-stream-curr (ks-eval a env this))) raw-args)))
-		 (ks-matrix (car vs) (cadr vs) (caddr vs) (cadddr vs) (car (cddddr vs)) (cadr (cddddr vs)))))
+		 (ks-matrix-rows (car vs) (cadr vs) (caddr vs) (cadddr vs) (car (cddddr vs)) (cadr (cddddr vs)))))
 	      ((= fn 'mergeE)
 	       (let ((res 'undefined) (as raw-args))
 		 (while (and as (= res 'undefined))

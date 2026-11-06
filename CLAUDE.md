@@ -210,11 +210,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
   `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
   is a failure; unset, it says it skipped them.
-  `ksworld-scene.l`'s `(ksworld-scene box)` is what a document draws: walking the box tree (`backgroundParts`, `contents`,
-  `parts`; a hidden box draws nothing), each shape's paths with their fills, in drawing order: the Béziers as the shape holds
-  them and the matrix composed from every transformation above them, in Gezira's order, since transforming the points is
-  Gezira's `TransformBeziers`, in Nile. KSWorld.ks's boxes draw 7 paths before its text, which is
-  kept as `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
+  `ksworld-render.l`'s `(ksworld-render box image process width height)` draws a document with libgezira and libnile
+  (`libgezira.k`, `libnile.k`): walking the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it
+  feeds each shape's path, as its FloatArray holds it, to a pipeline of `TransformBeziers` (the matrix composed from every
+  transformation above it), `ClipBeziers`, `Rasterize` and a composite in the fill's colour: the geometry is Gezira's, in
+  Nile. Matrices are Gezira's (x' = a x + c y + e); a document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's
+  rows, read once into those fields. The check stands a recording in for the libraries: the fixture's one pipeline and feed,
+  and KSWorld.ks's 7 paths before its text, which is kept as `span` records (string, font, fill, size) to be laid out with
+  TrueType glyphs.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

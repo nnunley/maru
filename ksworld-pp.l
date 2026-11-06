@@ -3,7 +3,7 @@
 (define-structure <ks-object> (class ref attrs slots data))
 (define-structure <ks-point>  (x y))
 (define-structure <ks-rect>   (left top right bottom))
-(define-structure <ks-matrix> (a b c d e f))
+(define-structure <ks-matrix> (a b c d e f))	; Gezira's: x' = a x + c y + e, y' = b x + d y + f
 (define-structure <ks-color>  (r g b a))
 
 (define-function ks-object? (x)	(= <ks-object> (type-of x)))
@@ -15,6 +15,9 @@
 (define-function ks-point (x y)			(new <ks-point> (* 1.0 x) (* 1.0 y)))
 (define-function ks-rect (l t r b)		(new <ks-rect> (* 1.0 l) (* 1.0 t) (* 1.0 r) (* 1.0 b)))
 (define-function ks-matrix (a b c d e f)	(new <ks-matrix> (* 1.0 a) (* 1.0 b) (* 1.0 c) (* 1.0 d) (* 1.0 e) (* 1.0 f)))
+;; a matrix as Squeak writes one, row by row (x' = a11 x + a12 y + a13, y' = a21 x + a22 y + a23): the documents' text, and
+;; KScript's M(...), say it so; read once into Gezira's fields
+(define-function ks-matrix-rows (a11 a12 a13 a21 a22 a23)	(ks-matrix a11 a21 a12 a22 a13 a23))
 (define-function ks-color (r g b a)		(new <ks-color> (* 1.0 r) (* 1.0 g) (* 1.0 b) (* 1.0 a)))
 
 (define-method do-print <ks-object> ()	(print "<" self.class "#" self.ref ">"))
@@ -115,8 +118,8 @@
 		     (/ (or (cadddr ws) 255) 255.0))))
 	((= vcls 'MatrixTransform2x3)
 	 (let ((ws (map string->double (ks-split vstr 32))))
-	   (ks-matrix (or (car ws) 1.0) (or (cadr ws) 0.0) (or (caddr ws) 0.0)
-		      (or (cadddr ws) 0.0) (or (car (cddddr ws)) 1.0) (or (cadr (cddddr ws)) 0.0))))
+	   (ks-matrix-rows (or (car ws) 1.0) (or (cadr ws) 0.0) (or (caddr ws) 0.0)
+			   (or (cadddr ws) 0.0) (or (car (cddddr ws)) 1.0) (or (cadr (cddddr ws)) 0.0))))
 	(else vstr)))
 
 (define-function b64-val (c)

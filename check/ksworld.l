@@ -1,7 +1,7 @@
 ;;; KSWorld documents run headless (ksworld-run.l): a fixture of ours, every stream read and run tick by tick, a send no
 ;;; method answers named as the failure; and KSWorld.ks, from the dbjr documents MARU_DBJR names (notes/plan/fetch-dbjr).
 (require "ksworld-run.l")
-(require "ksworld-scene.l")
+(require "ksworld-render.l")
 (require "check/temp.l")
 (define ok 1)
 (define-function expect (what got want)
@@ -17,13 +17,27 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("KScript: no method blink for KSBox" . 1))))
 
-;; what a document draws: a box's shape through its transformation and its container's, a hidden box drawing nothing
-(let ((scene (ksworld-scene (car (ksworld-load "check/ksworld/scene.pp")))))
-  (expect "one path drawn, its fill" (list (list-length scene) (<ks-object>-class (caar scene))) '(1 GeziraFillUniform))
-  (expect "the matrix placing it, both transformations composed, in Gezira's order" (cadar scene) '(2.0 0.0 0.0 2.0 105.0 57.0))
-  (expect "its Béziers as the shape holds them: transforming them is Gezira's"
-	  (cddr (car scene))
-	  '((0.0 0.0 0.0 0.0 10.0 0.0) (10.0 0.0 10.0 0.0 10.0 20.0) (10.0 20.0 10.0 20.0 0.0 20.0) (0.0 20.0 0.0 20.0 0.0 0.0))))
+;; what a document draws, handed to libgezira and libnile as pipelines and feeds: here they're stood in for by a recording
+;; of each call, so the walk is checked without the libraries
+(define *drawn* ())
+(define-function gezira_TransformBeziers (process a b c d e f) (list 'transform a b c d e f))
+(define-function gezira_ClipBeziers (process x0 y0 x1 y1) (list 'clip x0 y0 x1 y1))
+(define-function gezira_Rasterize (process) '(rasterize))
+(define-function gezira_CompositeUniformColorOverImage_ARGB32 (process image a r g b) (list 'paint a r g b))
+(define-function nile_Process_pipe stages (let ((out ())) (list-do s stages (or (= 0 s) (push out s))) (list-reverse! out)))	; 0 ends the list
+(define-function nile_Process_feed (pipeline floats n)
+  (let ((fs ())) (for (i 0 n) (push fs (float-at floats i))) (push *drawn* (cons pipeline (list-reverse! fs)))))
+(define-function drawn (doc width height)
+  (set *drawn* ())
+  (ksworld-render (car (ksworld-load doc)) 'image 'process width height)
+  (list-reverse! *drawn*))
+
+(let ((scene (drawn "check/ksworld/scene.pp" 200 150)))
+  (expect "one path drawn: placed by both transformations composed, clipped to the image, rasterised, painted red"
+	  (car (car scene)) '((transform 2.0 0.0 0.0 2.0 105.0 57.0) (clip 0.0 0.0 200.0 150.0) (rasterize) (paint 1.0 1.0 0.0 0.0)))
+  (expect "fed the shape's Béziers as it holds them: transforming them is Gezira's"
+	  (cdr (car scene))
+	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
 
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send 'Color 'white () () ())) (try (ks-send 'Color 'lighter () () ()) (lambda (c) (ksw-message c))))
@@ -48,6 +62,6 @@
 		  '(("KScript: no method installSelection for KSTextLayout" . 10)
 		    ("KScript: no method handlePointerMotion for KSTextLayout" . 5)
 		    ("KScript: no method handleButtonDown for KSTextLayout" . 5)))
-	  (expect "KSWorld.ks: the paths its boxes' shapes draw, before text" (list-length (ksworld-scene (array-at (at r 'table) 1))) 7))))))
+	  (expect "KSWorld.ks: the paths its boxes' shapes draw, before text" (list-length (drawn doc 1024 768)) 7))))))
 
 (println (if ok "ksworld ok" "ksworld FAILED"))
