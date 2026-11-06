@@ -72,23 +72,26 @@
       (list-do e (<john-world>-writes w) (and (not found) (= (car e) '%adapter) (= (cadr e) key) (set found (list (cddr e)))))
       (set w (<john-world>-parent w)))
     (car found)))
+(define-function fits? (f examples)		; f, if it maps every example; a formula found before is held to new ones too
+  (let ((bad ())) (list-do e examples (or bad (equal (formula-value f (car e)) (list (cadr e))) (set bad e))) (and f (not bad) f)))
 (define-function example-text (e) (concat-strings "  " (john-text (car e)) " -> " (john-text (cadr e)) "\n"))
 (define-john-builtin adapt: john-adapt)
 (define-method john-adapt <string> (examples)
   (let ((w *john-builtin-world*))
-    (or (adapter-of w self)
+    (or (fits? (adapter-of w self) examples)
 	(let ((f (meaning-search
 		  (concat-strings "Write a formula in x for: " self "\nIt must map:\n" (apply concat-strings (map example-text examples))
 				  "Use only x, whole numbers, + - * / and parentheses, with the usual precedence; / divides whole numbers, "
 				  "dropping the fraction. Reply with the formula only, on one line.")
 		  (lambda (answer)
-		    (let ((f (meaning-read $formula answer)) (bad ()))
-		      (if (not f) (cons () (concat-strings answer ": not a formula of x, + - * / and whole numbers"))
-			(list-do e examples (or bad (equal (formula-value (car f) (car e)) (list (cadr e))) (set bad e)))
-			(if (not bad) f
-			  (let ((v (formula-value (car f) (car bad))))
-			    (cons () (concat-strings answer ": gives " (if v (john-text (car v)) "no value") " for "
-						     (john-text (car bad)) ", not " (john-text (cadr bad))))))))))))
+		    (let* ((f (meaning-read $formula answer))
+			   (bad (and f (not (fits? (car f) examples))
+				     (let ((b ())) (list-do e examples (or b (fits? (car f) (list e)) (set b e))) b))))
+		      (cond ((not f) (cons () (concat-strings answer ": not a formula of x, + - * / and whole numbers")))
+			    ((not bad) f)
+			    (else (let ((v (formula-value (car f) (car bad))))
+				    (cons () (concat-strings answer ": gives " (if v (john-text (car v)) "no value") " for "
+							     (john-text (car bad)) ", not " (john-text (cadr bad))))))))))))
 	  (or f (john-fail "no formula found for: " self))
 	  (john-write w '%adapter (string->symbol self) f)))
     self))
@@ -96,5 +99,5 @@
 (define-method john-apply-adapter <long> (query)
   (let* ((f (or (adapter-of *john-builtin-world* query) (john-fail "no adapter for: " query)))
 	 (v (formula-value f self)))
-    (or v (john-fail query " has no value at " self))
+    (or v (john-fail "no value at " self " for: " query))
     (car v)))

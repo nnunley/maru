@@ -11,7 +11,7 @@
 (define socket-connect-c (subr "connect" "ipi>i"))
 (define socket-option-c	(subr "setsockopt" "iiipi>i"))
 (define socket-name-c	(subr "getsockname" "ipp>i"))
-(define socket-write-c	(subr "write" "ipl>l"))
+(define socket-send-c	(subr "send" "ipli>l"))
 (define socket-read-c	(subr "read" "ipl>l"))
 (define socket-close	(subr "close" "i>i"))
 (define socket-buffer-size 4096)
@@ -26,9 +26,19 @@
 (define socket-level (if socket-darwin? 65535 1))
 (define socket-reuse (if socket-darwin? 4 2))
 (define socket-receive-timeout (if socket-darwin? 4102 20))
+;; a peer that closes early is an error, not SIGPIPE ending the program: SO_NOSIGPIPE on Darwin, MSG_NOSIGNAL on Linux
+(define socket-no-sigpipe (if socket-darwin? 4130 ()))
+(define socket-send-flags (if socket-darwin? 0 16384))
 
-(define-function socket-check (what r) (if (< r 0) (error "socket: " what " failed") r))
 (define-function socket-fill (buffer n byte) (for (i 0 n) (set-byte-at buffer i byte)) buffer)
+(define-function socket-check (what r) (if (< r 0) (error "socket: " what " failed") r))
+(define-function socket-check-open (fd what r)	; closes fd before failing, so nothing leaks
+  (if (< r 0) (let () (socket-close fd) (error "socket: " what " failed")) r))
+(define-function socket-option (fd name value bytes)
+  (socket-fill socket-scratch 16 0)
+  (set-byte-at socket-scratch 0 (& 255 value))
+  (set-byte-at socket-scratch 1 (& 255 (>> value 8)))
+  (socket-check-open fd "setsockopt" (socket-option-c fd socket-level name socket-scratch bytes)))
 (define-function socket-sockaddr (port)		; family, port big-endian, 127.0.0.1, eight zeros
   (socket-fill socket-address 16 0)
   (if socket-darwin?
@@ -39,23 +49,22 @@
   (set-byte-at socket-address 4 127)
   (set-byte-at socket-address 7 1)
   socket-address)
-(define-function socket-tcp () (socket-check "socket" (socket-c 2 1 0)))	; AF_INET, SOCK_STREAM
+(define-function socket-tcp ()			; AF_INET, SOCK_STREAM
+  (let ((fd (socket-check "socket" (socket-c 2 1 0))))
+    (and socket-no-sigpipe (socket-option fd socket-no-sigpipe 1 4))
+    fd))
 (define-function socket-connect (port seconds)
   (let ((fd (socket-tcp)))
-    (socket-fill socket-scratch 16 0)			; a struct timeval: seconds, then microseconds
-    (set-byte-at socket-scratch 0 (& 255 seconds))
-    (set-byte-at socket-scratch 1 (& 255 (>> seconds 8)))
-    (socket-check "setsockopt" (socket-option-c fd socket-level socket-receive-timeout socket-scratch 16))
-    (socket-check "connect" (socket-connect-c fd (socket-sockaddr port) 16))
+    (socket-option fd socket-receive-timeout seconds 16)	; a struct timeval: seconds, then microseconds
+    (socket-check-open fd "connect" (socket-connect-c fd (socket-sockaddr port) 16))
     fd))
 (define-function socket-listen (port)
   (let ((fd (socket-tcp)))
-    (set-byte-at (socket-fill socket-scratch 4 0) 0 1)
-    (socket-check "setsockopt" (socket-option-c fd socket-level socket-reuse socket-scratch 4))
-    (socket-check "bind" (socket-bind-c fd (socket-sockaddr port) 16))
-    (socket-check "listen" (socket-listen-c fd 8))
+    (socket-option fd socket-reuse 1 4)
+    (socket-check-open fd "bind" (socket-bind-c fd (socket-sockaddr port) 16))
+    (socket-check-open fd "listen" (socket-listen-c fd 8))
     (set-byte-at (socket-fill socket-scratch 4 0) 0 16)
-    (socket-check "getsockname" (socket-name-c fd socket-address socket-scratch))
+    (socket-check-open fd "getsockname" (socket-name-c fd socket-address socket-scratch))
     (cons fd (+ (<< (byte-at socket-address 2) 8) (byte-at socket-address 3)))))
 (define-function socket-accept (fd) (socket-check "accept" (socket-accept-c fd 0 0)))
 (define-function socket-send (fd text)
@@ -64,7 +73,7 @@
       (let ((count (min socket-buffer-size (- n at))) (sent 0))
 	(for (i 0 count) (set-byte-at socket-buffer i (string-at text (+ at i))))
 	(while (< sent count)
-	  (set sent (+ sent (socket-check "write" (socket-write-c fd (+ socket-buffer sent) (- count sent))))))
+	  (set sent (+ sent (socket-check "send" (socket-send-c fd (+ socket-buffer sent) (- count sent) socket-send-flags)))))
 	(set at (+ at count))))))
 (define-function socket-receive-all (fd)	; to the end of the stream; a timeout is an error
   (let ((parts ()) (r 1))
