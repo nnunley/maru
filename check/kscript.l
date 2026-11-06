@@ -8,7 +8,7 @@
       (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
 
 (define-function box-of (source)
-  (let ((box (new <ks-object> 'KSBox 1 () () ())))
+  (let ((box (new <ks-object> 'KSBox 1 () () () 0)))
     (list-do st (kscript-parse source) (ks-eval st () box))
     box))
 

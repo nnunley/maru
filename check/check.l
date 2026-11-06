@@ -824,6 +824,9 @@
 	     (_     (run "ksworld-frame-dump" (concat-strings "./eval check/ksworld-frame-dump.l > " frame)))
 	     (san   (if (env-var "MARU_SANITIZE") "-g -O1 -fsanitize=thread" "-g -O1 -fsanitize=address,undefined"))
 	     (bin   (nile-build "nile-gezira-rerender" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "gezira-api.k") (concat-strings nile-dir "test/gezira-rerender.k")) san)))
+	;; every fill is whole path elements, and the first is the 26-float rectangle's 24 floats (four quadratic Béziers: the
+	;; floats the document's array holds, not the block's 26 that data-length reported)
+	(unit-assert (equal (last (run "ksworld-frame-summary" (concat-strings "tail -1 " frame))) "calls 937 whole 937 first 24"))
 	(list-do n '("1" "4")
 	  (unit-assert (equal (run (concat-strings "nile-gezira-rerender-" n) (concat-strings bin " " n " 2 " frame " && test ! -s " tmp "/nile-gezira-rerender-" n ".err") 600)
 			      '("gezira rerender ok")))))))

@@ -119,7 +119,7 @@
   (let ((s (new <ks-object> 'KSEventStream 0
 		(list ':__type__ type ':__code__ code ':__home__ home ':__dormant__ "false")
 		(list (cons '__currentValue__ init-val) (cons '__prevValue__ init-val))
-		())))
+		() 0)))
     s))
 
 (define-function ks-stream? (x)

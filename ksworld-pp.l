@@ -1,6 +1,6 @@
 ;;; ksworld-pp.l -- Deserializer and object model for KSWorld / Frank (.pp bundles)
 
-(define-structure <ks-object> (class ref attrs slots data))
+(define-structure <ks-object> (class ref attrs slots data count))
 (define-structure <ks-point>  (x y))
 (define-structure <ks-rect>   (left top right bottom))
 (define-structure <ks-matrix> (a b c d e f))	; Gezira's: x' = a x + c y + e, y' = b x + d y + f
@@ -175,6 +175,22 @@
 		(set-byte-at out (+ d 3) (byte-at tmp (+ s 0)))))))
 	out))))
 
+;; A FloatArray's length in floats, from the first word of its base64 (the count the document gives, not the size of the
+;; block data allocates: data-length reports the block, which is rounded up, so the words past the count would read as
+;; points of the path).
+(define-function b64-word-count (str)
+  (let ((acc 0) (bits 0) (got 0) (i 0))
+    (while (and (< got 4) (< i (string-length str)))
+      (let ((v (b64-val (string-at str i))))
+	(when (<= 0 v)
+	  (set acc (+ (<< acc 6) v))
+	  (set bits (+ bits 6))
+	  (when (<= 8 bits)
+	    (set bits (- bits 8))
+	    (set got (+ got 1)))))
+      (set i (+ i 1)))
+    (& (>> acc bits) 4294967295)))
+
 (define-function ksworld-read-pp (path)
   (if (or (= 0 (string-compare path "http://" 0 7))
 	  (= 0 (string-compare path "https://" 0 8)))
@@ -196,7 +212,7 @@
 	    (and (= k ':ref) (set ref (string->long v)))
 	    (set attrs (cons k (cons v attrs)))
 	    (set rest (cddr rest))))
-	(set-array-at table ref (new <ks-object> cls ref attrs () ()))))
+	(set-array-at table ref (new <ks-object> cls ref attrs () () 0))))
     ;; Pass 2: resolve slots, attributes, and data payloads
     (list-do e entries
       (let* ((cls (car e)) (rest (cdr e)))
@@ -210,6 +226,7 @@
 	    (set (<ks-object>-attrs obj)
 		 (cons ':__home__ (cons (array-at table (string->long home)) (<ks-object>-attrs obj)))))
 	  (when (and val-attr (or (= cls 'FloatArray) (= cls 'ShortPointArray) (= cls 'ByteArray)))
+	    (when (= cls 'FloatArray) (set (<ks-object>-count obj) (b64-word-count val-attr)))
 	    (set (<ks-object>-data obj)
 		 (b64-decode-words val-attr (cond ((= cls 'ShortPointArray) 'shorts)
 						  ((= cls 'ByteArray) 'bytes)
@@ -229,6 +246,7 @@
 		       (push slots (cons key val))))
 		    ((= (car sub) 'data)
 		     (let ((items (cdr sub)))
+		       (when (and items (= cls 'FloatArray)) (set (<ks-object>-count obj) (b64-word-count (car items))))
 		       (set (<ks-object>-data obj)
 			    (cond ((= cls 'FloatArray) (b64-decode-words (car items) 'floats))
 				  ((= cls 'ShortPointArray) (b64-decode-words (car items) 'shorts))

@@ -29,14 +29,10 @@
       (list 'uniform (* 1.0 (ks-slot fill 'alpha)) (* 1.0 (ks-slot fill 'red)) (* 1.0 (ks-slot fill 'green)) (* 1.0 (ks-slot fill 'blue)))
     (error "ksworld-render: can't paint with " fill)))
 
-;; The floats a fill takes: whole path elements, six floats each. KSWorld's path arrays can end in a partial element
-;; (231 of the 937 fills of KSWorld.ks, two floats past whole ones); gezira_fill refuses those, so they're left out.
-(define-function ks-whole-count (floats) (* 6 (/ (/ (data-length floats) 4) 6)))
-
 (define-function ksworld-render-path (path m gezira width height)
   (let ((floats (<ks-object>-data (ks-slot path 'floats))))
     (and floats
-	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill)) floats (ks-whole-count floats)))))
+	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill)) floats (<ks-object>-count (ks-slot path 'floats))))))
 
 ;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
 (define-function ksworld-render-selection (box m gezira width height)
@@ -66,9 +62,9 @@
 	(ksworld-render-selection box here gezira width height)
 	(list-do g (ks-text-glyphs box)
 	  (let ((floats (ks-glyph-floats g)))
-	    (and (< 0 (data-length floats))
+	    (and (< 0 (ks-glyph-count g))
 		 (gezira-fill-path gezira (ks-compose here (ks-glyph-matrix g)) width height (<ks-glyph>-paint g)
-				   floats (ks-whole-count floats))))))
+				   floats (ks-glyph-count g))))))
       (list-do part '(backgroundParts contents parts)
 	(list-do child (ks-items (ks-val box part))
 	  (ksworld-render-box child here gezira width height))))))

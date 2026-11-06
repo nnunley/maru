@@ -221,3 +221,8 @@
 +4 gezira-api.k: gezira_fill refuses a count that isn't whole elements, as nile_Process_feed does (nile/runtimes/maru)
 +95 ksworld-pixels.l: KSWorld.ks in an SDL3 window on a painting Gezira: the bar's composite, the page, a filled shape, and the selection and its glyphs after a press and a drag through sdl3-push (check/ksworld-pixels.l)
 +7 check.l: the ksworld_pixels case (check/check.l)
++18 ksworld-pp.l: a FloatArray's count, read from its base64 header (b64-word-count) and kept in the object's count field, the length the document gives rather than the block's (ksworld-pp.l)
++5 ksworld-text.l: ks-glyph-count, a glyph's floats counted from its outline, since data-length reports the block (ksworld-text.l)
+-4 ksworld-render.l: the whole-element rounding is gone; paths and glyphs pass their logical counts (ksworld-render.l)
++3 check.l: the ksworld_rerender assertion that every fill is whole elements and the first is the 24-float rectangle (check/check.l)
++2 check/ksworld-frame-dump.l: the summary line the rerender check reads (check/ksworld-frame-dump.l)
