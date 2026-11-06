@@ -57,7 +57,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c undo-irl.c osdefs.k
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
-CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
+CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
 
@@ -195,6 +195,24 @@ build/irl-lib.c : check/irl-lib-a.irl check/irl-lib-b.irl $(IRL_LIBRARY) | eval2
 build/irl-grammar.c : check/irl-grammar.irl $(IRL_LIBRARY) | eval2
 	@mkdir -p build
 	./eval2 compile-irl-library.l $(filter %.irl,$^) > $@
+
+# Gezira on the Maru runtime, as a library gezira-maru.l opens: gezira/nile/gezira.nl (the 2016 Nile source)
+# through Nile's Maru back end, the runtime (nile/runtimes/maru) and WriteToImage_ARGB32 and the entry points
+# (nile/runtimes/maru/gezira-image.k, gezira-api.k), compiled in one process as the irl libraries are.
+NILE_RT = nile/runtimes/maru/nile.k nile/runtimes/maru/nile-sync.k nile/runtimes/maru/nile-heap.k \
+	  nile/runtimes/maru/nile-deque.k nile/runtimes/maru/nile-thread.k nile/runtimes/maru/nile-process.k \
+	  nile/runtimes/maru/nile-kernel.k nile/runtimes/maru/nile-builtins.k
+build/nile.osdefs.k : nile/runtimes/maru/nile.osdefs compile-osdefs.l | eval
+	@mkdir -p build
+	./eval compile-osdefs.l nile/runtimes/maru/nile.osdefs > build/nile.osdefs.c
+	cc -o build/nile.osdefs.exe build/nile.osdefs.c && build/nile.osdefs.exe > $@
+build/gezira.k : gezira/nile/gezira.nl nile/compilers/maru/nile-gen-code.l nile/compilers/maru/nile-gen-code-maru.l nile/compilers/prelude.nl | eval2
+	@mkdir -p build
+	./nile/compilers/maru/nile-to-maru-compiler.sh gezira gezira/nile/gezira.nl > /dev/null && mv gezira.k $@
+build/gezira.c : build/gezira.k build/nile.osdefs.k $(NILE_RT) nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k | eval2
+	./eval2 ir-gen-c.k maru.k build/nile.osdefs.k $(NILE_RT) build/gezira.k nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k > $@.raw && sed 's/^int main(int argc, char \*\*argv)$$/int gezira_init_globals(int argc, char **argv)/' $@.raw > $@.tmp && echo '__attribute__((constructor)) static void gezira_load(void) { gezira_init_globals(0, 0); }' >> $@.tmp && mv $@.tmp $@ && rm -f $@.raw
+build/gezira.$(SO) : build/gezira.c
+	$(CC) -pthread -shared -fPIC -fno-builtin -w -o $@ $< -lm
 
 john.g.l : tpeg.l john.g | eval
 	./eval compile-tpeg.l john.g > john.g.l

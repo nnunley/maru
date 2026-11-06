@@ -758,6 +758,11 @@
       (unit-assert (equal (run (concat-strings "nile-gezira-image-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-gezira-image-" n ".err") 300)
 			  '("gezira image ok"))))))
 
+;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
+;; its selectors, the same rectangle as gezira_image, on one worker and four.
+(check "gezira_maru"
+  (unit-assert (equal (last (run "gezira_maru" "./eval check/gezira-maru.l" 300)) "gezira maru ok")))
+
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")

@@ -366,6 +366,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   and built with the runtime, with `nile/runtimes/maru/gezira-image.k` (the ARGB32 composite) renders a 40 by 30 rectangle at
   (10.5, 20) through TransformBeziers, ClipBeziers, Rasterize and ApplyTexturer: full pixels red, edge columns half covered, the
   rest white, on 1 and 4 workers (`nile/runtimes/maru/test/gezira-image.k`).
+- `gezira_maru` (`check/check.l`, `check/gezira-maru.l`): the Gezira library `build/gezira.dylib` (make builds it from
+  `gezira/nile/gezira.nl` and the runtime) through `gezira-maru.l`'s `<gezira-maru>` selectors renders the `gezira_image`
+  rectangle with a matrix, on 1 and 4 workers. `check/gezira-scene.l` draws `check/ksworld/scene.pp` the same way; it is
+  verified in a scratch copy with main's KSWorld stack and is not registered on this branch.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change
