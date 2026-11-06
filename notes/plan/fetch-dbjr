@@ -1,6 +1,6 @@
 #!/bin/sh
 # notes/plan/fetch-dbjr DIR: the dbjr documents the KSWorld checks read, from tinlizzie.org/dbjr into DIR, laid out as there,
-# and the font they name, in DIR/fonts.
+# with the images they name, and the font they name, in DIR/fonts.
 # Third-party, so DIR is a temporary directory (make check makes one with mktemp -d), never this tree.  A file already
 # there isn't fetched again.
 set -e
@@ -9,6 +9,12 @@ for doc in "KSWorld.ks/index.pp" "Front page Onward Full v8.ks/index.pp"; do
 	mkdir -p "$dir/$(dirname "$doc")"
 	[ -s "$dir/$doc" ] || curl -sfL --max-time 120 -o "$dir/$doc" "https://tinlizzie.org/dbjr/$(printf '%s' "$doc" | sed 's/ /%20/g')"
 	head -c 9 "$dir/$doc" | grep -q '^(objects' || { echo "not a KSWorld document: $dir/$doc" >&2; exit 1; }
+	# the images it names (an image fill's form), beside it
+	for png in $(grep -o '[A-Za-z0-9_-]*[.]png' "$dir/$doc" | sort -u); do
+		f="$dir/$(dirname "$doc")/$png"
+		[ -s "$f" ] || curl -sfL --max-time 120 -o "$f" "https://tinlizzie.org/dbjr/$(dirname "$doc" | sed 's/ /%20/g')/$png"
+		[ "$(head -c 4 "$f" | tail -c 3)" = PNG ] || { echo "not a PNG: $f" >&2; exit 1; }
+	done
 done
 # the font most of the documents name, DejaVu Sans (free, Bitstream Vera's licence), from its release, checked by its hash
 font="$dir/fonts/DejaVuSans.ttf"

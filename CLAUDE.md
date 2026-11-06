@@ -238,6 +238,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error, and so is a
   fill other than a uniform colour (the front page's `GeziraFillImage`).
+- `png` (`check/png.l`): `png.l`'s `(png-load path)` reads an 8-bit RGBA or RGB PNG, not interlaced, to a `<png>`: width,
+  height and width x height ARGB words in C memory (alpha on top, not premultiplied), as a Gezira image holds them. Every
+  chunk's CRC-32 is checked, the data inflated (stored, fixed and dynamic Huffman blocks) and checked against its Adler-32,
+  and every row filter undone; anything else is an error naming it. Our fixtures (`check/png/`) are held to pixels worked
+  out separately through zlib, and with `MARU_DBJR` the front page's image (730 x 980, which `fetch-dbjr` fetches with
+  every image a document names) at five points and in its byte sum. Untyped, it takes about 28 s of CPU for that image.
 - `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
   motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
   left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
