@@ -238,6 +238,12 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error, and so is a
   fill other than a uniform colour (the front page's `GeziraFillImage`).
+- `png` (`check/png.l`): `png.l`'s `(png-load path)` reads an 8-bit RGBA or RGB PNG, not interlaced, to a `<png>`: width,
+  height and width x height ARGB words in C memory (alpha on top, not premultiplied), as a Gezira image holds them. Every
+  chunk's CRC-32 is checked, the data inflated (stored, fixed and dynamic Huffman blocks) and checked against its Adler-32,
+  and every row filter undone; anything else is an error naming it. Our fixtures (`check/png/`) are held to pixels worked
+  out separately through zlib, and with `MARU_DBJR` the front page's image (730 x 980, which `fetch-dbjr` fetches with
+  every image a document names) at five points and in its byte sum. Untyped, it takes about 28 s of CPU for that image.
 - `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
   motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
   left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
@@ -355,8 +361,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `ir_retired`: `ir.k` and irgol are gone, and `irl.g` and `compile-irl.l`
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
-  by name or address, with typed results (`"dd>d"`), variadic calls and raw
-  byte access.
+  by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil), variadic
+  calls and raw byte access.
 - `asm_interface` (`check/asm-interface.l`): the one encoder interface
   (`asm`, `asm-forms`, `asm-decode`, refusals) answers the same way for arm64
   and x64, under both evaluators.
@@ -400,6 +406,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   A world keeps one record per slot however often it writes it, and a commit hands its parent only what the parent lacks, so a
   loop in a `try` doesn't grow the log, though each call that sets a fresh local still adds a record. Generators are aimed by
   deliberate bugs: reintroduce one and count the seeds that catch it.
+  A law file's limit is CPU time (300 s, `RLIMIT_CPU`, with an alarm at four times as long for a run that blocks), and so
+  is each question's (`law.l`'s `law-limit`, 60 s, 10 s for Nile's), so cases or agents running beside them can't fail
+  them by contention; each run keeps its own output, and a failure prints its
+  last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
+  forked question inherits from the law runner.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

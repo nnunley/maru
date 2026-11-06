@@ -74,7 +74,7 @@
   (map-with type-check (map-with resolve defs nile-prelude-env) '())
   (_exit 0))
 (define-function nile-verdict (ask)	; ask: run in the child, exiting with its verdict; (crash -1) if no child ran
-  (let ((st (law-child (lambda () (alarm 10) (ask)))))
+  (let ((st (law-child (lambda () (law-limit 10) (ask)))))
     (cond ((= 0 st) accept) ((or (= st (<< 3 8)) (= st (<< 4 8))) reject) (else (list 'crash st)))))
 (define nile-sigs ())
 (define-function nile-sig (type)

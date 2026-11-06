@@ -40,6 +40,8 @@
 (define waitpid	(subr "waitpid" "ipi>i"))
 (define _exit	(subr "_exit" "i"))
 (define status-word ((subr "malloc" "l>p") 8))
+(define setrlimit (subr "setrlimit" "ip>i"))
+(define rlimit ((subr "malloc" "l>p") 16))	; struct rlimit: soft and hard limits, 64 bits each, on Darwin and Linux alike
 (define-function run-status (secs cmd)
   (let ((pid (fork)))
     (when (= 0 pid)
@@ -200,9 +202,9 @@
 
 ;; Each evaluator calls C alike: subr by name or address, typed results, byte access.
 (check "eval2_subr"
-  (unit-assert (equal (last (run "subr" "./eval check/eval2-subr.l")) "subr ok"))
-  (unit-assert (equal (last (run "subr2" "./eval2 -b boot2.l check/eval2-subr.l")) "subr ok"))
-  (unit-assert (equal (last (run "subr3" "./eval3 -b boot2.l check/eval2-subr.l")) "subr ok")))
+  (unit-assert (equal (last (run "subr" "MARU_SUBR_STRING=returned ./eval check/eval2-subr.l")) "subr ok"))
+  (unit-assert (equal (last (run "subr2" "MARU_SUBR_STRING=returned ./eval2 -b boot2.l check/eval2-subr.l")) "subr ok"))
+  (unit-assert (equal (last (run "subr3" "MARU_SUBR_STRING=returned ./eval3 -b boot2.l check/eval2-subr.l")) "subr ok")))
 
 ;; eval3 (Piumarta, 2013) beside eval2 for comparison: it runs boot2.l and the
 ;; same cases, and calls C by libffi (dlextern) where eval2 uses subr.
@@ -322,8 +324,30 @@
     (run "gc_image_write2" (concat-strings "printf '(println ((subr \"GC_check_heap\" \">l\")))\\n(println keep)\\n' > " reader))
     (run "gc_image_save" (concat-strings "./eval " saver))
     (unit-assert (equal (run "gc_image_load" (concat-strings "./eval -l " image " " reader)) '("0" "(1 2 3)")))))
+;; a law file's limit is CPU time, not wall time, so cases running beside it can't fail it: RLIMIT_CPU (0 on Darwin and
+;; Linux) is set in the child and inherited by each question it forks, with an alarm at four times as long behind it
+;; for a run that blocks without using the CPU.  Each run keeps its own output, and a failure prints its last lines.
+(define-function run-cpu-status (secs cmd)
+  (let ((pid (fork)))
+    (when (= 0 pid)
+      (for (k 0 16) (set-byte-at rlimit k (& 255 (>> secs (* 8 (% k 8))))))
+      (setrlimit 0 rlimit)
+      (alarm (* 4 secs))
+      (execl "/bin/sh" "sh" "-c" cmd 0)
+      (_exit 127))
+    (waitpid pid status-word 0)
+    (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
+(define law-runs 0)
 (define-function law-file-holds (name evaluator support file)
-  (= 0 (run-status 500 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>&1; exec " evaluator " check/law.l " support " " file))))
+  (set law-runs (+ law-runs 1))
+  (let* ((out (concat-strings tmp "/" name "-" (long->string law-runs) ".out"))
+	 (status (run-cpu-status 300 (concat-strings "exec </dev/null >" out " 2>&1; exec " evaluator " check/law.l " support " " file))))
+    (or (= 0 status)
+	(let ((all (lines (contents-of-file-named out))))
+	  (println "law file " file " on " evaluator ": status " status " (a signal of 24 is the CPU limit, 14 the alarm); last lines:")
+	  (while (< 10 (list-length all)) (set all (cdr all)))
+	  (list-do l all (println "  " l))
+	  ()))))
 ;; the heaviest laws are the collector's, not an instruction set's or a particular evaluator's: one with tagged integers and
 ;; one with boxed.  eval2 keeps recover and gc_every here, and all of them in the sweep (make check-sweep)
 (define heavy-law-evaluators '("./eval" "./eval3 -b boot2.l"))
@@ -400,6 +424,8 @@
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
 (check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
+;; png.l: our fixtures (every deflate block and row filter), and with MARU_DBJR the front page's image (check/png.l)
+(check "png" (unit-assert (equal (last (run "png" "./eval check/png.l")) "png ok")))
 ;; KSWorld.ks in an SDL3 window on the dummy driver: SDL's mouse events reach the document, each change drawn (check/ksworld-window.l)
 (check "ksworld_window"
   (if (= 0 (run-status 60 "pkg-config --exists sdl3"))

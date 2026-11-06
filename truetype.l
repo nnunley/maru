@@ -3,26 +3,9 @@
 ;;; font units (y up), and (ttf-advance font glyph) how far it moves the pen.  A straight segment is written start, start, end,
 ;;; as KSWorld wrote its own glyphs; two control points in a row imply an on-curve point between them.  Composite glyphs
 ;;; are their components, moved (and scaled, if they say so).
-(define ttf-open	(subr "open" "si>i"))
-(define ttf-lseek	(subr "lseek" "ili>l"))
-(define ttf-read-c	(subr "read" "ipl>l"))
-(define ttf-close	(subr "close" "i>i"))
-(define ttf-malloc	(subr "malloc" "l>p"))
+(require "file-bytes.l")
 
 (define-structure <ttf> (bytes size base upem loca-long glyf loca hmtx metrics cmap ascent descent))
-
-;; the file's bytes in C memory, read whole; byte-at reads them
-(define-function ttf-file-bytes (path)
-  (let ((fd (ttf-open path 0)))
-    (and (< fd 0) (error "truetype: can't open " path))
-    (let* ((size (ttf-lseek fd 0 2)) (bytes (ttf-malloc size)) (at 0))
-      (ttf-lseek fd 0 0)
-      (while (< at size)
-	(let ((n (ttf-read-c fd (+ bytes at) (- size at))))
-	  (and (<= n 0) (error "truetype: short read of " path))
-	  (set at (+ at n))))
-      (ttf-close fd)
-      (cons bytes size))))
 
 ;; big-endian fields
 (define-function ttf-u8 (f at) (byte-at (<ttf>-bytes f) at))
@@ -66,7 +49,7 @@
   f)
 
 (define-function ttf-file (path)
-  (let ((file (ttf-file-bytes path))) (new <ttf> (car file) (cdr file) 0 0 () 0 0 0 0 0 0 0)))
+  (let ((file (file-bytes path))) (new <ttf> (car file) (cdr file) 0 0 () 0 0 0 0 0 0 0)))
 
 ;; a face's full name (name 4), from its Macintosh (bytes) or Windows (UTF-16, ASCII kept) record
 (define-function ttf-full-name (f)
