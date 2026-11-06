@@ -160,6 +160,17 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `a is b` asks whether a is one of a kind, b naming a member, its set, a group holding it or a class, and otherwise whether they're the
   same value; so `its evidence is Good`, after `group Good passed tested proved.`, and a value with fields simply isn't a bare name.
   `qualify C p is E` gives p E's value (the memos have it as `if`, in one use that answers yes or no).
+- `call_by_meaning` (`check/meaning.l`): `meaning.l`, call by meaning (Samimi et al., Onward! 2014, TR-2014-003) with a model
+  where the paper had Cyc. A model proves nothing, so each answer is held to what John can check: `"…" find-passing: "probe"`
+  takes an object whose `spec` the model says means the text only if it passes the probe, a qualification of its class, and
+  `"…" adapt: [ [ in, out ], … ]` takes a formula only if `meaning.g` reads it (x, whole numbers, `+ - * /`, parentheses:
+  nothing else parses) and `meaning-value.g` maps every example; `x apply-adapter: "…"` runs it with no model. A refusal goes
+  back with its reason, three tries, then a John error that `recover.l`'s `try` catches (holding only the source's literals:
+  strings the program made are undone with the world). An adapter is written into the world it was found in, so a failed
+  branch takes it with it; builtins read that world from `*john-builtin-world*`. Answers are recorded by prompt and never
+  asked twice. `ollama.l` asks a local Ollama's `/api/chat` over `socket.l` (TCP through `subr`, Darwin's and Linux's
+  sockaddr), reading the reply with `http.g` and `json.g`; it answers nothing for no server, a status other than 200, or a
+  reply with no message. A cloud model sees the prompt: public text only.
 - `plan_evidence` (`check/plan-evidence.l`): what `check/law.l` prints, read by `notes/plan/law-report.g` in a command, `law-events.l`, to events of
   evidence, one a law, read back through John: tested and proved hold if they're about this code, refuted, starved, vacuous, inconclusive and a law that
   stopped its run don't. The plan itself replays and plans.

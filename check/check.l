@@ -395,6 +395,8 @@
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
+;; call by meaning: answers from a scripted model held to probes and examples, and the Ollama client against a forked server
+(check "call_by_meaning" (unit-assert (equal (last (run "call_by_meaning" "./eval check/meaning.l")) "meaning ok")))
 (check "plan_evidence"
   (unit-assert (equal (last (run "plan_evidence" "./eval check/plan-evidence.l")) "plan evidence ok"))
   ;; the plan as it stands replays and plans, running no check
