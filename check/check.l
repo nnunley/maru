@@ -738,6 +738,16 @@
       (unit-assert (equal (run (concat-strings "nile-dupcat-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-dupcat-" n ".err") 300)
 			  '("dupcat ok" "dupzip ok"))))))
 
+; text-layout.nl, compiled by Nile's Maru back end (module text_layout: a hyphen isn't in a C name),
+; runs through the runtime with one worker and with eight, and lays out its glyphs as it should (R-text-layout).
+(check "nile_text_layout"
+  (let* ((gen (concat-strings tmp "/text-layout-gen"))
+	 (_   (run "text-layout-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh text_layout $R/nile/examples/text-layout.nl")))
+	 (bin (nile-build "nile-text-layout" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/text-layout.k")) "")))
+    (list-do n '("1" "8")
+      (unit-assert (equal (run (concat-strings "nile-text-layout-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-text-layout-" n ".err") 300)
+			  '("text-layout ok"))))))
+
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")
