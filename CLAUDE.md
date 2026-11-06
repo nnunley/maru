@@ -104,6 +104,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `check/ir2.k`, `maru-label.k` and `maru-test.k`'s primes and structs run their `main` in a forked child and print what
   they do under `cc`; the child sets its JIT pages executable first (`pthread_jit_write_protect_np` is per thread, and a
   forked one may start with them writable: an instruction abort at the code's entry).
+  Floats stay as bits in slots and integer registers and visit `abi.spec`'s `fscratch` registers to be operated on
+  (`fop`, `fcompare`, `convert`), and travel in its `fargs` and `fresult`; a literal is its double's bits, worked out in
+  Maru (normal numbers and zero; a subnormal, infinite or NaN literal is an error, and `-0.0` compiles as `0.0`). A write
+  stores at the size of the place it writes, so zero (an `int`) written to a pointer clears all of it. A frame or slot
+  beyond an immediate's reach is found from X29 through X15. Each unit starts from maru.k's own declarations, as maru.k
+  compiles once a process. `check/native/floats.k`, `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
+  (as `maru_gc` asks them) and `check/gc.k` pass natively. A struct of floats is passed in general registers, not as
+  the AAPCS64's homogeneous aggregate.
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.

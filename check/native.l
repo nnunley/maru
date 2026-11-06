@@ -71,7 +71,26 @@
   (expect "arithmetic and bits, C's signed results"
 	  (map (lambda (args) (apply (fn image 'arith "lll>l") args))
 	       '((-7 6 0) (-7 2 1) (-7 2 2) (12 10 3) (12 10 4) (12 10 5) (3 4 6) (-8 1 7) (5 0 8)))
-	  '(-42 -3 -1 8 14 6 48 -4 -6)))
+	  '(-42 -3 -1 8 14 6 48 -4 -6))
+  (expect "zero written to a pointer: a local, a field, an element, a global"
+	  (list ((fn image 'null-local "p>l") buffer) ((fn image 'null-field "p>l") buffer) ((fn image 'null-element "p>l") buffer)
+		((fn image 'null-global "p>l") buffer))
+	  '(0 0 0 0)))
+
+(let ((image (native-install (native-compile-file "check/native/floats.k"))))
+  (expect "fadd" ((fn image 'fadd "dd>d") 1.25 2.5) 3.75)
+  (expect "fmix, in float" ((fn image 'fmix "fff>f") 2.0 3.0 1.0) 5.5)
+  (expect "fneg" ((fn image 'fneg "d>d") 1.5) -1.5)
+  (expect "literals" ((fn image 'flit ">d") ) 2.375)
+  (expect "a float literal, rounded to float" ((fn image 'widen "f>d") ((fn image 'flit32 ">f") )) ((fn image 'widen "f>d") 0.1))
+  (expect "to long, toward zero" (list ((fn image 'to-long "d>l") 7.9) ((fn image 'to-long "d>l") -7.9)) '(7 -7))
+  (expect "to int" ((fn image 'to-int "f>i") -3.5) -3)
+  (expect "from long" ((fn image 'from-long "l>d") -42) -42.0)
+  (expect "widen and narrow" (list ((fn image 'widen "f>d") 0.5) ((fn image 'narrow "d>f") 0.25)) '(0.5 0.25))
+  (expect "every relation, on doubles" (map (lambda (ab) (apply (fn image 'relations "dd>l") ab)) '((-3.0 2.0) (2.0 -3.0) (7.0 7.0)))
+	  '(14 50 41))
+  (expect "nine doubles and two longs" ((fn image 'call-weigh ">d") ) 10.75)
+  (expect "a double through a call" ((fn image 'call-fadd "d>d") 0.5) 2.0))
 
 (expect "calls: ten arguments, printf's variadic ones, a global, a string"
 	(native-run-main (native-install (native-compile-file "check/native/calls.k")) ())
@@ -84,5 +103,37 @@
   (expect "maru-test.k's primes" (pieces (car out) 32) '("2" "3" "5" "7" "11" "13" "17" "19" "23" "29" "31"))
   (expect "maru-test.k's sum" (and (member? "sum is 708" out) 1) 1)
   (expect "maru-test.k's struct" (last out) "print-foo: 84 1332"))
+
+;; maru-check.k, upstream's own test: each section prints its "ok"
+(let ((out (native-run-main (native-install (native-compile-file "maru-check.k")) ())))
+  (list-do s '("bytes" "words" "ints" "floats" "structs" "pointers")
+    (expect (concat-string "maru-check.k's " s) (and (member? (concat-string s " ok") out) 1) 1)))
+
+;; the collector written in typed Maru, held to what maru_gc asks of it under cc: eleven reports, the nth after n
+;; thousand rounds of 256 cells (the last after ten thousand), and at the end everything freed and none left in use
+(define-function prefix-at? (p s i)	; whether s holds p at i
+  (and (<= (+ i (string-length p)) (string-length s))
+       (let ((k 0)) (while (and (< k (string-length p)) (= (string-at p k) (string-at s (+ i k)))) (set k (+ k 1))) (= k (string-length p)))))
+(define-function prefix? (p s) (prefix-at? p s 0))
+(define-function select (keep? l) (let ((out ())) (list-do x l (and (keep? x) (push out x))) (list-reverse! out)))
+(let* ((reports (map (lambda (l) (pieces l 32)) (select (lambda (l) (prefix? "GC: " l)) (native-run-main (native-install (native-compile-file "maru-gc.k")) ()))))
+       (k 0))
+  (expect "maru-gc.k's reports" (list-length reports) 11)
+  (list-do r reports
+    (expect "maru-gc.k's cells allocated" (string->long (caddr (cdddr r))) (* 256 (if (= k 10) 10000 (* 1000 k))))
+    (set k (+ k 1)))
+  (let ((final (last reports)))
+    (expect "maru-gc.k's collections" (< 0 (string->long (cadr (cdddr (cdddr final))))) 't)
+    (expect "maru-gc.k's cells in use" (string->long (cadr final)) 0)
+    (expect "maru-gc.k's bytes in use" (string->long (car (cddddr (cddddr (cdr final))))) 0)))
+
+;; check/gc.k in place of maru-gc.k's main: the heap grows when needed and adjacent free chunks merge
+(let* ((gc (contents-of-file-named "maru-gc.k"))
+       (main (let ((i 0)) (while (not (prefix-at? "(define-function main " gc i)) (set i (+ i 1))) i))
+       (path (concat-string "/tmp/maru-native-gc." (concat-string (long->string ((subr "getpid" ">i"))) ".k"))))
+  (contents-to-file-named (concat-string (string-copy gc 0 main) (contents-of-file-named "check/gc.k")) path)
+  (let ((out (native-run-main (native-install (native-compile-file path)) ())))
+    ((subr "unlink" "s>i") path)
+    (expect "check/gc.k" (last out) "gc ok")))
 
 (println (if ok "native ok" "native FAILED"))
