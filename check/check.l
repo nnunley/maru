@@ -634,24 +634,11 @@
 ;; fourth argument of nile_Process (R-one-interface). The link half, test/
 ;; interface.k against the runtime, waits for the runtime's task; until then
 ;; this asserts the declarations and the generator.
-(check "nile_interface"
-  (let ((n "nile/runtimes/maru/nile.k")
-	(c "$R/nile/compilers/maru")
-	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
-    (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
-			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
-    ;; compiles against nile.k alone (the driver's calls are resolved at run time, so this stops short of linking)
-    (run "nile-iface-gen" (concat-strings "./eval2 ir-gen-c.k maru.k " n " nile/runtimes/maru/test/interface.k > " tmp "/interface.c"))
-    (run "nile-iface-cc" (concat-strings "cc -c -fno-builtin -w -o " tmp "/interface.o " tmp "/interface.c"))
-    (run "nile-iface"(concat-strings "R=$PWD; mkdir -p " tmp "/iface && cd " tmp "/iface && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
-    (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
-			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
-
 ;;; ---------------------------------------------------------------- nile runtime in maru
 
 ;; The runtime's files, in the order they're compiled; later tasks append theirs.
 (define nile-dir "nile/runtimes/maru/")
-(define nile-runtime '("nile-sync.k" "nile-heap.k" "nile-deque.k" "nile-thread.k"))
+(define nile-runtime '("nile.k" "nile-sync.k" "nile-heap.k" "nile-deque.k" "nile-thread.k" "nile-process.k" "nile-kernel.k" "nile-builtins.k"))
 
 (define-function unique (items)
   (let ((out ()))
@@ -659,9 +646,8 @@
     (list-reverse! out)))
 
 ;; Compiles FILES (paths from the root) with nile.osdefs measured for this host and the runtime's
-;; files, in one ir-gen-c run, then cc -pthread.  -L lets a generated kernel's (load "nile.k")
-;; resolve against the runtime directory, so nile.k is never named here; a file named twice loads
-;; once.  Returns the binary's path.
+;; files, in one ir-gen-c run, then cc -pthread.  nile.k is the runtime's first file and is loaded
+;; once, so kernels don't load it; a file named twice is compiled once.  Returns the binary's path.
 (define-function nile-build (name files cflags)
   (let* ((osdefs  (concat-strings tmp "/" name ".osdefs"))
 	 (listed  ())
@@ -673,7 +659,7 @@
 	 (concat-strings "./eval compile-osdefs.l " nile-dir "nile.osdefs > " osdefs ".c"
 			 " && cc -o " osdefs ".exe " osdefs ".c && " osdefs ".exe > " osdefs ".k"))
     (run (concat-strings name "-build")
-	 (concat-strings "./eval2 -L " nile-dir " ir-gen-c.k maru.k " osdefs ".k" inputs
+	 (concat-strings "./eval2 ir-gen-c.k maru.k " osdefs ".k" inputs
 			 " > " tmp "/" name ".c && cc -pthread -fno-builtin -w " cflags
 			 " -o " tmp "/" name " " tmp "/" name ".c"))
     (concat-strings tmp "/" name)))
@@ -696,6 +682,42 @@
 	 (out (run "nile-startup-run"
 		   (concat-strings bin " && test ! -s " tmp "/nile-startup-run.err"))))
     (unit-assert (equal out '("startup 1 ok" "startup 2 ok" "startup 8 ok" "startup small ok")))))
+
+;; Many pipelines of hand-written reciprocal kernels, with 1, 2 and 8 workers, must each
+;; give the direct sum (R-recip, R-threads); the driver prints one line when they all do.
+(check "nile_recip"
+  (let ((bin (nile-build "nile-recip" (list (concat-strings nile-dir "test/recip.k")) "")))
+    (list-do n '("1" "2" "8")
+      (unit-assert (equal (run (concat-strings "nile-recip-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-recip-" n ".err") 300)
+			  '("recip ok"))))))
+
+;; Variable records, elements and partial feeds the runtime refuses with BAD_ARG (R-vars-fit,
+;; R-element-fits, review focus 4).
+(check "nile_limits"
+  (let* ((bin (nile-build "nile-limits" (list (concat-strings nile-dir "test/limits.k")) ""))
+	 (out (run "nile-limits-run" (concat-strings bin " && test ! -s " tmp "/nile-limits-run.err"))))
+    (unit-assert (equal out '("vars-fit ok" "element-fits ok" "partial-element ok")))))
+
+;; Too little memory for the pipeline sets nile_error and OUT_OF_MEMORY without a crash (R-oom).
+(check "nile_oom"
+  (let* ((bin (nile-build "nile-oom" (list (concat-strings nile-dir "test/oom.k")) ""))
+	 (out (run "nile-oom-run" (concat-strings bin " && test ! -s " tmp "/nile-oom-run.err") 120)))
+    (unit-assert (equal out '("oom ok")))))
+
+(check "nile_interface"
+  (let ((n "nile/runtimes/maru/nile.k")
+	(c "$R/nile/compilers/maru")
+	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
+    (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
+			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
+    ;; The link half: interface.k, with the runtime, asks dlsym for each call. Task 7 defines
+    ;; every call but prefix_input and reroute (Task 8) and the builtins Reverse, SortBy, DupZip
+    ;; and DupCat (Task 9), so those six are the missing ones.
+    (unit-assert (equal (run "nile-iface" (concat-strings (nile-build "nile-iface" (list (concat-strings nile-dir "test/interface.k")) "") " && test ! -s " tmp "/nile-iface.err"))
+			'("nile interface: 26 calls, 6 missing")))
+    (run "nile-iface-text" (concat-strings "R=$PWD; mkdir -p " tmp "/iface && cd " tmp "/iface && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
+    (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
+			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
 
 ;;; ---------------------------------------------------------------- budget
 
