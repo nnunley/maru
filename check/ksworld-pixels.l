@@ -68,26 +68,32 @@
      (expect "a filled shape's colour inside it: black pixels among its window pixels"
 	     (> (count-pixels g 605 53 624 65 (lambda (px) (= px -16777216))) 0) 't)
      (expect "the page is white where no fill reaches" (count-pixels g 0 0 9 9 (lambda (px) (= px -1))) 100)
-     ;; a press and a drag on the title (sdl3-push queues them as the window system would), each step drawing the frame
-     (sdl3-push (cons 'down (concat-list (at 200 13) '(1))))
-     (ksworld-window-step win)
-     (sdl3-push (cons 'move (at 300 13)))
-     (ksworld-window-step win)
-     (sdl3-push (cons 'up (concat-list (at 300 13) '(1))))
-     (ksworld-window-step win)
-     (let* ((sel (ks-val layout 'selection))
-	    (rc (car (ks-text-selection-rects box (ks-slot sel 'start) (- (ks-slot sel 'stop) 1))))
-	    (c (ks-slot layout 'selectionColor))
+     ;; the selection's rectangle: the drag below selects gaps 5 .. 18, so its text is the rectangle from 5 to 17 (the Interval's
+     ;; stop is one past the last character), the same rectangle each frame. Its fully covered pixels in the selection's colour
+     ;; are the selection as drawn.
+     (let* ((c (ks-slot layout 'selectionColor))
 	    (a (<ks-color>-a c)) (cr (<ks-color>-r c)) (cg (<ks-color>-g c)) (cb (<ks-color>-b c))
 	    (full (argb (byte-of a) (byte-of (* a cr)) (byte-of (* a cg)) (byte-of (* a cb))))
-	    (w (window-bounds m rc)))
+	    (rc (car (ks-text-selection-rects box 5 17)))
+	    (w (window-bounds m rc))
+	    (selected (lambda () (count-pixels g (car w) (cadr w) (caddr w) (cadddr w) (lambda (px) (= px full))))))
        (println "selection rect " rc " window " w " colour a r g b " a " " cr " " cg " " cb)
-       ;; the selection is painted in the layout's colour under the text: its fully covered pixels hold that colour
-       ;; premultiplied (a = 1 here), and the glyphs drawn over it are darker than it
-       (expect "the selection's colour, premultiplied, on its fully covered pixels"
-	       (> (count-pixels g (car w) (cadr w) (caddr w) (cadddr w) (lambda (px) (= px full))) 0) 't)
-       (expect "glyphs are darker than the selection they're drawn on"
-	       (> (count-pixels g (car w) (cadr w) (caddr w) (cadddr w) (lambda (px) (< (channel px 256) 128))) 0) 't))
+       ;; a press puts the caret: a zero-width selection, so nothing of it is drawn; the frame is drawn all the same
+       (sdl3-push (cons 'down (concat-list (at 200 13) '(1))))
+       (ksworld-window-step win)
+       (expect "the press puts a caret, which draws no selection" (selected) 0)
+       ;; the drag selects, and the next frame draws the selection: its pixels change between the two frames
+       (sdl3-push (cons 'move (at 300 13)))
+       (ksworld-window-step win)
+       (let ((after-drag (selected)))
+	 (expect "the drag's selection is drawn: its pixels in the selection's colour change from the press's frame"
+		 (> after-drag 0) 't)
+	 ;; the release keeps the selection drawn, and the glyphs drawn over it are darker than it
+	 (sdl3-push (cons 'up (concat-list (at 300 13) '(1))))
+	 (ksworld-window-step win)
+	 (expect "the release keeps the selection drawn" (= (selected) after-drag) 't)
+	 (expect "glyphs are darker than the selection they're drawn on"
+		 (> (count-pixels g (car w) (cadr w) (caddr w) (cadddr w) (lambda (px) (< (channel px 256) 128))) 0) 't)))
      (ksworld-window-close win)
      (gezira-stop g)))
   )
