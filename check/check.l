@@ -594,6 +594,10 @@
 ;; maru-test.k's sieve prints the primes below 32, then its struct code sets
 ;; x = 42 and y = 666, sums them and doubles both.  The two lines after the
 ;; primes read uninitialised memory and are skipped.
+;; data-length answers what a Data was made with (check/data-length.l), on the evaluators that have it
+(check "data_length"
+  (list-do e '("./eval" "./eval3")
+    (unit-assert (equal (last (run "data_length" (concat-strings e " check/data-length.l"))) "data-length ok"))))
 (check "maru_test"
   (let* ((out (run "maru_test" (concat-strings (ir2-build "maru-test" "maru-test.k") " 32")))
 	 (primes ()))

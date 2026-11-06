@@ -32,7 +32,7 @@ extern int isatty(int);
 #define	TAG_INT	1
 //#define	LIB_GC	1
 
-#define GC_APP_HEADER	int type;
+#define GC_APP_HEADER	int type;  unsigned int length;	/* length: what a Data was made with, as the block may be larger */
 #define GC_SAVE		1
 
 #if (LIB_GC)
@@ -169,7 +169,13 @@ static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 static oop traceStack= nil;
 long traceDepth= 0;			/* restored by a throw, through dlsym */
 
-static oop newData(size_t len)		{ return _newBits(Data, len); }
+static oop newData(size_t len)
+{
+  if (len > 0xffffffffUL) fatal("data: %lu bytes is more than a Data holds", (unsigned long)len);
+  oop obj= _newBits(Data, len);
+  ptr2hdr(obj)->length= (unsigned int)len;
+  return obj;
+}
 
 #if (TAG_INT)
   static inline int  isLong(oop x)	{ return (((long)x & 1) || Long == getType(x)); }
@@ -816,7 +822,7 @@ static void doprint(FILE *stream, oop obj, int storing)
     case Undefined:	fprintf(stream, "UNDEFINED");		break;
     case Data: {
 	//int i, j= GC_size(obj);
-	fprintf(stream, "<data[%i]", (int)GC_size(obj));
+	fprintf(stream, "<data[%i]", (int)ptr2hdr(obj)->length);
 	//for (i= 0;  i < j;  ++i) fprintf(stream, " %02x", ((unsigned char *)obj)[i]);
 	fprintf(stream, ">");
 	break;
@@ -2414,7 +2420,7 @@ static subr(data_length)
 {
   arity1(args, "data-length");
   oop arg= getHead(args);		if (!is(Data, arg)) { fprintf(stderr, "data-length: non-Data argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  return newLong(GC_size(arg));
+  return newLong(ptr2hdr(arg)->length);
 }
 
 static void idxtype(oop args, char *who)
@@ -2434,7 +2440,7 @@ static void valtype(oop args, char *who)
 static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned long eltsize, oop args, char *who)
 {
     if (isLong(obj)) return getLong(obj) + offset;
-    if (offset + eltsize > GC_size(obj)) {
+    if (offset + eltsize > (is(Data, obj) ? ptr2hdr(obj)->length : GC_size(obj))) {
 	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
 	fdumpln(stderr, args);
 	fatal(0);
@@ -2525,7 +2531,7 @@ static subr(native_call)
     size_t size= 0;
     switch (getType(obj))
     {
-	case Data:	addr= obj;			size= GC_size(obj);	break;
+	case Data:	addr= obj;			size= ptr2hdr(obj)->length;	break;
 	case Long:	addr= (void *)getLong(obj);				break;
 	case Subr:	addr= get(obj, Subr,imp);				break;
 	default:	fatal("call: cannot call object of type %i", getType(obj));
