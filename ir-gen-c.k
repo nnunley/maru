@@ -391,7 +391,6 @@
 
 (define-method ir-gen-postamble <ir-gen-c> ()
   (cond
-    (*ir-gen-c-main*	(ir-gen-c-bol self)    (print "f_main(argc, argv)")	(ir-gen-c-eol self)
-			(ir-gen-c-bol self)    (print "return 0")		(ir-gen-c-eol self)
+    (*ir-gen-c-main*	(ir-gen-c-bol self)    (print "return f_main(argc, argv)")	(ir-gen-c-eol self)	; main's answer is the exit status
 			(ir-gen-c-end self))
     (*ir-gen-c-init*	(ir-gen-c-end self))))

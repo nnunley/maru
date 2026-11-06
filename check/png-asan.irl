@@ -1,0 +1,35 @@
+// check/png-asan.irl: png.irl's decoder run on each file named, the file read into a buffer of exactly its size, so a
+// read past the input is AddressSanitizer's to find (the png_asan case builds png.irl with this, under ASan).  Prints
+// each file's error number (0 for a decoded image).
+import void*(char*, char*) fopen;
+import long(void*, long, long, void*) fread;
+import int(void*, long, int) fseek;
+import long(void*) ftell;
+import int(void*) fclose;
+import int(char*, ...) printf;
+
+long decode_file(char* path) {
+  let void* f := fopen(path, "rb");
+  if f == cast(0, void*) then return -1;
+  fseek(f, 0, 2);
+  let long n := ftell(f);
+  fseek(f, 0, 0);
+  let char* bytes := cast(malloc(n), char*);
+  fread(bytes, 1, n, f);
+  fclose(f);
+  let long* info := longs(3);
+  let long err := png_decode(bytes, n, info);
+  if err == 0 then png_free(cast(info[2], char*));
+  free(info);
+  free(bytes);
+  return err;
+}
+
+int main(int argc, char** argv) {
+  let int i := 1;
+  while i < argc do {
+    printf("%s %ld\n", argv[i], decode_file(argv[i]));
+    i := i + 1;
+  }
+  return 0;
+}

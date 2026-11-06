@@ -27,17 +27,27 @@
     (22 . "the image data asks for a preset dictionary") (23 . "a stored block's length doesn't match its complement")
     (24 . "a Huffman code with more codes than its lengths allow") (25 . "a length or distance code no stream may use")))
 
+;; the PNG held at address, size bytes long: (error-number . <png>), the image when the number is 0
+(define-function png-decode-status (address size)
+  (let* ((info ((subr "calloc" "ll>p") 3 8))
+	 (err (png-decode-entry address size info))
+	 (img (and (= 0 err) (new <png> (long-at info 0) (long-at info 1) (long-at info 2)))))
+    ((subr "free" "p") info)
+    (cons err img)))
+(define-function png-refuse (what err) (error "png: " what ": " (or (cdr (assq err png-errors)) err)))
+
 ;; the PNG held at address, size bytes long; what names it says where it came from
 (define-function png-decode (address size what)
-  (let* ((info ((subr "calloc" "ll>p") 3 8))
-	 (err (png-decode-entry address size info)))
-    (or (= 0 err) (error "png: " what ": " (or (cdr (assq err png-errors)) err)))
-    (new <png> (long-at info 0) (long-at info 1) (long-at info 2))))
+  (let ((r (png-decode-status address size)))
+    (or (= 0 (car r)) (png-refuse what (car r)))
+    (cdr r)))
 
+;; the file's bytes are freed whether the image is read or refused
 (define-function png-load (path)
-  (let* ((file (file-bytes path)) (png (png-decode (car file) (cdr file) path)))
+  (let* ((file (file-bytes path)) (r (png-decode-status (car file) (cdr file))))
     ((subr "free" "p") (car file))
-    png))
+    (or (= 0 (car r)) (png-refuse path (car r)))
+    (cdr r)))
 
 ;; an image written as a PNG: (address . length), RGBA if rgba is 1 (else RGB, alpha dropped), row y filtered as the
 ;; yth of filters, deflated in stored blocks (block 0) or fixed Huffman ones (1), its data in IDAT chunks of at most

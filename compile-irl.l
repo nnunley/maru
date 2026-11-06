@@ -102,9 +102,12 @@
 	  ((= head 'define)		(push defs `(define ,(cadr f)))
 					(push main (irl-main `(set ,(car (cadr f)) ,(irl-expand (caddr f))))))
 	  (else				(push main (irl-main f))))))
-    (if *irl-library* (list-reverse! defs)
-      (concat-list (list-reverse! defs)
-		   `((define-function main int () ,@(irl-body (list-reverse! main)) (return 0)))))))
+    ;; a program that defines main keeps it, and then has no top-level statements to run; otherwise main runs them
+    (let ((own (let ((found ())) (list-do f forms (and (pair? f) (= 'define-function (car f)) (= 'main (cadr f)) (set found 't))) found)))
+      (and own main (error "irl: a program defines main and also has top-level statements: " (car (list-reverse! main))))
+      (if (or *irl-library* own) (list-reverse! defs)
+	(concat-list (list-reverse! defs)
+		     `((define-function main int () ,@(irl-body (list-reverse! main)) (return 0))))))))
 
 (define-function irl-file-forms (file library)	; a file's maru.k forms; library: definitions only
   (let ((parser (text-parser-for-on <irl> (contents-of-file-named file))))

@@ -44,7 +44,8 @@
 ;; hostile input (check/png/bad/, each made to break one rule) is refused, for its own reason, never read past
 (list-do case '(("truncated" "the file ends early") ("chunk-length" "the file ends early")
 		("no-ihdr" "IHDR isn't the first chunk") ("idat-first" "IHDR isn't the first chunk")
-		("ihdr-short" "IHDR isn't 13 bytes") ("zero-width" "the width or height is 0")
+		("ihdr-short" "IHDR isn't 13 bytes") ("ihdr-eof" "IHDR isn't 13 bytes") ("zero-width" "the width or height is 0")
+		("wide" "the image is too large")
 		("huge" "the image is too large") ("compression" "a compression or filter method other than 0")
 		("filter-method" "a compression or filter method other than 0") ("no-iend" "there is no IEND")
 		("fdict" "the image data asks for a preset dictionary") ("no-adler" "the file ends early")

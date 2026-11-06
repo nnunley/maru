@@ -155,8 +155,10 @@ static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
 #define newOops(TYPE)	_newOops(TYPE, sizeof(struct TYPE))
 
-static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	setType(obj, type);  return obj; }
-static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  return obj; }
+/* every object's header holds the size asked for, so a Data however made (newData, allocate-atomic) answers its own
+   length, not the length a freed block's header kept */
+static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	setType(obj, type);  ptr2hdr(obj)->length= size > 0xffffffffUL ? 0xffffffffU : (unsigned int)size;  return obj; }
+static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  ptr2hdr(obj)->length= size > 0xffffffffUL ? 0xffffffffU : (unsigned int)size;  return obj; }
 
 static char *argv0;
 
@@ -2444,7 +2446,7 @@ static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned l
     if (offset > limit || eltsize > limit - offset) {	/* no sum to wrap: a negative index is a huge offset */
 	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
 	fdumpln(stderr, args);
-	fatal(0);
+	fatal("%s: index (%ld) out of range", who, offset);	/* the condition a handler sees names it */
     }
     return (unsigned long)obj + offset;
 }

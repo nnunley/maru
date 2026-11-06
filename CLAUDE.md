@@ -183,7 +183,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   evidence, one a law, read back through John: tested and proved hold if they're about this code, refuted, starved, vacuous, inconclusive and a law that
   stopped its run don't. The plan itself replays and plans.
 - `irl`: `irl.g` (inheriting `cexpr.g`) and `compile-irl.l` turn `test.irl`
-  into a `.k` program that `maru.k` compiles and that prints what it should;
+  into a `.k` program that `maru.k` compiles and that prints what it should; a program that defines its own `main`
+  (`check/irl-main.irl`, with arguments) keeps it, and one with both its own `main` and top-level statements is an error;
   `?:` with branches of different types (`check/irl-errors.irl`) stops ir2 at
   a type mismatch in the `if` (`check/irl-errors.l` records it in Maru).
 - `irl_library` (`check/irl-library.l`): `compile-irl.l --library A.irl B.irl` reads
@@ -237,6 +238,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error.
+- `png_asan` (`check/png-asan.irl`): `png.irl` built with a harness (an irl program with its own `main`) under
+  AddressSanitizer and UndefinedBehaviorSanitizer; every PNG fixture, good and hostile, is read into a buffer of exactly
+  its size, so any read past the input fails the case.
 - `png` (`check/png.l`): `png.l`'s `(png-load path)` reads an 8-bit RGBA or RGB PNG, not interlaced, to a `<png>`: width,
   height and width x height ARGB words in C memory (alpha on top, not premultiplied), as a Gezira image holds them. The
   decoder is `png.irl`, typed and lowered through ir2 into `build/png.dylib`: every chunk's CRC-32 is checked, the data
@@ -287,7 +291,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   order without running ahead of the clock (headless they take a whole tick). A stream that fails is reported once and
   the rest run on. Our fixture `check/ksworld/tiny.pp` in a window on the dummy driver: with the clock held still nothing
   runs or draws; seven milliseconds on, its timer fires once and one frame is drawn; fifty presses with the clock held
-  neither fire it nor leave the millisecond; its failing stream is reported once. `check/ksworld/timer.pp`'s timerE(1000)
+  neither fire it nor leave the millisecond, nor do 2100 more (each event moves 1/1024 of the way to the next
+  millisecond); its failing stream is reported once. An evaluator's time only moves forward: evaluating a time again, or an
+  earlier one, is refused. `check/ksworld/timer.pp`'s timerE(1000)
   and timerE(2.5), read at times that skip their multiples, fire as time passes them. `ksworld-show.l` runs only the
   start-up evaluation before the window, then the clock.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
@@ -396,7 +402,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose
-  byte offset overflows; the bounds check compares without a sum that could wrap.
+  byte offset overflows; the bounds check compares without a sum that could wrap, and a refusal's condition names it
+  (`byte-at: index (n) out of range`). Every object's header holds the size it was made with, so a Data `allocate-atomic`
+  made answers its own length, not a freed block's.
+- `byte_bounds` (`check/byte-bounds.l`): on all three evaluators, raw access to any object (a pair, where `eval2` has no
+  Data) refuses an index before its start or one whose byte offset wraps.
+- `exit_status` (`check/exit-status.k`): a typed program's exit status is what its `main` answers, through `ir-gen-c.k`'s
+  C `main` (it answered 0 whatever `main` returned, so checks reading a typed program's status were weaker than they read).
 - `asm_interface` (`check/asm-interface.l`): the one encoder interface
   (`asm`, `asm-forms`, `asm-decode`, refusals) answers the same way for arm64
   and x64, under both evaluators.

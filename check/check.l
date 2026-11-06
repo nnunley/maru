@@ -425,6 +425,17 @@
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
 (check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
+;; png.irl under AddressSanitizer: every fixture, good and hostile, read into a buffer of exactly its size by
+;; check/png-asan.irl, so any read past the input fails the case (ASan exits non-zero)
+(check "png_asan"
+  (let ((both (concat-strings tmp "/png-asan.irl")))
+    (run "png_asan_src" (concat-strings "grep -v '^export' png.irl > " both " && cat check/png-asan.irl >> " both))
+    (run "png_asan_k" (concat-strings "./eval compile-irl.l " both " > " tmp "/png-asan.k"))
+    (run "png_asan_c" (concat-strings "./eval2 ir-gen-c.k maru.k " tmp "/png-asan.k > " tmp "/png-asan.c"))
+    (run "png_asan_cc" (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " tmp "/png-asan " tmp "/png-asan.c -ldl"))
+    (let ((out (run "png_asan" (concat-strings tmp "/png-asan check/png/*.png check/png/bad/*.png"))))
+      (unit-assert (= (list-length out) 26)))))
+
 ;; png.l: our fixtures (every deflate block and row filter), and with MARU_DBJR the front page's image (check/png.l)
 (check "png" (unit-assert (equal (last (run "png" "./eval check/png.l")) "png ok")))
 ;; KSWorld.ks in an SDL3 window on the dummy driver: SDL's mouse events reach the document, each change drawn (check/ksworld-window.l)
@@ -580,12 +591,26 @@
   (built (concat-string "irl-lib." *shlib*))
   (unit-assert (equal (last (run "irl_library" "./eval check/irl-library.l")) "irl library ok")))
 
+;; raw access to any object is held to its block on every evaluator (check/byte-bounds.l)
+(check "byte_bounds"
+  (list-do e '("./eval" "./eval2" "./eval3")
+    (unit-assert (equal (last (run "byte_bounds" (concat-strings e " check/byte-bounds.l"))) "byte bounds ok"))))
+
+;; a typed program's exit status is what its main answers, through ir-gen-c's C main (check/exit-status.k)
+(check "exit_status"
+  (unit-assert (equal (run "exit_status" (concat-strings (ir2-build "exit-status" "check/exit-status.k") "; echo status $?"))
+		      '("status 3"))))
+
 (check "irl"
   (run "irl-gen" (concat-strings "./eval compile-irl.l test.irl > " tmp "/irl.k"))
   (unit-assert (equal (run "irl" (ir2-build "irl" (concat-strings tmp "/irl.k")))
 		      '("hello, world" "hello again" "42" "15" "15" "Point with x = 1 and y = 2" "Point with x = 1 and y = 2"
 			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47"
 			"   2   3   5   7  11  13  17  19  23  29  31  37  41  43  47  53  59  61  67  71  73  79  83  89  97")))
+  ;; a program's own main, with its arguments, is kept: none is generated in its place
+  (run "irl-main-gen" (concat-strings "./eval compile-irl.l check/irl-main.irl > " tmp "/irl-main.k"))
+  (unit-assert (equal (run "irl-main" (concat-strings (ir2-build "irl-main" (concat-strings tmp "/irl-main.k")) " one two"))
+		      '("main sees 3 arguments, the last two")))
   (run "irl-errors-gen" (concat-strings "./eval compile-irl.l check/irl-errors.irl > " tmp "/irl-errors.k"))
   (unit-assert (equal (last (run "irl-errors" (concat-strings "./eval2 ir-gen-c.k check/irl-errors.l maru.k " tmp "/irl-errors.k")))
 		      "irl errors ok")))

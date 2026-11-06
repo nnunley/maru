@@ -116,10 +116,10 @@
 (define *ks-logical-time* 0)
 ;; the time of the evaluation before, the evaluator's own (ks-sort-and-evaluate-at sets it from the one evaluating): whole
 ;; ticks headless, milliseconds in a window (ksworld-window.l), so a timer fires for each multiple of its step that time
-;; passes, once however many it passed.  Time evaluated again passes nothing; time gone back counts from the tick before.
+;; passes, once however many it passed.  An evaluator's time only moves forward (ks-sort-and-evaluate-at refuses one
+;; that doesn't).
 (define *ks-previous-time* -1)
-(define-function ks-time-before ()
-  (if (<= *ks-previous-time* *ks-logical-time*) *ks-previous-time* (- *ks-logical-time* 1)))
+(define-function ks-time-before () *ks-previous-time*)
 ;; the largest whole number at most a / b, for whole or fractional steps and times
 (define-function ks-floor-div (a b)
   (let* ((q (/ (* 1.0 a) b)) (n (double->long q)))
@@ -832,6 +832,8 @@
 	(ks-set-slot s '__firedAt__ *ks-logical-time*)))))
 
 (define-function ks-sort-and-evaluate-at (ev logical-time)
+  (or (> logical-time (<ks-evaluator>-previous ev))	; a stream fired if it fired at this time, so a time can't recur
+      (error "KScript: time " logical-time " isn't after " (<ks-evaluator>-previous ev) ", the last evaluated"))
   (set *ks-logical-time* logical-time)
   (set *ks-previous-time* (<ks-evaluator>-previous ev))
   (let ((sorted (ks-topologically-sorted-streams ev)))

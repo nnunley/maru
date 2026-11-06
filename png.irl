@@ -163,6 +163,7 @@ void fixed(struct Inflate* s) {
 void dynamic(struct Inflate* s) {
   let long nlen := 257 + bits(s, 5);
   let long ndist := 1 + bits(s, 5);
+  if nlen > 286 || ndist > 30 then s.err := 25;	// more codes than a stream may use, refused up front as zlib's puff does
   let long ncode := 4 + bits(s, 4);
   let long* order := longs(19);
   let long* cl := longs(19);
@@ -295,10 +296,10 @@ long png_decode(char* src, long n, long* info) {
     else if be32(src, at + 8 + len) != crc(table, src, at + 4, at + 8 + len) then err := 2;
     else if (at == 8) != (type == 1229472850) then err := 16;	// IHDR, first and only first
     else {
-      if type == 1229472850 then {
+      if type == 1229472850 && len != 13 then err := 17;	// before a field of it is read: it may be the file's last bytes
+      else if type == 1229472850 then {
         w := be32(src, at + 8); h := be32(src, at + 12); colour := u8(src, at + 17);
-        if len != 13 then err := 17;
-        else if w == 0 || h == 0 then err := 18;
+        if w == 0 || h == 0 then err := 18;
         else if w > 16777216 || h > 16777216 || w * h > 268435456 then err := 19;
         else if u8(src, at + 16) != 8 then err := 3;
         else if colour != 6 && colour != 2 then err := 4;

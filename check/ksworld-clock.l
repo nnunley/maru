@@ -43,7 +43,12 @@
       (for (i 0 50) (sdl3-push '(down 5 5 1)))
       (ksworld-window-step win)
       (expect "fifty presses with the clock held: the timer unfired" (ks-stream-curr count) 3)
-      (expect "and document time within the clock's millisecond" (< (<ksworld-session>-time s) 10) 't))
+      (expect "and document time within the clock's millisecond" (< (<ksworld-session>-time s) 10) 't)
+      ;; however many come in one step
+      (for (i 0 2100) (sdl3-push '(down 5 5 1)))
+      (ksworld-window-step win)
+      (expect "2100 more presses: still unfired" (ks-stream-curr count) 3)
+      (expect "and still within the millisecond" (< (<ksworld-session>-time s) 10) 't))
     (ksworld-window-close win))
   ;; a timer fires when time passes a multiple of its step, though no evaluation lands on one: check/ksworld/timer.pp's
   ;; timerE(1000) and timerE(2.5), the clock read at milliseconds that skip their multiples (document time is the clock
@@ -59,4 +64,10 @@
     (list-do t '(15 32 49 1000 1015 2000) (set now t) (ksworld-window-step win))	; 16 … 1001 … 2001
     (expect "timerE(1000) past 1000 and past 2000" (ks-stream-curr (ks-slot root 'slowCount)) 2)
     (ksworld-window-close win))
+  ;; an evaluator's time only moves forward: evaluating a time again, or an earlier one, is refused
+  (let ((ev (cdr (assq 'evaluator (ksworld-run "check/ksworld/timer.pp" 1)))))
+    (ks-sort-and-evaluate-at ev 5)
+    (expect "the same time again is refused" (try (let () (ks-sort-and-evaluate-at ev 5) 'evaluated) (lambda (c) 'refused)) 'refused)
+    (expect "an earlier time is refused" (try (let () (ks-sort-and-evaluate-at ev 3) 'evaluated) (lambda (c) 'refused)) 'refused)
+    (expect "a later one runs" (try (let () (ks-sort-and-evaluate-at ev 6) 'evaluated) (lambda (c) 'refused)) 'evaluated))
   (println (if ok "ksworld clock ok" "ksworld clock FAILED"))))

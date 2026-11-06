@@ -1,0 +1,6 @@
+// check/irl-main.irl: a program that defines its own main, with arguments, which compile-irl.l keeps (the irl case)
+import int(char*, ...) printf;
+int main(int argc, char** argv) {
+  printf("main sees %d arguments, the last %s\n", argc, argv[argc - 1]);
+  return 0;
+}
