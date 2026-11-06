@@ -193,6 +193,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `nat <- 0 fby nat' + 1` never updates), and undefined keeps the value and stops the change. `timerE`
   is the only source. Untyped, so it runs on `eval`, not through ir2; `anyE` and `switchColE` still
   read held values, and layout and rendering don't exist yet.
+  Methods are defined per kind of receiver (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), and
+  a send no method answers is an error naming kind and selector, never a quiet `nil`.
+- `ksworld_headless` (`check/ksworld.l`): `ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
+  every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
+  tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
+  counts a timer's ticks and names the send nothing answers. Where the dbjr documents are (`MARU_DBJR`, else `~/pkm`'s
+  copy; third-party, so never in this tree) it runs `KSWorld.ks`: 520 objects, 346 streams (281 setters), every stream's
+  code read, and `KSTextLayout`'s `installSelection`, `handleButtonDown` and `handlePointerMotion` missing (they were
+  Squeak methods in an image that didn't survive). Otherwise it says it skipped them.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
