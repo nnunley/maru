@@ -6,7 +6,6 @@
 ;;; HTTP/1.0, so the server closes the connection after the reply and sends the body whole, never chunked.
 (require "socket.l")
 (require "json.l")
-(require "recover.l")
 (define *ollama-port* 11434)
 (define *ollama-model* "deepseek-v4.1-flash:cloud")
 (define *ollama-seconds* 180)
@@ -18,12 +17,11 @@
 (define-function ollama-body (response)		; what follows the headers of a 200, or ()
   (let ((parser (text-parser-for-on <httpreply> response)))
     (and ($reply parser) (<text-parser>-result parser))))
-(define-function ollama-exchange (request)	; the server's whole response, or () if it can't be reached
-  (try (let ((fd (socket-connect *ollama-port* *ollama-seconds*)))
-	 (unwind-protect
-	     (let () (socket-send fd request) (socket-receive-all fd))
-	   (socket-close fd)))
-       (lambda (condition) ())))
+(define-function ollama-exchange (request)	; the server's whole response, or ()
+  (let ((fd (socket-connect *ollama-port* *ollama-seconds*)))
+    (and fd (let ((response (and (socket-send fd request) (socket-receive-all fd))))
+	      (socket-close fd)
+	      response))))
 (define-function ollama-chat (messages)
   (set *ollama-calls* (+ *ollama-calls* 1))
   (let* ((turns (map (lambda (m) (list 'object (cons "role" (car m)) (cons "content" (cdr m)))) messages))

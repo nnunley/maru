@@ -1,9 +1,13 @@
 ;;; socket.l: TCP on 127.0.0.1, through subr.  A sockaddr_in is laid out by hand, as check/jobs.l lays out a rusage: Darwin's
 ;;; starts with a length byte and Linux's doesn't, so the system's name (uname's first field) picks the layout and the
 ;;; socket option numbers.  Strings pass through one C buffer.
-;;;   (socket-connect port seconds)  a connected descriptor, reads timing out after seconds
+;;;   (socket-connect port seconds)  a connected descriptor, reads timing out after seconds, or () if nothing answers
+;;;   (socket-send fd text)          true, or () if the peer has gone
+;;;   (socket-receive-all fd)        what arrives to the end of the stream, or () on a timeout or reset
 ;;;   (socket-listen port)           (descriptor . port), port 0 letting the system choose; (socket-accept fd) takes one
-;;;   (socket-send fd text) (socket-receive-all fd) (socket-close fd)
+;;;   (socket-close fd)
+;;; What a peer can do is answered, not signalled, so a caller needs no handler (recover.l); setting up a socket that
+;;; fails is an error, and closes it first.
 (define socket-c	(subr "socket" "iii>i"))
 (define socket-bind-c	(subr "bind" "ipi>i"))
 (define socket-listen-c	(subr "listen" "ii>i"))
@@ -56,8 +60,9 @@
 (define-function socket-connect (port seconds)
   (let ((fd (socket-tcp)))
     (socket-option fd socket-receive-timeout seconds 16)	; a struct timeval: seconds, then microseconds
-    (socket-check-open fd "connect" (socket-connect-c fd (socket-sockaddr port) 16))
-    fd))
+    (if (< (socket-connect-c fd (socket-sockaddr port) 16) 0)
+	(let () (socket-close fd) ())
+      fd)))
 (define-function socket-listen (port)
   (let ((fd (socket-tcp)))
     (socket-option fd socket-reuse 1 4)
@@ -68,18 +73,21 @@
     (cons fd (+ (<< (byte-at socket-address 2) 8) (byte-at socket-address 3)))))
 (define-function socket-accept (fd) (socket-check "accept" (socket-accept-c fd 0 0)))
 (define-function socket-send (fd text)
-  (let ((n (string-length text)) (at 0))
-    (while (< at n)
+  (let ((n (string-length text)) (at 0) (gone ()))
+    (while (and (< at n) (not gone))
       (let ((count (min socket-buffer-size (- n at))) (sent 0))
 	(for (i 0 count) (set-byte-at socket-buffer i (string-at text (+ at i))))
-	(while (< sent count)
-	  (set sent (+ sent (socket-check "send" (socket-send-c fd (+ socket-buffer sent) (- count sent) socket-send-flags)))))
-	(set at (+ at count))))))
-(define-function socket-receive-all (fd)	; to the end of the stream; a timeout is an error
+	(while (and (< sent count) (not gone))
+	  (let ((r (socket-send-c fd (+ socket-buffer sent) (- count sent) socket-send-flags)))
+	    (if (< r 0) (set gone 1) (set sent (+ sent r)))))
+	(set at (+ at count))))
+    (not gone)))
+(define-function socket-receive-all (fd)
   (let ((parts ()) (r 1))
     (while (< 0 r)
-      (set r (socket-check "read" (socket-read-c fd socket-buffer socket-buffer-size)))
-      (let ((s (string r)))
-	(for (i 0 r) (set-string-at s i (byte-at socket-buffer i)))
-	(push parts s)))
-    (apply concat-strings (list-reverse! parts))))
+      (set r (socket-read-c fd socket-buffer socket-buffer-size))
+      (when (< 0 r)
+	(let ((s (string r)))
+	  (for (i 0 r) (set-string-at s i (byte-at socket-buffer i)))
+	  (push parts s))))
+    (and (= r 0) (apply concat-strings (list-reverse! parts)))))

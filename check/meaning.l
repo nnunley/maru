@@ -2,6 +2,7 @@
 ;;; more than compute, answers asked again, and an adapter kept in the world it was found in.  And the model client
 ;;; (ollama.l) against a server forked here: a reply, a refusal, nothing listening, and JSON both ways.
 (require "meaning.l")
+(require "recover.l")
 (define ok 1)
 (define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
 (define-function has? (str sub)
