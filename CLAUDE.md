@@ -112,6 +112,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   compiles once a process. `check/native/floats.k`, `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
   (as `maru_gc` asks them) and `check/gc.k` pass natively. A struct of floats is passed in general registers, not as
   the AAPCS64's homogeneous aggregate.
+- `native_image` (`check/native-image-save.l`, `check/native-image.l`): a unit compiled natively is a code image, a
+  Maru form (`native-link.l`'s `native-image-of`): position-independent code, then a table of 8-byte slots through
+  which it reaches each global, C function and string literal (ADR to the slot, then a load), the functions' offsets
+  and the globals' sizes. `native-save` writes one on `eval2`; `native-image.l` alone (no maru.k, no grammars) loads one
+  on any evaluator, filling the table (globals' storage, `dlsym`, string bytes) before installing and running `__init`.
+  `native-install` is loading the image held in memory. `add.k` and `flow.k`, saved on `eval2`, give Tasks 1 and 2's
+  answers on `eval` and `eval3`. A string literal must be ASCII.
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.

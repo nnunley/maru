@@ -631,6 +631,13 @@
     (unit-assert (equal (last (run "data_length" (concat-strings e " check/data-length.l"))) "data-length ok"))))
 ;; typed Maru compiled to native code in-process and called by address (check/native.l, native.l)
 (check "native_ir2" (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l")) "native ok")))
+;; a unit saved as a code image on eval2, loaded and called on eval and eval3 with native-image.l alone
+(check "native_image"
+  (let ((dir (concat-strings tmp "/native-image")))
+    (run "native_image_dir" (concat-strings "mkdir -p " dir))
+    (unit-assert (equal (last (run "native_image_save" (concat-strings "./eval2 check/native-image-save.l " dir))) "saved"))
+    (unit-assert (equal (last (run "native_image_eval" (concat-strings "./eval check/native-image.l " dir))) "image ok"))
+    (unit-assert (equal (last (run "native_image_eval3" (concat-strings "./eval3 check/native-image.l " dir))) "image ok"))))
 (check "maru_test"
   (let* ((out (run "maru_test" (concat-strings (ir2-build "maru-test" "maru-test.k") " 32")))
 	 (primes ()))
