@@ -1,8 +1,13 @@
 ;;; png.l: PNGs read to ARGB words.  Our fixtures (check/png/) hold the three kinds of deflate block (stored.png stored,
-;;; filters.png fixed Huffman, dynamic.png dynamic) and every row filter, RGBA and RGB (rgb.png); the expected pixels
-;;; were worked out separately, through zlib.  With MARU_DBJR, the front page's image too, at five points and in sum.
+;;; filters.png fixed Huffman, dynamic.png dynamic) and every row filter, RGBA and RGB (rgb.png), and chunks.png the
+;;; chunks that carry no pixels (gAMA cHRM sRGB pHYs tEXt zTXt iTXt, a suggested PLTE, a private one, tIME and tEXt after
+;;; the data) and the data split over three IDATs; the expected pixels were worked out separately, through zlib.  An
+;;; unknown critical chunk, and an ancillary chunk whose CRC is wrong, are refused.  Random images round-trip: written by
+;;; png-encode (every filter, stored and fixed Huffman blocks, IDATs of 1 to 64 bytes, tEXt around them) and read back,
+;;; each pixel the same.  With MARU_DBJR, the front page's image too, at five points and in sum.
 (require "png.l")
 (require "check/temp.l")
+(require "recover.l")
 (define ok 1)
 (define-function expect (what got want)
   (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
@@ -25,6 +30,36 @@
   (expect "dynamic.png's pixels" (at-points img '((0 0) (23 0) (5 7) (23 15))) '(0 2225160931 1423288959 2691223608))
   ;; the byte sum is of the unfiltered RGBA bytes, the same in any order
   (expect "dynamic.png's bytes" (byte-sum img) 198148))
+
+;; chunks that carry no pixels are skipped, wherever they are, and the data may be split over several IDATs
+(expect "chunks.png" (pixels (png-load "check/png/chunks.png"))
+	'(3019914360 3693634720 72387784 746108144 1419828248 3306245513 2991243834 3349896979 70525972 1776619837
+	  2603854627 2962508028 3978104317 1389296166 3752267639 877446332 2177572271 4009219281 4287483550 1986887125))
+;; what can't be skipped is refused, by name
+(define-function last-of (l) (if (cdr l) (last-of (cdr l)) (car l)))
+(define-function refusal (path) (try (let () (png-load path) "no refusal") (lambda (c) (last-of (cdr c)))))
+(expect "an unknown critical chunk" (refusal "check/png/critical.png") "an unknown critical chunk")
+(expect "an ancillary chunk's CRC" (refusal "check/png/ancillary-crc.png") "a chunk's CRC doesn't match")
+
+;; the round trip: random images, every filter and both block kinds, IDATs of 1 to 64 bytes, read back pixel for pixel
+(define seed 12345)
+(define-function random (n) (set seed (% (+ (* seed 1103515245) 12345) 2147483648)) (% (>> seed 8) n))
+(define trips 0)
+(for (trial 0 120)
+  (let* ((w (+ 1 (random 17))) (h (+ 1 (random 13))) (rgba (random 2)) (few (random 2))
+	 (img (new <png> w h ((subr "malloc" "l>p") (* 4 (* w h)))))
+	 (filters ()) (written ()) (back ()) (same 1))
+    (for (k 0 (* w h))	; a few colours make runs for the Huffman blocks to repeat
+      (set-int32-at (<png>-pixels img) k
+		    (| (if (= rgba 1) (<< (random 256) 24) (<< -1 24))
+		       (if (= few 1) (* 1118481 (random 3)) (random 16777216)))))
+    (for (y 0 h) (push filters (random 5)))
+    (set written (png-encode img rgba filters (random 2) (+ 1 (random 64))))
+    (set back (png-decode (car written) (cdr written) "a round trip"))
+    (or (and (= w (<png>-width back)) (= h (<png>-height back))) (set same ()))
+    (for (k 0 (* w h)) (or (= (int32-at (<png>-pixels img) k) (int32-at (<png>-pixels back) k)) (set same ())))
+    (if same (set trips (+ trips 1)) (println "FAIL round trip " trial ": " w "x" h " rgba " rgba " filters " filters))))
+(expect "images that round-trip" trips 120)
 
 (let ((dbjr (env-var "MARU_DBJR")))
   (if dbjr

@@ -236,14 +236,27 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
   `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
-  glyph's left bearing). An emphasis other than bold and italic is an error, and so is a
-  fill other than a uniform colour (the front page's `GeziraFillImage`).
+  glyph's left bearing). An emphasis other than bold and italic is an error.
 - `png` (`check/png.l`): `png.l`'s `(png-load path)` reads an 8-bit RGBA or RGB PNG, not interlaced, to a `<png>`: width,
-  height and width x height ARGB words in C memory (alpha on top, not premultiplied), as a Gezira image holds them. Every
-  chunk's CRC-32 is checked, the data inflated (stored, fixed and dynamic Huffman blocks) and checked against its Adler-32,
-  and every row filter undone; anything else is an error naming it. Our fixtures (`check/png/`) are held to pixels worked
-  out separately through zlib, and with `MARU_DBJR` the front page's image (730 x 980, which `fetch-dbjr` fetches with
-  every image a document names) at five points and in its byte sum. Untyped, it takes about 28 s of CPU for that image.
+  height and width x height ARGB words in C memory (alpha on top, not premultiplied), as a Gezira image holds them. The
+  decoder is `png.irl`, typed and lowered through ir2 into `build/png.dylib`: every chunk's CRC-32 is checked, the data
+  inflated (stored, fixed and dynamic Huffman blocks) and checked against its Adler-32, and every row filter undone;
+  ancillary chunks are skipped and an unknown critical one refused (PNG 5.4), and anything else is an error naming it. Our
+  fixtures (`check/png/`) are held to pixels worked out separately through zlib: every block kind and filter, RGB, and
+  `chunks.png`'s chunks with no pixels (gAMA, cHRM, sRGB, pHYs, tEXt, zTXt, iTXt, a suggested PLTE, a private one, tIME and
+  tEXt after the data) around data split over three IDATs. `png-encode` writes an image back (any filter per row, stored
+  or fixed Huffman blocks with runs, IDATs of any size, tEXt around them), and 120 random images round-trip pixel for
+  pixel. With `MARU_DBJR` the front page's image (730 x 980, which `fetch-dbjr` fetches with every image a document
+  names) at five points and in its byte sum; it decodes in well under a second.
+- `gezira_image_fill` (`check/gezira-image-fill.l`): an image as a Gezira paint, `(image pixels width height matrix filter)`,
+  as KSWorld's `GeziraFillImage` paints one (its `pipelineOn:for:`, in Frank's GeziraBindings): the canvas's inverse
+  matrix, then `ReadFromImage_ARGB32` (typed Maru beside the writer, `gezira-image.k`), unfiltered for a whole-pixel
+  translation, else mipmapped (GeziraBindings' `downsample`, each level cached on the form) while the minification passes
+  2, 4 … and filtered bilinearly. A translation copies a small image exactly, a uniform image stays uniform downsampled and
+  filtered, and premultiplying rounds as the writer does, on 1 and 4 workers. `ksworld-render.l` reads a Form's PNG from
+  beside its document (`ksworld-pp.l` keeps the path) and premultiplies it once. With `MARU_DBJR` the front page's
+  photograph, rendered with the rest of the page, matches what its pipeline gives worked out from the PNG's pixels (the
+  downsampled texel, then the bilinear filter, then the writer's rounding) at 98 of 100 grid points, none off by more than 1.
 - `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
   motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
   left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the

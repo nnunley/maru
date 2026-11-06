@@ -834,6 +834,9 @@
 
 (check "gezira_maru"
   (unit-assert (equal (last (run "gezira_maru" "./eval check/gezira-maru.l" 300)) "gezira maru ok")))
+;; an image as a Gezira paint, as KSWorld's GeziraFillImage paints one, and the front page's photograph (check/gezira-image-fill.l)
+(check "gezira_image_fill"
+  (unit-assert (equal (last (run "gezira_image_fill" "./eval check/gezira-image-fill.l" 300)) "gezira image fill ok")))
 
 ; Many fills through the Gezira library's entry points, 1200 of three shapes (one a whole KSWorld page's first path, which
 ; outgrew the runtime's heap while DupZip buffered its second branch), on 1 and 4 workers: each returns 0, the pixels

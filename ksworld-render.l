@@ -11,6 +11,7 @@
 (require "ksworld-text.l")
 
 (require "gezira.l")
+(require "png.l")
 
 (define ks-identity (ks-matrix 1 0 0 1 0 0))
 ;; parent then child: x' = a x + c y + e, y' = b x + d y + f
@@ -23,16 +24,60 @@
 	     (+ (+ (* (<ks-matrix>-b p) (<ks-matrix>-e c)) (* (<ks-matrix>-d p) (<ks-matrix>-f c))) (<ks-matrix>-f p))))
 (define-function ks-matrix-of (v) (if (ks-matrix? v) v ks-identity))
 
-;; what a fill paints, as a Gezira is told it: (uniform alpha red green blue)
-(define-function ksworld-paint (fill)
-  (if (and (ks-object? fill) (= 'GeziraFillUniform (<ks-object>-class fill)))
-      (list 'uniform (* 1.0 (ks-slot fill 'alpha)) (* 1.0 (ks-slot fill 'red)) (* 1.0 (ks-slot fill 'green)) (* 1.0 (ks-slot fill 'blue)))
-    (error "ksworld-render: can't paint with " fill)))
+(define-function ks-invert (m)
+  (let* ((a (<ks-matrix>-a m)) (b (<ks-matrix>-b m)) (c (<ks-matrix>-c m)) (d (<ks-matrix>-d m))
+	 (e (<ks-matrix>-e m)) (f (<ks-matrix>-f m)) (det (- (* a d) (* b c))))
+    (ks-matrix (/ d det) (/ (- b) det) (/ (- c) det) (/ a det)
+	       (/ (- (* c f) (* d e)) det) (/ (- (* b e) (* a f)) det))))
+
+;; a number with no fraction (a Squeak point that equals its rounding), and a square root
+(define-function ks-whole? (x) (= (* 1.0 x) (long->double (double->long (* 1.0 x)))))
+(define ks-sqrt (subr "sqrt" "d>d"))
+
+;; an image fill's form: its PNG read once, made premultiplied, as GeziraFillImage's setForm: takes a 32-bit form;
+;; (form png mipmaps), mipmaps ((level . pixels) …) made as the original makes them, by GeziraBindings' downsample
+(define ksworld-forms ())
+(define-function ksworld-form (form gezira)
+  (or (assq form ksworld-forms)
+      (let ((png (png-load (or (ks-attr form ':__path__) (error "ksworld-render: no image file for " form)))))
+	(gezira-premultiply gezira (<png>-pixels png) (* (<png>-width png) (<png>-height png)))
+	(car (push ksworld-forms (list form png ()))))))
+
+;; GeziraFillImage's pipelineOn:for:, as its paint: the canvas's inverse transformation (composed with the fill's own
+;; transform), unfiltered if filtering is off or that is a whole-pixel translation, else mipmapped while the
+;; minification passes 2, 4 … (each level half the size, the matrix halved) and filtered bilinearly
+(define-function ksworld-image-paint (fill m gezira)
+  (let* ((entry (ksworld-form (ks-slot fill 'form) gezira))
+	 (png (cadr entry))
+	 (t (ks-invert m))
+	 (own (ks-slot fill 'transform)))
+    (and (ks-matrix? own) (set t (ks-compose own t)))
+    (if (or (= 'false (ks-val fill 'filter))
+	    (and (= 1.0 (<ks-matrix>-a t)) (= 0.0 (<ks-matrix>-b t)) (= 0.0 (<ks-matrix>-c t)) (= 1.0 (<ks-matrix>-d t))
+		 (ks-whole? (<ks-matrix>-e t)) (ks-whole? (<ks-matrix>-f t))))
+	(list 'image (<png>-pixels png) (<png>-width png) (<png>-height png) t 0)
+      (let ((pixels (<png>-pixels png)) (w (<png>-width png)) (h (<png>-height png)) (level 2)
+	    (minification (ks-sqrt (+ (* (<ks-matrix>-a t) (<ks-matrix>-a t)) (* (<ks-matrix>-c t) (<ks-matrix>-c t))))))
+	(while (and (> minification level) (or (> w 1) (> h 1)))
+	  (let ((made (assq level (caddr entry))))
+	    (or made (set-car (cddr entry) (cons (set made (cons level (gezira-downsample gezira pixels w h))) (caddr entry))))
+	    (set pixels (cdr made)) (set w (/ w 2)) (set h (/ h 2)))
+	  (set t (ks-matrix (* 0.5 (<ks-matrix>-a t)) (* 0.5 (<ks-matrix>-b t)) (* 0.5 (<ks-matrix>-c t))
+			    (* 0.5 (<ks-matrix>-d t)) (* 0.5 (<ks-matrix>-e t)) (* 0.5 (<ks-matrix>-f t))))
+	  (set level (* 2 level)))
+	(list 'image pixels w h t 1)))))
+
+;; what a fill paints, as a Gezira is told it: (uniform alpha red green blue), or an image (ksworld-image-paint)
+(define-function ksworld-paint (fill m gezira)
+  (cond ((and (ks-object? fill) (= 'GeziraFillUniform (<ks-object>-class fill)))
+	 (list 'uniform (* 1.0 (ks-slot fill 'alpha)) (* 1.0 (ks-slot fill 'red)) (* 1.0 (ks-slot fill 'green)) (* 1.0 (ks-slot fill 'blue))))
+	((and (ks-object? fill) (= 'GeziraFillImage (<ks-object>-class fill))) (ksworld-image-paint fill m gezira))
+	(else (error "ksworld-render: can't paint with " fill))))
 
 (define-function ksworld-render-path (path m gezira width height)
   (let ((floats (<ks-object>-data (ks-slot path 'floats))))
     (and floats
-	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill)) floats (<ks-object>-count (ks-slot path 'floats))))))
+	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill) m gezira) floats (<ks-object>-count (ks-slot path 'floats))))))
 
 ;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
 (define-function ksworld-render-selection (box m gezira width height)

@@ -199,6 +199,12 @@
 	(car (read tmp)))
     (car (read path))))
 
+;; a path's directory, with its slash ("" for none)
+(define-function ksworld-directory (path)
+  (let ((end 0))
+    (for (i 0 (string-length path)) (and (= ?/ (string-at path i)) (set end (+ i 1))))
+    (string-copy path 0 end)))
+
 (define-function ksworld-load (path)
   (let* ((form (ksworld-read-pp path))
 	 (root-id (string->long (ks-plist-get (cdr form) ':root)))
@@ -212,7 +218,12 @@
 	    (and (= k ':ref) (set ref (string->long v)))
 	    (set attrs (cons k (cons v attrs)))
 	    (set rest (cddr rest))))
-	(set-array-at table ref (new <ks-object> cls ref attrs () () 0))))
+	(set-array-at table ref (new <ks-object> cls ref attrs () () 0))
+	;; a Form's image is a file beside the document
+	(let ((href (ks-plist-get attrs ':href)))
+	  (and href (= cls 'Form)
+	       (set (<ks-object>-attrs (array-at table ref))
+		    (cons ':__path__ (cons (concat-string (ksworld-directory path) href) (<ks-object>-attrs (array-at table ref)))))))))
     ;; Pass 2: resolve slots, attributes, and data payloads
     (list-do e entries
       (let* ((cls (car e)) (rest (cdr e)))

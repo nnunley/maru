@@ -25,6 +25,9 @@
 (define gezira-pixel-entry (gezira-entry "gezira_pixel" "liii>i"))
 (define gezira-stop-entry (gezira-entry "gezira_stop" "l"))
 (define gezira-fill-entry (gezira-entry "gezira_fill" "lliippi>i"))
+(define gezira-fill-image-entry (gezira-entry "gezira_fill_image" "lliippiliii>i"))
+(define gezira-downsample-entry (gezira-entry "gezira_downsample" "llii>l"))
+(define gezira-premultiply-entry (gezira-entry "gezira_premultiply" "li"))
 
 (define-structure <gezira-maru> (init image width height workers))
 
@@ -41,18 +44,32 @@
 (define-method gezira-pixel <gezira-maru> (x y)
   (gezira-pixel-entry self.image self.width x y))
 
-;; the matrix and paint as the entry point's params buffer: a b c d e f, then alpha red green blue
+;; the matrices and paint as the entry points' params buffer: the path's a b c d e f, then a uniform paint's alpha red
+;; green blue, or an image's texture matrix
+(define-function gezira-params (m paint)
+  (let ((params (data 48)) (i 0))
+    (list-do v (concat-list (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m))
+			    (if (= 'image (car paint))
+				(let ((t (car (cddddr paint))))
+				  (list (<ks-matrix>-a t) (<ks-matrix>-b t) (<ks-matrix>-c t) (<ks-matrix>-d t) (<ks-matrix>-e t) (<ks-matrix>-f t)))
+			      (cdr paint)))
+      (set-float-at params i (* 1.0 v))
+      (set i (+ i 1)))
+    params))
 (define-method gezira-fill-path <gezira-maru> (m width height paint floats count)
   (if (not (= width self.width)) (error "gezira-maru: a path is clipped to the image's width, " self.width))
   (if (not (= height self.height)) (error "gezira-maru: a path is clipped to the image's height, " self.height))
-  (let ((params (data 40)) (i 0) (status 0))
-    (list-do v (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m)
-		     (cadr paint) (caddr paint) (cadddr paint) (car (cddddr paint)))
-      (set-float-at params i (* 1.0 v))
-      (set i (+ i 1)))
-    (set status (gezira-fill-entry self.init self.image self.width self.height params floats count))
+  (let* ((params (gezira-params m paint))
+	 (status (cond ((= 'uniform (car paint)) (gezira-fill-entry self.init self.image self.width self.height params floats count))
+		       ((= 'image (car paint))
+			(gezira-fill-image-entry self.init self.image self.width self.height params floats count
+						 (cadr paint) (caddr paint) (cadddr paint) (cadr (cddddr paint))))
+		       (else (error "gezira-maru: no paint " paint)))))
     (if (not (= 0 status)) (error "gezira-maru: the runtime reports status " status))
     status))
+
+(define-method gezira-downsample <gezira-maru> (pixels width height) (gezira-downsample-entry self.init pixels width height))
+(define-method gezira-premultiply <gezira-maru> (pixels count) (gezira-premultiply-entry pixels count))
 
 (define-method gezira-stop <gezira-maru> ()
   (gezira-stop-entry self.init))

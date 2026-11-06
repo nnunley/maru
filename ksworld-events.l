@@ -16,11 +16,6 @@
 (ks-methods Hand (focus (set (<ks-hand>-focus recv) (car args)) (car args)))
 (ks-methods Event (hand (<ks-event>-hand recv)) (position (<ks-event>-position recv)))
 
-(define-function ks-invert (m)
-  (let* ((a (<ks-matrix>-a m)) (b (<ks-matrix>-b m)) (c (<ks-matrix>-c m)) (d (<ks-matrix>-d m))
-	 (e (<ks-matrix>-e m)) (f (<ks-matrix>-f m)) (det (- (* a d) (* b c))))
-    (ks-matrix (/ d det) (/ (- b) det) (/ (- c) det) (/ a det)
-	       (/ (- (* c f) (* d e)) det) (/ (- (* b e) (* a f)) det))))
 (define-function ks-apply-matrix (m p)
   (ks-point (+ (+ (* (<ks-matrix>-a m) (<ks-point>-x p)) (* (<ks-matrix>-c m) (<ks-point>-y p))) (<ks-matrix>-e m))
 	    (+ (+ (* (<ks-matrix>-b m) (<ks-point>-x p)) (* (<ks-matrix>-d m) (<ks-point>-y p))) (<ks-matrix>-f m))))

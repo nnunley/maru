@@ -1,0 +1,496 @@
+// png.irl -- a PNG decoder (8-bit RGBA or RGB, not interlaced) for png.l: every chunk's CRC-32 checked, the image
+// data inflated (RFC 1950 and 1951: stored, fixed and dynamic Huffman blocks, codes decoded a bit at a time as zlib's
+// puff does) and checked against its Adler-32, each row's filter undone (PNG 9.2), and the pixels written as width x
+// height ARGB words, alpha in the top byte, not premultiplied.  Ancillary chunks are skipped, CRCs and all checked; an
+// unknown critical chunk is an error, as PNG 5.4 has it.  Errors are numbers png.l names.
+
+import void*(long) malloc;
+import void(void*) free;
+
+struct Inflate { char* src; long pos, end, bitbuf, bitcnt, err; char* out; long at, size; };
+struct Huff { long* counts; long* symbols; };
+
+long u8(char* p, long i) return cast(p[i], long) & 255;
+long be32(char* p, long i) return (u8(p, i) << 24) | (u8(p, i + 1) << 16) | (u8(p, i + 2) << 8) | u8(p, i + 3);
+long* longs(long n) return cast(malloc(n * cast(sizeof(long), long)), long*);
+
+long crc(long* table, char* p, long from, long to) {
+  let long c := 4294967295;
+  while from < to do {
+    c := table[(c ^ u8(p, from)) & 255] ^ (c >> 8);
+    from := from + 1;
+  }
+  return c ^ 4294967295;
+}
+long* crc_table() {
+  let long* t := longs(256);
+  let long n := 0;
+  while n < 256 do {
+    let long c := n;
+    let long k := 0;
+    while k < 8 do { c := (c & 1) == 1 ? 3988292384 ^ (c >> 1) : c >> 1; k := k + 1; }
+    t[n] := c;
+    n := n + 1;
+  }
+  return t;
+}
+
+// n bits, least significant first; past the end sets err 7 and answers 0
+long bits(struct Inflate* s, long n) {
+  let long v := s.bitbuf;
+  while s.bitcnt < n && s.err == 0 do {
+    if s.pos >= s.end then s.err := 7;
+    else {
+      v := v | (u8(s.src, s.pos) << cast(s.bitcnt, int));
+      s.pos := s.pos + 1;
+      s.bitcnt := s.bitcnt + 8;
+    }
+  }
+  s.bitbuf := v >> cast(n, int);
+  s.bitcnt := s.bitcnt - n;
+  return v & ((cast(1, long) << cast(n, int)) - 1);
+}
+
+void huffman(struct Huff* h, long* lengths, long n) {
+  let long* offsets := longs(16);
+  let long i := 0;
+  h.counts := longs(16);
+  h.symbols := longs(n);
+  while i < 16 do { h.counts[i] := 0; i := i + 1; }
+  i := 0;
+  while i < n do { h.counts[lengths[i]] := h.counts[lengths[i]] + 1; i := i + 1; }
+  offsets[1] := 0;
+  i := 1;
+  while i < 15 do { offsets[i + 1] := offsets[i] + h.counts[i]; i := i + 1; }
+  i := 0;
+  while i < n do {
+    if lengths[i] != 0 then {
+      h.symbols[offsets[lengths[i]]] := i;
+      offsets[lengths[i]] := offsets[lengths[i]] + 1;
+    }
+    i := i + 1;
+  }
+  free(offsets);
+}
+struct Huff* huff() return cast(malloc(cast(sizeof(struct Huff), long)), struct Huff*);
+void huffman_free(struct Huff* h) { free(h.counts); free(h.symbols); free(h); }
+
+// a symbol, or -1 with err 8 for a code its table doesn't hold
+long decode(struct Inflate* s, struct Huff* h) {
+  let long code := 0;
+  let long first := 0;
+  let long index := 0;
+  let long len := 1;
+  while len <= 15 && s.err == 0 do {
+    code := code | bits(s, 1);
+    let long count := h.counts[len];
+    if code - count < first then return h.symbols[index + (code - first)];
+    index := index + count;
+    first := (first + count) << 1;
+    code := code << 1;
+    len := len + 1;
+  }
+  if s.err == 0 then s.err := 8;
+  return -1;
+}
+
+void put(struct Inflate* s, long byte) {
+  if s.at >= s.size then s.err := 11;
+  else { s.out[s.at] := cast(byte, char); s.at := s.at + 1; }
+}
+
+long length_base(long i) {
+  if i < 8 then return i + 3;
+  if i == 28 then return 258;
+  let long e := (i - 4) / 4;
+  return (((4 + ((i - 4) & 3)) << cast(e, int)) + 3);
+}
+long length_extra(long i) return i < 8 || i == 28 ? cast(0, long) : (i - 4) / 4;
+long dist_base(long i) {
+  if i < 4 then return i + 1;
+  let long e := (i - 2) / 2;
+  return ((2 + (i & 1)) << cast(e, int)) + 1;
+}
+long dist_extra(long i) return i < 4 ? cast(0, long) : (i - 2) / 2;
+
+void codes(struct Inflate* s, struct Huff* lengths, struct Huff* distances) {
+  let long sym := decode(s, lengths);
+  while s.err == 0 && sym != 256 do {
+    if sym < 256 then put(s, sym);
+    else {
+      let long i := sym - 257;
+      let long len := length_base(i) + bits(s, length_extra(i));
+      let long d := decode(s, distances);
+      let long dist := dist_base(d) + bits(s, dist_extra(d));
+      if dist > s.at then s.err := 9;
+      while len > 0 && s.err == 0 do { put(s, u8(s.out, s.at - dist)); len := len - 1; }
+    }
+    if s.err == 0 then sym := decode(s, lengths);
+  }
+}
+
+void fixed(struct Inflate* s) {
+  let long* l := longs(288);
+  let long* d := longs(30);
+  let long i := 0;
+  let struct Huff* hl := huff();
+  let struct Huff* hd := huff();
+  while i < 288 do { l[i] := i < 144 ? cast(8, long) : i < 256 ? cast(9, long) : i < 280 ? cast(7, long) : cast(8, long); i := i + 1; }
+  i := 0;
+  while i < 30 do { d[i] := 5; i := i + 1; }
+  huffman(hl, l, 288);
+  huffman(hd, d, 30);
+  codes(s, hl, hd);
+  huffman_free(hl); huffman_free(hd); free(l); free(d);
+}
+
+void dynamic(struct Inflate* s) {
+  let long nlen := 257 + bits(s, 5);
+  let long ndist := 1 + bits(s, 5);
+  let long ncode := 4 + bits(s, 4);
+  let long* order := longs(19);
+  let long* cl := longs(19);
+  let long* lengths := longs(nlen + ndist);
+  let long i := 0;
+  let struct Huff* hc := huff();
+  let struct Huff* hl := huff();
+  let struct Huff* hd := huff();
+  order[0] := 16; order[1] := 17; order[2] := 18; order[3] := 0; order[4] := 8; order[5] := 7; order[6] := 9;
+  order[7] := 6; order[8] := 10; order[9] := 5; order[10] := 11; order[11] := 4; order[12] := 12; order[13] := 3;
+  order[14] := 13; order[15] := 2; order[16] := 14; order[17] := 1; order[18] := 15;
+  while i < 19 do { cl[i] := 0; i := i + 1; }
+  i := 0;
+  while i < ncode do { cl[order[i]] := bits(s, 3); i := i + 1; }
+  huffman(hc, cl, 19);
+  i := 0;
+  while i < nlen + ndist && s.err == 0 do {
+    let long sym := decode(s, hc);
+    if sym >= 0 && sym < 16 then { lengths[i] := sym; i := i + 1; }
+    else if sym >= 16 then {
+      let long prev := 0;
+      let long n := sym == 16 ? 3 + bits(s, 2) : sym == 17 ? 3 + bits(s, 3) : 11 + bits(s, 7);
+      if sym == 16 then { if i == 0 then s.err := 14; else prev := lengths[i - 1]; }
+      while n > 0 && i < nlen + ndist && s.err == 0 do { lengths[i] := prev; i := i + 1; n := n - 1; }
+    }
+  }
+  if s.err == 0 then {
+    huffman(hl, lengths, nlen);
+    huffman(hd, lengths + nlen * cast(sizeof(long), long), ndist);
+    codes(s, hl, hd);
+    huffman_free(hl); huffman_free(hd);
+  }
+  huffman_free(hc); free(order); free(cl); free(lengths);
+}
+
+// a zlib stream at src[from, to) into out (size bytes); answers 0, or an error number
+long inflate(char* src, long from, long to, char* out, long size) {
+  let struct Inflate* s := cast(malloc(cast(sizeof(struct Inflate), long)), struct Inflate*);
+  let long last := 0;
+  s.src := src; s.pos := from + 2; s.end := to; s.bitbuf := 0; s.bitcnt := 0; s.err := 0;
+  s.out := out; s.at := 0; s.size := size;
+  if (u8(src, from) & 15) != 8 || ((u8(src, from) << 8) + u8(src, from + 1)) % 31 != 0 then return 6;
+  while last == 0 && s.err == 0 do {
+    last := bits(s, 1);
+    let long type := bits(s, 2);
+    if type == 0 then {
+      s.bitbuf := 0; s.bitcnt := 0;
+      let long len := u8(src, s.pos) + (u8(src, s.pos + 1) << 8);
+      let long k := 0;
+      s.pos := s.pos + 4;
+      while k < len && s.err == 0 do { put(s, u8(src, s.pos + k)); k := k + 1; }
+      s.pos := s.pos + len;
+    }
+    else if type == 1 then fixed(s);
+    else if type == 2 then dynamic(s);
+    else s.err := 10;
+  }
+  let long err := s.err != 0 ? s.err : s.at != size ? cast(11, long) : cast(0, long);
+  let long end := s.pos;
+  let long at := s.at;
+  free(s);
+  if err != 0 then return err;
+  let long a := 1;
+  let long b := 0;
+  let long i := 0;
+  while i < at do { a := (a + u8(out, i)) % 65521; b := (b + a) % 65521; i := i + 1; }
+  if be32(src, end) != ((b << 16) | a) then return 12;
+  return 0;
+}
+
+long absl(long x) return x < 0 ? 0 - x : x;
+long paeth(long a, long b, long c) {
+  let long p := a + b - c;
+  let long pa := absl(p - a);
+  let long pb := absl(p - b);
+  let long pc := absl(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+}
+
+// rows in place: each a filter number then its bytes; answers 0, or 13 for an unknown filter
+long unfilter(char* raw, long w, long h, long bpp) {
+  let long stride := w * bpp;
+  let long y := 0;
+  while y < h do {
+    let long row := y * (stride + 1) + 1;
+    let long f := u8(raw, row - 1);
+    if f > 4 then return 13;
+    let long x := 0;
+    while x < stride do {
+      let long at := row + x;
+      let long a := x >= bpp ? u8(raw, at - bpp) : cast(0, long);
+      let long b := y > 0 ? u8(raw, at - (stride + 1)) : cast(0, long);
+      let long c := y > 0 && x >= bpp ? u8(raw, at - (stride + 1) - bpp) : cast(0, long);
+      let long pred := f == 0 ? cast(0, long) : f == 1 ? a : f == 2 ? b : f == 3 ? (a + b) >> 1 : paeth(a, b, c);
+      raw[at] := cast((u8(raw, at) + pred) & 255, char);
+      x := x + 1;
+    }
+    y := y + 1;
+  }
+  return 0;
+}
+
+// the PNG at src[0, n): info gets width, height and the pixels' address (malloc'd; png_free frees them);
+// answers 0, or an error number
+long png_decode(char* src, long n, long* info) {
+  let long* table := crc_table();
+  let long at := 8;
+  let long w := 0;
+  let long h := 0;
+  let long colour := 0;
+  let long zsize := 0;
+  let long err := 0;
+  if n < 8 || u8(src, 0) != 137 || u8(src, 1) != 80 || u8(src, 2) != 78 || u8(src, 3) != 71 then err := 1;
+  // the chunks: CRCs, the header, and how much image data
+  while err == 0 && at + 12 <= n do {
+    let long len := be32(src, at);
+    if at + 12 + len > n then err := 7;
+    else if be32(src, at + 8 + len) != crc(table, src, at + 4, at + 8 + len) then err := 2;
+    else {
+      if u8(src, at + 4) == 73 && u8(src, at + 5) == 72 then {		// IHDR
+        w := be32(src, at + 8); h := be32(src, at + 12); colour := u8(src, at + 17);
+        if u8(src, at + 16) != 8 then err := 3;
+        else if colour != 6 && colour != 2 then err := 4;
+        else if u8(src, at + 20) != 0 then err := 5;
+      }
+      if u8(src, at + 4) == 73 && u8(src, at + 5) == 68 then zsize := zsize + len;	// IDAT
+      // a critical chunk (its name's first letter upper case) other than IHDR, PLTE, IDAT and IEND can't be skipped
+      if (u8(src, at + 4) & 32) == 0 && be32(src, at + 4) != 1229472850 && be32(src, at + 4) != 1347179589
+         && be32(src, at + 4) != 1229209940 && be32(src, at + 4) != 1229278788 then err := 15;
+      at := at + 12 + len;
+    }
+  }
+  free(table);
+  if err != 0 then return err;
+  // the image data, joined
+  let long bpp := colour == 6 ? cast(4, long) : cast(3, long);
+  let char* z := cast(malloc(zsize + 1), char*);
+  let long zat := 0;
+  at := 8;
+  while at + 12 <= n do {
+    let long len := be32(src, at);
+    if u8(src, at + 4) == 73 && u8(src, at + 5) == 68 then {
+      let long k := 0;
+      while k < len do { z[zat + k] := src[at + 8 + k]; k := k + 1; }
+      zat := zat + len;
+    }
+    at := at + 12 + len;
+  }
+  let long size := h * (1 + w * bpp);
+  let char* raw := cast(malloc(size + 1), char*);
+  err := inflate(z, 0, zsize, raw, size);
+  free(z);
+  if err == 0 then err := unfilter(raw, w, h, bpp);
+  if err != 0 then { free(raw); return err; }
+  let char* px := cast(malloc(4 * w * h + 1), char*);
+  let long y := 0;
+  while y < h do {
+    let long x := 0;
+    while x < w do {
+      let long s := y * (1 + w * bpp) + 1 + x * bpp;
+      let long d := 4 * (y * w + x);
+      px[d] := raw[s + 2];
+      px[d + 1] := raw[s + 1];
+      px[d + 2] := raw[s];
+      px[d + 3] := bpp == 4 ? raw[s + 3] : cast(255, char);
+      x := x + 1;
+    }
+    y := y + 1;
+  }
+  free(raw);
+  info[0] := w; info[1] := h; info[2] := cast(px, long);
+  return 0;
+}
+void png_free(char* pixels) free(pixels);
+
+
+// ---- encoding, for the round trip: png_encode writes ARGB words as a PNG, each row filtered as filters[y] says, the
+// data deflated in stored blocks (block 0) or fixed Huffman ones (block 1: literals, and runs repeating the row above,
+// or in a one-row image the pixel before),
+// split into IDAT chunks of at most chunk bytes, between a tEXt chunk before and one after.
+struct Out { char* buf; long at, cap, bitbuf, bitcnt; };
+
+void out_byte(struct Out* o, long b) {
+  if o.at >= o.cap then {
+    let char* bigger := cast(malloc(o.cap * 2), char*);
+    let long k := 0;
+    while k < o.at do { bigger[k] := o.buf[k]; k := k + 1; }
+    free(o.buf);
+    o.buf := bigger;
+    o.cap := o.cap * 2;
+  }
+  o.buf[o.at] := cast(b & 255, char);
+  o.at := o.at + 1;
+}
+void out_be32(struct Out* o, long v) { out_byte(o, v >> 24); out_byte(o, v >> 16); out_byte(o, v >> 8); out_byte(o, v); }
+// n bits of v, least significant first, as deflate packs them
+void out_bits(struct Out* o, long v, long n) {
+  o.bitbuf := o.bitbuf | ((v & ((cast(1, long) << cast(n, int)) - 1)) << cast(o.bitcnt, int));
+  o.bitcnt := o.bitcnt + n;
+  while o.bitcnt >= 8 do { out_byte(o, o.bitbuf); o.bitbuf := o.bitbuf >> 8; o.bitcnt := o.bitcnt - 8; }
+}
+void out_flush(struct Out* o) { if o.bitcnt > 0 then out_bits(o, 0, 8 - o.bitcnt); }
+// a Huffman code, its bits most significant first
+void out_code(struct Out* o, long code, long len) {
+  let long r := 0;
+  let long k := 0;
+  while k < len do { r := (r << 1) | ((code >> cast(k, int)) & 1); k := k + 1; }
+  out_bits(o, r, len);
+}
+// a fixed-Huffman literal or length symbol (RFC 1951 3.2.6)
+void out_fixed(struct Out* o, long sym) {
+  if sym < 144 then out_code(o, 48 + sym, 8);
+  else if sym < 256 then out_code(o, 400 + sym - 144, 9);
+  else if sym < 280 then out_code(o, sym - 256, 7);
+  else out_code(o, 192 + sym - 280, 8);
+}
+void out_match(struct Out* o, long len, long dist) {
+  let long i := 28;
+  while length_base(i) > len do i := i - 1;
+  out_fixed(o, 257 + i);
+  out_bits(o, len - length_base(i), length_extra(i));
+  let long d := 29;
+  while dist_base(d) > dist do d := d - 1;
+  out_code(o, d, 5);
+  out_bits(o, dist - dist_base(d), dist_extra(d));
+}
+
+// zlib's stream of raw[0, n)
+void deflate(struct Out* o, char* raw, long n, long block, long back) {
+  out_byte(o, 120); out_byte(o, 1);
+  if block == 0 then {
+    let long at := 0;
+    while at < n || n == 0 do {
+      let long len := n - at > 65535 ? cast(65535, long) : n - at;
+      out_bits(o, at + len >= n ? cast(1, long) : cast(0, long), 1);
+      out_bits(o, 0, 2);
+      out_flush(o);
+      out_byte(o, len); out_byte(o, len >> 8); out_byte(o, ~len); out_byte(o, (~len) >> 8);
+      let long k := 0;
+      while k < len do { out_byte(o, u8(raw, at + k)); k := k + 1; }
+      at := at + len;
+      if n == 0 then n := -1;
+    }
+  }
+  else {
+    out_bits(o, 1, 1);
+    out_bits(o, 1, 2);
+    let long i := 0;
+    while i < n do {
+      let long run := 0;
+      while i >= back && i + run < n && run < 258 && u8(raw, i + run) == u8(raw, i + run - back) do run := run + 1;
+      if run >= 3 then { out_match(o, run, back); i := i + run; }
+      else { out_fixed(o, u8(raw, i)); i := i + 1; }
+    }
+    out_fixed(o, 256);
+    out_flush(o);
+  }
+  let long a := 1;
+  let long b := 0;
+  let long k := 0;
+  while k < n do { a := (a + u8(raw, k)) % 65521; b := (b + a) % 65521; k := k + 1; }
+  out_be32(o, (b << 16) | a);
+}
+
+void out_chunk(struct Out* o, long* table, long type, char* data, long len) {
+  out_be32(o, len);
+  let long start := o.at;
+  out_be32(o, type);
+  let long k := 0;
+  while k < len do { out_byte(o, u8(data, k)); k := k + 1; }
+  out_be32(o, crc(table, o.buf, start, o.at));
+}
+
+// a tEXt chunk: keyword, a zero byte, then the text
+void out_text(struct Out* o, long* table, char* key, long klen, char* text, long tlen) {
+  let char* d := cast(malloc(klen + 1 + tlen), char*);
+  let long k := 0;
+  while k < klen do { d[k] := key[k]; k := k + 1; }
+  d[klen] := cast(0, char);
+  k := 0;
+  while k < tlen do { d[klen + 1 + k] := text[k]; k := k + 1; }
+  out_chunk(o, table, 1950701684, d, klen + 1 + tlen);
+  free(d);
+}
+
+// info gets the PNG's address (png_free frees it) and length
+void png_encode(char* argb, long w, long h, long rgba, long* filters, long block, long chunk, long* info) {
+  let long bpp := rgba == 1 ? cast(4, long) : cast(3, long);
+  let long stride := w * bpp;
+  let char* raw := cast(malloc(h * (stride + 1) + 1), char*);
+  let char* plain := cast(malloc(h * stride + 1), char*);
+  let long y := 0;
+  while y < h do {		// the pixels' bytes, RGB(A), row by row
+    let long x := 0;
+    while x < w do {
+      let long d := y * stride + x * bpp;
+      let long s := 4 * (y * w + x);
+      plain[d] := argb[s + 2]; plain[d + 1] := argb[s + 1]; plain[d + 2] := argb[s];
+      if rgba == 1 then plain[d + 3] := argb[s + 3];
+      x := x + 1;
+    }
+    y := y + 1;
+  }
+  y := 0;
+  while y < h do {		// each row filtered, against the unfiltered bytes as PNG 9.2 defines
+    let long f := filters[y];
+    raw[y * (stride + 1)] := cast(f, char);
+    let long x := 0;
+    while x < stride do {
+      let long at := y * stride + x;
+      let long a := x >= bpp ? u8(plain, at - bpp) : cast(0, long);
+      let long b := y > 0 ? u8(plain, at - stride) : cast(0, long);
+      let long c := y > 0 && x >= bpp ? u8(plain, at - stride - bpp) : cast(0, long);
+      let long pred := f == 0 ? cast(0, long) : f == 1 ? a : f == 2 ? b : f == 3 ? (a + b) >> 1 : paeth(a, b, c);
+      raw[y * (stride + 1) + 1 + x] := cast((u8(plain, at) - pred) & 255, char);
+      x := x + 1;
+    }
+    y := y + 1;
+  }
+  let struct Out* z := cast(malloc(cast(sizeof(struct Out), long)), struct Out*);
+  z.buf := cast(malloc(64), char*); z.at := 0; z.cap := 64; z.bitbuf := 0; z.bitcnt := 0;
+  deflate(z, raw, h * (stride + 1), block, block == 1 && h > 1 ? stride + 1 : bpp);
+  let struct Out* o := cast(malloc(cast(sizeof(struct Out), long)), struct Out*);
+  o.buf := cast(malloc(64), char*); o.at := 0; o.cap := 64; o.bitbuf := 0; o.bitcnt := 0;
+  let long* table := crc_table();
+  out_byte(o, 137); out_byte(o, 80); out_byte(o, 78); out_byte(o, 71); out_byte(o, 13); out_byte(o, 10); out_byte(o, 26); out_byte(o, 10);
+  let char* hdr := cast(malloc(13), char*);
+  hdr[0] := cast(w >> 24, char); hdr[1] := cast(w >> 16, char); hdr[2] := cast(w >> 8, char); hdr[3] := cast(w, char);
+  hdr[4] := cast(h >> 24, char); hdr[5] := cast(h >> 16, char); hdr[6] := cast(h >> 8, char); hdr[7] := cast(h, char);
+  hdr[8] := cast(8, char); hdr[9] := cast(rgba == 1 ? cast(6, long) : cast(2, long), char);
+  hdr[10] := cast(0, char); hdr[11] := cast(0, char); hdr[12] := cast(0, char);
+  out_chunk(o, table, 1229472850, hdr, 13);					// IHDR
+  out_text(o, table, "Comment", 7, "before the data", 15);
+  let long at := 0;
+  while at < z.at do {
+    let long len := z.at - at > chunk ? chunk : z.at - at;
+    out_chunk(o, table, 1229209940, z.buf + at, len);				// IDAT
+    at := at + len;
+  }
+  out_text(o, table, "Comment", 7, "after the data", 14);
+  out_chunk(o, table, 1229278788, hdr, 0);					// IEND
+  free(raw); free(plain); free(hdr); free(table); free(z.buf); free(z);
+  info[0] := cast(o.buf, long); info[1] := o.at;
+  free(o);
+}
+
+export png_decode, png_free, png_encode;
