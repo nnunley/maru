@@ -59,7 +59,8 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c undo-irl.c osdefs.k
 # libraries the checks open; a library that fails to build fails only the checks that need it
 CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/library-mode.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
-	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
+	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l \
+	     sdl3.osdefs.k
 
 # Runs $(1) with MARU_DBJR naming the dbjr documents the KSWorld check reads: the caller's, or else fetched into a fresh
 # temporary directory (mktemp -d, under TMPDIR) and removed after.  Only when the KSWorld check is among those run.  If
@@ -294,10 +295,16 @@ osdefs.g.l : osdefs.g tpeg.l | eval
 %.osdefs.exe : %.osdefs.c
 	$(CC) -o $@ $<
 
+# SDL3's headers and library from pkg-config: sdl3.osdefs measures SDL3's macros and structs, so it needs them.
+SDL3_FLAGS = $(shell pkg-config --cflags --libs sdl3 2>/dev/null)
+SDL3_HEADERS = $(wildcard $(patsubst -I%,%/SDL3/SDL_events.h,$(filter -I%,$(SDL3_FLAGS))))
+sdl3.osdefs.exe : sdl3.osdefs.c $(SDL3_HEADERS)
+	$(CC) -o $@ $< $(SDL3_FLAGS)
+
 %.osdefs.k : %.osdefs.exe
 	./$< > $@
 
-OSDEFS = $(wildcard *.osdefs) $(wildcard net/*.osdefs)
+OSDEFS = $(filter-out sdl3.osdefs,$(wildcard *.osdefs)) $(wildcard net/*.osdefs)	# sdl3.osdefs needs SDL3: built by check
 OSKEFS = $(OSDEFS:.osdefs=.osdefs.k)
 
 osdefs : osdefs.g.l $(OSKEFS) .force

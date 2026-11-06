@@ -1,0 +1,96 @@
+; Gezira renders KSWorld documents in an SDL3 window, with the mouse: what's being built, what each piece builds on, and what
+; would show it works.  MARU_PLAN=render notes/plan/record asks the checks; MARU_PLAN=render ./eval notes/plan/next.l says
+; what's next.  The Nile runtime's pieces follow docs/plans/2026-10-15-nile-runtime-in-maru.md (RFC
+; docs/rfc/draft-ndn-nile-runtime-in-maru-02.md); the document's side builds on notes/plan/ksworld.john.
+
+start-world plan.
+load "notes/plan/probes.l".
+
+set Evidence = untested | passed(tree) | failed(tree)
+  | tested(tree, trials) | proved(tree, cases) | refuted(tree, counterexample) | starved(tree, met, drawn)
+  | vacuous(tree) | inconclusive(tree, input).
+group Good passed tested proved.
+
+group Check Case Measure Grammar Law.
+create Case evidence.
+create Measure evidence command cadence.
+create Grammar evidence file class rule host inherits samples.
+create Law evidence file support.
+qualify Case observe is it case-passes.
+qualify Measure observe is it command-succeeds.
+qualify Grammar observe is it compiles-and-reads.
+qualify Law observe is it law-verdict.
+qualify Check routine if 1 = 1.
+qualify Measure routine if its cadence = "routine".
+
+make Measure WholeSuite untested "nice make check" "full".
+
+; the Nile runtime in typed Maru, task by task
+make Case nile_interface untested.
+make Case nile_osdefs untested.
+make Case nile_startup untested.
+make Case nile_recip untested.
+make Case nile_limits untested.
+make Case nile_oom untested.
+make Case nile_prefix untested.
+make Case nile_reroute untested.
+make Case nile_reverse untested.
+make Case nile_sort untested.
+make Case nile_dupcat untested.
+make Case nile_threads untested.
+make Case nile_tsan untested.
+make Case nile_text_layout untested.
+; what draws, and where
+make Case gezira_image untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
+make Case sdl3_window untested.			; a window shows a pixel buffer, and mouse events come back
+make Case ksworld_headless untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
+make Case ksworld_text untested.		; a document's spans laid out as TrueType glyph paths
+make Case ksworld_render untested.		; a document rendered through Gezira to pixels, against its bundle's preview
+make Case ksworld_mouse untested.		; a click lands on the box under it, fires its streams, and the redraw shows it
+
+create Code tree.
+action Check observed Answer consequence its evidence = Answer.
+qualify Check holds if its evidence is Good and its evidence tree = Now tree.
+qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
+
+create Capability what where shown-by builds-on planned.
+make Capability NileInterface "nile.k is the one interface; the Maru generator passes sizeof_vars"
+  "nile/runtimes/maru/nile.k" [ nile_interface ] [ ] no.
+make Capability NileThreads "pthread types sized from nile.osdefs; a worker pool that starts, syncs and shuts down"
+  "nile/runtimes/maru/nile-sync.k, nile-heap.k, nile-deque.k, nile-thread.k" [ nile_osdefs, nile_startup ] [ NileInterface ] no.
+make Capability NileProcesses "processes and the kernel interface, with the limits and running out of memory"
+  "nile/runtimes/maru/nile-process.k, nile-kernel.k" [ nile_recip, nile_limits, nile_oom, nile_prefix, nile_reroute ] [ NileThreads ] no.
+make Capability NileBuiltins "the remaining built-ins, and every thread count giving the same answer, race-free"
+  "nile/runtimes/maru/nile-builtins.k" [ nile_reverse, nile_sort, nile_dupcat, nile_threads, nile_tsan ] [ NileProcesses ] no.
+make Capability NileEndToEnd "text-layout.nl runs end to end through Maru, as the C runtime ran it"
+  "nile/, check/check.l" [ nile_text_layout ] [ NileBuiltins ] no.
+make Capability GeziraImage "Gezira's kernels, compiled through Maru, render a scene to pixels"
+  "gezira/, the Nile runtime" [ gezira_image ] [ NileEndToEnd ] no.
+make Capability Sdl3Window "an SDL3 window shows a pixel buffer each frame and hands back mouse and key events"
+  "sdl3.osdefs, sdl3.k" [ sdl3_window ] [ ] no.
+make Capability DocumentScene "a document's boxes ask a Gezira to fill their shapes' paths, each placed by its matrix and painted in its fill"
+  "ksworld-render.l" [ ksworld_headless ] [ ] no.
+make Capability DocumentText "a document's text spans are laid out with TrueType glyph outlines, quadratic Béziers Gezira draws"
+  "a TrueType byte grammar, ksworld-text.l" [ ksworld_text ] [ DocumentScene ] no.
+make Capability DocumentRendered "a document is rendered through Gezira to pixels, and matches its bundle's preview"
+  "ksworld-render.l" [ ksworld_render ] [ GeziraImage, DocumentText ] no.
+make Capability MouseHandled "in an SDL3 window, a click lands on the box under it, fires its streams, and the redraw shows it"
+  "ksworld-window.l" [ ksworld_mouse ] [ DocumentRendered, Sdl3Window ] no.
+make Capability NothingElseBroke "every other check in the repository still passes"
+  "the whole tree" [ WholeSuite ] [ MouseHandled ] no.
+
+qualify Capability proven if its shown-by size > 0 and for every its shown-by do each holds = yes.
+qualify Capability done if it proven = yes or it planned = yes.
+qualify Capability ready if for every its builds-on do each done = yes.
+rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
+rel-qualify Check:C supports Capability:K if C in K shown-by.
+qualify Check regressed if not its evidence is Good and not its evidence is untested
+  and for some time A up to time do (at time A its evidence is Good).
+
+create Team.
+make Team T.
+action Team build Capability consequence Capability planned = yes.
+rule Team build is Capability done = no.
+rule Team build is Capability ready = yes.
+goal Team deliver try for every all Capability do each done = yes.
+goal-strategy Team deliver sat.

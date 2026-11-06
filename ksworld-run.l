@@ -11,6 +11,7 @@
 ;;; A setter's code is a printout of the value it starts with, which the document also holds, so it isn't read.
 (require "kscript.l")
 (require "recover.l")
+(require "ksworld-events.l")
 
 (define-function ksw-assoc (key alist) (let ((r ())) (list-do p alist (and (not r) (equal (car p) key) (set r p))) r))
 (define-function ksw-count (table key)		; table is (list . alist): bump key's count
@@ -28,7 +29,7 @@
     (list-reverse! out)))
 
 (define-function ksworld-run (path ticks)
-  (let* ((table (cadr (ksworld-load path)))
+  (let* ((doc (ksworld-load path)) (table (cadr doc))
 	 (objects 0) (streams ()) (setters 0) (dormant 0) (code ())
 	 (unreadable 0) (evaluations 0) (fired 0)
 	 (failed (list ())) (failed-streams ()))
@@ -58,7 +59,7 @@
 			(ksw-count failed (ksw-message c)))))))
 	(unwind-protect (for (t 0 ticks) (ks-sort-and-evaluate-at ev t))
 	  (set ks-evaluate-stream plain)))
-      (list (cons 'document path) (cons 'objects objects) (cons 'streams (list-length streams)) (cons 'setters setters)
+      (list (cons 'document path) (cons 'root (car doc)) (cons 'evaluator ev) (cons 'time ticks) (cons 'objects objects) (cons 'streams (list-length streams)) (cons 'setters setters)
 	    (cons 'dormant dormant) (cons 'code (list-length code)) (cons 'read (list-length read)) (cons 'unreadable unreadable)
 	    (cons 'ticks ticks) (cons 'evaluations evaluations) (cons 'fired fired) (cons 'failed (list-length failed-streams))
 	    (cons 'failures (ksw-sorted (car failed))) (cons 'table table)))))

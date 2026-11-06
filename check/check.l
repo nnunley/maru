@@ -398,6 +398,15 @@
 (check "kscript" (unit-assert (equal (last (run "kscript" "./eval check/kscript.l notes/sources/grammars/*.kscript")) "kscript ok")))
 ;; KSWorld documents headless (ksworld-run.l): a fixture of ours, and KSWorld.ks where the dbjr documents are
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
+;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
+(check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
+;; KSWorld.ks in an SDL3 window on the dummy driver: SDL's mouse events reach the document, each change drawn (check/ksworld-window.l)
+(check "ksworld_window"
+  (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
+      (let ()
+	(run "ksworld-window-osdefs" "make -q sdl3.osdefs.k")	; measured from these headers, not stale
+	(unit-assert (equal (last (run "ksworld_window" "SDL_VIDEO_DRIVER=dummy ./eval check/ksworld-window.l")) "ksworld window ok")))
+      (println "SKIP ksworld_window: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
@@ -612,6 +621,21 @@
 			    (concat-strings tmp "/gc.k"))
     (unit-assert (equal (last (run "gc" (ir2-build "gc" (concat-strings tmp "/gc.k")))) "gc ok"))))
 
+;;; ---------------------------------------------------------------- sdl3
+
+;; sdl3.k (typed; sdl3.osdefs.k measured from SDL3's headers) opens a window on SDL's dummy video driver,
+;; draws a known frame, reads it back and round-trips synthetic mouse and key events (check/sdl3-window.k).
+;; Without SDL3 (pkg-config, or pkg-config itself, finds no sdl3) it says it skipped and passes.
+(check "sdl3_window"
+  (if (= 0 (run-status 60 "pkg-config --exists sdl3"))
+      (let ((prog (concat-strings tmp "/sdl3-window")))
+	(run "sdl3-osdefs-built" "make -q sdl3.osdefs.k")	; measured from these headers, not stale
+	(run "sdl3-window-src" (concat-strings "cat sdl3.osdefs.k sdl3.k check/sdl3-window.k > " tmp "/sdl3-window.k"))
+	(run "sdl3-window-gen" (concat-strings "./eval2 ir-gen-c.k maru.k " tmp "/sdl3-window.k > " prog ".c"))
+	(run "sdl3-window-cc" (concat-strings "cc -fno-builtin -w -o " prog " " prog ".c $(pkg-config --libs sdl3)"))
+	(unit-assert (equal (last (run "sdl3_window" (concat-strings "SDL_VIDEO_DRIVER=dummy " prog))) "sdl3 ok")))
+      (println "SKIP sdl3_window: SDL3 is not installed (pkg-config --exists sdl3 fails)")))
+
 ;;; ---------------------------------------------------------------- boot2
 
 ;; boot2.l defines in Maru the string and number operations eval2 dropped.
@@ -763,6 +787,9 @@
 ;; ir-gen-c's library mode: a unit with no main, built as a shared library and opened from untyped Maru (library-mode.l)
 (check "library_mode"
   (unit-assert (equal (last (run "library_mode" "./eval check/library-mode.l" 120)) "library mode ok")))
+
+(check "gezira_scene"
+  (unit-assert (equal (last (run "gezira_scene" "./eval check/gezira-scene.l" 300)) "gezira scene ok")))
 
 (check "gezira_maru"
   (unit-assert (equal (last (run "gezira_maru" "./eval check/gezira-maru.l" 300)) "gezira maru ok")))

@@ -8,12 +8,7 @@
 (define dlsym (subr "dlsym" "ps>p"))
 (define system (subr "system" "s>i"))
 
-(define-selector gezira-image (gezira) (error "gezira-maru: " gezira " paints no image"))
-(define-selector gezira-clear (gezira) (error "gezira-maru: " gezira " paints no image"))
-(define-selector gezira-pixel (gezira x y) (error "gezira-maru: " gezira " paints no image"))
-(define-selector gezira-stop (gezira) (error "gezira-maru: " gezira " is no Gezira"))
-(define-selector gezira-fill-path (gezira matrix width height paint floats count)
-  (error "gezira-maru: " gezira " is no Gezira"))
+(require "gezira.l")
 
 ;; the library's shared object, by the platform's suffix, opened once from the tree (as make builds it)
 (define gezira-lib-path

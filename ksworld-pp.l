@@ -3,7 +3,7 @@
 (define-structure <ks-object> (class ref attrs slots data))
 (define-structure <ks-point>  (x y))
 (define-structure <ks-rect>   (left top right bottom))
-(define-structure <ks-matrix> (a b c d e f))
+(define-structure <ks-matrix> (a b c d e f))	; Gezira's: x' = a x + c y + e, y' = b x + d y + f
 (define-structure <ks-color>  (r g b a))
 
 (define-function ks-object? (x)	(= <ks-object> (type-of x)))
@@ -15,7 +15,23 @@
 (define-function ks-point (x y)			(new <ks-point> (* 1.0 x) (* 1.0 y)))
 (define-function ks-rect (l t r b)		(new <ks-rect> (* 1.0 l) (* 1.0 t) (* 1.0 r) (* 1.0 b)))
 (define-function ks-matrix (a b c d e f)	(new <ks-matrix> (* 1.0 a) (* 1.0 b) (* 1.0 c) (* 1.0 d) (* 1.0 e) (* 1.0 f)))
+;; a matrix as Squeak writes one, row by row (x' = a11 x + a12 y + a13, y' = a21 x + a22 y + a23): the documents' text, and
+;; KScript's M(...), say it so; read once into Gezira's fields
+(define-function ks-matrix-rows (a11 a12 a13 a21 a22 a23)	(ks-matrix a11 a21 a12 a22 a13 a23))
 (define-function ks-color (r g b a)		(new <ks-color> (* 1.0 r) (* 1.0 g) (* 1.0 b) (* 1.0 a)))
+
+;; (define-flags name a b c ...) defines a as 1, b as 2, c as 4, and so on, a bit each in order, and name as ((a . 1) ...)
+(define-form define-flags (name . members)
+  (let ((bit 1) (values ()))
+    (list-do m members
+      (push values `(define ,m ,bit))
+      (set bit (<< bit 1)))
+    `(let () ,@(list-reverse! values) (define ,name (list ,@(map (lambda (m) `(cons ',m ,m)) members))))))
+
+;; a face's style, as a document stores it: a bit for each emphasis, plain when none is set
+(define-flags ks-emphasis ks-bold ks-italic ks-underlined ks-narrow ks-struck-out)
+(define ks-plain 0)
+(define ks-bold-italic (| ks-bold ks-italic))
 
 (define-method do-print <ks-object> ()	(print "<" self.class "#" self.ref ">"))
 (define-method do-print <ks-point> ()	(print "(" self.x "@" self.y ")"))
@@ -115,8 +131,8 @@
 		     (/ (or (cadddr ws) 255) 255.0))))
 	((= vcls 'MatrixTransform2x3)
 	 (let ((ws (map string->double (ks-split vstr 32))))
-	   (ks-matrix (or (car ws) 1.0) (or (cadr ws) 0.0) (or (caddr ws) 0.0)
-		      (or (cadddr ws) 0.0) (or (car (cddddr ws)) 1.0) (or (cadr (cddddr ws)) 0.0))))
+	   (ks-matrix-rows (or (car ws) 1.0) (or (cadr ws) 0.0) (or (caddr ws) 0.0)
+			   (or (cadddr ws) 0.0) (or (car (cddddr ws)) 1.0) (or (cadr (cddddr ws)) 0.0))))
 	(else vstr)))
 
 (define-function b64-val (c)

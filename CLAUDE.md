@@ -20,7 +20,9 @@ relative to the current directory, so run everything from the repo root.
 The end goal is to synthesize the rest of VPRI's work into something that runs on modern
 machines. [tinlizzie.org](https://tinlizzie.org/), the archived VPRI site, is a core reference
 for that: the papers (`/VPRIPapers/`) and the top-down system's own dump (`/dbjr/`, including
-the KSWorld `.pp` bundles). Keep third-party texts in `~/pkm`, not in this tree.
+the KSWorld `.pp` bundles). Keep third-party texts in `~/pkm`, not in this tree, with one exception: `ksworld/` is
+KSWorld's own source, every KS class as Frank's image last had it (`ksworld/README.md` says where it comes from), kept
+here as the reference for the KSWorld work. Its `.st` files aren't counted in `lines`.
 
 ## Other history (tags)
 
@@ -101,6 +103,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `eval3`: `eval3` runs `boot2.l` with the `boot2_strings` and `asm_interface`
   cases, and `dlextern` (`check/dlextern.l`, as `libsdl2.k` uses it) calls libc
   through `subr` in `eval3` and `eval2` alike.
+- `sdl3_window` (`check/sdl3-window.k`, `sdl3.k`): `sdl3.k`, typed SDL3 over its C functions (measured in `sdl3.osdefs`), opens a
+  window on SDL's dummy video driver, draws a known frame, reads its pixels back at four points and round-trips a mouse button,
+  a motion and a key event. Offscreen fails on macOS (no GL), so the case sets `SDL_VIDEO_DRIVER=dummy`. `sdl3.osdefs.k` is
+  measured from this machine's SDL3 headers when the check builds (it isn't tracked), and the case asserts it's up to date.
+  Where `pkg-config` finds no SDL3 (or there's no `pkg-config`) it prints `SKIP` and passes.
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
@@ -195,16 +202,58 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   read held values, and layout and rendering don't exist yet.
   Methods are defined per kind of receiver (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), and
   a send no method answers is an error naming kind and selector; a KSWorld object's send sets or reads a field it already has, but
-  never makes one, which would hide a missing method.
+  never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
   counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
-  520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
-  `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
-  is a failure; unset, it says it skipped them.
+  520 objects, 346 streams (281 setters), every stream's code read, and nothing it names missing: `KSTextLayout`'s
+  `installSelection`, `handleButtonDown` and `handlePointerMotion` are class methods, which documents don't keep, and
+  `ksworld-events.l`'s stand in for KSWorld's own (KScript, in `ksworld/KSTextLayout.st`). Named but missing is a failure;
+  unset, it says it skipped them.
+  `ksworld-render.l`'s `(ksworld-render box gezira width height)` draws a document with whatever Gezira it's given: walking
+  the box tree (`backgroundParts`, `contents`, `parts`; a hidden box draws nothing), it asks `(gezira-fill-path gezira matrix
+  width height paint floats count)` of each shape's path, as its FloatArray holds it, placed by the matrix composed from every
+  transformation above it. The geometry is Gezira's, in Nile. `gezira-library.l`'s Gezira is libgezira and libnile
+  (`libgezira.k`, `libnile.k`: a `TransformBeziers`, `ClipBeziers`, `Rasterize`, composite pipeline); Gezira compiled into the
+  image would answer the same message, so neither need be a library. Matrices are Gezira's (x' = a x + c y + e); a
+  document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
+  a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
+  `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
+  `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
+  quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
+  KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,
+  `ksworld-pp.l`'s `define-flags`) is identical to what it reads from this system's Times New Roman, where macOS has it.
+  `ksworld-text.l` lays a text box's spans out as KSWorld did (its KSTextLayout's margins, justification, tab stops and
+  wrapping; lines ascent plus descent plus 2 apart; a centred line's width adding its first glyph's left bearing), and
+  `ksworld-render.l` draws each character's outline after the box's shape: each of KSWorld.ks's five text boxes puts the
+  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 937 paths (the three
+  carets it kept showing among them).
+  Fonts are found as a browser finds them: a family falls through to its alternatives, its generic family (`serif`,
+  `sans-serif`) and a last resort (DejaVu Sans, which `fetch-dbjr` fetches), and a character a font lacks to the next
+  font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
+  `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
+  KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
+  glyph's left bearing). An emphasis other than bold and italic is an error, and so is a
+  fill other than a uniform colour (the front page's `GeziraFillImage`).
+- `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
+  motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
+  left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
+  renderer composes), a motion or release to the box the hand holds if that stream is awake, then one tick runs. The
+  handlers are ours, written before KSWorld's own turned up in `ksworld/KSTextLayout.st`: a press puts the caret at the nearest gap, wakes `buttonUp` and `pointerMotion` and has the hand hold
+  the box; a drag selects from the press; a release, by the document's own stream, puts them back to sleep. A selection is
+  an Interval of gaps, `(from to: to + 1)`, as every one the documents kept is one wide, and the redraw asks the Gezira for
+  it in the layout's `selectionColor` under the text.
+- `ksworld_window` (`check/ksworld-window.l`): `ksworld-window.l` puts a running document in an SDL3 window through `sdl3.l`
+  (SDL3 for untyped Maru, through `subr`, with `sdl3.osdefs.k`'s constants and offsets; the library is the first of
+  `*sdl3-libraries*` that opens). Each `(ksworld-window-step win)` reads SDL's events, hands button 1's presses and
+  releases and every motion to `ksworld-pointer` (window points are document points), and draws a frame when one reached a
+  box, or first: it clears the Gezira, renders the document and shows `(gezira-image gezira)`, width x height ARGB pixels a
+  painting Gezira answers. Escape or a quit stops it. On the dummy driver the check queues a press, a drag and a release as
+  the window system would, and each reaches KSWorld.ks's title and draws a frame; its Gezira counts paths and paints
+  nothing, so pixels wait on a Gezira that paints (GeziraImage). Where `pkg-config` finds no SDL3 it prints `SKIP`.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
