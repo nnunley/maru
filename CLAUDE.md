@@ -96,7 +96,14 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `or`, `not` and every comparison (integers signed, pointers unsigned), on slots of 1, 2, 4 and 8 bytes; `* / %`, the
   bitwise operations and shifts (C's signed results), integer and pointer casts, struct fields through a pointer or an
   indexed element, indexing and `addressof`, each place reached through its address in a register. A conditional
-  branch is a short branch over `B`, so its reach is `B`'s.
+  branch is a short branch over `B`, so its reach is `B`'s. Globals live in a zeroed block the image owns, set by an
+  `__init` function run at install; externs resolve through `dlsym`, string literals are copied out of Maru's heap, and
+  calls follow the AAPCS64 with Apple's rules (stack arguments at natural alignment, variadic ones in 8-byte slots,
+  structs of 16 bytes or fewer in registers). `label` and `goto`, direct or computed, lower to labels and branches; a
+  value of type label takes a pointer's slot. `check/native/calls.k` (ten arguments, `printf`, a global), `zero-global.k`,
+  `check/ir2.k`, `maru-label.k` and `maru-test.k`'s primes and structs run their `main` in a forked child and print what
+  they do under `cc`; the child sets its JIT pages executable first (`pthread_jit_write_protect_np` is per thread, and a
+  forked one may start with them writable: an instruction abort at the code's entry).
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.
