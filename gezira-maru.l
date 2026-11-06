@@ -6,6 +6,7 @@
 ;;; gezira-pixel reads one.  gezira-clear makes it opaque white, as a page is.  The paint is (uniform alpha red green blue), the floats a Data buffer of 32-bit floats.
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
+(require "ksworld-pp.l")
 (define system (subr "system" "s>i"))
 
 (require "gezira.l")
@@ -25,11 +26,11 @@
 (define gezira-stop-entry (gezira-entry "gezira_stop" "l"))
 (define gezira-fill-entry (gezira-entry "gezira_fill" "lliippi>i"))
 
-(define-structure <gezira-maru> (init image width height))
+(define-structure <gezira-maru> (init image width height workers))
 
 (define-function gezira-maru (width height workers)
   (let ((init (gezira-start-entry workers)))
-    (new <gezira-maru> init (gezira-image-new-entry width height) width height)))
+    (new <gezira-maru> init (gezira-image-new-entry width height) width height workers)))
 
 (define-method gezira-image <gezira-maru> () self.image)
 
