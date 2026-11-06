@@ -158,6 +158,13 @@
     (and control (push out (list (car pen) (cadr pen) (car control) (cadr control) (car start) (cadr start))))
     (list-reverse! out)))
 
+;; a glyph's bounding box, (x-min y-min x-max y-max) in font units; all 0 for one with no outline
+(define-function ttf-bounds (f glyph)
+  (let* ((where (ttf-glyph-offset f glyph)) (at (+ (<ttf>-glyf f) (car where))))
+    (if (= (car where) (cdr where))
+	'(0 0 0 0)
+      (list (ttf-i16 f (+ at 2)) (ttf-i16 f (+ at 4)) (ttf-i16 f (+ at 6)) (ttf-i16 f (+ at 8))))))
+
 (define-function ttf-outline (f glyph)
   (let* ((where (ttf-glyph-offset f glyph)) (at (+ (<ttf>-glyf f) (car where))))
     (if (= (car where) (cdr where))

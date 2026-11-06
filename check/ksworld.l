@@ -18,34 +18,6 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("KScript: no method blink for KSBox" . 1))))
 
-;; the characters a document kept (each its own box, its shape a glyph from TrueType) against what truetype.l reads of the
-;; same character from the same font: Times New Roman, which KSWorld.ks's are, where this system has it, in the face's style.
-(define times-new-roman
-  (list (cons ks-plain		"Times New Roman")
-	(cons ks-bold		"Times New Roman Bold")
-	(cons ks-italic		"Times New Roman Italic")
-	(cons ks-bold-italic	"Times New Roman Bold Italic")))
-(define-function times-file (style)
-  (concat-strings "/System/Library/Fonts/Supplemental/" (cdr (assq style times-new-roman)) ".ttf"))
-(define-function shape-beziers (shape)
-  (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (<ks-object>-data (ks-slot path 'floats))) (out ()))
-    (for (i 0 (/ (/ (data-length floats) 4) 6))
-      (let ((z ())) (for (k 0 6) (push z (float-at floats (+ (* 6 i) k)))) (push out (list-reverse! z))))
-    (list-reverse! out)))
-(define-function box-style (box) (ks-slot (ks-slot (ks-val box 'font) 'face) 'style))
-(define-function glyphs-as-kept (table)
-  (if (not (= 0 ((subr "access" "si>i") (times-file ks-bold) 4)))
-      (println "KSWorld.ks's glyphs: skipped, no Times New Roman at " (times-file ks-plain))
-    (let ((seen 0))
-      (array-do o table
-	(when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (< 0 (or (ks-val o 'unicode) 0)) (ks-object? (ks-val o 'shape)))
-	  (set seen (+ seen 1))
-	  (let ((font (ttf-load (times-file (box-style o)))))
-	    (expect (concat-string "the glyph KSWorld kept for U+" (long->string (ks-val o 'unicode)))
-		    (shape-beziers (ks-val o 'shape))
-		    (map (lambda (z) (map (lambda (v) (* 1.0 v)) z)) (ttf-outline font (ttf-glyph font (ks-val o 'unicode))))))))
-      (expect "KSWorld.ks's kept glyphs, each compared" seen 5))))
-
 ;; what a document draws, asked of a Gezira: here one that records each path it's asked to fill, so the walk is checked
 ;; with no Gezira built
 (define-structure <gezira-recording> (paths))
@@ -57,6 +29,40 @@
   (let ((g (new <gezira-recording> ())))
     (ksworld-render (car (ksworld-load doc)) g width height)
     (list-reverse! (<gezira-recording>-paths g))))
+
+;; the characters a document kept (each its own box, its shape a glyph from TrueType) against what truetype.l reads of the
+;; same character from the same font, and each text box's last line, the one KSWorld left laid out, against where
+;; ksworld-text.l puts its first character: Times New Roman, which KSWorld.ks's are, where this system has it.
+(define-function shape-beziers (shape)
+  (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (<ks-object>-data (ks-slot path 'floats))) (out ()))
+    (for (i 0 (/ (/ (data-length floats) 4) 6))
+      (let ((z ())) (for (k 0 6) (push z (float-at floats (+ (* 6 i) k)))) (push out (list-reverse! z))))
+    (list-reverse! out)))
+(define-function box-style (box) (ks-slot (ks-slot (ks-val box 'font) 'face) 'style))
+(define-function near (a b) (let ((d (- a b))) (< (* d d) 0.00000001)))
+(define-function laid-out-as-kept (box)
+  (let ((c (ks-slot (ks-slot box 'handler) 'lineStart)) (found ()))
+    (list-do g (ks-text-glyphs box)
+      (let ((p (ks-glyph-box g)) (m (ks-val c 'transformation)))
+	(and (= (<ks-glyph>-glyph g) (ttf-glyph (<ks-glyph>-font g) (ks-val c 'unicode)))
+	     (near (<ks-point>-x p) (<ks-matrix>-e m)) (near (<ks-point>-y p) (<ks-matrix>-f m))
+	     (set found 1))))
+    found))
+(define-function text-as-kept (table doc)
+  (let ((kept 0) (boxes 0))
+    (array-do o table
+      (when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (< 0 (or (ks-val o 'unicode) 0)) (ks-object? (ks-val o 'shape)))
+	(set kept (+ kept 1))
+	(let ((font (ks-font 'TimesNewRoman (box-style o))))
+	  (expect (concat-string "the glyph KSWorld kept for U+" (long->string (ks-val o 'unicode)))
+		  (shape-beziers (ks-val o 'shape))
+		  (map (lambda (z) (map (lambda (v) (* 1.0 v)) z)) (ttf-outline font (ttf-glyph font (ks-val o 'unicode)))))))
+      (when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o))
+	(set boxes (+ boxes 1))
+	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s last line, laid out as KSWorld did")
+		(laid-out-as-kept o) 1)))
+    (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
+    (expect "KSWorld.ks: the paths it draws, shapes then each character" (list-length (drawn doc 1024 768)) 934)))
 
 (require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
 (expect "the library Gezira is one" (type-of (gezira-library 0 0)) <gezira-library>)
@@ -90,7 +96,9 @@
 		  '(("KScript: no method installSelection for KSTextLayout" . 10)
 		    ("KScript: no method handlePointerMotion for KSTextLayout" . 5)
 		    ("KScript: no method handleButtonDown for KSTextLayout" . 5)))
-	  (expect "KSWorld.ks: the paths its boxes' shapes draw, before text" (list-length (drawn doc 1024 768)) 7)
-	  (glyphs-as-kept (at r 'table)))))))
+	  (set *ks-font-path* (cons (concat-string dir "/fonts") *ks-font-path*))
+	  (if (ks-font-file 'TimesNewRoman ks-bold)
+	      (text-as-kept (at r 'table) doc)
+	    (println "KSWorld.ks's text: skipped, no Times New Roman in " *ks-font-path*)))))))
 
 (println (if ok "ksworld ok" "ksworld FAILED"))

@@ -221,8 +221,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
   `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
   quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
-  KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being Squeak's
-  emphasis) is identical to what it reads from this system's Times New Roman, where macOS has it.
+  KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,
+  `ksworld-pp.l`'s `define-flags`) is identical to what it reads from this system's Times New Roman, where macOS has it.
+  `ksworld-text.l` lays a text box's spans out as KSWorld did (its KSTextLayout's margins, justification, tab stops and
+  wrapping; lines ascent plus descent plus 2 apart; a centred line's width adding its first glyph's left bearing), and
+  `ksworld-render.l` draws each character's outline after the box's shape: each of KSWorld.ks's five text boxes puts the
+  character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 934 paths. A family
+  with no `.ttf` (Palatino Linotype; macOS has only a `.ttc`) or an emphasis other than bold and italic is an error.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

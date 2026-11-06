@@ -20,16 +20,18 @@
 (define-function ks-matrix-rows (a11 a12 a13 a21 a22 a23)	(ks-matrix a11 a21 a12 a22 a13 a23))
 (define-function ks-color (r g b a)		(new <ks-color> (* 1.0 r) (* 1.0 g) (* 1.0 b) (* 1.0 a)))
 
-;; (define-enum name a b c ...) defines a as 0, b as 1, and so on, counted in order, and name as the list of them
-(define-form define-enum (name . members)
-  (let ((n 0) (values ()))
+;; (define-flags name a b c ...) defines a as 1, b as 2, c as 4, and so on, a bit each in order, and name as ((a . 1) ...)
+(define-form define-flags (name . members)
+  (let ((bit 1) (values ()))
     (list-do m members
-      (push values `(define ,m ,n))
-      (set n (+ n 1)))
-    `(let () ,@(list-reverse! values) (define ,name ',members))))
+      (push values `(define ,m ,bit))
+      (set bit (<< bit 1)))
+    `(let () ,@(list-reverse! values) (define ,name (list ,@(map (lambda (m) `(cons ',m ,m)) members))))))
 
-;; a face's style, as Squeak counts its emphasis
-(define-enum ks-emphasis ks-plain ks-bold ks-italic ks-bold-italic)
+;; a face's style, as a document stores it: a bit for each emphasis, plain when none is set
+(define-flags ks-emphasis ks-bold ks-italic ks-underlined ks-narrow ks-struck-out)
+(define ks-plain 0)
+(define ks-bold-italic (| ks-bold ks-italic))
 
 (define-method do-print <ks-object> ()	(print "<" self.class "#" self.ref ">"))
 (define-method do-print <ks-point> ()	(print "(" self.x "@" self.y ")"))

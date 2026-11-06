@@ -5,8 +5,10 @@
 ;;; Gezira compiled into the image answers the same message, so neither has to be a library.
 ;;; A box draws its shape, then its contents in order, so later ones are on top (TR-2013-002, 4.1 and 4.2): each
 ;;; transformation is relative to the box's container, and a glyph's shape has its own transform from em units, so each
-;;; box's matrix is composed here, six numbers, in Gezira's terms.
+;;; box's matrix is composed here, six numbers, in Gezira's terms.  A text box's spans, laid out by ksworld-text.l, are drawn
+;;; after its shape, each character its TrueType outline.
 (require "kscript.l")
+(require "ksworld-text.l")
 
 (define-selector gezira-fill-path (gezira matrix width height paint floats count)
   (error "ksworld-render: " gezira " is no Gezira"))
@@ -42,6 +44,12 @@
 	  (list-do element (ks-items (ks-slot shape 'elements))
 	    (and (ks-object? element) (= 'GeziraPath (<ks-object>-class element))
 		 (ksworld-render-path element sm gezira width height)))))
+      (when (ks-text-box? box)
+	(list-do g (ks-text-glyphs box)
+	  (let ((floats (ks-glyph-floats g)))
+	    (and (< 0 (data-length floats))
+		 (gezira-fill-path gezira (ks-compose here (ks-glyph-matrix g)) width height (<ks-glyph>-paint g)
+				   floats (/ (data-length floats) 4))))))
       (list-do part '(backgroundParts contents parts)
 	(list-do child (ks-items (ks-val box part))
 	  (ksworld-render-box child here gezira width height))))))
