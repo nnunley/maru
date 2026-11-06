@@ -1,0 +1,59 @@
+; KSWorld documents, headless (docs/superpowers/specs/2026-11-06-ksworld-headless-design.md): what's being built, what it
+; builds on, and what would show it works.  MARU_PLAN=ksworld notes/plan/record asks the checks; ./eval notes/plan/next.l
+; with MARU_PLAN=ksworld says what's next.  The documents are third-party, so they're fetched into a temporary directory
+; first, and every check that reads them is asked of that copy: a KSWorld objective never stands on documents we didn't fetch.
+
+start-world plan.
+load "notes/plan/probes.l".
+
+set Evidence = untested | passed(tree) | failed(tree)
+  | tested(tree, trials) | proved(tree, cases) | refuted(tree, counterexample) | starved(tree, met, drawn)
+  | vacuous(tree) | inconclusive(tree, input).
+group Good passed tested proved.
+
+group Check Case Measure Grammar Law.
+create Case evidence.
+create Measure evidence command cadence.
+create Grammar evidence file class rule host inherits samples.
+create Law evidence file support.
+qualify Case observe is it case-passes.
+qualify Measure observe is it command-succeeds.
+qualify Grammar observe is it compiles-and-reads.
+qualify Law observe is it law-verdict.
+qualify Check routine if 1 = 1.
+qualify Measure routine if its cadence = "routine".
+
+; first the documents, into the directory the checks below read
+make Measure DbjrDocuments untested "notes/plan/fetch-dbjr /tmp/maru-plan/dbjr" "routine".
+make Measure KSWorldHeadless untested
+  "notes/plan/fetch-dbjr /tmp/maru-plan/dbjr && MARU_DBJR=/tmp/maru-plan/dbjr nice make check CHECKS=ksworld_headless" "routine".
+make Measure WholeSuite untested "MARU_DBJR=/tmp/maru-plan/dbjr nice make check" "full".
+
+create Code tree.
+action Check observed Answer consequence its evidence = Answer.
+qualify Check holds if its evidence is Good and its evidence tree = Now tree.
+qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
+
+create Capability what where shown-by builds-on planned.
+make Capability DocumentsAvailable "the dbjr documents the checks read are fetched from tinlizzie.org/dbjr into a temporary directory"
+  "notes/plan/fetch-dbjr" [ DbjrDocuments ] [ ] no.
+make Capability RunsHeadless "a KSWorld document loads, every stream's code reads, and the evaluator runs it tick by tick, naming each send nothing answers"
+  "ksworld-run.l, kscript.l" [ KSWorldHeadless ] [ DocumentsAvailable ] no.
+make Capability NothingElseBroke "every other check in the repository still passes"
+  "the whole tree" [ WholeSuite ] [ RunsHeadless ] no.
+
+qualify Capability proven if its shown-by size > 0 and for every its shown-by do each holds = yes.
+qualify Capability done if it proven = yes or it planned = yes.
+qualify Capability ready if for every its builds-on do each done = yes.
+rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
+rel-qualify Check:C supports Capability:K if C in K shown-by.
+qualify Check regressed if not its evidence is Good and not its evidence is untested
+  and for some time A up to time do (at time A its evidence is Good).
+
+create Team.
+make Team T.
+action Team build Capability consequence Capability planned = yes.
+rule Team build is Capability done = no.
+rule Team build is Capability ready = yes.
+goal Team deliver try for every all Capability do each done = yes.
+goal-strategy Team deliver sat.

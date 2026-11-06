@@ -1,6 +1,8 @@
 #!/bin/sh
 # notes/plan/record [full]: appends what the checks answer about this code to the evidence, and shows the plan.
 events=$(mktemp)
-./eval notes/plan/observe.l "$@" > "$events" && cat "$events" >> notes/plan/evidence.john
+# MARU_PLAN names the plan (notes/plan/NAME.john), tree-matching if unset; each has its own evidence file
+case "${MARU_PLAN:-tree-matching}" in tree-matching) ledger=notes/plan/evidence.john ;; *) ledger=notes/plan/$MARU_PLAN-evidence.john ;; esac
+./eval notes/plan/observe.l "$@" > "$events" && cat "$events" >> "$ledger"
 rm -f "$events"
 exec ./eval notes/plan/next.l

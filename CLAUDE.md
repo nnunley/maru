@@ -199,10 +199,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
-  counts a timer's ticks and names the send nothing answers. Where the dbjr documents are (`MARU_DBJR`, else `~/pkm`'s
-  copy; third-party, so never in this tree) it runs `KSWorld.ks`: 520 objects, 346 streams (281 setters), every stream's
-  code read, and `KSTextLayout`'s `installSelection`, `handleButtonDown` and `handlePointerMotion` missing (they were
-  Squeak methods in an image that didn't survive). Otherwise it says it skipped them.
+  counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
+  as tinlizzie.org/dbjr (`notes/plan/fetch-dbjr DIR` makes one; third-party, so never in this tree) it runs `KSWorld.ks`:
+  520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
+  `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
+  is a failure; unset, it says it skipped them.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for
@@ -377,6 +378,8 @@ evaluator, reading its language) and prints the answers as events, each an `Evid
 `notes/plan/record [full]` appends them to `evidence.john`; `./eval notes/plan/next.l` shows what's done and the next step,
 running nothing. A law's check answers its verdict, with what backs it, and only tested or proved counts. Planning says `using build`, so
 under `sat` the evidence is constant. `notes/plan/LOOP.md` holds the loop's rules and notes.
+`MARU_PLAN=NAME` picks another plan, `notes/plan/NAME.john` with its own `NAME-evidence.john`: `ksworld` is the headless
+KSWorld work, whose first capability fetches the dbjr documents into `/tmp/maru-plan/dbjr` for the checks that read them.
 
 ## Known not to work (verified on arm64 macOS)
 

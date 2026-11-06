@@ -10,7 +10,7 @@ snapshot() {
   git add -u
   sources=$(git ls-files -o --exclude-standard | { grep -E '[.](l|k|g|c|h|nl|spec|osdefs|irl|dc|law|john)$|Makefile$' || true; })
   [ -z "$sources" ] || echo "$sources" | git add --pathspec-from-file=-
-  git rm -q --cached --ignore-unmatch notes/plan/evidence.john '*.md'
+  git rm -q --cached --ignore-unmatch notes/plan/evidence.john 'notes/plan/*-evidence.john' '*.md'
   git write-tree
   unset GIT_INDEX_FILE
   rm -f "$index"

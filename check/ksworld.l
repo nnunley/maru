@@ -1,5 +1,5 @@
 ;;; KSWorld documents run headless (ksworld-run.l): a fixture of ours, every stream read and run tick by tick, a send no
-;;; method answers named as the failure; and, where the dbjr documents are (MARU_DBJR, else ~/pkm's copy), KSWorld.ks.
+;;; method answers named as the failure; and KSWorld.ks, from the dbjr documents MARU_DBJR names (notes/plan/fetch-dbjr).
 (require "ksworld-run.l")
 (require "check/temp.l")
 (define ok 1)
@@ -25,17 +25,19 @@
 (expect "a value's kind names the failure too"
 	(try (ks-send 5 'frobnicate () () ()) (lambda (c) (ksw-message c))) "KScript: no method frobnicate for Number")
 
-(let* ((dir (or (env-var "MARU_DBJR") (concat-string (or (env-var "HOME") "/nonexistent") "/pkm/raw/vpri/frank/dbjr/docs")))
-       (doc (concat-string dir "/d4ea559dada5.pp")))	; KSWorld.ks/index.pp
-  (if (not (= 0 ((subr "access" "si>i") doc 4)))
-      (println "KSWorld.ks: skipped, no dbjr documents at " dir)
-    (let ((r (ksworld-run doc 3)))
-      (expect "KSWorld.ks: objects and streams" (list (at r 'objects) (at r 'streams) (at r 'setters) (at r 'code) (at r 'unreadable))
-	      '(520 346 281 65 0))
-      (expect "KSWorld.ks: what's missing"
-	      (at r 'failures)
-	      '(("KScript: no method installSelection for KSTextLayout" . 10)
-		("KScript: no method handlePointerMotion for KSTextLayout" . 5)
-		("KScript: no method handleButtonDown for KSTextLayout" . 5))))))
+(let ((dir (env-var "MARU_DBJR")))	; laid out as tinlizzie.org/dbjr: notes/plan/fetch-dbjr DIR makes one
+  (if (not dir)
+      (println "KSWorld.ks: skipped, MARU_DBJR names no dbjr documents")
+    (let ((doc (concat-string dir "/KSWorld.ks/index.pp")))
+      (if (not (= 0 ((subr "access" "si>i") doc 4)))
+	  (expect "MARU_DBJR holds KSWorld.ks" doc ())	; named but missing is a failure, not a skip
+	(let ((r (ksworld-run doc 3)))
+	  (expect "KSWorld.ks: objects and streams" (list (at r 'objects) (at r 'streams) (at r 'setters) (at r 'code) (at r 'unreadable))
+		  '(520 346 281 65 0))
+	  (expect "KSWorld.ks: what's missing"
+		  (at r 'failures)
+		  '(("KScript: no method installSelection for KSTextLayout" . 10)
+		    ("KScript: no method handlePointerMotion for KSTextLayout" . 5)
+		    ("KScript: no method handleButtonDown for KSTextLayout" . 5))))))))
 
 (println (if ok "ksworld ok" "ksworld FAILED"))

@@ -14,8 +14,13 @@
     (or (and (= 0 status) (= 13 (string-length text))) (error "notes/plan/tree-hash gave no hash"))
     (string-copy text 0 12)))
 (define plan-tree (plan-tree-now))
-(define plan-evidence (john-read "notes/plan/evidence.john"))
-(john-run (concat-list (john-read "notes/plan/tree-matching.john")
+;; which plan: MARU_PLAN names notes/plan/NAME.john, tree-matching if unset; each keeps its evidence apart
+(define plan-name (or (env-var "MARU_PLAN") "tree-matching"))
+(define plan-evidence-file
+  (if (= plan-name "tree-matching") "notes/plan/evidence.john" (concat-strings "notes/plan/" plan-name "-evidence.john")))
+(or (= 0 ((subr "access" "si>i") plan-evidence-file 4)) (system (concat-strings "touch " plan-evidence-file)))
+(define plan-evidence (john-read plan-evidence-file))
+(john-run (concat-list (john-read (concat-strings "notes/plan/" plan-name ".john"))
 		       (cons (list 'make 'Code 'Now plan-tree) plan-evidence)))
 (define-function plan-ask (object message . args)
   (john-eval `(send ,object ,message ,@args) *john-world* ()))

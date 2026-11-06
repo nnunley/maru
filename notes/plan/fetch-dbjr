@@ -1,0 +1,10 @@
+#!/bin/sh
+# notes/plan/fetch-dbjr DIR: the dbjr documents the KSWorld checks read, from tinlizzie.org/dbjr into DIR, laid out as there.
+# Third-party, so they live in a temporary directory, never in this tree.  A file already there isn't fetched again.
+set -e
+dir=${1:-/tmp/maru-plan/dbjr}
+for doc in "KSWorld.ks/index.pp" "Front page Onward Full v8.ks/index.pp"; do
+	mkdir -p "$dir/$(dirname "$doc")"
+	[ -s "$dir/$doc" ] || curl -sfL --max-time 120 -o "$dir/$doc" "https://tinlizzie.org/dbjr/$(printf '%s' "$doc" | sed 's/ /%20/g')"
+	head -c 9 "$dir/$doc" | grep -q '^(objects' || { echo "not a KSWorld document: $dir/$doc" >&2; exit 1; }
+done
