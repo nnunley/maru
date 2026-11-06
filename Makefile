@@ -61,9 +61,20 @@ CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l
 
+# Runs $(1) with MARU_DBJR naming the dbjr documents the KSWorld check reads: the caller's, or else fetched into a fresh
+# temporary directory (mktemp -d, under TMPDIR) and removed after.  Only when the KSWorld check is among those run.  If
+# they can't be fetched it says so, and that check says it skipped them.
+define with-dbjr
+	@case " $(CHECKS) $(2) " in *ksworld*|"  ") fetch=yes ;; *) fetch= ;; esac; \
+	if [ -n "$$MARU_DBJR" ] || [ -z "$$fetch" ]; then $(1); \
+	else dbjr=$$(mktemp -d "$${TMPDIR:-/tmp}/maru-dbjr.XXXXXX") && \
+	  if notes/plan/fetch-dbjr "$$dbjr"; then MARU_DBJR=$$dbjr $(1); else echo "dbjr documents not fetched: KSWorld.ks isn't checked"; $(1); fi; \
+	  status=$$?; rm -rf "$$dbjr"; exit $$status; fi
+endef
+
 check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l kscript.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
-	./eval check/parallel.l $(CHECKS)
+	$(call with-dbjr,./eval check/parallel.l $(CHECKS))
 
 check-sweep : eval eval2 eval3 .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
@@ -71,7 +82,7 @@ check-sweep : eval eval2 eval3 .force
 
 check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l kscript.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
-	./eval check/parallel.l --quick
+	$(call with-dbjr,./eval check/parallel.l --quick)
 
 # a target whose recipe fails is removed, so no check reads a half-written file
 .DELETE_ON_ERROR :

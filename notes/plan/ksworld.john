@@ -1,7 +1,7 @@
 ; KSWorld documents, headless (docs/superpowers/specs/2026-11-06-ksworld-headless-design.md): what's being built, what it
 ; builds on, and what would show it works.  MARU_PLAN=ksworld notes/plan/record asks the checks; ./eval notes/plan/next.l
-; with MARU_PLAN=ksworld says what's next.  The documents are third-party, so they're fetched into a temporary directory
-; first, and every check that reads them is asked of that copy: a KSWorld objective never stands on documents we didn't fetch.
+; with MARU_PLAN=ksworld says what's next.  The documents are third-party, so make check fetches them into a temporary
+; directory (mktemp -d) before the checks that read them: a KSWorld objective never stands on documents we didn't fetch.
 
 start-world plan.
 load "notes/plan/probes.l".
@@ -23,11 +23,11 @@ qualify Law observe is it law-verdict.
 qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
-; first the documents, into the directory the checks below read
-make Measure DbjrDocuments untested "notes/plan/fetch-dbjr /tmp/maru-plan/dbjr" "routine".
-make Measure KSWorldHeadless untested
-  "notes/plan/fetch-dbjr /tmp/maru-plan/dbjr && MARU_DBJR=/tmp/maru-plan/dbjr nice make check CHECKS=ksworld_headless" "routine".
-make Measure WholeSuite untested "MARU_DBJR=/tmp/maru-plan/dbjr nice make check" "full".
+; first that the documents can be fetched; make check fetches them itself into a temporary directory before its KSWorld check
+make Measure DbjrDocuments untested
+  "d=$(mktemp -d \"${TMPDIR:-/tmp}/maru-dbjr.XXXXXX\") && notes/plan/fetch-dbjr \"$d\"; s=$?; rm -rf \"$d\"; exit $s" "routine".
+make Measure KSWorldHeadless untested "nice make check CHECKS=ksworld_headless" "routine".
+make Measure WholeSuite untested "nice make check" "full".
 
 create Code tree.
 action Check observed Answer consequence its evidence = Answer.

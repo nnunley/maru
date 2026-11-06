@@ -1,8 +1,9 @@
 #!/bin/sh
 # notes/plan/fetch-dbjr DIR: the dbjr documents the KSWorld checks read, from tinlizzie.org/dbjr into DIR, laid out as there.
-# Third-party, so they live in a temporary directory, never in this tree.  A file already there isn't fetched again.
+# Third-party, so DIR is a temporary directory (make check makes one with mktemp -d), never this tree.  A file already
+# there isn't fetched again.
 set -e
-dir=${1:-/tmp/maru-plan/dbjr}
+dir=${1:?usage: notes/plan/fetch-dbjr DIR}
 for doc in "KSWorld.ks/index.pp" "Front page Onward Full v8.ks/index.pp"; do
 	mkdir -p "$dir/$(dirname "$doc")"
 	[ -s "$dir/$doc" ] || curl -sfL --max-time 120 -o "$dir/$doc" "https://tinlizzie.org/dbjr/$(printf '%s' "$doc" | sed 's/ /%20/g')"
