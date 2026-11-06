@@ -748,6 +748,16 @@
       (unit-assert (equal (run (concat-strings "nile-text-layout-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-text-layout-" n ".err") 300)
 			  '("text-layout ok"))))))
 
+;; Gezira's kernels, from gezira/nile/gezira.nl (the 2016 Nile source), through Nile's Maru back end and
+;; the Maru runtime: a 40 by 30 rectangle at (10.5, 20) composited into an ARGB32 image, with one worker and four.
+(check "gezira_image"
+  (let* ((gen (concat-strings tmp "/gezira-gen"))
+	 (_   (run "gezira-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh gezira $R/gezira/nile/gezira.nl")))
+	 (bin (nile-build "nile-gezira-image" (list (concat-strings gen "/gezira.k") (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "test/gezira-image.k")) "")))
+    (list-do n '("1" "4")
+      (unit-assert (equal (run (concat-strings "nile-gezira-image-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-gezira-image-" n ".err") 300)
+			  '("gezira image ok"))))))
+
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")

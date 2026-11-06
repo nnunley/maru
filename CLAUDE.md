@@ -362,6 +362,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `nile_text_layout` (`check/check.l`): `text-layout.nl`, compiled by `nile-to-maru-compiler.sh` as module `text_layout`,
   runs through the Maru runtime (`nile/runtimes/maru/test/text-layout.k`) with 1 and 8 workers and lays four glyphs out
   as (0,0) (3,0) (6,0) (0,1).
+- `gezira_image` (`check/check.l`): `gezira/nile/gezira.nl`, Gezira in the 2016 Nile dialect, compiled by Nile's Maru back end
+  and built with the runtime, with `nile/runtimes/maru/gezira-image.k` (the ARGB32 composite) renders a 40 by 30 rectangle at
+  (10.5, 20) through TransformBeziers, ClipBeziers, Rasterize and ApplyTexturer: full pixels red, edge columns half covered, the
+  rest white, on 1 and 4 workers (`nile/runtimes/maru/test/gezira-image.k`).
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change

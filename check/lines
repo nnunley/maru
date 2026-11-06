@@ -165,3 +165,8 @@
 +52 nile-gen-code-maru.l: an if's branches each bind their primed values, and after the if each is copied into fresh variables, the branch's when the condition holds and the other's otherwise; before, both branches' values were written back unconditionally, so the last branch always won (nile/compilers/maru)
 +63 test/text-layout.k: the text-layout.nl driver: four glyphs through LayoutText on one or eight workers, asserting the four points (R-text-layout); a driver, so it counts (nile/runtimes/maru/test)
 +10 check/check.l: the nile_text_layout case, which compiles text-layout.nl as module text_layout (a hyphen isn't in a C name) and runs it with 1 and 8 workers (check/check.l)
++848 gezira/nile/gezira.nl: Gezira in the 2016 Nile dialect, the defs textarea of compilers/js/nile-compiler.html at damelang/nile 8c76903, copied verbatim with a three-line header (gezira/nile)
++82 gezira-image.k: WriteToImage_ARGB32, the ARGB32 composite gezira/c/gezira-image.c has in C, as a typed Maru consumer of (Color, x, y, coverage, inverse coverage) (nile/runtimes/maru)
++109 test/gezira-image.k: the gezira_image driver: a 40 by 30 rectangle at (10.5, 20) through the compiled Gezira kernels into the image, on one or four workers, asserting the pixels (R-gezira-image); a driver, so it counts (nile/runtimes/maru/test)
++10 check/check.l: the gezira_image case, which compiles gezira.nl with Nile's Maru back end and builds it with the runtime (check/check.l)
++16 nile-gen-code.l: SortBy's index is converted from Nile's 1-based field number to the runtime's 0-based offset, and a process argument's type is found through a typedef such as Texturer (nile/compilers/maru)
