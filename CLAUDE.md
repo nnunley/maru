@@ -210,6 +210,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   520 objects, 346 streams (281 setters), every stream's code read, and `KSTextLayout`'s `installSelection`,
   `handleButtonDown` and `handlePointerMotion` missing (Squeak methods in an image that didn't survive). Named but missing
   is a failure; unset, it says it skipped them.
+  `ksworld-scene.l`'s `(ksworld-scene box)` is what a document draws: walking the box tree (`backgroundParts`, `contents`,
+  `parts`; a hidden box draws nothing), each shape's paths, their quadratic Béziers composed through every transformation
+  into window coordinates, with their fills, in drawing order. KSWorld.ks's boxes draw 7 paths before its text, which is
+  kept as `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
 - `sat_john` (`check/sat-john.l`): `cnf.l`'s gates (and, or, xor, iff, mux, true, exactly
   one) agree with their truth tables through the solver. Under `set-opt planner sat`,
   `satisfy` goes to `john-sat.l`, which infers a sort (number, name, or list of a sort) for

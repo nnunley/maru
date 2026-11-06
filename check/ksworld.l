@@ -1,6 +1,7 @@
 ;;; KSWorld documents run headless (ksworld-run.l): a fixture of ours, every stream read and run tick by tick, a send no
 ;;; method answers named as the failure; and KSWorld.ks, from the dbjr documents MARU_DBJR names (notes/plan/fetch-dbjr).
 (require "ksworld-run.l")
+(require "ksworld-scene.l")
 (require "check/temp.l")
 (define ok 1)
 (define-function expect (what got want)
@@ -15,6 +16,14 @@
   (expect "a setter keeps the value the document holds" (ks-val box 'label) "hello")
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("KScript: no method blink for KSBox" . 1))))
+
+;; what a document draws: a box's shape through its transformation and its container's, a hidden box drawing nothing
+(let ((scene (ksworld-scene (car (ksworld-load "check/ksworld/scene.pp")))))
+  (expect "one path drawn, its fill" (list (list-length scene) (<ks-object>-class (caar scene))) '(1 GeziraFillUniform))
+  (expect "its Béziers in the window, through both transformations"
+	  (cdar scene)
+	  '((105.0 57.0 105.0 57.0 125.0 57.0) (125.0 57.0 125.0 57.0 125.0 97.0)
+	    (125.0 97.0 125.0 97.0 105.0 97.0) (105.0 97.0 105.0 97.0 105.0 57.0))))
 
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send 'Color 'white () () ())) (try (ks-send 'Color 'lighter () () ()) (lambda (c) (ksw-message c))))
@@ -38,6 +47,7 @@
 		  (at r 'failures)
 		  '(("KScript: no method installSelection for KSTextLayout" . 10)
 		    ("KScript: no method handlePointerMotion for KSTextLayout" . 5)
-		    ("KScript: no method handleButtonDown for KSTextLayout" . 5))))))))
+		    ("KScript: no method handleButtonDown for KSTextLayout" . 5)))
+	  (expect "KSWorld.ks: the paths its boxes' shapes draw, before text" (list-length (ksworld-scene (array-at (at r 'table) 1))) 7))))))
 
 (println (if ok "ksworld ok" "ksworld FAILED"))
