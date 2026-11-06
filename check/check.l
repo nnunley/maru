@@ -629,6 +629,24 @@
       (unit-assert (< 1000 (string-length was)))
       (unit-assert (equal was now)))))
 
+;; nile.k declares every call of the RFC's public and kernel interface tables
+;; (in their order), and Nile's Maru generator passes sizeof_vars as the
+;; fourth argument of nile_Process (R-one-interface). The link half, test/
+;; interface.k against the runtime, waits for the runtime's task; until then
+;; this asserts the declarations and the generator.
+(check "nile_interface"
+  (let ((n "nile/runtimes/maru/nile.k")
+	(c "$R/nile/compilers/maru")
+	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
+    (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
+			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
+    ;; compiles against nile.k alone (the driver's calls are resolved at run time, so this stops short of linking)
+    (run "nile-iface-gen" (concat-strings "./eval2 ir-gen-c.k maru.k " n " nile/runtimes/maru/test/interface.k > " tmp "/interface.c"))
+    (run "nile-iface-cc" (concat-strings "cc -c -fno-builtin -w -o " tmp "/interface.o " tmp "/interface.c"))
+    (run "nile-iface"(concat-strings "R=$PWD; mkdir -p " tmp "/iface && cd " tmp "/iface && " c "/nile-to-maru-compiler.sh text-layout $R/nile/examples/text-layout.nl"))
+    (unit-assert (string-find (contents-of-file-named (concat-strings tmp "/iface/text-layout.k"))
+			      "(nile_Process parent 2 3 (sizeof struct text-layout_MakeWords_vars)"))))
+
 ;;; ---------------------------------------------------------------- budget
 
 ;; Derived code and code outside the stack (marked derived or unused in
