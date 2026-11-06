@@ -89,7 +89,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `gen-asm-x86.k` (C preprocessor encoding macros, read by a grammar) encodes as
   `clang -target i386` does. Change the spec, never `asm-x86.k`.
 - `ir2` (`check/ir2.k`): sizes, alignment and struct padding match `osdefs.k`;
-  pointer offsets of any integer width move by bytes at full pointer width.
+  pointer offsets of any integer width move by bytes at full pointer width; an indexed element is an lvalue, as in C,
+  so a struct in an array has its fields read and written in place and `(addressof (indir s i))` is i elements in.
 - `core_forms` (`check/core-forms.l`): arithmetic, comparison and logical
   forms give the same values untyped and through `maru.k`.
 - `zero_global` (`check/zero-global.k`): a global declared with no

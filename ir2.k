@@ -505,8 +505,6 @@
 							    (set self.parameters (list m))
 							    (set self.type (<ir-struct-member>-type m)))))
 
-(define-selector ir-member? args			())
-(define-method ir-member? <ir-member> ()		1)
 
 ;
 
@@ -584,12 +582,17 @@
 
 ;
 
+;; what has an address, as in C: a variable, a field, an indexed element
+(define-selector ir-lvalue? args			())
+(define-method ir-lvalue? <ir-get-var> ()		1)
+(define-method ir-lvalue? <ir-member> ()		1)
+(define-method ir-lvalue? <ir-indir> ()			1)
+
 (define-class <ir-addressof> <ir-insn> ())		(define-function ir-addressof (args)	(new <ir-addressof> () args))
 
 (define-method ir-check-type <ir-addressof> (ir val?)	(let* ((lval (car self.operands))
 							       (type (ir-check-type lval ir 1)))
-							  (or (ir-get-var? lval)
-							      (ir-member?  lval)
+							  (or (ir-lvalue? lval)
 							      (error "non-lvalue in addressof: "self))
 							  (set self.type (ir-pointer-to type))))
 

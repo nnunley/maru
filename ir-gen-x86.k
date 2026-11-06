@@ -659,6 +659,8 @@
 
 (define-method ir-gen-x86-addressof <ir-member> (dst gen)	(ir-gen-x86-addressof-member self dst gen))
 (define-method ir-gen-x86-addressof <ir-set-member> (dst gen)	(ir-gen-x86-addressof-member self dst gen))
+(define-method ir-gen-x86-addressof <ir-indir> (dst gen)
+  (ir-gen-x86-indir-address gen self.type (car self.operands) (cadr self.operands) dst))
 
 (define-method ir-gen-x86-allocate <ir-addressof> (gen)
   (ir-gen-x86-allocate (car self.operands) gen)

@@ -1,5 +1,6 @@
 ;;; ir2 must lay out every C type as osdefs.k measured it, and move pointers
-;;; by bytes (maru-check.k).  Expected values are computed in the host, from
+;;; by bytes (maru-check.k).  An indexed element is an lvalue, as in C: its fields
+;;; can be read and written, and its address is i elements in.  Expected values are computed in the host, from
 ;;; osdefs.k, while the checks are expanded.
 ;;;
 ;;; ./eval2 ir-gen-c.k maru.k check/ir2.k > ir2.c && cc -o ir2 ir2.c && ./ir2
@@ -33,12 +34,22 @@
   `(let (((n ,type) ,n))
      (check ,(symbol->string (concat-symbol type '-offset)) (= (- (+ q n) q) ,n))))
 
+(define-struct <slot> ((object long) (index long) (kind int)))
+
 (define-function main int ((argc int) (argv char * *))
   (layout char char)  (layout short short)  (layout int int)  (layout long long)
   (layout int32 int32)  (layout int64 int64)  (layout float float)  (layout double double)
   (layout pointer void *)
   (let (((q long *) (cast (malloc 64) long *)))
     (offset char 3)  (offset short -3)  (offset int 3)  (offset long -3)
-    (offset int64 8589934592))
+    (offset int64 8589934592)
+    (let (((s struct <slot> *) (cast (malloc (cast (* 4 (sizeof struct <slot>)) long)) struct <slot> *)))
+      (set (. (indir s 2) index) 42)
+      (set (. (indir s 3) kind) 7)
+      (check "indexed-fields" (and (= (. (indir s 2) index) 42) (= (. (indir s 3) kind) 7)))
+      (check "address-of-indexed-struct"
+	     (= (- (cast (addressof (indir s 3)) long) (cast s long)) (cast (* 3 (sizeof struct <slot>)) long)))
+      (check "address-of-indexed-long" (= (- (cast (addressof (indir q 5)) long) (cast q long)) (cast (* 5 (sizeof long)) long)))
+      (check "field-through-address" (= (. (addressof (indir s 2)) index) 42))))
   (printf "ir2 ok\n")
   (return 0))
