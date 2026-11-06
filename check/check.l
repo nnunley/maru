@@ -807,6 +807,20 @@
       (unit-assert (equal (run (concat-strings "nile-gezira-many-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-gezira-many-" n ".err") 300)
 			  '("gezira many ok"))))))
 
+; A KSWorld frame's fill calls (check/ksworld-frame-dump.l, from KSWorld.ks's dbjr document) rendered twice on one runtime, on 1
+; and 4 workers, under AddressSanitizer and UndefinedBehaviorSanitizer; MARU_SANITIZE=thread gives ThreadSanitizer instead.
+; A partial element is refused (test/gezira-rerender.k). It names ksworld so make fetches the dbjr documents.
+(check "ksworld_rerender"
+  (if (not (env-var "MARU_DBJR"))
+      (println "SKIP ksworld_rerender: MARU_DBJR names no dbjr documents")
+      (let* ((frame (concat-strings tmp "/frame.txt"))
+	     (_     (run "ksworld-frame-dump" (concat-strings "./eval check/ksworld-frame-dump.l > " frame)))
+	     (san   (if (env-var "MARU_SANITIZE") "-g -O1 -fsanitize=thread" "-g -O1 -fsanitize=address,undefined"))
+	     (bin   (nile-build "nile-gezira-rerender" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "gezira-api.k") (concat-strings nile-dir "test/gezira-rerender.k")) san)))
+	(list-do n '("1" "4")
+	  (unit-assert (equal (run (concat-strings "nile-gezira-rerender-" n) (concat-strings bin " " n " 2 " frame " && test ! -s " tmp "/nile-gezira-rerender-" n ".err") 600)
+			      '("gezira rerender ok")))))))
+
 ; Zip streams: DupZip's output holds pairs before its input's second piece is poured, and every pair is right (R-zip-stream).
 (check "nile_zip_stream"
   (let ((bin (nile-build "nile-zip-stream" (list (concat-strings nile-dir "test/zip-stream.k")) "")))

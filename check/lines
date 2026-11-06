@@ -215,3 +215,8 @@
 +77 test/gezira-many.k: the gezira_many driver, 1200 fills of three shapes through the Gezira entry points on any worker count, with nile_print_leaks (nile/runtimes/maru/test)
 +13 check.l: the gezira_many case, and gezira-kernels, which gezira_image and gezira_many share (check/check.l)
 +28 ksworld-show.l: runnable window on a KSWorld document, for a person to try (ksworld-show.l)
++104 test/gezira-rerender.k: the gezira_rerender driver: a KSWorld frame's fill calls, read from a dump, rendered twice on one runtime, and a probe that a partial element is refused (nile/runtimes/maru/test)
++23 ksworld-frame-dump.l: prints the fill calls ksworld-render makes for KSWorld.ks's first frame, for the ksworld_rerender check (check/ksworld-frame-dump.l)
++14 check.l: the ksworld_rerender case, ASan and UBSan by default and ThreadSanitizer under MARU_SANITIZE=thread (check/check.l)
++4 ksworld-render.l: a path's floats are whole elements, since gezira_fill refuses a partial one (ksworld-render.l)
++4 gezira-api.k: gezira_fill refuses a count that isn't whole elements, as nile_Process_feed does (nile/runtimes/maru)
