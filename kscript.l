@@ -219,26 +219,44 @@
 (define-method ks-kind <long> () 'Number)
 (define-method ks-kind <double> () 'Number)
 (define-method ks-kind <string> () 'String)
-(define-method ks-kind <symbol> () (if (ks-method-for self 'class?) self 'String))	; Color names a class; other symbols are text
+(define-method ks-kind <symbol> () (if (= self 'Color) 'ColorClass 'String))	; Color names a class; other symbols are text
 (define-method ks-kind <pair> () 'List)
 (define-method ks-kind <ks-point> () 'Point)
 (define-method ks-kind <ks-rect> () 'Rectangle)
 (define-method ks-kind <ks-color> () 'Color)
 (define-method ks-kind <ks-object> () self.class)
 
+;; whether pattern from p matches text from t: * matches any run, # any one character, case aside (Squeak's String>>match:)
+(define-function ks-lower (c) (if (and (<= ?A c) (<= c ?Z)) (+ c 32) c))
+(define-function ks-match (pattern p text t)
+  (cond ((= p (string-length pattern)) (= t (string-length text)))
+	((= ?* (string-at pattern p)) (or (ks-match pattern (+ p 1) text t) (and (< t (string-length text)) (ks-match pattern p text (+ t 1)))))
+	((= t (string-length text)) ())
+	((or (= ?# (string-at pattern p)) (= (ks-lower (string-at pattern p)) (ks-lower (string-at text t)))) (ks-match pattern (+ p 1) text (+ t 1)))
+	(else ())))
+;; a list sorted by before?, stably (insertion)
+(define-function ks-sort (items before?)
+  (let ((out ()))
+    (list-do x items
+      (let ((head ()) (rest out))
+	(while (and rest (not (before? x (car rest)))) (push head (car rest)) (set rest (cdr rest)))
+	(set out (concat-list (list-reverse! head) (cons x rest)))))
+    out))
+
 (define-function ks-no-method (recv sel) (error "KScript: no method " sel " for " (ks-kind recv)))
 
-;; a KSWorld object's own kind, then what every KSWorld object answers: a closure in a slot of that name, or the slot itself
+;; a KSWorld object's own kind, then what every KSWorld object answers: a closure in a slot of that name, or setting or reading
+;; a field it has
 (define-function ks-object-send (recv sel args env this)
   (let ((m (ks-method-for 'KSObject sel)))
     (if m (m recv args env this)
       (let ((slot (assq sel (<ks-object>-slots recv))))
-	(cond ((not slot) (ks-no-method recv sel))
-	      ((or (ks-closure? (ks-stream-curr (cdr slot)))
-		   (and (ks-object? (ks-stream-curr (cdr slot))) (= 'KSClosure (<ks-object>-class (ks-stream-curr (cdr slot))))))
+	(cond ((and slot (or (ks-closure? (ks-stream-curr (cdr slot)))
+			     (and (ks-object? (ks-stream-curr (cdr slot))) (= 'KSClosure (<ks-object>-class (ks-stream-curr (cdr slot)))))))
 	       (ks-apply (ks-stream-curr (cdr slot)) args env recv))
-	      (args (ks-set-val recv sel (car args)))
-	      (else (ks-val recv sel)))))))
+	      ((and args slot (not (ks-stream? (cdr slot)))) (ks-set-val recv sel (car args)))	; a field it has; a stream is set with set()
+	      ((or (not slot) args) (ks-no-method recv sel))	; a field it lacks: making one would hide a missing method
+	      (else (or (ks-val recv sel) 'nil)))))))
 
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
@@ -289,6 +307,7 @@
   (asNumber (ks-parse-num (ks-to-string recv)))
   ((asString printString) (ks-to-string recv))
   (findTokens (ks-split (ks-to-string recv) (string-at (ks-to-string (car args)) 0)))
+  (match (ks-bool (ks-match (ks-to-string recv) 0 (ks-to-string (car args)) 0)))	; Squeak's match:, * any run, # any one
   (asBoolean (ks-bool (ks-truthy? recv))))
 
 (ks-methods List
@@ -301,10 +320,10 @@
 		 (incr idx)
 		 (and (ks-truthy? (ks-apply pred (list (car cur)) env this)) (set found idx))
 		 (set cur (cdr cur)))
-	       found)))
+	       found))
+  (sort (ks-sort recv (lambda (a b) (ks-truthy? (if args (ks-apply (car args) (list a b) env this) (ks-cmp '<= a b)))))))
 
-(ks-methods Color			; the class, a global
-  (class? 1)
+(ks-methods ColorClass			; Color, the class, a global
   (white (ks-color 1.0 1.0 1.0 1.0))
   (black (ks-color 0.0 0.0 0.0 1.0))
   (yellow (ks-color 1.0 1.0 0.0 1.0))
@@ -313,7 +332,7 @@
   (transparent (ks-color 0.0 0.0 0.0 0.0))
   (gray (let ((g (or (car args) 0.5))) (ks-color g g g 1.0))))
 
-(ks-methods Color			; a color: the same kind, as the class shares Color's name
+(ks-methods Color
   (lighter (ks-color (min 1.0 (+ (<ks-color>-r recv) 0.15)) (min 1.0 (+ (<ks-color>-g recv) 0.15))
 		     (min 1.0 (+ (<ks-color>-b recv) 0.15)) (<ks-color>-a recv)))
   (_mixed_with (let ((w (* 1.0 (car args))) (c2 (cadr args)))

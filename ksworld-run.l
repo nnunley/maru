@@ -6,7 +6,7 @@
 ;;;   document PATH
 ;;;   objects N, streams S: setters A, dormant B, code C
 ;;;   code read R, unreadable U
-;;;   ticks T: evaluations E, fired F, failed X
+;;;   ticks T: evaluations E, fired F, failed X     (X counts unreadable streams too, each stream once)
 ;;;   failed: COUNT MESSAGE        (one line each, streams that failed with that message, most first)
 ;;; A setter's code is a printout of the value it starts with, which the document also holds, so it isn't read.
 (require "kscript.l")
@@ -44,7 +44,8 @@
       (list-do s code
 	(if (try (let () (ks-stream-ast s) 1) (lambda (c) (ksw-count failed (concat-string "unreadable: " (ksw-message c))) ()))
 	    (push read s)
-	  (set unreadable (+ unreadable 1))))
+	  (set unreadable (+ unreadable 1))
+	  (push failed-streams s)))
       (set (<ks-evaluator>-streams ev) read)
       (let ((plain ks-evaluate-stream))
 	(set ks-evaluate-stream
@@ -55,8 +56,8 @@
 		      (unless (memq s failed-streams)	; a stream counts once, at its first failure
 			(push failed-streams s)
 			(ksw-count failed (ksw-message c)))))))
-	(for (t 0 ticks) (ks-sort-and-evaluate-at ev t))
-	(set ks-evaluate-stream plain))
+	(unwind-protect (for (t 0 ticks) (ks-sort-and-evaluate-at ev t))
+	  (set ks-evaluate-stream plain)))
       (list (cons 'document path) (cons 'objects objects) (cons 'streams (list-length streams)) (cons 'setters setters)
 	    (cons 'dormant dormant) (cons 'code (list-length code)) (cons 'read (list-length read)) (cons 'unreadable unreadable)
 	    (cons 'ticks ticks) (cons 'evaluations evaluations) (cons 'fired fired) (cons 'failed (list-length failed-streams))
