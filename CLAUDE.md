@@ -539,11 +539,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   forked question inherits from the law runner.
 - `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`, `check/hash-ops.g`): `hash.l`, a hash table in Maru on every
   evaluator, keyed by identity (Smalltalk's `==`: a number by its value and kind, anything else by its address, as `=` compares
-  strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. Generated programs of
-  puts, removes and gets agree with an association list searched with the same equality, at every get and in the count, keys and
-  values after; sizes around each doubling of the buckets hold; and an identity table loaded from a saved image (where every
-  object has moved) rehashes before answering, since it notes where an anchor of its own lived. Planted bugs (an entry not
-  emptied on removal, 2.0 hashed apart from 2, a table that never rehashes) are each caught.
+  strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. A number hashes by its
+  double (a long past 2^53 is equal to the double it rounds to), and a bucket index wraps, never negates (the least long's
+  negation is itself). Generated programs of puts, removes and gets, over numbers (negative, past 2^53, halves, the least long),
+  strings, symbols, nested and deep pairs, nil and keys kept as one object, agree with an association list searched with an
+  equality of its own, at every get and in the count, keys and values after; every pair of those numbers is found exactly when
+  equal; sizes around each doubling hold, compacting at three quarters removed; and tables saved in an image (`check/hash-image-
+  save.l`, where loading moves every object) answer as before, keep their order and grow, since each notes where an anchor of its
+  own lived and rehashes once it has moved. Planted bugs (an entry not emptied on removal, 2.0 hashed apart from 2, a table that
+  never rehashes) are each caught. NaN is no key: `=` doesn't find it equal to itself.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

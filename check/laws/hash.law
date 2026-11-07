@@ -2,18 +2,29 @@
 -- and the keys and values in the order they were first put
 reference programs_agree(p, k)
 reference grows(n, k)
+reference finds_iff_same(a, b, k)
 reference key_kinds(n)
-under test: program, op, key, kind, many, once
+under test: program, op, key, kind, many, once, numkey
 defaults trials = 300, size = 6
 let numerals = [0, 1, 2, 3, 7]
 
 -- few keys, so puts overwrite, removes hit and gets find what was put
+-- a key from a numeral, by each kind of key (kept twice: identity tables need keys that hit).  A schema can't stand for
+-- the functor (for f in num | dbl: ... key(f(n)) keeps f), so one rule each
 rule k_number:  number(n) => key(num(n))
 rule k_double:  number(n) => key(dbl(n))
 rule k_string:  number(n) => key(str(n))
 rule k_symbol:  number(n) => key(sym(n))
-rule k_pair:    number(a), number(b) => key(pair(a, b))
+rule k_deep:    number(n) => key(deep(n))
+rule k_neg:     number(n) => key(neg(n))
+rule k_big:     number(n) => key(big(n))
+rule k_bigdbl:  number(n) => key(bigdbl(n))
+rule k_half:    number(n) => key(half(n))
+rule k_kept:    number(n) => key(kept(n))
+rule k_kept2:   number(n) => key(kept(n))
+rule k_pair:    key(a), key(b) => key(pair(a, b))
 fact key(Nil)
+fact key(Min)
 rule o_put:     key(k), number(v) => op(put(k, v))
 rule o_put2:    key(k), number(v) => op(put(k, v))
 rule o_remove:  key(k) => op(remove(k))
@@ -23,20 +34,16 @@ fact program(End)
 rule p_one:     op(o), program(p) => program(seq(o, p))
 rule p_three:   op(a), op(b), op(c), program(p) => program(seq(a, seq(b, seq(c, p))))
 
-fact kind(Identity)
-fact kind(Equal)
+for k in Identity | Equal: fact kind(k)
 -- sizes around each growth: a table starts with 8 buckets and doubles past three quarters full
-fact many(0)
-fact many(1)
-fact many(5)
-fact many(6)
-fact many(7)
-fact many(13)
-fact many(100)
-fact many(700)
+for n in 0 | 1 | 5 | 6 | 7 | 13 | 100 | 700: fact many(n)
 fact once(1)
+-- numbers where hashing goes wrong: negatives, 2^53 and past (a long and the double it rounds to are equal), halves, the
+-- least long (whose negation is itself), and 2 against 2.0
+for k in num(0) | num(2) | dbl(2) | neg(7) | half(1) | big(0) | big(1) | bigdbl(0) | bigdbl(1) | Min: fact numkey(k)
 
 law programs:  all p: program(p), k: kind(k). programs_agree(p, k) = accept
 law grows:     all n: many(n), k: kind(k). grows(n, k) = accept by exhaustion
+law numbers:   all a: numkey(a), b: numkey(b), k: kind(k). finds_iff_same(a, b, k) = accept by exhaustion
 -- an identity table tells apart what an equality table takes as one key: two strings of the same text, 2 and 2.0
 law key_kinds: all n: once(n). key_kinds(n) = accept by exhaustion

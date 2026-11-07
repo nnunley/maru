@@ -14,12 +14,15 @@
 	((and (double? a) (double? b))	(= a b))
 	(else				(= (address-of a) (address-of b)))))
 (define-function hash-address (x) (>> (address-of x) 4))
+;; a number by its double's whole part, as = compares a long with a double (2^53 + 1 is 2^53.0); one with no whole part a
+;; long can hold (NaN, infinite, past 2^62) hashes as 0
+(define-function hash-number (x)
+  (let ((d (* 1.0 x)))
+    (if (and (< -4.0e18 d) (< d 4.0e18)) (double->long d) 0)))
 (define-function hash-identity (x)
-  (cond ((long? x)	x)
-	((double? x)	(double->long x))
-	(else		(hash-address x))))
+  (if (or (long? x) (double? x)) (hash-number x) (hash-address x)))
 
-;; equality is Maru's equal: 2 and 2.0 are equal, so a number hashes as its whole part; a string by its text, a pair by
+;; equality is Maru's equal: 2 and 2.0 are equal, so a number hashes by its double; a string by its text, a pair by
 ;; its first few elements (equal walks them all), anything else by where it lives, as equal compares it
 (define-function hash-text (s)
   (let ((h 7))
@@ -29,8 +32,7 @@
 (define-function hash-equal (x) (hash-equal-depth x 4))
 (set hash-equal-depth
      (lambda (x depth)
-       (cond ((long? x)		x)
-	     ((double? x)	(double->long x))
+       (cond ((or (long? x) (double? x))	(hash-number x))
 	     ((string? x)	(hash-text x))
 	     ((pair? x)		(if (< 0 depth)
 				    (% (+ (* 31 (hash-equal-depth (car x) (- depth 1))) (hash-equal-depth (cdr x) (- depth 1))) 16777213)
@@ -45,8 +47,8 @@
 (define-function hash-table-same? (table a b) ((<hash-table>-same table) a b))
 
 (define-function hash-bucket-of (table key)
-  (let ((h ((<hash-table>-hash table) key)) (n (array-length (<hash-table>-buckets table))))
-    (% (if (< h 0) (- 0 h) h) n)))
+  (let* ((n (array-length (<hash-table>-buckets table))) (r (% ((<hash-table>-hash table) key) n)))
+    (if (< r 0) (+ r n) r)))	; % keeps the sign, and negating the least long gives itself back
 
 ;; every live entry indexed afresh into buckets of size n, the entries compacted, the anchor's place noted
 (define-function hash-rebuild (table n)
