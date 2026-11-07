@@ -569,14 +569,13 @@
 	(john-say (concat-strings "  " (john-text (car wr)) " " (john-text (cadr wr)) " = " (john-text (cddr wr))))))))
 (define-function john-condition-text (c)	; (error part ...) as one line
   (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (string? p) p (john-text p))))) s))
-(define try-call)	; recover.l's, loaded the first time a statement is entered with echo on
 (define-function john-enter (s)
   (let ((before *john-out*) (w *john-world*))
     (if (not *john-echo*) (john-statement s)
-      (let ((failed (let () (require "recover.l")	; at the prompt only: batch runs end on an error, as before
-		      (try-call (lambda () (john-statement s) ()) john-condition-text))))
+      (let ((failed (let () (require "recover.l")	; at the prompt only (it takes a second to load): batch runs end on an error
+		      ((eval 'try-call) (lambda () (john-statement s) ()) john-condition-text))))	; found when run, as it loads late
 	(cond (failed (john-say failed))
-	      ((member? (car s) *john-declarations*) (john-say "ok."))
+	      ((or (member? (car s) *john-declarations*) (and (= 'for (car s)) (= 'make (car (caddr s))))) (john-say "ok."))	; a for that makes declares
 	      ((not (= w *john-world*)) (john-mutations w *john-world*)))))
     (let ((out ()) (l *john-out*)) (while (not (= l before)) (push out (car l)) (set l (cdr l))) out)))
 (define-function john-run (forms)

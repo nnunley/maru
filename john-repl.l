@@ -3,6 +3,7 @@
 ;;; RN-2008-003's transcripts: a declaration answers ok., a query its value, a step its mutations, an error its message.
 ;;; A statement ends at a line whose last character, blanks aside, is . or ?; the prompt shows only on a terminal.
 (require "john-eval.l")
+(require "recover.l")	; every statement at the prompt runs in a try
 
 (define getchar (subr "getchar" ">i"))
 (define isatty (subr "isatty" "i>i"))
@@ -16,23 +17,25 @@
   (let ((i (- (string-length line) 1)))
     (while (and (>= i 0) (member? (string-at line i) '(32 9 10 13))) (set i (- i 1)))
     (and (>= i 0) (member? (string-at line i) '(46 63)))))
+(define-function john-repl-blank? (text)	; nothing but blanks and newlines
+  (let ((b 1)) (for (i 0 (string-length text)) (or (member? (string-at text i) '(32 9 10 13)) (set b ()))) b))
 (define-function john-repl-read (text)	; read once, keeping the relations declared so far
   (let ((parser (text-parser-for-on <john> text)))
     (if ($program parser) (<john>-result parser) (error "john: can't read: " text))))
 (define-function john-repl-answer (text)
   (set *john-echo* 1)
-  (require "recover.l")
   (let ((forms (try-call (lambda () (john-repl-read text)) (lambda (c) (println (john-condition-text c)) ()))))
     (list-do s forms (list-do l (john-enter s) (println l)))))
 
 (john-begin)
 (set *john-relations* *john-prelude-relations*)
-(list-do path *arguments*
-  (let ((forms (john-read path)))	; a file is read twice, so a relation may be used before its rel-qualify
-    (list-do s forms (john-enter s))))
+(let ((text ""))	; the files are read as one text, twice, so a relation one declares may be used before it, or in another
+  (list-do path *arguments* (set text (concat-strings text (contents-of-file-named path) "\n")))
+  (list-do s (john-read-text text) (john-enter s)))
 (set *arguments* ())
 (let ((tty (= 1 (isatty 0))) (text "") (line ()))
   (while (let () (and tty (let () (print "> ") (fflush 0))) (set line (john-repl-line)))
     (set text (concat-strings text line "\n"))
-    (and (john-repl-ends? text) (let () (john-repl-answer text) (set text ""))))
-  (or (= "" text) (println "unfinished statement")))
+    (cond ((john-repl-blank? text) (set text ""))	; blank lines between statements are nothing
+	  ((john-repl-ends? text) (john-repl-answer text) (set text ""))))
+  (or (john-repl-blank? text) (println "unfinished statement")))

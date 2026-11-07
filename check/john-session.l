@@ -47,6 +47,13 @@
 (expect "time didn't move" (enter "time.") '("0"))
 (set *john-echo* ())
 
+;; a for whose body is a make declares, so it answers ok.
+(john-begin)
+(set *john-echo* 1)
+(expect "a for that makes answers ok." (enter "create Var n. for [ [ \"X1\" name ], [ \"X2\" name ] ] do make Var (each first) 0.") '("ok." "ok."))
+(expect "and its objects are made" (enter "X2 n.") '("0"))
+(set *john-echo* ())
+
 ;; RN-2008-003 §14: all is a set, and one-from its one element
 (john-begin)
 (enter "create block col row.
@@ -75,5 +82,30 @@
       ((subr "fclose" "p>i") f))
     (system (concat-strings "./eval john-repl.l < " in " > " out " 2>&1"))
     (expect (concat-string "transcript " name) (file-lines out) (list-reverse! want))))
+
+
+;; blank lines after the last statement are no unfinished statement
+(let ((in (concat-string check-tmp "/blank.in")) (out (concat-string check-tmp "/blank.out")))
+  (let ((f ((subr "fopen" "ss>p") in "w"))) ((subr "fputs" "sp>i") "create C n.\n\n  \n" f) ((subr "fclose" "p>i") f))
+  (system (concat-strings "./eval john-repl.l < " in " > " out " 2>&1"))
+  (expect "trailing blank lines" (file-lines out) '("ok.")))
+;; a relation one file declares, another file and the prompt use
+(let ((a (concat-string check-tmp "/rel-a.john")) (b (concat-string check-tmp "/rel-b.john"))
+      (in (concat-string check-tmp "/rel.in")) (out (concat-string check-tmp "/rel.out")))
+  (let ((f ((subr "fopen" "ss>p") a "w")))
+    ((subr "fputs" "sp>i") "create Box size. make Box S 1. make Box L 2.\nrel-qualify Box:A smaller Box:B if A size < B size.\n" f)
+    ((subr "fclose" "p>i") f))
+  (let ((f ((subr "fopen" "ss>p") b "w"))) ((subr "fputs" "sp>i") "qualify Box tiny if it smaller L.\n" f) ((subr "fclose" "p>i") f))
+  (let ((f ((subr "fopen" "ss>p") in "w"))) ((subr "fputs" "sp>i") "S tiny.\nS smaller L.\n" f) ((subr "fclose" "p>i") f))
+  (system (concat-strings "./eval john-repl.l " a " " b " < " in " > " out " 2>&1"))
+  (expect "relations carry across files and to the prompt" (file-lines out) '("yes" "yes")))
+;; recover.l loaded before john-eval.l keeps its try
+(let ((script (concat-string check-tmp "/order.l")) (out (concat-string check-tmp "/order.out")))
+  (let ((f ((subr "fopen" "ss>p") script "w")))
+    ((subr "fputs" "sp>i") "(require \"recover.l\") (require \"john-eval.l\") (john-begin) (set *john-echo* 1)
+(list-do s (john-read-text \"create C n. C fly.\") (list-do l (john-enter s) (println l)))\n" f)
+    ((subr "fclose" "p>i") f))
+  (system (concat-strings "./eval " script " > " out " 2>&1"))
+  (expect "recover.l first, then john-eval.l" (file-lines out) '("ok." "john: no property or qualification fly of C")))
 
 (if ok (println "john session ok") (exit 1))
