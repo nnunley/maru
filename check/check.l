@@ -425,6 +425,8 @@
 (check "kscript" (unit-assert (equal (last (run "kscript" "./eval check/kscript.l notes/sources/grammars/*.kscript")) "kscript ok")))
 ;; KSWorld documents headless (ksworld-run.l): a fixture of ours, and KSWorld.ks where the dbjr documents are
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
+;; KSWorld's own methods from ksworld/*.st: every KScript method of KSTextLayout read, and each a method of the class
+(check "ksworld_sources" (unit-assert (equal (last (run "ksworld_sources" "./eval check/ksworld-sources.l")) "ksworld sources ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
 (check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
 ;; png.irl under AddressSanitizer: every fixture, good and hostile, read into a buffer of exactly its size by

@@ -3,7 +3,9 @@
 # KScript, Ohshima's FRP and scripting language for KSWorld (VPRI TR-2012-001,
 # Appendices I and II).  Inherits C's lexing and arithmetic from <cexpr> and
 # adds indentation-structured blocks, closures, event streams (<-, fby, on,
-# startsWith, when/then, @ref, lag '), comprehensions, and dictionary literals.
+# startsWith, when/then, @ref, lag '), comprehensions, and dictionary literals;
+# and, as KSWorld's own methods (ksworld/*.st) write them, += and -=, #'symbols'
+# and $$(expr) streams.
 
 <kscript> : <cexpr> ()
 
@@ -24,7 +26,11 @@ paramlist	= ident?:a ("," _ ident)*:b					-> `(,@a ,@b) ;
 dictpair	= (anyident | string | sglstring):k (":" | "->") _ expr:v	-> (list k v) ;
 dictpairs	= dictpair?:a (("," | ".") _ dictpair)*:b			-> `(,@a ,@b) ;
 
+symbolname	= "'" (!"'" .)* $:x "'" _					-> (string->symbol x) ;
+
 primary		= "..." _							-> 'ellipsis
+		| "#" symbolname:x						-> `(symbol ,x)	# #'wordWidth', a Squeak Symbol
+		| "$$" "("_ expr:e ")"_						-> `(stream-expr ,e)	# a stream of an expression, as <- makes one
 		| "@" anyident:x						-> `(stream-ref ,x)
 		| ":" anyident:x						-> `(global ,x)
 		| (-> (ks-indent self)):c "("_ paramlist:ps ")"_ "->"_
@@ -87,7 +93,8 @@ fbyexpr		= whenexpr:a "fby" wb fbyexpr:b ("on" wb whenexpr)?:t		-> `(fby ,a ,b ,
 		| whenexpr
 		;
 
-assignop	= "<-" -> 'stream-def | ":=" -> 'assign | "?=" -> 'assign-or | "=" !"=" -> 'assign ;
+assignop	= "<-" -> 'stream-def | ":=" -> 'assign | "?=" -> 'assign-or | "+=" -> 'assign-add | "-=" -> 'assign-sub
+		| "=" !"=" -> 'assign ;
 
 expr		= suffix:a assignop:o _ expr:b					-> `(,o ,a ,b)
 		| fbyexpr
