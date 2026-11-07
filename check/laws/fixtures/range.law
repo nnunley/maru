@@ -2,3 +2,5 @@
 under test: number
 let numerals = [1 .. 4, 10]
 law range_values: all n: number(n). (n >= 1 && n <= 4) || n = 10 by exhaustion
+-- a long range in a claim is one constant, not thousands of nested forms (which overflowed the stack)
+law range_long: all n: number(n). [n | [0 .. 9999]] = [n | [0 .. 9999]] by exhaustion

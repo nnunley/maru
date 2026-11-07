@@ -31,25 +31,38 @@
 (define-function law-var (x) (string->symbol (concat-string "$" (symbol->string x))))
 (define law-conv)
 (define template-holes)
-;; a list's elements with each range A .. B (constant whole numbers) put in place as the numbers A to B
+;; a list's elements with each range A .. B (constant whole numbers) put in place as the numbers A to B; by loops, as a
+;; range may be thousands long and a recursion per element overflows the stack
 (define-function law-range? (x) (and (pair? x) (= 'law-range (car x))))
 (define-function law-ranges (elems)
-  (cond ((not elems) ())
-	((law-range? (car elems))
-	 (let ((a (cadr (car elems))) (b (caddr (car elems))) (out ()))
-	   (or (and (long? a) (long? b)) (error "E_RANGE: a range's ends are whole numbers, not " a " and " b))
-	   (while (<= a b) (push out a) (set a (+ a 1)))
-	   (concat-list (list-reverse! out) (law-ranges (cdr elems)))))
-	(else (cons (car elems) (law-ranges (cdr elems))))))
+  (let ((out ()))
+    (list-do e elems
+      (if (law-range? e)
+	  (let ((a (cadr e)) (b (caddr e)))
+	    (or (and (long? a) (long? b)) (error "E_RANGE: a range's ends are whole numbers, not " a " and " b))
+	    (while (<= a b) (push out a) (set a (+ a 1))))
+	  (push out e)))
+    (list-reverse! out)))
 ;; in a rule a template is a term, (template lang text ((hole . $hole)...)), so it unifies
 (define-function law-template-term (x)
   (list 'template (cadr x) (caddr x) (map (lambda (n) (cons n (law-conv n 1))) (template-holes (caddr x)))))
+(define law-all-constant?)
 (define-function law-list-from (elems tail var)
-  (if elems (cons (law-conv (car elems) var) (law-list-from (cdr elems) tail var)) (and tail (law-conv (car tail) var))))
-;; a list literal in a claim or condition is a form that builds the list: its elements are claim values, its tail a list
+  (cond ((and (not tail) (law-all-constant? elems))	elems)	; constants are themselves, however many
+	(elems	(cons (law-conv (car elems) var) (law-list-from (cdr elems) tail var)))
+	(else	(and tail (law-conv (car tail) var)))))
+;; a list literal in a claim or condition is a form that builds the list: its elements are claim values, its tail a list.
+;; One of constants only (a range always) is the constant itself: thousands of nested cons forms overflowed the stack.
+(define-function law-constant? (x) (or (long? x) (double? x) (string? x)))
+(define-function law-all-constant? (elems)
+  (let ((all 1))
+    (while (and all elems) (or (law-constant? (car elems)) (set all ())) (set elems (cdr elems)))
+    all))
 (define-function law-list-form (elems tail)
-  (if elems (list 'cons (law-conv (car elems) 'claim) (law-list-form (cdr elems) tail))
-    (if tail (law-conv (car tail) 'claim) (list 'quote ()))))
+  (cond ((and (not tail) (law-all-constant? elems))	(list 'quote elems))
+	(elems	(list 'cons (law-conv (car elems) 'claim) (law-list-form (cdr elems) tail)))
+	(tail	(law-conv (car tail) 'claim))
+	(else	(list 'quote ()))))
 (define-function law-conv (x var)	; var: lower-case names become variables
   (cond
     ((symbol? x)		(let ((l (assq x *law-lets*)))

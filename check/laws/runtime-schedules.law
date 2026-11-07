@@ -9,8 +9,7 @@
 -- robin, found none of the races these schedules find (they need a long run, then one switch at the right lock).
 -- A refutation names its schedule, runs again the same way, and shrinks to earlier change points.
 -- With the races put back one at a time (the funnel's wakeup, a kernel's input position, a double queue), 1000 trials
--- refute the first two; the double queue showed in 2 of 9000 schedules of dupzip alone, so the schedule that exposes each
--- is kept below as a value, and checked by exhaustion.
+-- refute the first two, and the schedule that exposes each is kept below as a value, checked by exhaustion.
 under test: scheduled, schedule, priorities, changes
 -- priorities and turns alike: every number to 400, as PCT draws its change points, then a few later turns (a run takes 300
 -- to 1700); a sparser set missed races these find
@@ -44,23 +43,26 @@ law layout_contracts: all k: layout_kind(k), lw: layout_width(k, lw), w: sched_w
                           let r = scheduled(k, w, lw, rt_glyphs(245, 7), s).
     r.contracts = [0, 0, 0, 0] && r.output = layout(k, 1, lw, rt_glyphs(245, 7))
 
--- The schedules that exposed each race fixed on 2026-11-06, kept as values so each race stays fixed: with it put back, the
--- run on its schedule breaks a contract or the output (a kernel's input position: words at seed 307; the funnel's lost
--- wakeup: words at 143, a deadlock; the double queue: dupzip over 1 .. 300 at 497, a process queued twice and 5 blocks
--- out). PROVED here covers just these schedules, which is what it says. A change to the runtime can move which interleaving
--- a seed gives, so a race put back should still be found on its schedule; check that when the scheduler or the runtime
--- changes (each mutant was found anew on 2026-11-06, after the last fix).
-fact found("words", 2, 307)
-fact found("words", 2, 143)
-fact found("dupzip", 2, 497)
+-- The schedules that expose two races fixed on 2026-11-06, kept as values so each stays fixed: with it put back, the run on
+-- its schedule breaks a contract or the output (a kernel's input position: words at seed 1144; the funnel's lost wakeup:
+-- words at 98, a deadlock). PROVED here covers just these schedules, which is what it says. A change to the runtime moves
+-- which interleaving a seed gives, so when the scheduler or runtime changes, put each race back and find its schedule
+-- anew (found again on 2026-11-07, after the claims, when the earlier seeds 307 and 143 no longer exposed anything).
+-- The double queue has no schedule here: with it put back, 22500 schedules on the claiming runtime found none, so only
+-- nile_Process_claim_locked's test holds it.
+fact found("words", 2, 1144)
+fact found("words", 2, 98)
 law found_glyphs: all k: layout_kind(k), lw: layout_width(k, lw), w: sched_workers(w), seed: found(k, w, seed),
                       let r = scheduled(k, w, lw, rt_glyphs(245, 7), seed).
     r.contracts = [0, 0, 0, 0] && r.output = layout(k, 1, lw, rt_glyphs(245, 7)) by exhaustion
-law found_numbers: all k: builtin_kind(k), w: sched_workers(w), seed: found(k, w, seed),
-                       let r = scheduled(k, w, 10, [1 .. 300], seed).
-    r.contracts = [0, 0, 0, 0] && r.output = run_on(k, 1, [1 .. 300]) by exhaustion
 
 -- the built-ins, over 123 pairs (two buffers crossed)
 law builtin_contracts: all k: builtin_kind(k), w: sched_workers(w), s: schedule(s),
                            let r = scheduled(k, w, 10, rt_pairs(123, 7), s).
     r.contracts = [0, 0, 0, 0] && r.output = run_on(k, 1, rt_pairs(123, 7))
+
+-- a kernel that reroutes in its body, as Nile's → substitution does (Gezira's StrokeOneSide): it passes 0 .. 4999 until it
+-- reads 750, then a sub-pipeline negates the rest; thirteen buffers, so its input can run past INPUT_MAX (10) while it runs
+law reroute_contracts: all w: sched_workers(w), s: schedule(s),
+                           let r = scheduled("reroute", w, 750, [0 .. 1499], s).
+    r.contracts = [0, 0, 0, 0] && r.output = rt_run("reroute", 1, 750, [0 .. 1499])

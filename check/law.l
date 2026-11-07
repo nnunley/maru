@@ -55,7 +55,15 @@
 ;; a relation under test (checks(expr, ...)), a template is filled with the law's values and parsed
 (define-function law-template (lang text bindings) (template-parse lang (template-fill lang text bindings)))
 (define-function law-upper? (x) (let ((c (string-at (symbol->string x) 0))) (and (<= ?A c) (<= c ?Z))))
-(define-function law-ne (a b) (not (equal a b)))
+;; = in a claim: equal, walking a list's spine by a loop and recursing only into its elements, as a value may be a list
+;; of thousands (a run's output) and a recursion per element overflows the stack
+(define-function law-equal (a b)
+  (let ((same 1))
+    (while (and same (pair? a) (pair? b))
+      (or (law-equal (car a) (car b)) (set same ()))
+      (set a (cdr a)) (set b (cdr b)))
+    (and same (if (or (pair? a) (pair? b)) (and (pair? a) (pair? b) (law-equal a b)) (equal a b)))))
+(define-function law-ne (a b) (not (law-equal a b)))
 (define *law-verdict* ())	; claim or condition, once one's value is a reference's verdict
 (define-function law-truth (what v)
   (and (or (= v 'accept) (= v 'reject) (and (pair? v) (= 'crash (car v)))) (not *law-verdict*) (set *law-verdict* what))
@@ -67,7 +75,7 @@
 	((= 'quote (car x))	x)
 	((= 'template (car x))	(list 'law-template (list 'quote (cadr x)) (caddr x)
 				      (cons 'list (map (lambda (n) (list 'cons (list 'quote n) n)) *lnames*))))
-	(else			(cons (cond ((= '= (car x)) 'equal) ((= '!= (car x)) 'law-ne) (else (car x)))
+	(else			(cons (cond ((= '= (car x)) 'law-equal) ((= '!= (car x)) 'law-ne) (else (car x)))
 				      (map law-form (cdr x))))))
 
 ;; references: a template term is passed as its text; anything but accept or reject
@@ -229,8 +237,16 @@
 
 ;; VACUOUS: the claim names nothing under test (directly or through a variable's
 ;; domain), or still holds with every under-test function returning 0, and 1
+;; does x name any of names? Quoted data holds no names, and a list's spine is walked by a loop: a claim may hold a
+;; constant list of thousands (a range), and a recursion per element overflowed the stack
 (define-function law-names? (x names)
-  (if (pair? x) (or (law-names? (car x) names) (law-names? (cdr x) names)) (and (symbol? x) (member? x names))))
+  (if (and (pair? x) (= 'quote (car x)))
+      ()
+      (let ((found ()))
+	(while (and (not found) (pair? x))
+	  (and (law-names? (car x) names) (set found 1))
+	  (set x (cdr x)))
+	(or found (and (symbol? x) (member? x names))))))
 (define-function law-uses? (b)	; a goal domain whose relation is, or reaches, one under test
   (let ((y ()))
     (and (= 'goal (cadr b))
@@ -357,7 +373,8 @@
 ;; Mutants: a fact's set member replaced by each other member, "rel(a,b:=c)"; a fact removed, "-rel(a,b)";
 ;; a rule's premise i removed, "name-i".  A tuple is tried only where the mutant can answer differently: one
 ;; holding a replaced fact's other constants, or one whose search, under the file's rules, unified the rule.
-(define-function law-occurs? (c x) (or (equal c x) (and (pair? x) (or (law-occurs? c (car x)) (law-occurs? c (cdr x))))))
+(define-function law-occurs? (c x)	; quoted data (a constant list, maybe thousands long) holds no names to find
+  (or (equal c x) (and (pair? x) (not (= 'quote (car x))) (or (law-occurs? c (car x)) (law-occurs? c (cdr x))))))
 (define-function law-set-of (v) (let ((m ())) (list-do s *law-sets* (and (not m) (member? v (cdr s)) (set m (cdr s)))) m))
 (define-function law-swap (l x y) (if (= x (car l)) (if y (cons y (cdr l)) (cdr l)) (cons (car l) (law-swap (cdr l) x y))))
 (define-function law-drop (l i) (if (= i 0) (cdr l) (cons (car l) (law-drop (cdr l) (- i 1)))))

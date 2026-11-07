@@ -438,7 +438,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   else `REFUTED k of n survive` (`fixtures/adequacy.law`). `let numerals = [1, 2]`
   replaces `number`'s numerals (`fixtures/numerals.law`). The mutant focus follows where a law
   uses the relation (`reach.law`), and a reference's answers are kept by name and text
-  (`refs.law`). A per-case `let NAME = EXPR` binding is evaluated once per case, is no domain, and shrinks by recomputing (`let.law`); `law-record` answers a record and `r.name` reads its field, `=` by value, E_FIELD otherwise (`fields.law`, `field-error.law`, `field-plain.law`); list terms `[c | s]` in rules and claims, and by exhaustion's bound on lists: size n reaches lengths 1 to n + 1 (`lists.law`, `schedule.law`); a range `A .. B` in a list is the whole numbers A to B, `E_RANGE` for ends that aren't (`range.law`). Shrinking keeps each value in its domain, and a let after a shrunk value is computed only from values in their domains (`domain-shrink.law`: a driver once got 0 workers). `.law` files count toward `lines`.
+  (`refs.law`). A per-case `let NAME = EXPR` binding is evaluated once per case, is no domain, and shrinks by recomputing (`let.law`); `law-record` answers a record and `r.name` reads its field, `=` by value, E_FIELD otherwise (`fields.law`, `field-error.law`, `field-plain.law`); list terms `[c | s]` in rules and claims, and by exhaustion's bound on lists: size n reaches lengths 1 to n + 1 (`lists.law`, `schedule.law`); a range `A .. B` in a list is the whole numbers A to B, `E_RANGE` for ends that aren't (`range.law`); a list of constants in a claim is one constant, and claims' `=` and the runner's check of the names a claim uses (`law-names?`) loop along a list's spine, so a value thousands long (a run's output) doesn't overflow the stack. Shrinking keeps each value in its domain, and a let after a shrunk value is computed only from values in their domains (`domain-shrink.law`: a driver once got 0 workers). `.law` files count toward `lines`.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
   well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
   are sound (Nile's own resolver and type checker, forked per question, accept what they
@@ -552,13 +552,18 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `nile_requeued`, `nile_unreturned`, `nile_deadlocks`; the driver prints them last, and lists the live processes when
   blocks stay out). The law generates the PCT schedule term (three or more priorities, three change points up to 400) and
   claims, in the law file, that the contracts are all 0 and the output is one worker's, for text-layout's three stages and
-  the built-ins: TESTED 1000 each, never PROVED, as a schedule is one interleaving of very many. With the races fixed on
+  the built-ins, and for a kernel that reroutes in its body as Nile's → substitution does (Gezira's `StrokeOneSide`;
+  `test/reroute-kernels.k`, over `0 .. 1499` rerouting at 750, thirteen buffers): TESTED 1000 each, never PROVED, as a
+  schedule is one interleaving of very many. Every wakeup decides and claims in one critical section
+  (`nile_Process_claim_locked`), and a reroute decides in the section that clears the process's body, so a process is
+  never woken or removed twice, nor acted on after another waker freed it. With the races fixed on
   2026-11-06 put back, 1000 trials refute the funnel's lost wakeup and a kernel saving its input position in a buffer handed
-  in since; the double queue showed in 2 of 9000 seeded dupzip schedules. So the schedule that exposed each race is kept in
-  the law file as a value (`found`: words at seeds 307 and 143, dupzip over `1 .. 300` at 497) and checked by exhaustion,
-  PROVED for just those schedules; each race put back fails its own. A change to the scheduler or runtime can move what a
-  seed gives, so recheck that each race is still found then. Enumerating every schedule within two preemptions, or two
-  delays of a round robin, found none of them.
+  in since, and the schedule that exposes each is kept in the law file as a value (`found`: words at seeds 1144 and 98)
+  and checked by exhaustion, PROVED for just those schedules; each race put back fails its own. A change to the scheduler
+  or runtime moves what a seed gives (the claims did: the earlier seeds stopped exposing anything), so then put each race
+  back and find its schedule anew. The double queue has none: put back on the claiming runtime, 22500 schedules found
+  nothing, so only `nile_Process_claim_locked`'s test holds it. Enumerating every schedule within two preemptions, or two
+  delays of a round robin, found none of the races.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change

@@ -515,8 +515,9 @@
 		 ;; shrinking stays in each domain, and a let after the shrunk value is computed only from values in their domains
 		 ("domain-shrink" "check/laws/fixtures/domain-shrink.l" 256 "law member_only: REFUTED w=2 seed=42"
 		  "law member_pair: REFUTED w=8 lw=1 seed=43" "law member_let: REFUTED w=2 r=1 seed=44")
-		 ;; a range in a list, A .. B, is the whole numbers A to B (numerals 1 .. 4 and 10: five values)
-		 ("range" "" 0 "law range_values: PROVED 5")
+		 ;; a range in a list, A .. B, is the whole numbers A to B (numerals 1 .. 4 and 10: five values); a long one in a claim is a
+		 ;; constant, walked by loops, not thousands of nested forms or frames (they overflowed the stack)
+		 ("range" "" 0 "law range_values: PROVED 5" "law range_long: PROVED 5")
 		 ;; a record's fields, a list literal and = by value; a record printed readably in a refutation
 		 ("fields" "check/laws/fixtures/fields.l" 256 "law fields_read: TESTED 100" "law record_value: TESTED 100" "law record_equal: TESTED 100"
 		  "law shown: REFUTED n=0 r={a: 0, b: (0 0)} seed=45")
@@ -841,7 +842,7 @@
 
 ;; A rerouted pipeline gives the kernel's output, then the sub-pipeline's (R-reroute), with 1 and 2 workers.
 (check "nile_reroute"
-  (let ((bin (nile-build "nile-reroute" (list (concat-strings nile-dir "test/reroute.k")) "")))
+  (let ((bin (nile-build "nile-reroute" (list (concat-strings nile-dir "test/reroute-kernels.k") (concat-strings nile-dir "test/reroute.k")) "")))
     (list-do n '("1" "2")
       (unit-assert (equal (run (concat-strings "nile-reroute-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-reroute-" n ".err") 300)
 			  '("reroute ok"))))))
@@ -957,7 +958,8 @@
 (check "nile_laws"
   (let* ((gen (concat-strings tmp "/nile-laws-gen"))
 	 (_   (run "nile-laws-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh text_layout $R/nile/examples/text-layout.nl")))
-	 (bin (nile-build "nile-law-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/law-runtime.k")) ""))
+	 (bin (nile-build "nile-law-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/reroute-kernels.k")
+						    (concat-strings nile-dir "test/law-runtime.k")) ""))
 	 (dir (concat-strings tmp "/nile-laws"))
 	 (_   (run "nile-laws-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_laws" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
@@ -976,15 +978,16 @@
 (check "nile_schedules"
   (let* ((gen (concat-strings tmp "/nile-sched-gen"))
 	 (_   (run "nile-sched-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh text_layout $R/nile/examples/text-layout.nl")))
-	 (bin (nile-build "nile-sched-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/law-runtime.k")) ""))
+	 (bin (nile-build "nile-sched-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/reroute-kernels.k")
+						      (concat-strings nile-dir "test/law-runtime.k")) ""))
 	 (dir (concat-strings tmp "/nile-sched"))
 	 (_   (run "nile-sched-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_schedules" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
 			      "check/laws/runtime.l" "check/laws/runtime-schedules.law")))
     (unit-assert out)
     (unit-assert (equal (and out (lines (contents-of-file-named out)))
-			'("law layout_contracts: TESTED 1000" "law found_glyphs: PROVED 2" "law found_numbers: PROVED 1"
-			  "law builtin_contracts: TESTED 1000")))))
+			'("law layout_contracts: TESTED 1000" "law found_glyphs: PROVED 2"
+			  "law builtin_contracts: TESTED 1000" "law reroute_contracts: TESTED 1000")))))
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")

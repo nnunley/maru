@@ -29,7 +29,7 @@
 			    " $R/nile/examples/text-layout.nl > /dev/null && cd $R"
 			    " && ./eval compile-osdefs.l " nile "nile.osdefs > " dir "/nile.osdefs.c"
 			    " && cc -o " dir "/nile.osdefs " dir "/nile.osdefs.c && " dir "/nile.osdefs > " dir "/nile.osdefs.k"
-			    " && ./eval2 ir-gen-c.k maru.k " dir "/nile.osdefs.k" files " " dir "/text_layout.k " nile
+			    " && ./eval2 ir-gen-c.k maru.k " dir "/nile.osdefs.k" files " " dir "/text_layout.k " nile "test/reroute-kernels.k " nile
 			    "test/law-runtime.k > " runtime-bin ".c && cc -pthread -fno-builtin -w -o " runtime-bin " " runtime-bin ".c")))
       (error "sweep: can't build " runtime-bin)))
 (list-do evaluator evaluators
