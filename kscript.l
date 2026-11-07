@@ -778,7 +778,11 @@
 		  ((and (pair? lhs) (= (car lhs) 'index))
 		   (let ((target (ks-stream-curr (ks-eval (cadr lhs) env this)))
 			 (idx (ks-stream-curr (ks-eval (caddr lhs) env this))))
-		     (ks-set-val target (string->symbol (ks-to-string idx)) val))))
+		     (if (array? target)	; an element, counted from 0, inside the array or an error
+			 (let ((k (if (double? idx) (double->long idx) idx)))
+			   (if (and (long? k) (<= 0 k) (< k (array-length target))) (set-array-at target k val)
+			     (error "KScript: index " idx " out of bounds for an array of " (array-length target))))
+		       (ks-set-val target (string->symbol (ks-to-string idx)) val)))))
 	    val))
 	 ((= op 'assign-or)
 	  (let ((cur (ks-stream-curr (ks-eval (cadr exp) env this))))

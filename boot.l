@@ -155,16 +155,13 @@
 	len)
     0))
 
-(define %list->array
-  (lambda (list index)
-    (if (pair? list)
-	(let ((a (%list->array (cdr list) (+ 1 index))))
-	  (set-array-at a index (car list))
-	  a)
-      (array index))))
-
-(define-function list->array (list)
-  (%list->array list 0))
+(define-function list->array (list)	; a loop, not recursion: a long list mustn't overflow the stack
+  (let ((a (array (list-length list))) (i 0))
+    (while (pair? list)
+      (set-array-at a i (car list))
+      (set i (+ i 1))
+      (set list (cdr list)))
+    a))
 
 (define-function array-append (arr val)
   (set-array-at arr (array-length arr) val))

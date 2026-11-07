@@ -105,6 +105,7 @@
 (expect "an array's collect:, inject:into: and , answer arrays and values"
 	(list (array->list (st "#(1 2 3) collect: [:x | x * x]")) (st "#(1 2 3) inject: 0 into: [:a :x | a + x]") (array->list (st "#(1) , #(2)")))
 	'((1 4 9) 6 (1 2)))
+(expect "a list joined with an array is one list of both" (ks-send (list 1 2) (string->symbol ",") (list (list->array '(3))) () ()) '(1 2 3))
 (expect "KScript and Smalltalk share arrays" (st "#(1 2 3) = {1. 2. 3}") 'true)
 
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

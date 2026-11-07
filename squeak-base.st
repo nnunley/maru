@@ -211,7 +211,7 @@ List collect: aBlock                    { (map (lambda (x) (ks-apply aBlock (lis
 List do: aBlock displayingProgress: b  [ self do: aBlock ]
 List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list-reverse! out)) }
 List isEmpty                            { (ks-bool (not self)) }
-List , other                            { (concat-list self other) }
+List , other                            { (concat-list self (ks-elements-of other)) }
 List reduce: aBlock                     { (let ((acc (car self))) (list-do x (cdr self) (set acc (ks-apply aBlock (list acc x) () ()))) acc) }
 
 "Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"

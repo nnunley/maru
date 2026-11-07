@@ -103,4 +103,8 @@ for i in [0...10] by 5 total := total + i
 	(list (ks-run "[3, 1, 2].first()") (ks-run "[3, 1, 2].second()") (array->list (ks-run "[3, 1, 2].copy()")) (array->list (ks-run "[3, 1, 2].sort()")))
 	'(3 1 (3 1 2) (1 2 3)))
 
+(expect "a long range, made without recursion" (array-length (ks-run "[1...20000]")) 20000)
+(expect "an element of an array is set by its index"
+	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
+
 (and ok (println "kscript ok"))
