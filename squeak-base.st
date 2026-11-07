@@ -18,10 +18,14 @@ Object : ()
   Color : Object ()
   Collection : Object ()
     HashedCollection : Collection ()
+      Set : HashedCollection (items)
+        IdentitySet : Set ()
       Dictionary : HashedCollection ()
         IdentityDictionary : Dictionary ()
+          SystemDictionary : IdentityDictionary ()
     SequenceableCollection : Collection ()
       List : SequenceableCollection ()
+      OrderedCollection : SequenceableCollection (items)
       ArrayedCollection : SequenceableCollection ()
         Array : ArrayedCollection ()
         String : ArrayedCollection ()
@@ -74,6 +78,7 @@ IdentityDictionary includesKey: key     { (ks-bool (ks-assq (ks-dict-key key) (<
 IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
+Object class initialize                 [ self ]
 "Behavior: a class knows its name, its superclass and the classes under it (those loaded)"
 Object class name                       { (<ks-class>-name self) }
 Object class superclass                 { (or (ks-class-named (<ks-class>-super self)) 'nil) }
@@ -206,9 +211,47 @@ List asSet                              { (let ((out ())) (list-do x self (or (m
 List isEmpty                            { (ks-bool (not self)) }
 List , other                            { (concat-list self other) }
 List reduce: aBlock                     { (let ((acc (car self))) (list-do x (cdr self) (set acc (ks-apply aBlock (list acc x) () ()))) acc) }
-List first                              { (car self) }
 
 "Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"
 TTFontDescription : Object ()
 TTFontDescription class allInstances    [ #() ]
 List at: i                              { (let ((c self) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for a list of " (list-length self)))) }
+
+"Smalltalk, the system's dictionary: its classes and globals by name"
+SystemDictionary at: key                { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (and g (cdr g))) (error "Smalltalk: no global named " key)) }
+SystemDictionary at: key ifAbsent: aBlock { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (and g (cdr g))) (ks-apply aBlock () () ())) }
+SystemDictionary includesKey: key       { (ks-bool (or (ks-class-named (ks-dict-key key)) (assq (ks-dict-key key) *ks-globals*))) }
+Smalltalk := SystemDictionary new.
+
+"An OrderedCollection keeps its elements in order (in a KScript list, items), a Set each one once (equal), an IdentitySet each
+ object once (itself); what they answer is what KSWorld's compiler passes send them"
+OrderedCollection initialize            { (let () (ks-set-slot self 'items ()) self) }
+OrderedCollection add: x                { (let () (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x))) x) }
+OrderedCollection addAll: c             { (let () (list-do x (ks-elements-of c) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) c) }
+OrderedCollection removeLast            { (let* ((l (ks-slot self 'items)) (x (ks-last l))) (ks-set-slot self 'items (ks-but-last l)) x) }
+OrderedCollection size                  { (list-length (ks-slot self 'items)) }
+OrderedCollection asArray               { (ks-slot self 'items) }
+Set initialize                          { (let () (ks-set-slot self 'items ()) self) }
+Set add: x                              { (let () (or (ks-set-has? self x) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) x) }
+Set includes: x                         { (ks-bool (ks-set-has? self x)) }
+Set do: aBlock                          { (let () (list-do x (ks-slot self 'items) (ks-apply aBlock (list x) () ())) self) }
+Set collect: aBlock                     { (map (lambda (x) (ks-apply aBlock (list x) () ())) (ks-slot self 'items)) }
+Set size                                { (list-length (ks-slot self 'items)) }
+Set isEmpty                             { (ks-bool (not (ks-slot self 'items))) }
+Set asArray                             { (ks-slot self 'items) }
+List asArray                            [ self ]
+
+"What every sequence answers, as Squeak's SequenceableCollection does, from at: and size (an Array, a String, KScript's lists
+ and an OrderedCollection answer those themselves); ArrayedCollection (fixed size) and OrderedCollection (grows) are siblings"
+SequenceableCollection first            [ self at: 1 ]
+SequenceableCollection second           [ self at: 2 ]
+SequenceableCollection third            [ self at: 3 ]
+SequenceableCollection fourth           [ self at: 4 ]
+SequenceableCollection last             [ self at: self size ]
+SequenceableCollection isEmpty          [ self size = 0 ]
+SequenceableCollection notEmpty         [ self isEmpty not ]
+SequenceableCollection do: aBlock       [ 1 to: self size do: [:i | aBlock value: (self at: i)] ]
+SequenceableCollection collect: aBlock  [ | out | out := OrderedCollection new.  self do: [:x | out add: (aBlock value: x)].  out asArray ]
+SequenceableCollection inject: acc into: aBlock [ | r | r := acc.  self do: [:x | r := aBlock value: r value: x].  r ]
+SequenceableCollection includes: x      [ self do: [:e | e = x ifTrue: [^ true]].  false ]
+OrderedCollection at: i                 { (let ((c (ks-slot self 'items)) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for an OrderedCollection of " (list-length (ks-slot self 'items))))) }

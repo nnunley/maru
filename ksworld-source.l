@@ -129,6 +129,13 @@
     out))
 (define-function ks-assq (key l)	; the pair whose car is key itself (an IdentityDictionary's lookup)
   (let ((found ())) (while (and l (not found)) (and (= key (caar l)) (set found (car l))) (set l (cdr l))) found))
+(define-function ks-elements-of (c) (cond ((pair? c) c) ((ks-object? c) (ks-slot c 'items)) (else ())))	; a collection's elements
+(define-function ks-last (l) (if (cdr l) (ks-last (cdr l)) (car l)))
+(define-function ks-but-last (l) (if (cdr l) (cons (car l) (ks-but-last (cdr l))) ()))
+(define-function ks-set-has? (set x)	; a Set by equality, an IdentitySet by identity
+  (let ((same (if (= 'IdentitySet (<ks-object>-class set)) (lambda (a b) (= a b)) equal)) (found ()))
+    (list-do e (ks-slot set 'items) (and (same e x) (set found 1)))
+    found))
 (define-function ks-dict-key (k) (cond ((symbol? k) k) ((string? k) (string->symbol k)) (else k)))
 (define-function ks-without (x l) (if l (if (= x (car l)) (cdr l) (cons (car l) (ks-without x (cdr l)))) ()))
 ;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)
@@ -138,6 +145,7 @@
   (list-do d (parse-string <squeak> $library (contents-of-file-named path))
     (let ((op (car d)))
       (cond ((= op 'class) (ks-define-class (cadr d) (caddr d) (cadddr d)))
+	    ((= op 'global) (push *ks-globals* (cons (cadr d) (ks-stream-curr (ks-eval (caddr d) (list (cons '%top 1)) ())))))
 	    (else
 	     (let* ((class (cadr d)) (kind (if (= 'class (caddr d)) (ks-meta class) class)))
 	       (if (= op 'method)

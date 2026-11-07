@@ -149,6 +149,7 @@
 ;; platform's (Object, Number, Array ...) from squeak-base.st, after test-pepsi.l's hierarchy.
 (define-structure <ks-class> (name super ivars))
 (define *ks-classes* ())	; (name . class)
+(define *ks-globals* ())	; (name . value), Smalltalk's globals (squeak-base.st's Smalltalk)
 (define *ks-classvars* ())	; ((CLASS NAME) . value), Smalltalk's class variables
 (define-function ks-assoc (key l)	; the pair whose car is equal to key
   (let ((found ())) (while (and l (not found)) (and (equal key (caar l)) (set found (car l))) (set l (cdr l))) found))
@@ -175,6 +176,7 @@
 	  ((or (= name 'nil) (= name 'null)) 'nil)
 	  ((= name 'undefined) 'undefined)
 	  ((ks-class-named name) (ks-class-named name))
+	  ((assq name *ks-globals*) (cdr (assq name *ks-globals*)))	; a global, Smalltalk say
 	  ((ks-object? this)
 	   (let ((s (ks-slot this name)))
 	     (cond ((ks-stream? s) (if lag? (ks-stream-prev s) (ks-stream-curr s)))

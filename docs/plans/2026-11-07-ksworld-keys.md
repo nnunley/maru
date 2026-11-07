@@ -65,6 +65,19 @@ Steps, each a check first:
    Done so far: KSFont, KSFace, KSFamily and KSShape run from their sources over squeak-ttf.st (Squeak's TrueType classes
    on truetype.l), with class variables and class initialization; a letter from KSWorld's withChar:inFont: waits on
    streamOf (KSBox>>initialize).
+3e. One shared world (the user, 2026-11-07: "a common vm infrastructure/world; not using a common representation is a
+   concern"), done before more is built on the old shape. Today there are three object models (Maru's structures,
+   Smalltalk as kscript.l's <ks-object>, KScript's slot alists holding streams) and two truths (Maru's, KScript's 'true
+   'false 'nil symbols). Instead, from the bottom:
+   - Maru's booleans are the truth: () false, anything else true, t the canonical true; Smalltalk's nil and false are (),
+     its true t, as test-pepsi.l has them (false := nil);
+   - a Smalltalk class is a Maru type, its instance variables its fields, its methods dispatched on the type as pepsi's
+     define-message does; the Smalltalk layer (squeak-base.st's primitives included) knows nothing of KScript's types;
+   - KSWorld's classes are Smalltalk classes, a document's objects their instances, and their slots KSObject's own
+     dictionary (it is an IdentityDictionary) on the platform's Dictionary, so KScript's this.x and Smalltalk's self at: #x
+     reach one storage;
+   - KScript (kscript.l) evaluates onto that layer: Maru's booleans, the shared objects and dispatch, no tables of its own.
+   Every KScript and KSWorld check moves with it.
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy

@@ -2,6 +2,8 @@
 # read to tpeg's own rule form, (NAME EXPRESSION PARAMETERS), so Maru's PEG runs them (ometa2.l):
 #   anything .   empty (an empty sequence)   rule rule(arg, ...)   { ... } a list   ( ... ) a group   #sym 'string' $c a value
 #   "tok" a token   < ... > the text matched   x:name   :name (anything:name)   &x ~x ?[test]   x* x+ x?   [expr]   -> [expr]
+#   empty(x) pushes x back onto the input for the next term: folded into that term's application, whose arguments tpeg pushes
+#   as cells ahead of its input (ometa2.l's ometa2-seq)
 # A Smalltalk expression ([ ], ?[ ], -> [ ], a rule's argument) is kept as its source, (smalltalk "..."), for ometa2.l to read
 # with squeak.g and run with the rule's bindings.
 
@@ -34,7 +36,9 @@ term		= "&" term:t							-> `(peek-for ,t)
 			 | "?" !"[" -> `(match-zero-one ,b) :b
 			 )* (":" name:n -> `(assign-result ,n ,b) :b)?		-> b ;
 base		= "anything" !idchar						-> `(match-any)
+		| "empty" _ "(" stargs:as ")"					-> `(ometa2-push ,@(map (lambda (a) `(smalltalk ,a)) as))
 		| "empty" !idchar						-> `(match-all)
+		| ("nil" | "true" | "false") @ $$:v !idchar			-> `(match-object ,v)	# the values, KScript's symbols
 		| name:n "(" stargs:as ")"					-> `(match-rule ,n ,@(map (lambda (a) `(smalltalk ,a)) as))
 		| name:n							-> `(match-rule ,n)
 		| "{" choice:c _ "}"						-> `(match-list ,c)

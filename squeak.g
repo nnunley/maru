@@ -66,7 +66,8 @@ pattern		= (keyword:k idpart:a _ -> (cons k (string->symbol a)))+:ps	-> (cons (s
 primitive	= "<" (!">" .)* ">" _ ;
 method		= _ pattern:p primitive* temps:ts primitive* statements:ss !.	-> `(,(car p) (fn ,(cdr p) ,@ts ,@ss)) ;
 
-# test-pepsi.l's own way of writing a library, as squeak-base.st writes the platform: "Name : Super (ivars)" defines a
+# test-pepsi.l's own way of writing a library, as squeak-base.st writes the platform: "name := expression." a global,
+# "Name : Super (ivars)" defines a
 # class, "Class pattern [ statements ]" (or "Class class pattern ...", its class side) a method, and "Class pattern
 # { s-expression }" a primitive, Maru with self and the arguments bound.  Reads to (class NAME SUPER IVARS) and
 # (method CLASS SIDE SELECTOR (fn PARAMS ...)) or (primitive CLASS SIDE SELECTOR PARAMS FORM).
@@ -80,7 +81,8 @@ sexpr		= "(" sspace (sexpr:e sspace -> e)*:es ")"			-> es
 		| (schar+) @ $:s						-> (string->symbol s) ;
 libside		= "class" !letter _ !("[" | "{")				-> 'class	# Object class { ... } is a method named class
 		|								-> 'instance ;
-libdef		= idpart:c _ ":" _ (idpart:s _ -> (string->symbol s))?:s "(" _ (idpart:v _ -> (string->symbol v))*:vs ")" _
+libdef		= idpart:n _ ":=" _ expression:e "." _				-> `(global ,(string->symbol n) ,e)	# nil := ..., as pepsi's
+		| idpart:c _ ":" _ (idpart:s _ -> (string->symbol s))?:s "(" _ (idpart:v _ -> (string->symbol v))*:vs ")" _
 										-> `(class ,(string->symbol c) ,(car s) ,vs)
 		| idpart:c _ libside:side pattern:p "[" _ temps:ts statements:ss "]" _
 										-> `(method ,(string->symbol c) ,side ,(car p) (fn ,(cdr p) ,@ts ,@ss))

@@ -10,19 +10,36 @@
 ;;; OMeta2's own rules (anything, empty, end, exactly, token, spaces ...) are Maru's PEG's or in <ometa2-base>.
 (require "ksworld-source.l")
 (require "source-parser.l")
+(define-function ometa2-fold-push (terms)	; empty(x) then rule(args), maybe bound, is rule(args, x)
+  (let ((out ()))
+    (while terms
+      (let ((t (car terms)) (next (cadr terms)))
+	(if (and (pair? t) (= 'ometa2-push (car t)) next)
+	    (let () (push out (if (= 'assign-result (car next))
+				  `(assign-result ,(cadr next) (match-rule ,@(cdr (caddr next)) ,@(cdr t)))
+				`(match-rule ,@(cdr next) ,@(cdr t))))
+		 (set terms (cddr terms)))
+	  (push out t) (set terms (cdr terms)))))
+    (list-reverse! out)))
 (define-function ometa2-seq (terms result)	; a sequence, its last value the result if there is one
-  (let ((ts (if result (concat-list terms (list `(result-expr ,result))) terms)))
+  (let ((ts (ometa2-fold-push (if result (concat-list terms (list `(result-expr ,result))) terms))))
     (cond ((not ts) '(match-all)) ((not (cdr ts)) (car ts)) (else `(match-all ,@ts)))))
 
 (tpeg-load "ometa2.g")
-(define ometa2-match)	; forward: ometa2.st's primitives call it
+(define ometa2-match)	; forward: ometa2.st's primitives call these
+(define ometa2-fail)
 (ks-load-library "ometa2.st")
 
 ;; the Smalltalk in rules: compiled once each, kept by number, run with the rule's bindings and the grammar's object
 (define *ometa2-actions* (array))
 (define *ometa2-host* ())	; the grammar object whose rules are running: self in their Smalltalk
 (define *ometa2-parser* ())	; and the parser running them, for apply:withArgs:
-(define-function ometa2-action (k env) (ks-stream-curr (ks-eval (array-at *ometa2-actions* k) env *ometa2-host*)))
+;; an action fails its alternative, as OMeta2Fail signal does in OMeta2: it throws to the action running, which answers
+;; ometa2-failed, and the rule's sequence checks for that (ometa2-finish)
+(define *ometa2-fail* (cons 'ometa2-fail ()))
+(define-function ometa2-fail () ((eval 'throw) *ometa2-fail* 'ometa2-failed))
+(define-function ometa2-action (k env)
+  (catch *ometa2-fail* (lambda () (ks-stream-curr (ks-eval (array-at *ometa2-actions* k) env *ometa2-host*)))))
 (define-function ometa2-true? (v) (ks-truthy? v))
 (define-function ometa2-compile (src ivars classvars)	; the number of a Smalltalk expression's tree
   (let ((p (text-parser-for-on <squeak> src)))
@@ -39,6 +56,10 @@
 	(else (let () (list-do e x (set out (ometa2-names e out))) out))))
 (define-function ometa2-finish (x names ivars classvars text?)
   (cond ((not (pair? x)) x)
+	((and (= 'result-expr (car x)) (pair? (cadr x)) (= 'smalltalk (car (cadr x))))	; an action's value, unless it failed
+	 `(match-all (assign-result ometa2-value (result-expr ,(ometa2-finish (cadr x) names ivars classvars text?)))
+		     (peek-expr (not (= ometa2-value 'ometa2-failed)))
+		     (result-expr ometa2-value)))
 	((= 'smalltalk (car x))
 	 `(ometa2-action ,(ometa2-compile (cadr x) ivars classvars) (list ,@(map (lambda (n) `(cons ',n ,n)) names))))
 	((= 'ometa2-char (car x)) (if text? `(match-string ,(list->string (list (cadr x)))) `(match-object ,(cadr x))))
@@ -53,6 +74,12 @@
 	 (let* ((r (<text-parser>-result p)) (names (ometa2-names (cadr r) (caddr r))))
 	   (list (car r) (ometa2-finish (cadr r) names ivars classvars text?) (caddr r))))))
 
+(define-function ometa2-rule-method (rule text?)	; made in a function so each closes over its own rule (on eval, a loop's
+  (lambda (recv args env this)				; closures share its variables)
+    (if (apply (if text? text-parser-invoke-rule source-parser-invoke-args) (cons rule (cons (eval (concat-symbol '$ rule)) (cons *ometa2-parser* args))))
+	(if text? (<text-parser>-result *ometa2-parser*) (<source-parser>-result *ometa2-parser*))
+      (ometa2-fail))))
+
 (define-function ometa2-grammar-name (class) (string->symbol (concat-strings "<ometa-" (symbol->string class) ">")))
 (define *ometa2-loaded* ())
 (define-function ometa2-load-class (class text?)	; its Smalltalk support as a class, its rules as <ometa-CLASS>
@@ -65,7 +92,9 @@
       (list-do m (ks-source-methods path)
 	(and (= 'instance (<ks-source-method>-side m)) (not (<ks-source-method>-tree m))
 	     (let ((r (ometa2-rule (<ks-source-method>-source m) ivars cvs text?))) (and r (push rules r)))))
-      (tpeg-define (list (ometa2-grammar-name class) (if text? '<text-parser> '<source-parser>) ()) (list-reverse! rules)))))
+      (tpeg-define (list (ometa2-grammar-name class) (if text? '<text-parser> '<source-parser>) ()) (list-reverse! rules))
+      ;; and, as in OMeta2, each rule a method of its class: applied on the parser running, self apply: #r withArgs: {...}
+      (list-do r rules (ks-method class (car r) (ometa2-rule-method (car r) text?))))))
 
 (define-function ometa2-match (class rule input args)	; class match: input with: #rule withArgs: args
   (let* ((host (ks-send (ks-class-named class) 'new () () ()))
