@@ -103,6 +103,17 @@
   (let ((name (<ks-class>-name class)))
     (new <ks-object> name 0 () (map (lambda (v) (cons v 'nil)) (ks-all-ivars name)) () 0)))
 
+;; what squeak-base.st's primitives need: a Squeak symbol (#at:put:, a string or symbol) as the selector we name it by
+(define-function ks-selector-of (x)
+  (let ((s (if (symbol? x) (symbol->string x) x)) (parts ()) (w ()) (colon ()))
+    (for (i 0 (string-length s))
+      (let ((c (string-at s i)))
+	(if (= c ?:) (let () (set colon 1) (push parts (list->string (list-reverse! w))) (set w ())) (push w c))))
+    (if colon (squeak-selector (list-reverse! parts)) (string->symbol s))))
+(define-function ks-responds? (recv sel)	; a method of its kind, or a closure in a slot of that name
+  (or (ks-method-for (ks-kind recv) sel)
+      (and (ks-object? recv) (let ((p (assq sel (<ks-object>-slots recv)))) (and p (ks-closure? (ks-stream-curr (cdr p))))))))
+(define-function ks-without (x l) (if l (if (= x (car l)) (cdr l) (cons (car l) (ks-without x (cdr l)))) ()))
 ;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)
 (define-function ks-primitive-function (f) (lambda (recv args env this) (apply f (cons recv args))))
 ;; the platform, in test-pepsi.l's form: classes, methods and primitives (Maru with self and the arguments bound)
@@ -128,4 +139,7 @@
 	(ks-define-class class super (caddr def))))
     (list-do m (ks-source-methods path)
       (let ((tree (<ks-source-method>-tree m)) (kind (if (= 'class (<ks-source-method>-side m)) (ks-meta class) class)))
-	(and tree (ks-method kind (<ks-source-method>-selector m) (ks-method-function kind tree (<ks-source-method>-kscript? m) ())))))))
+	(when tree	; a KScript method with parameters is its KSCompiler selector, as KSWorld compiled it: width = (aNumber) is
+	  ;; width:, which a KScript call width(n) reaches (ks-squeak-selector), while width() is another method, unary width
+	  (let ((f (ks-method-function kind tree (<ks-source-method>-kscript? m) ())) (sel (<ks-source-method>-selector m)))
+	    (ks-method kind (if (<ks-source-method>-kscript? m) (ks-squeak-selector sel (list-length (cadr tree))) sel) f)))))))

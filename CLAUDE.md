@@ -328,6 +328,20 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   beside its document (`ksworld-pp.l` keeps the path) and premultiplies it once. With `MARU_DBJR` the front page's
   photograph, rendered with the rest of the page, matches what its pipeline gives worked out from the PNG's pixels (the
   downsampled texel, then the bilinear filter, then the writer's rounding) at 98 of 100 grid points, none off by more than 1.
+- `ksworld_sources` (`check/ksworld-sources.l`, plan `docs/plans/2026-11-07-ksworld-keys.md`): KSWorld's own code runs from its
+  sources (`ksworld/*.st`): `st-fileout.g` reads Squeak's file-out (each class's definition, its instance and class sides),
+  `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
+  grammar) its Smalltalk ones to the same trees, so neither is transliterated by hand; `ksworld-source.l` makes each a method
+  of its class. A selector is named as KSCompiler named it (`at:put:` is `_at_put`; a KScript method with parameters is its
+  keyword selector, and KScript's `rec.abc(a, b)` reaches `abc:with:`), `self` is `this`, an instance variable a field of it,
+  and a Smalltalk method answers `self` without `^`, whose `^` leaves it from a block too (`catch.l`). Classes are values in
+  `kscript.l`, with superclasses (a send climbs them) and metaclasses for class sides, and an unknown form is an error, never a
+  quiet nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
+  primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), `nil`
+  answering tests as false, and a KSWorld object an IdentityDictionary of its slots. Every KScript method of KSTextLayout and
+  every Smalltalk method of KSContentsCollection and KSBox reads, and a KSContentsCollection is made, grown and edited by its
+  own Smalltalk. A text box's letters are letter boxes, as KSWorld read the spans it wrote (`ksworld-pp.l`), checked in
+  `ksworld_headless` against the five letters KSWorld kept.
 - `ksworld_mouse` (`check/ksworld-mouse.l`): `ksworld-events.l`'s `(ksworld-pointer session kind point)` delivers a press,
   motion or release at a document point to KSWorld.ks's running streams (`ksworld-session` continues what `ksworld-run`
   left), headless: a press goes to the topmost box under it with a `buttonDown` (through the inverse of the matrices the
@@ -609,6 +623,9 @@ KSWorld work, whose first capability is that the dbjr documents can be fetched.
   segfault, the one failure `recover.l` can't yet catch. On the default 8 MB stack `eval` overflows between 2,000 and 4,000 nested
   tail calls, and `eval2` between 4,000 and 7,000.
 - `eval2.c` was hand-edited upstream; nothing here regenerates it.
+- On `eval`, closures made in a loop's body share its variables, and its `let`s: `(list-do x '(1 2 3) (push fs (lambda () x)))`
+  answers 3 three times (`eval2` and `eval3` give each its own). Make such a closure in a function of its own, as
+  `ksworld-source.l`'s `ks-primitive-function` does; an audit (2026-11-07) found no other closure in the tree outliving its loop.
 - Cross-compiling: ir2 sizes follow the host's `osdefs.k`. Since that change
   (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
   on a 64-bit host, which is wrong for its 32-bit target.

@@ -12,6 +12,9 @@ Object : ()
   Magnitude : Object ()
     Number : Magnitude ()
   Collection : Object ()
+    HashedCollection : Collection ()
+      Dictionary : HashedCollection ()
+        IdentityDictionary : Dictionary ()
     SequenceableCollection : Collection ()
       List : SequenceableCollection ()
       ArrayedCollection : SequenceableCollection ()
@@ -31,6 +34,17 @@ Object ifNotNil: aBlock                 [ aBlock numArgs = 0 ifTrue: [aBlock val
 Object ifNil: nilBlock ifNotNil: aBlock [ self ifNotNil: aBlock ]
 Object error: message                   { (error "Smalltalk: " message) }
 Object initialize                       [ self ]
+Object perform: aSymbol                 { (ks-send self (ks-selector-of aSymbol) () () self) }
+Object perform: aSymbol with: a         { (ks-send self (ks-selector-of aSymbol) (list a) () self) }
+Object perform: aSymbol with: a with: b { (ks-send self (ks-selector-of aSymbol) (list a b) () self) }
+Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-selector-of aSymbol))) }
+
+"Dictionaries: a KSWorld object is an IdentityDictionary of its slots"
+IdentityDictionary at: key              { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
+IdentityDictionary at: key ifAbsent: aBlock { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
+IdentityDictionary at: key put: value   { (ks-set-slot self (ks-selector-of key) value) }
+IdentityDictionary includesKey: key     { (ks-bool (assq (ks-selector-of key) (<ks-object>-slots self))) }
+IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
 UndefinedObject isNil                   [ true ]

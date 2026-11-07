@@ -298,10 +298,16 @@
 	      ((or (not slot) args) (ks-no-method recv sel))	; a field it lacks: making one would hide a missing method
 	      (else (or (ks-val recv sel) 'nil)))))))
 
+;; the Smalltalk selector KSCompiler makes of a KScript call (its send:receiver:arguments:): rec.abc(a) is abc:, rec.abc(a,
+;; b) abc:with:, in our naming _abc and _abc_with; a selector already in that naming, or with no arguments, is itself
+(define-function ks-squeak-selector (sel n)
+  (let ((s (symbol->string sel)))
+    (if (or (= 0 n) (= ?_ (string-at s 0))) sel
+      (let ((out (concat-string "_" s))) (for (i 1 n) (set out (concat-string out "_with"))) (string->symbol out)))))
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
     (let* ((kind (ks-kind recv))
-	   (m (ks-method-for kind sel)))
+	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args)))))))
       (cond (m (m recv args env this))
 	    ((ks-stream? recv) (ks-send (ks-stream-curr recv) sel args env this))	; a stream answers as its value does
 	    ((ks-object? recv) (ks-object-send recv sel args env this))
