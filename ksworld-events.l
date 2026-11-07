@@ -22,7 +22,7 @@
 
 ;; every visible box in drawing order, with the matrix from it to the document
 (define-function ks-boxes (box m out)
-  (when (and (ks-object? box) (not (= 'false (ks-val box 'visible))))
+  (when (and (ks-object? box) (not (ks-slot-false? box 'visible)))
     (let ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation)))))
       (set-car out (cons (cons box here) (car out)))
       (list-do part '(backgroundParts contents parts)
@@ -60,7 +60,7 @@
 (define-function ks-time-after-event (t)
   (if *ks-event-limit* (+ t (/ (- *ks-event-limit* t) 1024.0)) (+ t 1)))
 (define-function ksworld-session (run)
-  (new <ksworld-session> (cdr (assq 'root run)) (cdr (assq 'evaluator run)) (cdr (assq 'time run)) (new <ks-hand> 'nil)))
+  (new <ksworld-session> (cdr (assq 'root run)) (cdr (assq 'evaluator run)) (cdr (assq 'time run)) (new <ks-hand> ())))
 
 ;; kind is down, move or up; answers the box the event went to, or ()
 (define-function ksworld-pointer (session kind point)
@@ -93,7 +93,7 @@
 	 (list-do s '(buttonUp pointerMotion)
 	   (set (<ks-object>-attrs (ks-slot box s)) (cons ':__dormant__ (cons "false" (<ks-object>-attrs (ks-slot box s))))))
 	 (set (<ks-hand>-focus (<ks-event>-hand ev)) box)
-	 (ks-fire (ks-slot box 'showSelection) 'true)
+	 (ks-fire (ks-slot box 'showSelection) 't)
 	 gap))))
   (handlePointerMotion
    (let ((ev (car args)) (box (ks-slot recv 'whole)))

@@ -40,7 +40,7 @@
      (expect "a drag selects, and a frame shows it" (list (ks-selection-gaps layout) (<ksworld-window>-frames win)) '((5 . 18) 3))
      (sdl3-push (cons 'up (concat-list (at 300 13) '(1))))
      (ksworld-window-step win)
-     (expect "a release lets go" (<ks-hand>-focus (<ksworld-session>-hand s)) 'nil)
+     (expect "a release lets go" (<ks-hand>-focus (<ksworld-session>-hand s)) ())
      (sdl3-push '(move 10 10))
      (expect "so a motion after it draws nothing" (list (ksworld-window-step win) (<ksworld-window>-frames win)) '(t 4))
      (sdl3-push '(quit))

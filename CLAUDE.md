@@ -267,7 +267,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   a send no method answers is an error naming kind and selector; a KSWorld object's send sets or reads a field it already has, but
   never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
-  collection, true as a test, never nil.
+  collection, true as a test, never nil. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
+  them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. A departure: false prints
+  as `nil`, where Squeak printed `false`.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
@@ -339,8 +341,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   and a Smalltalk method answers `self` without `^`, whose `^` leaves it from a block too (`catch.l`). Classes are values in
   `kscript.l`, with superclasses (a send climbs them) and metaclasses for class sides, and an unknown form is an error, never a
   quiet nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
-  primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), `nil`
-  answering tests as false, and a KSWorld object an IdentityDictionary of its slots. Every KScript method of KSTextLayout and
+  primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), Maru's
+  booleans (`t`, and `()` for false and nil alike: false answers as nil does), and a KSWorld object an IdentityDictionary of its slots. Every KScript method of KSTextLayout and
   every Smalltalk method of KSContentsCollection and KSBox reads, and a KSContentsCollection is made, grown and edited by its
   own Smalltalk. A text box's letters are letter boxes, as KSWorld read the spans it wrote (`ksworld-pp.l`), checked in
   `ksworld_headless` against the five letters KSWorld kept.

@@ -38,7 +38,7 @@ term		= "&" term:t							-> `(peek-for ,t)
 base		= "anything" !idchar						-> `(match-any)
 		| "empty" _ "(" stargs:as ")"					-> `(ometa2-push ,@(map (lambda (a) `(smalltalk ,a)) as))
 		| "empty" !idchar						-> `(match-all)
-		| ("nil" | "true" | "false") @ $$:v !idchar			-> `(match-object ,v)	# the values, KScript's symbols
+		| ("nil" | "true" | "false") @ $$:v !idchar			-> `(match-object ,(and (= v 'true) 't))	# Maru's t and ()
 		| name:n "(" stargs:as ")"					-> `(match-rule ,n ,@(map (lambda (a) `(smalltalk ,a)) as))
 		| name:n							-> `(match-rule ,n)
 		| "{" choice:c _ "}"						-> `(match-list ,c)

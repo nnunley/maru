@@ -55,7 +55,7 @@ String isString                         [ true ]
 Object isSymbol                         [ false ]
 String isSymbol                         { (ks-bool (symbol? self)) }
 BlockClosure isBlock                    [ true ]
-BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a (ks-elements-of args))) (for (i 0 n) (push out (if a (car a) 'nil)) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
+BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a (ks-elements-of args))) (for (i 0 n) (push out (if a (car a) ())) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
 Object initialize                       [ self ]
 Object perform: aSymbol                 { (ks-send self (ks-selector-of aSymbol) () () self) }
 Object perform: aSymbol with: a         { (ks-send self (ks-selector-of aSymbol) (list a) () self) }
@@ -67,13 +67,13 @@ Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-select
 Dictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
 Dictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
 Dictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
-Dictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
+Dictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
 Dictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
 Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 IdentityDictionary at: key              { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
 IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
 IdentityDictionary at: key put: value   { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
-IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
+IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
 IdentityDictionary includesKey: key     { (ks-bool (ks-assq (ks-dict-key key) (<ks-object>-slots self))) }
 IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
@@ -81,7 +81,7 @@ Object class new                        [ self basicNew initialize ]
 Object class initialize                 [ self ]
 "Behavior: a class knows its name, its superclass and the classes under it (those loaded)"
 Object class name                       { (<ks-class>-name self) }
-Object class superclass                 { (or (ks-class-named (<ks-class>-super self)) 'nil) }
+Object class superclass                 { (or (ks-class-named (<ks-class>-super self)) ()) }
 Object class allSubclasses              { (ks-subclasses-of (<ks-class>-name self)) }
 Object class withAllSubclasses          { (cons self (ks-subclasses-of (<ks-class>-name self))) }
 Object class compileAll                 [ "a class here is compiled from its source as it loads" self ]
@@ -90,7 +90,7 @@ UndefinedObject notNil                  [ false ]
 UndefinedObject ifNil: aBlock           [ aBlock value ]
 UndefinedObject ifNotNil: aBlock        [ nil ]
 UndefinedObject ifNil: nilBlock ifNotNil: aBlock [ nilBlock value ]
-"nil answers a test as false does, as test-pepsi.l's nil, which is its false"
+"nil is false, one value, (), as test-pepsi.l has it (false := nil): no value answers as False, so its tests are nil's"
 UndefinedObject ifTrue: aBlock          [ nil ]
 UndefinedObject ifFalse: aBlock         [ aBlock value ]
 UndefinedObject ifTrue: aBlock ifFalse: bBlock [ bBlock value ]
@@ -98,6 +98,8 @@ UndefinedObject ifFalse: bBlock ifTrue: aBlock [ bBlock value ]
 UndefinedObject and: aBlock             [ nil ]
 UndefinedObject or: aBlock              [ aBlock value ]
 UndefinedObject not                     [ true ]
+UndefinedObject & aBoolean              [ nil ]
+UndefinedObject | aBoolean              [ aBoolean ]
 
 "Booleans"
 True ifTrue: aBlock                     [ aBlock value ]
@@ -109,23 +111,14 @@ True or: aBlock                         [ true ]
 True & aBoolean                         [ aBoolean ]
 True | aBoolean                         [ true ]
 True not                                [ false ]
-False ifTrue: aBlock                    [ nil ]
-False ifFalse: aBlock                   [ aBlock value ]
-False ifTrue: aBlock ifFalse: bBlock    [ bBlock value ]
-False ifFalse: bBlock ifTrue: aBlock    [ bBlock value ]
-False and: aBlock                       [ false ]
-False or: aBlock                        [ aBlock value ]
-False & aBoolean                        [ false ]
-False | aBoolean                        [ aBoolean ]
-False not                               [ true ]
 
 "Blocks"
 BlockClosure numArgs                    { (list-length (<ks-closure>-params self)) }
 BlockClosure value                      { (ks-apply self () () ()) }
 BlockClosure value: a                   { (ks-apply self (list a) () ()) }
 BlockClosure value: a value: b          { (ks-apply self (list a b) () ()) }
-BlockClosure whileTrue: aBlock          { (let () (while (ks-truthy? (ks-apply self () () ())) (ks-apply aBlock () () ())) 'nil) }
-BlockClosure whileFalse: aBlock         { (let () (while (not (ks-truthy? (ks-apply self () () ()))) (ks-apply aBlock () () ())) 'nil) }
+BlockClosure whileTrue: aBlock          { (let () (while (ks-truthy? (ks-apply self () () ())) (ks-apply aBlock () () ())) ()) }
+BlockClosure whileFalse: aBlock         { (let () (while (not (ks-truthy? (ks-apply self () () ()))) (ks-apply aBlock () () ())) ()) }
 BlockClosure whileTrue                  [ self whileTrue: [] ]
 
 "Numbers"
@@ -194,7 +187,7 @@ String asString                         { (if (symbol? self) (symbol->string sel
 String copyWithout: c                   { (let ((s (if (symbol? self) (symbol->string self) self)) (out ())) (for (i 0 (string-length s)) (or (= c (string-at s i)) (push out (string-at s i)))) (list->string (list-reverse! out))) }
 
 "Arrays, counting from 1"
-Array class new: n                      { (let ((a (array n))) (for (i 0 n) (set-array-at a i 'nil)) a) }
+Array class new: n                      { (let ((a (array n))) (for (i 0 n) (set-array-at a i ())) a) }
 Array size                              { (array-length self) }
 Array at: i                             { (if (and (long? i) (< 0 i) (<= i (array-length self))) (array-at self (- i 1)) (error "Smalltalk: index " i " out of bounds for an Array of " (array-length self))) }
 Array = other                           { (ks-bool (ks-equal? self other)) }
@@ -207,9 +200,9 @@ ArrayedCollection replaceFrom: start to: stop with: source startingAt: from
                                             ifFalse: [start to: stop do: [:i | self at: i put: (source at: from + i - start)]] ]
 List size                               { (list-length self) }
 List do: aBlock                         { (let () (list-do x self (ks-apply aBlock (list x) () ())) self) }
-List collect: aBlock                    { (map (lambda (x) (ks-apply aBlock (list x) () ())) self) }
+List collect: aBlock                    { (list->array (map (lambda (x) (ks-apply aBlock (list x) () ())) self)) }
 List do: aBlock displayingProgress: b  [ self do: aBlock ]
-List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list-reverse! out)) }
+List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list->array (list-reverse! out))) }
 List isEmpty                            { (ks-bool (not self)) }
 List , other                            { (concat-list self (ks-elements-of other)) }
 List reduce: aBlock                     { (let ((acc (car self))) (list-do x (cdr self) (set acc (ks-apply aBlock (list acc x) () ()))) acc) }
@@ -237,7 +230,7 @@ Set initialize                          { (let () (ks-set-slot self 'items ()) s
 Set add: x                              { (let () (or (ks-set-has? self x) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) x) }
 Set includes: x                         { (ks-bool (ks-set-has? self x)) }
 Set do: aBlock                          { (let () (list-do x (ks-slot self 'items) (ks-apply aBlock (list x) () ())) self) }
-Set collect: aBlock                     { (map (lambda (x) (ks-apply aBlock (list x) () ())) (ks-slot self 'items)) }
+Set collect: aBlock                     { (list->array (map (lambda (x) (ks-apply aBlock (list x) () ())) (ks-slot self 'items))) }
 Set size                                { (list-length (ks-slot self 'items)) }
 Set isEmpty                             { (ks-bool (not (ks-slot self 'items))) }
 Set asArray                             { (list->array (ks-slot self 'items)) }
@@ -254,6 +247,8 @@ SequenceableCollection isEmpty          [ self size = 0 ]
 SequenceableCollection notEmpty         [ self isEmpty not ]
 SequenceableCollection do: aBlock       [ 1 to: self size do: [:i | aBlock value: (self at: i)] ]
 SequenceableCollection collect: aBlock  [ | out | out := OrderedCollection new.  self do: [:x | out add: (aBlock value: x)].  out asArray ]
+Array asArray                           [ self ]
+SequenceableCollection reduce: aBlock    [ | r | r := self first.  2 to: self size do: [:i | r := aBlock value: r value: (self at: i)].  r ]
 SequenceableCollection inject: acc into: aBlock [ | r | r := acc.  self do: [:x | r := aBlock value: r value: x].  r ]
 SequenceableCollection includes: x      [ self do: [:e | e = x ifTrue: [^ true]].  false ]
 OrderedCollection at: i                 { (let ((c (ks-slot self 'items)) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for an OrderedCollection of " (list-length (ks-slot self 'items))))) }

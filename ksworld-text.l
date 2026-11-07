@@ -200,7 +200,7 @@
 	 (tabs (and (ks-object? interval) (list (ks-slot interval 'start) (ks-slot interval 'stop) (ks-slot interval 'step))))
 	 (chars (ks-letter-chars (ks-items (ks-val box 'contents))))
 	 (y top) (out ()) (lines ()) (next 0))
-    (list-do line (ks-break-lines chars width tabs (not (= 'true (ks-slot layout 'noWrap))) left)
+    (list-do line (ks-break-lines chars width tabs (not (= 't (ks-slot layout 'noWrap))) left)
       (let* ((hard (car line)) (origin (cadr line)) (chars (cddr line)) (ink (ks-line-ink chars))
 	     (used (if ink (+ (ks-line-width ink tabs origin) (ks-left-bearing (car ink))) 0))
 	     (spaces (let ((n 0)) (list-do c ink (and (= 32 (<ks-char>-code c)) (set n (+ n 1)))) n))

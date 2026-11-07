@@ -26,7 +26,7 @@ TTGlyph transformFor: scale             [ | b | b := self bounds.
                                           "font units to the box: scaled, y down, the ink's top left at the origin"
                                           MatrixTransform2x3 a: scale b: 0 c: 0 d: scale negated e: b left * scale negated f: b bottom * scale ]
 
-GeziraPath class path: floats           { (new <ks-object> 'GeziraPath 0 () (list (cons 'floats floats) (cons 'fill 'nil)) () 0) }
+GeziraPath class path: floats           { (new <ks-object> 'GeziraPath 0 () (list (cons 'floats floats) (cons 'fill ())) () 0) }
 GeziraPath fill: aColor                 { (let () (ks-set-slot self 'fill aColor) self) }
 MatrixTransform2x3 : Object ()
 MatrixTransform2x3 class a: a b: b c: c d: d e: e f: f { (ks-matrix a b c d e f) }

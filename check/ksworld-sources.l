@@ -59,7 +59,7 @@
 (ks-load-source-class 'KSContentsCollection)
 (define-function listed (v) (if (array? v) (map listed (array->list v)) v))	; an array, and arrays in it, as lists
 (define-function run (text)	; a KScript program's statements in one environment; the last one's value, arrays as lists
-  (let ((r 'nil) (env (list (cons '%top 1)))) (list-do s (kscript-parse text) (set r (ks-stream-curr (ks-eval s env ())))) (listed r)))
+  (let ((r ()) (env (list (cons '%top 1)))) (list-do s (kscript-parse text) (set r (ks-stream-curr (ks-eval s env ())))) (listed r)))
 (expect "a collection from its class, grown and read by its own methods"
 	(run "var c = KSContentsCollection.new()\nc._add(1)\nc._add(2)\nc._addFirst(0)\n[c.size(), c._at(1), c._at(3), c.removeFirst(), c.size(), c.first()]")
 	'(3 0 2 0 2 1))
@@ -97,7 +97,7 @@
 
 ;; Smalltalk's literal and brace arrays are Maru arrays, KScript's too, and an empty one isn't nil
 (define-function st (text)	; a Smalltalk expression's value, as a method answering it
-  ((ks-method-function 'Object (cadr (ks-squeak-method (concat-string "f\n\t^ " text) () ())) () ()) 'nil () () ()))
+  ((ks-method-function 'Object (cadr (ks-squeak-method (concat-string "f\n\t^ " text) () ())) () ()) () () () ()))
 (expect "a literal array and a brace array are arrays"
 	(list (array? (st "#(1 2 3)")) (array->list (st "#(1 2 3)")) (array->list (st "{1. 1 + 1}"))) '(t (1 2 3) (1 2)))
 (expect "an empty array is empty, and not nil"
@@ -106,6 +106,15 @@
 	(list (array->list (st "#(1 2 3) collect: [:x | x * x]")) (st "#(1 2 3) inject: 0 into: [:a :x | a + x]") (array->list (st "#(1) , #(2)")))
 	'((1 4 9) 6 (1 2)))
 (expect "a list joined with an array is one list of both" (ks-send (list 1 2) (string->symbol ",") (list (list->array '(3))) () ()) '(1 2 3))
-(expect "KScript and Smalltalk share arrays" (st "#(1 2 3) = {1. 2. 3}") 'true)
+(expect "KScript and Smalltalk share arrays" (st "#(1 2 3) = {1. 2. 3}") 't)
+(expect "a collection made from none is an empty array, never nil, and a list's collect: an array"
+	(list (array? (st "#() collect: [:x | x]")) (array? (st "OrderedCollection new asArray")) (array? (st "Set new asArray"))
+	      (array->list (ks-send (list 1 2) '_collect (list (ks-eval (car (kscript-parse "(x) -> x * 10")) () ())) () ())))
+	'(t t t (10 20)))
+;; Smalltalk's true is Maru's t, and false and nil are one value, (), answering as nil does: ifTrue: does nothing, ifFalse: runs
+(expect "true is t, false and nil are ()" (list (st "true") (st "false") (st "nil") (st "false == nil") (st "3 > 2")) '(t () () t t))
+(expect "false is nil: isNil, ifTrue: and ifFalse:"
+	(list (st "false isNil") (st "false ifTrue: [1]") (st "false ifFalse: [2]") (st "true ifTrue: [1] ifFalse: [2]") (st "true & false") (st "false | true"))
+	'(t () 2 1 () t))
 
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

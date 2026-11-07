@@ -45,14 +45,14 @@
 (define-function ks-closure? (x)	(= <ks-closure> (type-of x)))
 (define-function ks-return? (x)		(= <ks-return>  (type-of x)))
 
-(define-function ks-defined? (v)	(and v (!= v 'undefined)))
-(define-function ks-truthy? (v)		(and v (!= v 'false) (!= v 'nil) (!= v 'undefined)))
-(define-function ks-bool (b)		(if b 'true 'false))
+(define-function ks-defined? (v)	(!= v 'undefined))	; false and nil, (), are values; undefined is none
+(define-function ks-truthy? (v)		(and v (!= v 'undefined)))	; Maru's truth: () is false and nil, undefined neither
+(define-function ks-bool (b)		(if b 't ()))
 
 (define-function ks-not (v)
   (cond ((= v 'undefined) 'undefined)
-	((ks-truthy? v) 'false)
-	(else 'true)))
+	((ks-truthy? v) ())
+	(else 't)))
 
 (define-function number? (x)		(or (long? x) (double? x)))
 
@@ -62,7 +62,6 @@
 	((and (ks-point? a) (ks-point? b))
 	 (and (= (<ks-point>-x a) (<ks-point>-x b))
 	      (= (<ks-point>-y a) (<ks-point>-y b))))
-	((or (and (= a 'nil) (= b ())) (and (= a ()) (= b 'nil))) 1)
 	((and (array? a) (array? b)) (ks-equal-arrays? a b))	; arrays by their elements, as Squeak's Array>>=
 	(else (equal a b))))
 (define-function ks-equal-arrays? (a b)
@@ -109,6 +108,8 @@
 
 (define-function ks-to-string (v)
   (cond ((string? v) v)
+	((not v) "nil")
+	((= v 't) "true")
 	((symbol? v) (symbol->string v))
 	((long? v) (long->string v))
 	((double? v) (format "%g" v))
@@ -141,11 +142,12 @@
   (and (ks-object? x) (= (<ks-object>-class x) 'KSEventStream)))
 
 (define-function ks-stream-curr (x)
-  (if (ks-stream? x) (ks-slot x '__currentValue__) x))
+  (if (ks-stream? x) (ks-stream-value x) x))
 
 (define-function ks-stream-prev (x)
   (if (ks-stream? x)
-      (or (ks-slot x '__prevValue__) (ks-slot x '__currentValue__))
+      (let ((p (assq '__prevValue__ (<ks-object>-slots x))))	; a previous false is false; a stream read without one has its current
+	(if p (cdr p) (ks-stream-value x)))
     x))
 
 ;; Classes, as Smalltalk has them: a class is a value (its name, its superclass, its instance variables), named where code
@@ -177,9 +179,8 @@
   (let ((pair (assq name env)))
     (cond (pair (cdr pair))
 	  ((= name 'this) this)
-	  ((= name 'true) 'true)
-	  ((= name 'false) 'false)
-	  ((or (= name 'nil) (= name 'null)) 'nil)
+	  ((= name 'true) 't)
+	  ((or (= name 'false) (= name 'nil) (= name 'null)) ())
 	  ((= name 'undefined) 'undefined)
 	  ((ks-class-named name) (ks-class-named name))
 	  ((assq name *ks-globals*) (cdr (assq name *ks-globals*)))	; a global, Smalltalk say
@@ -187,7 +188,7 @@
 	   (let ((s (ks-slot this name)))
 	     (cond ((ks-stream? s) (if lag? (ks-stream-prev s) (ks-stream-curr s)))
 		   (s s)
-		   (else 'nil))))
+		   (else ()))))
 	  (else name))))
 
 (define-function ks-env-set! (env this name val)
@@ -265,14 +266,13 @@
 (define-method ks-kind <long> () 'Number)
 (define-method ks-kind <double> () 'Number)
 (define-method ks-kind <string> () 'String)
-(define-method ks-kind <symbol> ()	; Color names a class; true, false and nil are Smalltalk's; other symbols are text
-  (cond ((= self 'Color) 'ColorClass) ((= self 'true) 'True) ((= self 'false) 'False)
-	((or (= self 'nil) (= self 'undefined)) 'UndefinedObject) (else 'String)))
+(define-method ks-kind <symbol> ()	; Color names a class; t is true; undefined answers as nil; other symbols are text
+  (cond ((= self 'Color) 'ColorClass) ((= self 't) 'True) ((= self 'undefined) 'UndefinedObject) (else 'String)))
 (define-method ks-kind <array> () 'Array)
 (define-method ks-kind <ks-closure> () 'BlockClosure)
 (define-method ks-kind <ks-class> () (ks-meta self.name))
 (define-method ks-kind <pair> () 'List)
-(define-method ks-kind <undefined> () 'List)	; (), the empty list (KScript's nil is the symbol nil)
+(define-method ks-kind <undefined> () 'UndefinedObject)	; (), Maru's false and nil, as Smalltalk's (an empty list is an empty array)
 (define-method ks-kind <ks-point> () 'Point)
 (define-method ks-kind <ks-rect> () 'Rectangle)
 (define-method ks-kind <ks-color> () 'Color)
@@ -315,7 +315,7 @@
 	       (ks-apply (ks-stream-curr (cdr slot)) args env recv))
 	      ((and args slot (not (ks-stream? (cdr slot)))) (ks-set-val recv sel (car args)))	; a field it has; a stream is set with set()
 	      ((or (not slot) args) (ks-no-method recv sel))	; a field it lacks: making one would hide a missing method
-	      (else (or (ks-val recv sel) 'nil)))))))
+	      (else (or (ks-val recv sel) ())))))))
 
 ;; the Smalltalk selector KSCompiler makes of a KScript call (its send:receiver:arguments:): rec.abc(a) is abc:, rec.abc(a,
 ;; b) abc:with:, in our naming _abc and _abc_with; a selector already in that naming, or with no arguments, is itself
@@ -410,10 +410,9 @@
 	       found))
   (sort (ks-sort recv (lambda (a b) (ks-truthy? (if args (ks-apply (car args) (list a b) env this) (ks-cmp '<= a b)))))))
 
-;; true, false and nil: Smalltalk's kinds, answering what they answered when they were text
-(ks-methods True (asBoolean 'true) ((asString printString) "true"))
-(ks-methods False (asBoolean 'false) ((asString printString) "false"))
-(ks-methods UndefinedObject (asBoolean 'false) ((asString printString) (ks-to-string recv)))
+;; Maru's t and (): true, and false and nil as one value
+(ks-methods True (asBoolean 't) ((asString printString) "true"))
+(ks-methods UndefinedObject (asBoolean ()) ((asString printString) "nil"))
 
 (ks-methods ColorClass			; Color, the class, a global
   (white (ks-color 1.0 1.0 1.0 1.0))
@@ -486,10 +485,10 @@
 	   (cond ((ks-stream? s) (if lag? (ks-stream-prev s) (ks-stream-curr s)))
 		 (s s)
 		 ((= field 'contents) (ks-items (ks-val obj 'contents)))
-		 (else 'nil))))
+		 (else ()))))
 	((pair? obj)
 	 (let ((p (assq field obj)))
-	   (if p (cdr p) 'nil)))
+	   (if p (cdr p) ())))
 	(else (ks-send obj field () () ()))))	; a value's field is a message with no arguments, answered or an error
 
 (define-function ks-elements (v)	; what a for, a comprehension or anyE walks: an array's, a list's or a box's elements
@@ -497,15 +496,15 @@
 (define-function ks-index (obj idx)
   (cond ((and (array? obj) (number? idx))	; counting from 0
 	 (let ((k (if (double? idx) (double->long idx) idx)))
-	   (if (and (<= 0 k) (< k (array-length obj))) (array-at obj k) 'nil)))
+	   (if (and (<= 0 k) (< k (array-length obj))) (array-at obj k) ())))
 	((and (pair? obj) (number? idx))
 	 (let ((cur obj) (k (if (double? idx) (double->long idx) idx)))
 	   (while (and cur (< 0 k)) (set cur (cdr cur)) (decr k))
-	   (if cur (car cur) 'nil)))
+	   (if cur (car cur) ())))
 	((ks-object? obj)
 	 (let ((key (if (symbol? idx) idx (string->symbol (ks-to-string idx)))))
 	   (ks-val obj key)))
-	(else 'nil)))
+	(else ())))
 
 (define-function ks-apply (fn args env caller-this)
   (cond ((ks-closure? fn)
@@ -513,10 +512,10 @@
 	       (ps (<ks-closure>-params fn))
 	       (as args))
 	   (while ps
-	     (push new-env (cons (car ps) (if as (car as) 'nil)))
+	     (push new-env (cons (car ps) (if as (car as) ())))
 	     (set ps (cdr ps))
 	     (set as (cdr as)))
-	   (let ((res 'nil) (stmts (<ks-closure>-body fn)))
+	   (let ((res ()) (stmts (<ks-closure>-body fn)))
 	     (while (and stmts (not (ks-return? res)))
 	       (set res (ks-eval (car stmts) new-env (<ks-closure>-this fn)))
 	       (set stmts (cdr stmts)))
@@ -530,7 +529,7 @@
 		 (set cached (new <ks-closure> (cadr ast) (cddr ast) () clos-this))
 		 (set (<ks-object>-attrs fn) (cons ':__compiled__ (cons cached (<ks-object>-attrs fn))))))
 	   (ks-apply cached args env clos-this)))
-	(else 'nil)))
+	(else ())))
 
 ;;; ---------------------------------------------------------------- evaluator
 
@@ -599,7 +598,7 @@
 		(args (map (lambda (a) (ks-stream-curr (ks-eval a env this))) (cdddr exp))))
 	    (ks-send recv sel args env this)))
 	 ((= op 'cascade)	; each message to the one receiver; the last one's answer
-	  (let ((recv (ks-eval (cadr exp) env this)) (res 'nil))
+	  (let ((recv (ks-eval (cadr exp) env this)) (res ()))
 	    (list-do m (cddr exp)
 	      (set res (ks-send recv (car m) (map (lambda (a) (ks-stream-curr (ks-eval a env this))) (cdr m)) env this)))
 	    res))
@@ -617,7 +616,7 @@
 	    ns))
 	 ((= op 'char) (cadr exp))
 	 ((= op 'symbol) (cadr exp))	; #'name', a Smalltalk Symbol: Maru's symbol, text as KScript's are
-	 ((= op 'classvar) (let ((p (ks-assoc (cdr exp) *ks-classvars*))) (if p (cdr p) 'nil)))	; Smalltalk's class variables
+	 ((= op 'classvar) (let ((p (ks-assoc (cdr exp) *ks-classvars*))) (if p (cdr p) ())))	; Smalltalk's class variables
 	 ((= op 'call)
 	  (let ((fn (cadr exp))
 		(raw-args (cddr exp)))
@@ -704,7 +703,7 @@
 		(ks-eval (caddr exp) env this)
 	      (if (cadddr exp)
 		  (ks-eval (cadddr exp) env this)
-		'nil))))
+		()))))
 	 ((= op 'when-stream)
 	  (let ((tval (ks-stream-curr (ks-eval (cadr exp) env this)))
 		(vname (caddr exp))
@@ -740,23 +739,23 @@
 		 (col-val (ks-stream-curr (ks-eval (caddr exp) env this)))
 		 (items (ks-elements col-val))
 		 (cond-exp (cadddr exp))
-		 (found 'nil))
-	    (while (and (pair? items) (= found 'nil))
+		 (found ()) (done ()))
+	    (while (and (pair? items) (not done))
 	      (let* ((it (car items))
 		     (sub-env (cons (cons vname it) env)))
 		(when (or (not cond-exp) (ks-truthy? (ks-stream-curr (ks-eval cond-exp sub-env this))))
-		  (set found it)))
+		  (set found it) (set done 1)))
 	      (set items (cdr items)))
 	    found))
 	 ((= op 'begin)
-	  (let ((res 'nil) (stmts (cdr exp)))
+	  (let ((res ()) (stmts (cdr exp)))
 	    (while (and stmts (not (ks-return? res)))
 	      (set res (ks-eval (car stmts) env this))
 	      (set stmts (cdr stmts)))
 	    res))
 	 ((= op 'var)
 	  (let* ((vname (cadr exp))
-		 (val (if (caddr exp) (ks-stream-curr (ks-eval (caddr exp) env this)) 'nil)))
+		 (val (if (caddr exp) (ks-stream-curr (ks-eval (caddr exp) env this)) ())))
 	    (when (pair? env)
 	      (set-cdr env (cons (car env) (cdr env)))
 	      (set-car env (cons vname val)))
@@ -815,7 +814,7 @@
 				       step-val)
 			   col-val)))
 		 (body (car (cddddr exp)))
-		 (res 'nil))
+		 (res ()))
 	    (when (pair? items)
 	      (list-do it items
 		(let ((sub-env (cons (cons vname it) env)))
@@ -825,8 +824,8 @@
 	  (let ((target (cadr exp)))
 	    (when (and (pair? target) (= (car target) 'field))
 	      (let ((obj (ks-stream-curr (ks-eval (cadr target) env this))))
-		(and (ks-object? obj) (ks-set-val obj (caddr target) 'nil))))
-	    'nil))
+		(and (ks-object? obj) (ks-set-val obj (caddr target) ()))))
+	    ()))
 	 ((= op 'return)
 	  (new <ks-return> (ks-stream-curr (ks-eval (cadr exp) env this))))
 	 (else (error "KScript: no form " op " (" exp ")")))))))	; never a quiet nil

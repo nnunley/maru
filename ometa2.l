@@ -67,6 +67,9 @@
 	 (if text? `(match-string ,(cadr x))
 	   `(match-all (assign-result ometa2-element (match-any)) (peek-expr (equal ometa2-element ,(cadr x))))))
 	((= 'quote (car x)) x)
+	((or (= 'match-zero-more (car x)) (= 'match-one-more (car x)))	; a repetition's value is a collection, an array, as OMeta2's
+	 `(match-all (assign-result ometa2-many (,(car x) ,(ometa2-finish (cadr x) names ivars classvars text?)))
+		     (result-expr (list->array ometa2-many))))
 	(else (map (lambda (e) (ometa2-finish e names ivars classvars text?)) x))))
 (define-function ometa2-rule (src ivars classvars text?)	; (NAME EXPRESSION PARAMETERS), or () if src isn't a rule
   (let ((p (text-parser-for-on <ometa2> src)))

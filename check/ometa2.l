@@ -16,14 +16,14 @@
 ;; a list holding one; the stream expression's own call and what holds no stream it leaves alone
 (ometa2-load-class 'KSQuoteAttributor2 ())
 (let* ((inner (list 'call "" '(var "timerE" timerE) 100))
-       (body (list 'func "" '(x) () 'false '(var "x" x)))
+       (body (list 'func "" '(x) () () '(var "x" x)))
        (send (list 'send "" 'mapE inner body))
        (tree (list 'call "" (list 'var "$$" (string->symbol "$$")) send))
        (attrs (ometa2-match 'KSQuoteAttributor2 'start tree ())))
   (expect "the send and the call inside are marked"
-	  (list (ks-send attrs '_includesKey (list send) () attrs) (ks-send attrs '_includesKey (list inner) () attrs)) '(true true))
+	  (list (ks-send attrs '_includesKey (list send) () attrs) (ks-send attrs '_includesKey (list inner) () attrs)) '(t t))
   (expect "the outer call and a plain variable are not"
-	  (list (ks-send attrs '_includesKey (list tree) () attrs) (ks-send attrs '_includesKey (list (caddr inner)) () attrs)) '(false false)))
+	  (list (ks-send attrs '_includesKey (list tree) () attrs) (ks-send attrs '_includesKey (list (caddr inner)) () attrs)) '(() ())))
 
 ;; KSQuoteTranslator2, the pass that gives a stream expression its meaning, reads from its source and opens KSWorld's
 ;; construction code for $$(timerE(100)): a block declaring pvtStrm as a new KSNewEventStream

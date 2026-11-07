@@ -123,7 +123,7 @@
 				(if last-value? v recv))))))))
 (define-function ks-basic-new (class)	; Behavior>>basicNew: an instance with each instance variable nil
   (let ((name (<ks-class>-name class)))
-    (new <ks-object> name 0 () (map (lambda (v) (cons v 'nil)) (ks-all-ivars name)) () 0)))
+    (new <ks-object> name 0 () (map (lambda (v) (cons v ())) (ks-all-ivars name)) () 0)))
 
 ;; what squeak-base.st's primitives need: a Squeak symbol (#at:put:, a string or symbol) as the selector we name it by
 (define-function ks-selector-of (x)

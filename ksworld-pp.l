@@ -63,11 +63,19 @@
 	(set (<ks-object>-slots obj) (cons (cons key val) (<ks-object>-slots obj)))))
     val))
 
+(define-function ks-stream-value (s)	; a stream's current value; one it was saved without is undefined, as in KSWorld
+  (let ((p (assq '__currentValue__ (<ks-object>-slots s))))
+    (if p (cdr p) 'undefined)))
+
 (define-function ks-val (obj key)
   (let ((v (ks-slot obj key)))
     (if (and (ks-object? v) (= (<ks-object>-class v) 'KSEventStream))
-	(ks-slot v '__currentValue__)
+	(ks-stream-value v)
       v)))
+
+(define-function ks-slot-false? (obj key)	; has the slot, and it holds false (a slot it lacks isn't false, it's missing)
+  (let ((p (and (ks-object? obj) (assq key (<ks-object>-slots obj)))))
+    (and p (not (ks-val obj key)))))
 
 (define-function ks-set-val (obj key val)
   (let ((v (ks-slot obj key)))
@@ -115,9 +123,8 @@
 (define-function ks-parse-value (vcls vstr)
   (cond ((or (= vcls 'Number) (= vcls 'SmallInteger)) (ks-parse-num vstr))
 	((= vcls 'Float) (string->double vstr))
-	((= vcls 'True) 'true)
-	((= vcls 'False) 'false)
-	((= vcls 'UndefinedObject) 'nil)
+	((= vcls 'True) 't)
+	((or (= vcls 'False) (= vcls 'UndefinedObject)) ())
 	((= vcls 'KSProtoObject) 'undefined)
 	((or (= vcls 'Symbol) (= vcls 'ByteSymbol)) (string->symbol vstr))
 	((or (= vcls 'String) (= vcls 'ByteString)) vstr)

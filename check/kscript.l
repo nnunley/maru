@@ -12,6 +12,7 @@
     (list-do st (kscript-parse source) (ks-eval st () box))
     box))
 
+(define-function ks-run (text) (ks-stream-curr (ks-eval (car (kscript-parse text)) () ())))
 ;; a stream's value at each of ticks logical times
 (define-function ticks (source name n)
   (let ((box (box-of source))
@@ -41,8 +42,8 @@
 a <- true fby when timer then b'
 b <- false fby when timer then a'
 "))
-  (expect "a" (ticks source 'a 5) '(true false true false true))
-  (expect "b" (ticks source 'b 5) '(false true false true false)))
+  (expect "a" (ticks source 'a 5) '(t () t () t))
+  (expect "b" (ticks source 'b 5) '(() t () t ())))
 
 ;; undefined stops a change propagating, and the stream keeps its value (the report's stopper)
 (let ((source "myTimer <- timerE(1)
@@ -67,7 +68,7 @@ c <- 0 fby when t then c' + 1
 " 'c 5)
 	'(0 0 1 1 2))
 
-(expect "a long equals a double" (ks-eval (car (kscript-parse "1 == 1.0")) () ()) 'true)
+(expect "a long equals a double" (ks-eval (car (kscript-parse "1 == 1.0")) () ()) 't)
 
 (let ((box (box-of "")))
   (ks-set-val box 'bounds (ks-rect 1 2 3 4))
@@ -79,15 +80,20 @@ c <- 0 fby when t then c' + 1
 for i in [0...10] by 5 total := total + i
 ") 'total) 15)
 
-;; true, false and nil have kinds of their own (True, False, UndefinedObject), and answer what they answered as text
-(expect "true, false and nil as booleans and text"
-	(list (ks-send 'true 'asBoolean () () ()) (ks-send 'false 'asBoolean () () ()) (ks-send 'nil 'asBoolean () () ())
-	      (ks-send 'true 'printString () () ()) (ks-send 'false 'asString () () ()))
-	'(true false false "true" "false"))
+;; KScript's truth is Maru's: true is t, false and nil are both (), and anything else, an empty array too, is true
+(expect "true, false and nil are Maru's t and ()" (list (ks-run "true") (ks-run "false") (ks-run "nil") (ks-run "false == nil")) '(t () () t))
+(expect "comparisons and not answer t and ()" (list (ks-run "1 < 2") (ks-run "2 < 1") (ks-run "not true") (ks-run "not nil")) '(t () () t))
+(expect "undefined is neither, and stops a change" (list (ks-run "undefined") (ks-run "not undefined")) '(undefined undefined))
+(expect "t answers as True, () as UndefinedObject"
+	(list (ks-kind 't) (ks-kind ()) (ks-send 't 'asBoolean () () ()) (ks-send () 'asBoolean () () ())
+	      (ks-send 't 'printString () () ()) (ks-send () 'printString () () ()))
+	'(True UndefinedObject t () "true" "nil"))
+(let ((box (box-of "flag := false\n")))
+  (expect "a field holding false is a field: read and set by a send, never missing"
+	  (list (ks-send box 'flag () () box) (ks-send box 'flag '(t) () box) (ks-val box 'flag)) '(() t t)))
 
 ;; KScript's lists are Maru arrays (one representation with Smalltalk's Arrays): a literal, a range and a comprehension
 ;; each make one, counted from 0 by an index, and an empty one is a collection, true as a test, never nil or false
-(define-function ks-run (text) (ks-stream-curr (ks-eval (car (kscript-parse text)) () ())))
 (let ((a (ks-run "[1, 2, 3]")))
   (expect "a literal is an array" (and (array? a) (array->list a)) '(1 2 3)))
 (expect "a range is an array" (let ((a (ks-run "[1...3]"))) (and (array? a) (array->list a))) '(1 2 3))
@@ -106,5 +112,10 @@ for i in [0...10] by 5 total := total + i
 (expect "a long range, made without recursion" (array-length (ks-run "[1...20000]")) 20000)
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
+
+(expect "a stream with no value is undefined, one holding false is false"
+	(let ((none (new <ks-object> 'KSEventStream 0 () () () 0)) (off (ks-make-stream () "exprE" "" ())))
+	  (list (ks-stream-curr none) (ks-stream-prev none) (ks-stream-curr off) (ks-stream-prev off)))
+	'(undefined undefined () ()))
 
 (and ok (println "kscript ok"))

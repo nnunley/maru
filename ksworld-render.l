@@ -52,7 +52,7 @@
 	 (t (ks-invert m))
 	 (own (ks-slot fill 'transform)))
     (and (ks-matrix? own) (set t (ks-compose own t)))
-    (if (or (= 'false (ks-val fill 'filter))
+    (if (or (ks-slot-false? fill 'filter)
 	    (and (= 1.0 (<ks-matrix>-a t)) (= 0.0 (<ks-matrix>-b t)) (= 0.0 (<ks-matrix>-c t)) (= 1.0 (<ks-matrix>-d t))
 		 (ks-whole? (<ks-matrix>-e t)) (ks-whole? (<ks-matrix>-f t))))
 	(list 'image (<png>-pixels png) (<png>-width png) (<png>-height png) t 0)
@@ -82,7 +82,7 @@
 ;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
 (define-function ksworld-render-selection (box m gezira width height)
   (let ((layout (ks-slot box 'handler)) (sel ()))
-    (when (and (= 'true (ks-val box 'showSelection)) (ks-object? (set sel (ks-val layout 'selection))))
+    (when (and (= 't (ks-val box 'showSelection)) (ks-object? (set sel (ks-val layout 'selection))))
       (let ((c (ks-slot layout 'selectionColor)))
 	(list-do r (ks-text-selection-rects box (ks-slot sel 'start) (- (ks-slot sel 'stop) 1))
 	  (let ((floats (data (* 4 24))) (i 0)
@@ -95,7 +95,7 @@
 			      (list 'uniform (<ks-color>-a c) (<ks-color>-r c) (<ks-color>-g c) (<ks-color>-b c)) floats 24)))))))
 
 (define-function ksworld-render-box (box m gezira width height)
-  (when (and (ks-object? box) (not (= 'false (ks-val box 'visible))))
+  (when (and (ks-object? box) (not (ks-slot-false? box 'visible)))
     (let* ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation))))
 	   (shape (ks-val box 'shape)))
       (when (ks-object? shape)

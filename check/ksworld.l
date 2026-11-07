@@ -110,7 +110,7 @@
 	'(1.0 "Smalltalk: ColorClass does not understand lighter"))
 (expect "match (the pattern receives it) and sort, as a listing uses them"
 	(list (ks-send "*.jpg" 'match '("photo.JPG") () ()) (ks-send "*.jpg" 'match '("a.txt") () ()) (ks-send '(3 1 2) 'sort () () ()))
-	'(true false (1 2 3)))
+	'(t () (1 2 3)))
 (expect "a value's kind names the failure too"
 	(try (ks-send 5 'frobnicate () () ()) (lambda (c) (ksw-message c))) "Smalltalk: Number does not understand frobnicate")
 

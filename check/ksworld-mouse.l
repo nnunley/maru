@@ -30,7 +30,7 @@
     (expect "the caret at the nearest gap, shown, the drag awake and the hand holding the box"
 	    (list (ks-selection-gaps layout) (ks-val box 'showSelection) (ks-awake? (ks-slot box 'buttonUp))
 		  (ks-awake? (ks-slot box 'pointerMotion)) (<ks-hand>-focus (<ksworld-session>-hand s)))
-	    (list '(5 . 5) 'true 't 't box))
+	    (list '(5 . 5) 't 't 't box))
     (expect "a drag goes to the box the hand holds" (ksworld-pointer s 'move (at 300 13)) box)
     (expect "and selects from the press" (ks-selection-gaps layout) '(5 . 18))
     (let ((g (new <gezira-points> ())) (c (ks-slot layout 'selectionColor)) (corner (at 199.634033 2)) (found ()))
@@ -43,7 +43,7 @@
     (ksworld-pointer s 'up (at 300 13))
     (expect "a release puts the drag to sleep and the hand lets go"
 	    (list (ks-awake? (ks-slot box 'buttonUp)) (ks-awake? (ks-slot box 'pointerMotion)) (<ks-hand>-focus (<ksworld-session>-hand s)))
-	    '(() () nil))
+	    '(() () ()))
     (expect "so a motion after it goes nowhere" (ksworld-pointer s 'move (at 100 13)) ())))
 
 (println (if ok "ksworld mouse ok" "ksworld mouse FAILED"))
