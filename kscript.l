@@ -287,7 +287,14 @@
 	(set out (concat-list (list-reverse! head) (cons x rest)))))
     out))
 
-(define-function ks-no-method (recv sel) (error "KScript: no method " sel " for " (ks-kind recv)))
+(define-function ks-squeak-name (sel)	; our name for a selector back to Squeak's: _at_put is at:put:, size and + themselves
+  (let ((s (symbol->string sel)))
+    (if (and (< 1 (string-length s)) (= ?_ (string-at s 0)))
+	(let ((out ()))
+	  (for (i 1 (string-length s)) (push out (if (= ?_ (string-at s i)) ?: (string-at s i))))
+	  (string->symbol (concat-string (list->string (list-reverse! out)) ":")))
+      sel)))
+(define-function ks-no-method (recv sel) (error "Smalltalk: " (ks-kind recv) " does not understand " (ks-squeak-name sel)))
 
 ;; a KSWorld object's own kind, then what every KSWorld object answers: a closure in a slot of that name, or setting or reading
 ;; a field it has
@@ -308,14 +315,24 @@
   (let ((s (symbol->string sel)))
     (if (or (= 0 n) (= ?_ (string-at s 0))) sel
       (let ((out (concat-string "_" s))) (for (i 1 n) (set out (concat-string out "_with"))) (string->symbol out)))))
+(define ks-send)	; forward: ks-native-send and ks-send call each other
+;; what a send nothing answers does, at the root: a stream answers as its value does, a document's object from its slots
+;; (ks-object-send), and anything else is refused naming the send
+(define-function ks-native-send (recv sel args env this)
+  (cond ((ks-stream? recv) (ks-send (ks-stream-curr recv) sel args env this))
+	((ks-object? recv) (ks-object-send recv sel args env this))
+	(else (ks-no-method recv sel))))
+;; a send: the receiver's kind's method, up its superclasses; else, as in Smalltalk, doesNotUnderstand: with a Message (its
+;; selector in Squeak's form and ours, its arguments), which KSObject answers from its slots and Object at the root natively
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
     (let* ((kind (ks-kind recv))
-	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args)))))))
+	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args))))))
+	   (dnu (and (not m) (ks-method-for kind '_doesNotUnderstand))))
       (cond (m (m recv args env this))
-	    ((ks-stream? recv) (ks-send (ks-stream-curr recv) sel args env this))	; a stream answers as its value does
-	    ((ks-object? recv) (ks-object-send recv sel args env this))
-	    (else (ks-no-method recv sel))))))
+	    (dnu (dnu recv (list (new <ks-object> 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments args)) () 0))
+		      env this))
+	    (else (ks-native-send recv sel args env this))))))
 
 (ks-methods Point
   ((x _x) (<ks-point>-x recv))

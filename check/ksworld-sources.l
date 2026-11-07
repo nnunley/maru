@@ -70,6 +70,16 @@
 	'((10 20 30) 2 20))
 (expect "an index past the end is Squeak's error, not a quiet nil"
 	(try (run "var c = KSContentsCollection.new()\nc._at(1)") (lambda (c) 'refused)) 'refused)
+;; a selector nothing answers is doesNotUnderstand: with a Message, as in Smalltalk: KSObject's own (from its source) calls a
+;; block kept in the slot of that name, and Object's, at the root, refuses it naming the selector
+(ks-load-source-class 'KSObject)
+(define o (ks-basic-new (ks-class-named 'KSObject)))
+(ks-set-slot o 'twice (car (kscript-parse "(self, n) -> n * 2")))
+(set (cdr (assq 'twice (<ks-object>-slots o))) (ks-eval (cdr (assq 'twice (<ks-object>-slots o))) () ()))
+(expect "KSObject>>doesNotUnderstand: calls the block in the slot named by the selector" (ks-send o '_twice '(21) () o) 42)
+(expect "Object>>doesNotUnderstand: names what was sent"
+	(try (ks-send 3 'frobnicate () () ()) (lambda (c) (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (symbol? p) (symbol->string p) p)))) s)))
+	"Smalltalk: Number does not understand frobnicate")
 (expect "a form the evaluator doesn't know is an error naming it" (try (ks-eval '(no-such-form 1) () ()) (lambda (c) 'refused)) 'refused)
 
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

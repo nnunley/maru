@@ -9,6 +9,7 @@ Object : ()
     True : Boolean ()
     False : Boolean ()
   BlockClosure : Object ()
+  Message : Object ()
   Character : Object ()
   Magnitude : Object ()
     Number : Magnitude ()
@@ -38,6 +39,13 @@ Object ifNil: aBlock                    [ self ]
 Object ifNotNil: aBlock                 [ aBlock numArgs = 0 ifTrue: [aBlock value] ifFalse: [aBlock value: self] ]
 Object ifNil: nilBlock ifNotNil: aBlock [ self ifNotNil: aBlock ]
 Object error: message                   { (error "Smalltalk: " message) }
+Object doesNotUnderstand: aMessage      { (ks-native-send self (ks-slot aMessage 'name) (ks-slot aMessage 'arguments) () self) }
+Message selector                        { (ks-slot self 'selector) }
+Message arguments                       { (ks-slot self 'arguments) }
+Message numArgs                         { (list-length (ks-slot self 'arguments)) }
+Object isBlock                          [ false ]
+BlockClosure isBlock                    [ true ]
+BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a args)) (for (i 0 n) (push out (if a (car a) 'nil)) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
 Object initialize                       [ self ]
 Object perform: aSymbol                 { (ks-send self (ks-selector-of aSymbol) () () self) }
 Object perform: aSymbol with: a         { (ks-send self (ks-selector-of aSymbol) (list a) () self) }
@@ -49,6 +57,7 @@ Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-select
 IdentityDictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
 IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
 IdentityDictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
+IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
 IdentityDictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
 IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
@@ -161,6 +170,8 @@ Number isAlphaNumeric                   [ self isLetter or: [self isDigit] ]
 "Strings and symbols (KScript's text is Maru's strings and symbols alike)"
 String size                             { (if (symbol? self) (string-length (symbol->string self)) (string-length self)) }
 String at: i                            { (let ((s (if (symbol? self) (symbol->string self) self))) (if (and (long? i) (< 0 i) (<= i (string-length s))) (string-at s (- i 1)) (error "Smalltalk: index " i " out of bounds for a string of " (string-length s)))) }
+String indexOf: c                       { (let ((s (if (symbol? self) (symbol->string self) self)) (at 0)) (for (i 0 (string-length s)) (and (= 0 at) (= c (string-at s i)) (set at (+ i 1)))) at) }
+String copyFrom: start to: stop         { (let ((s (if (symbol? self) (symbol->string self) self))) (string-copy s (- start 1) (+ 1 (- stop start)))) }
 String asSymbol                         { (if (symbol? self) self (string->symbol self)) }
 String asString                         { (if (symbol? self) (symbol->string self) self) }
 String copyWithout: c                   { (let ((s (if (symbol? self) (symbol->string self) self)) (out ())) (for (i 0 (string-length s)) (or (= c (string-at s i)) (push out (string-at s i)))) (list->string (list-reverse! out))) }
@@ -181,6 +192,7 @@ List collect: aBlock                    { (map (lambda (x) (ks-apply aBlock (lis
 List do: aBlock displayingProgress: b  [ self do: aBlock ]
 List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list-reverse! out)) }
 List isEmpty                            { (ks-bool (not self)) }
+List , other                            { (concat-list self other) }
 
 "Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"
 TTFontDescription : Object ()

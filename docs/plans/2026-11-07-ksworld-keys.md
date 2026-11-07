@@ -64,3 +64,8 @@ Steps, each a check first:
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy
    driver: a press on the title, typing, and the frame's pixels change where the new letter goes.
 6. ksworld-show.l: a person can click and type in KSWorld.ks.
+
+Future directions (not yet):
+- doesNotParse: (the user, 2026-11-07), the parsing counterpart of doesNotUnderstand:: a production or string that fails and
+  cannot be recovered calls doesNotParse: with the input and the production's context (rule, position, what was
+  expected), so something can try to pick the parse back up.

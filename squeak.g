@@ -21,7 +21,7 @@ binsel		= (binchar+) @ $:s _						-> (string->symbol s) ;
 
 number		= ("-"? digit+ ("r" [0-9A-Z]+)? ("." digit+)? ("e" "-"? digit+)?) @ $:s _	-> (squeak-number s) ;
 string		= "'" ("''" -> 39 | !"'" .)* $:s "'" _				-> s ;
-character	= "$" . $:c _							-> `(char ,(string-at c 0)) ;
+character	= "$" .:c _							-> `(char ,c) ;	# . answers the character's code
 symbol		= "#" ( (idpart ":")+ @ $:s _					-> `(symbol ,(string->symbol s))
 		      | idpart:s _						-> `(symbol ,(string->symbol s))
 		      | binsel:s						-> `(symbol ,s)
