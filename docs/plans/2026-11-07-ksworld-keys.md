@@ -94,6 +94,13 @@ Steps, each a check first:
    Every KScript and KSWorld check moves with it. The same rule covers JOHN (its objects, classes, yes/no truth and
    valued sets) and the laws runtime (law-record, law-truth): each moves onto the shared objects and Maru's booleans, as
    its own step after KSWorld's, with its checks.
+3f. Native as we go (the user, 2026-11-07: "use our ir lower to jit compile everything to native as we go"), after 3e fixes
+   what compiled code manipulates. Reading KSWorld's sources through the interpreted grammars costs 50 to 90 ms a method
+   (KSBox's 370 about 20 s, a window's classes minutes): the grammars (st-fileout.g, kscript.g, squeak.g, ometa2.g and
+   tpeg's generated parsers), then the evaluator, then KSWorld's methods compile through ir2 (native-ir2's intents and
+   lowering) as they load, and what's compiled is kept as a native image (native-save, native-image.l), so a start loads
+   code instead of re-reading. The missing piece is untyped Maru through ir2, the evaluator compiling itself. Measured
+   before and after: KSBox's methods read, and a KSWorld.ks window's time to its first frame.
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy
