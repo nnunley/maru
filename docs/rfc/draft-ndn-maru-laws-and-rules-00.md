@@ -420,8 +420,13 @@ claim's rules: one valued a reference's verdict is `E_CLAIM`, and a reference th
 crashes in one makes the law `INCONCLUSIVE`. [R-law-classify]
 
 A law MAY then ask for a share: `cover P% NAME, ...`. A law that would pass but in
-which a class met fewer than P percent of its cases, or which has no cases, is
-`UNDERCOVERED`, naming each such class with its count, the cases and the share asked:
+which a class fell short of P percent of its cases, or which has no cases, is
+`UNDERCOVERED`. Under `EXHAUST` the count is exact, and short means fewer. Under `TEST`
+the cases are a sample, and short means the shortfall is more than 6 standard errors of
+a share of exactly P (the normal approximation, about one in a billion), so a run on a
+fresh seed does not fail a law whose share is near its cover by chance. A sample too
+small to tell passes; asking for more trials is the author's remedy. The line names each
+such class with its count, the cases and the share asked:
 `UNDERCOVERED two_buffers 20 of 1000 < 20%`. Counts, not rounded shares, so the line
 never reads `20% < 20%`. A cover is judged after `VACUOUS`, so
 the stand-ins that judge vacuity are not judged for cover. A cover naming no declared

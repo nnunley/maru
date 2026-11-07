@@ -532,7 +532,9 @@
 		  "law cover_unknown: E_COVER cover names big, which no classify declares" "law cover_over: E_COVER cover asks 120% of zero, more than all"
 		  "law class_verdict: E_CLAIM a class of class_verdict is a verdict; compare it, e.g. `= accept`"
 		  "law class_crash: INCONCLUSIVE status=7 input=(0)" "law class_twice: E_COVER classify names zero twice")
-		 ("classify-none" "" 256 "law none: TESTED 0" "law none_covered: UNDERCOVERED zero 0 of 0 < 5%"))
+		 ("classify-none" "" 256 "law none: TESTED 0" "law none_covered: UNDERCOVERED zero 0 of 0 < 5%")
+		 ;; by test, 8 of 100 is no evidence against 12%, but 11 of 100 is against 50%
+		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 11 of 100 < 50%" "law sampled_near: TESTED 100 (zero 8%)"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (list-do c '(("field-error" "no field c in the record, which has a, b") ("field-plain" "a is read from a value that is not a record"))

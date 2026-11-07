@@ -170,11 +170,17 @@
   (cond (*law-crash* 'crash) (*law-verdict* 'verdict) (else 'hold)))
 (define-function law-percent (c n) (/ (+ (* 100 c) (/ n 2)) n))	; a share in whole percents, rounded to nearest
 (define-function law-index (name ks) (if (= name (caar ks)) 0 (+ 1 (law-index name (cdr ks)))))
+;; is c of n short of p percent?  Exhausted, the count is exact.  Sampled, only if chance can't explain it: the
+;; shortfall is over z = 6 standard errors of a share of exactly p (normal approximation, squared to stay in whole
+;; numbers), about one in a billion, so a sweep's fresh seeds don't fail a law whose share is near its cover
+(define-function law-short? (c n p)
+  (let ((d (- (* p n) (* 100 c))))
+    (and (< 0 d) (or (= 'exhaustion *lmethod*) (< (* (* 36 n) (* p (- 100 p))) (* d d))))))
 (define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover;
   (let ((n (cadr r)) (short ()) (shares ()))	; no cases give no shares and meet no cover
     (list-do v *lcover*
       (let ((c (law-nth *lcounts* (law-index (cadr v) *lk*))))
-	(and (or (= 0 n) (< (* 100 c) (* (car v) n))) (push short (list (cadr v) c n (car v))))))
+	(and (or (= 0 n) (law-short? c n (car v))) (push short (list (cadr v) c n (car v))))))
     (cond (short (cons 'UNDERCOVERED (list-reverse! short)))
 	  ((= 0 n) (list (car r) n))
 	  (else
