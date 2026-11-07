@@ -1,7 +1,15 @@
-;;; john-eval.l -- runs JOHN programs (john.l's forms) by searching possible worlds.
+;;; john-eval.l -- runs JOHN programs (john.l's forms) as a session, searching possible worlds.
 ;;;
-;;;   (john-run forms)        runs a program's statements in order; the lines it prints
+;;;   (john-begin)            starts a session: an empty knowledge base, and the current world at time 0
+;;;   (john-enter form)       enters one statement; the lines it answers
+;;;   (john-run forms)        a session fed a program's statements; every line they answer
 ;;;   (john-run-file path)    the same, for a file
+;;;
+;;; A session is RN-2008-003's model (§15): a knowledge base (classes, qualifications, actions, rules, goals, options ...,
+;;; the *john-...* lists below) and a working memory (the current world and its parents).  Declarations add to the first,
+;;; and a make's facts to the current world; only a step (do, or a satisfied goal) moves time.  With *john-echo* on, as at
+;;; john-repl.l's prompt, a declaration answers ok., a step its mutations, and a failed statement its error, undone.
+;;; docs/rfc/draft-ndn-maru-john-session-00.md.
 ;;;
 ;;; An object is its name, a symbol; a class is its instances wherever a collection is
 ;;; expected.  A world holds the property values set in it and finds the rest in its
@@ -35,6 +43,7 @@
 (define *john-options* ())	; (name . value), from set-opt
 (define *john-world* ())	; the current world
 (define *john-out* ())		; lines printed, newest first
+(define *john-echo* ())		; at the prompt: ok., each step's mutations, and errors answered rather than ending the run
 (define *john-limit* 16)	; satisfy gives up after this many time steps: set-opt time-limit N (ours), 16 unless set
 
 (define-function john-fail args (apply error (cons "john: " args)))
@@ -318,6 +327,9 @@
 		      ((= op 'at-time) (let ((t (john-eval (cadr x) w env)))
 					 (or (<= t (<john-world>-time w)) (john-fail "at time " t ": an expression reads only the past, now " (<john-world>-time w)))
 					 (john-eval (caddr x) (john-at-time w t) env)))
+		      ((= op 'one-from) (let ((xs (john-elements (john-eval (cadr x) w env))))	; RN-2008-003 §14
+					  (or xs (john-fail "one-from: nothing to choose from"))
+					  (car xs)))
 		      ((= op 'all) (if (cddr x) (john-fail "all with property values is not read yet") (john-instances (cadr x))))
 		      ((= op 'select) (let ((out ()))
 					(list-do o (john-instances (cadr x))
@@ -501,6 +513,8 @@
 	(and (assq f *john-builtins*) (john-fail (car m) " can't have a field " f ": every value answers " f))
 	(and (member? f seen) (john-fail (car m) " names its field " f " twice"))
 	(push seen f)))))
+(define-function john-set-text (vs)
+  (let ((s "{ ") (first 1)) (list-do v vs (set s (concat-strings s (if first "" ", ") (john-text v))) (set first ())) (concat-string s " }")))
 (define-function john-statement (s)
   (let ((op (car s)))
     (cond ((= op 'load) (require (cadr s)))
@@ -530,18 +544,43 @@
 	  ((= op 'goal-optimization) (set *john-gopts* (concat-list *john-gopts* (list (cdr s)))))
 	  ((= op 'satisfy) (john-satisfy (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cadddr s))
 					 (car (cddddr s)) (cadr (cddddr s))))
-	  ((= op 'query) (john-say (john-text (john-eval (cadr s) *john-world* ()))))
+	  ((= op 'query) (john-say (cond ((= 'time (cadr s)) (john-text (<john-world>-time *john-world*)))	; time.: the current world's
+					 ((and (pair? (cadr s)) (= 'all (car (cadr s))))	; a class's instances, a set as §14 prints them
+					  (john-set-text (john-eval (cadr s) *john-world* ())))
+					 (else (john-text (john-eval (cadr s) *john-world* ()))))))
 	  ((= op 'is) (john-say (john-text (john-eval (cadr s) *john-world* ()))))	; the memos' is ... ?
 	  ((= op 'at-time) (john-at-time-query (john-eval (cadr s) *john-world* ()) (caddr s)))
 	  ((= op 'do) (john-do (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cdddr s))))
 	  (else (john-fail "statement not read yet: " op)))))
-(define-function john-reset ()
+(define-function john-begin ()
   (set *john-limit* 16)
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())
   (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-goal-strategies* ()) (set *john-enumerations* (john-prelude-enumerations)) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
   (set (<john-world>-time *john-world*) 0))
+;; entering a statement
+(define *john-declarations* '(load enumeration start-world end-world group create make qualify rel-qualify action rule goal
+			      heuristic set-opt action-optimization goal-strategy goal-optimization))
+(define-function john-mutations (from to)	; each step from world from to world to: time T: STEP, then what it wrote
+  (let ((ws ()))
+    (while (and to (not (= to from))) (push ws to) (set to (<john-world>-parent to)))
+    (list-do w ws
+      (john-say (concat-strings "time " (john-text (<john-world>-time w)) ": " (john-step-text (<john-world>-action w))))
+      (list-do wr (let ((r ())) (list-do x (<john-world>-writes w) (push r x)) r)	; writes are newest first
+	(john-say (concat-strings "  " (john-text (car wr)) " " (john-text (cadr wr)) " = " (john-text (cddr wr))))))))
+(define-function john-condition-text (c)	; (error part ...) as one line
+  (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (string? p) p (john-text p))))) s))
+(define try-call)	; recover.l's, loaded the first time a statement is entered with echo on
+(define-function john-enter (s)
+  (let ((before *john-out*) (w *john-world*))
+    (if (not *john-echo*) (john-statement s)
+      (let ((failed (let () (require "recover.l")	; at the prompt only: batch runs end on an error, as before
+		      (try-call (lambda () (john-statement s) ()) john-condition-text))))
+	(cond (failed (john-say failed))
+	      ((member? (car s) *john-declarations*) (john-say "ok."))
+	      ((not (= w *john-world*)) (john-mutations w *john-world*)))))
+    (let ((out ()) (l *john-out*)) (while (not (= l before)) (push out (car l)) (set l (cdr l))) out)))
 (define-function john-run (forms)
-  (john-reset)
-  (list-do s forms (john-statement s))
+  (john-begin)
+  (list-do s forms (john-enter s))
   (list-reverse! *john-out*))
 (define-function john-run-file (path) (john-run (john-read path)))

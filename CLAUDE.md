@@ -220,6 +220,16 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `a is b` asks whether a is one of a kind, b naming a member, its set, a group holding it or a class, and otherwise whether they're the
   same value; so `its evidence is Good`, after `group Good passed tested proved.`, and a value with fields simply isn't a bare name.
   `qualify C p is E` gives p E's value (the memos have it as `if`, in one use that answers yes or no).
+- `john_session` (`check/john-session.l`, `docs/rfc/draft-ndn-maru-john-session-00.md`): JOHN runs as a session, RN-2008-003's
+  model (§15): `john-begin` starts one (an empty knowledge base, world 0), `john-enter` enters one statement and answers its
+  lines, and `john-run` is a session fed a program. Declarations (and `make`'s facts) never move time; only `do` and a
+  satisfied goal do, so world 0 keeps what was declared before the first step, and `time.` answers the current time. At
+  the prompt, `./eval john-repl.l [FILE...]` (files entered first, read twice; then standard input, a statement ending at a
+  line ending in `.` or `?`, a relation declared before it's used), a declaration answers `ok.`, a step its mutations
+  (`time T: STEP`, then `  OBJECT PROPERTY = VALUE` per write, ours: the memos don't show them), a satisfied goal those of
+  each new step after its plan, and a failed statement its error, undone by `recover.l`'s `try`. `all` answers a set,
+  `{ A1, A2 }`, and `one-from` its one element (§14). The transcripts `check/john/*.session` (§13's `opponent`, §14's grid,
+  its `row - 1` written `row + 1` to give the memo's answer, and ours) are replayed through the REPL.
 - `call_by_meaning` (`check/meaning.l`): `meaning.l`, call by meaning (Samimi et al., Onward! 2014, TR-2014-003) with a model
   where the paper had Cyc. A model proves nothing, so each answer is held to what John can check: `"…" find-passing: "probe"`
   takes an object whose `spec` the model says means the text only if it passes the probe, a qualification of its class, and

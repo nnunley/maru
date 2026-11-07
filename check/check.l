@@ -462,6 +462,8 @@
 
 ;; john-eval.l solves Hanoi by searching possible worlds, and an unknown name is an error (check/john-run.l).
 (check "john_run" (unit-assert (equal (last (run "john_run" "./eval check/john-run.l")) "john run ok")))
+;; JOHN as a session: time moved only by steps, echo at the prompt, failed statements undone, RN-2008-003's transcripts at john-repl.l
+(check "john_session" (unit-assert (equal (last (run "john_session" "./eval check/john-session.l")) "john session ok")))
 ;; call by meaning: answers from a scripted model held to probes and examples, and the Ollama client against a forked server
 (check "call_by_meaning" (unit-assert (equal (last (run "call_by_meaning" "./eval check/meaning.l")) "meaning ok")))
 (check "plan_evidence"

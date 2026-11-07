@@ -1,0 +1,12 @@
+> create Counter n.
+ok.
+> make Counter C 0.
+ok.
+> C do fly.
+john: C has no action fly
+> make Counter D 1 2.
+john: make D: 1 properties, 2 values
+> D n.
+john: unknown name: D
+> time.
+0

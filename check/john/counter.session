@@ -1,0 +1,27 @@
+> create Counter n.
+ok.
+> make Counter C 0.
+ok.
+> action Counter bump consequence its n = its n + 1.
+ok.
+> goal Counter reach try its n = 3.
+ok.
+> time.
+0
+> C do bump.
+time 1: C bump
+  C n = 1
+> C satisfy reach.
+looking 1 time unit ahead (1 possible worlds)
+looking 2 time unit ahead (1 possible worlds)
+satisfied at time: 3
+satisfied by: [ C bump , C bump , C bump ]
+time 2: C bump
+  C n = 2
+time 3: C bump
+  C n = 3
+> at time 1 C n.
+1
+> at time 4 C n.
+Possible World values (1 time unit from now):
+{ 4 }

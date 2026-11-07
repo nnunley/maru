@@ -1182,6 +1182,6 @@
 				  ", unroll " (format "%d" (john-sat-unroll)) ")")))))
 
 (define-function john-run-sorts (forms)
-  (john-reset)
+  (john-begin)
   (list-do s forms (or (= 'satisfy (car s)) (john-statement s)))
   (john-sat-check *john-goals*))

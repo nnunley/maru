@@ -1,0 +1,12 @@
+> create Player opponent turn.
+ok.
+> make Player White Black yes.
+ok.
+> make Player Black White no.
+ok.
+> White opponent.
+Black
+> White opponent turn.
+no
+> White turn.
+yes
