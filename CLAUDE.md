@@ -443,7 +443,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
-  check; the `in`, `number` and `=` builtins work as specified; schemas, relation
+  check; the `in`, `number` and `=` builtins work as specified; schemas (whose variable may name a term's function:
+  `for f in num | dbl: ... key(f(n))`, `law_cexpr`), relation
   parameters and facts read from a function expand to first-order rules, and an unknown
   relation is rejected.
 - `law_cexpr` (`check/law-compile-test.l`, `check/laws/cexpr.law`): `law.g` (inheriting

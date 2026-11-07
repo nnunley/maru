@@ -246,7 +246,10 @@ a schema (`for op in "+" | "-" | "/": fact infix(op, Number, Number,
 Number)`), a rule whose parameter is a relation (`rule cons_list(r):
 r(x), list_of(r, xs) => list_of(r, [x | xs])`, where `r(x)` applies `r`
 with `x` as its last argument), and facts read from a source (below).
-All three MUST be expanded into first-order rules before any law runs,
+A schema's variable MUST stand for every occurrence of its name in the
+item, a term's function name included, so `for f in num | dbl: rule
+k_f: number(n) => key(f(n))` is two rules, one making `num(n)` and one
+`dbl(n)`. All three MUST be expanded into first-order rules before any law runs,
 so the engine, its three modes and the mutants see only first-order
 rules. [R-higher-order-expansion]
 

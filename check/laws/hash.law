@@ -9,19 +9,8 @@ defaults trials = 300, size = 6
 let numerals = [0, 1, 2, 3, 7]
 
 -- few keys, so puts overwrite, removes hit and gets find what was put
--- a key from a numeral, by each kind of key (kept twice: identity tables need keys that hit).  A schema can't stand for
--- the functor (for f in num | dbl: ... key(f(n)) keeps f), so one rule each
-rule k_number:  number(n) => key(num(n))
-rule k_double:  number(n) => key(dbl(n))
-rule k_string:  number(n) => key(str(n))
-rule k_symbol:  number(n) => key(sym(n))
-rule k_deep:    number(n) => key(deep(n))
-rule k_neg:     number(n) => key(neg(n))
-rule k_big:     number(n) => key(big(n))
-rule k_bigdbl:  number(n) => key(bigdbl(n))
-rule k_half:    number(n) => key(half(n))
-rule k_kept:    number(n) => key(kept(n))
-rule k_kept2:   number(n) => key(kept(n))
+-- a key from a numeral, by each kind of key (kept twice: identity tables need keys that hit)
+for f in num | dbl | str | sym | deep | neg | big | bigdbl | half | kept | kept: rule k_f: number(n) => key(f(n))
 rule k_pair:    key(a), key(b) => key(pair(a, b))
 fact key(Nil)
 fact key(Min)

@@ -46,6 +46,9 @@
 	       (law plain (($a Type) ($b Type)) () (= (+ a b) (+ b a)) () () () ()))))
     (expect "numbers the file mentions, in order, once"
       (equal (law-file-numbers items) '(2 40 3))))
+  (expect "a schema variable names a term's function too, nested or not"
+    (equal (rules-expand (law-text-read "for f in num | dbl: rule k_f: number(n) => key(pair(f(n), f(0)))\n"))
+	   '((k_f (key (pair (num $n) (num 0))) (number $n)) (k_f (key (pair (dbl $n) (dbl 0))) (number $n)))))
   (let ((rs (rules-expand (law-text-read "fact color(Red)\nrule paint: color(c) => painted(c)\n"))))
     (expect "read rules expand and run" (rules-holds? rs '(painted Red) 1)))
 

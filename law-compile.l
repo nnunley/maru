@@ -63,6 +63,7 @@
 	(elems	(list 'cons (law-conv (car elems) 'claim) (law-list-form (cdr elems) tail)))
 	(tail	(law-conv (car tail) 'claim))
 	(else	(list 'quote ()))))
+(define *law-schema-vars* ())	; the variables of the schemas around the item being read
 (define-function law-conv (x var)	; var: lower-case names become variables
   (cond
     ((symbol? x)		(let ((l (assq x *law-lets*)))
@@ -75,7 +76,8 @@
     ((= 'law-list (car x))	(let ((elems (law-ranges (cadr x))))
 				  (if (= var 'claim) (law-list-form elems (cddr x)) (law-list-from elems (cddr x) var))))
     ((= 'template (car x))	(if (= var 1) (law-template-term x) x))
-    (else			(cons (car x) (map (lambda (a) (law-conv a var)) (cdr x))))))
+    (else			(cons (if (member? (car x) *law-schema-vars*) (law-var (car x)) (car x))	; a schema's function name
+				      (map (lambda (a) (law-conv a var)) (cdr x))))))
 (define-function law-goal (g scope)	; a goal's relation is a variable only if a parameter or schema variable
   (cons (if (member? (car g) scope) (law-var (car g)) (car g)) (map (lambda (a) (law-conv a 1)) (cdr g))))
 
@@ -110,8 +112,11 @@
       ((= k 'rule)	(cons 'rule (cons (cadr it) (cons (map law-var (caddr it))
 			    (map (lambda (g) (law-goal g (concat-list scope (caddr it)))) (cdddr it))))))
       ((= k 'fact)	(list 'fact (law-goal (cadr it) ())))
-      ((= k 'schema)	(list 'schema (law-var (cadr it)) (map (lambda (a) (law-conv a ())) (caddr it))
-			      (law-item (cadddr it) (cons (cadr it) scope))))
+      ((= k 'schema)	(let ((outer *law-schema-vars*) (values (map (lambda (a) (law-conv a ())) (caddr it))))
+			  (set *law-schema-vars* (cons (cadr it) outer))	; within its item, the variable names functions too
+			  (let ((inner (law-item (cadddr it) (cons (cadr it) scope))))
+			    (set *law-schema-vars* outer)
+			    (list 'schema (law-var (cadr it)) values inner))))
       ((= k 'law)	(law-conv-law it))
       (else		it))))
 
@@ -119,6 +124,7 @@
   (let ((parser (text-parser-for-on <law> text)))
     (or ($program parser) (error "syntax error"))
     (set *law-lets* ())
+    (set *law-schema-vars* ())
     (let ((out ())) (list-do it (<law>-result parser) (set out (concat-list out (list (law-item it ()))))) out)))
 
 ;;; The items rules-expand takes: rules, facts, schemas and facts-from-function.
