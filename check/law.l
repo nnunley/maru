@@ -41,7 +41,7 @@
 		    (and trials (push out (cons 'trials trials)))
 		    out))
 (define-function law-setting (key)
-  (cdr (or (assq key *law-env*) (assq key *law-config*) (assq key '((size . 3) (trials . 100) (seed . 42) (starved_ratio . 20))))))
+  (cdr (or (assq key *law-env*) (assq key *law-config*) (assq key '((size . 3) (trials . 100) (seed . 42) (starved_ratio . 20) (cover_ratio . 100))))))
 (define-function law-nth (l i) (if (= i 0) (car l) (law-nth (cdr l) (- i 1))))
 (define-function law-take (l i) (and (> i 0) (cons (car l) (law-take (cdr l) (- i 1)))))
 (define-function law-put (l i v) (if (= i 0) (cons v (cdr l)) (cons (car l) (law-put (cdr l) (- i 1) v))))
@@ -170,12 +170,21 @@
   (cond (*law-crash* 'crash) (*law-verdict* 'verdict) (else 'hold)))
 (define-function law-percent (c n) (/ (+ (* 100 c) (/ n 2)) n))	; a share in whole percents, rounded to nearest
 (define-function law-index (name ks) (if (= name (caar ks)) 0 (+ 1 (law-index name (cdr ks)))))
-;; is c of n short of p percent?  Exhausted, the count is exact.  Sampled, only if chance can't explain it: the
-;; shortfall is over z = 6 standard errors of a share of exactly p (normal approximation, squared to stay in whole
-;; numbers), about one in a billion, so a sweep's fresh seeds don't fail a law whose share is near its cover
-(define-function law-short? (c n p)
-  (let ((d (- (* p n) (* 100 c))))
-    (and (< 0 d) (or (= 'exhaustion *lmethod*) (< (* (* 36 n) (* p (- 100 p))) (* d d))))))
+;; a sampled cover is decided sequentially, as QuickCheck's checkCoverage does: c of n met p percent if the Wilson
+;; interval's low bound reaches 0.9 of p, and fell short if its high bound is under p, at z = 6 (about one in a billion
+;; each way), so a sweep's fresh seeds don't fail a law by chance and a real shortfall isn't let through; until then, more
+;; cases are drawn.  Exhausted, the count is exact
+(define law-sqrt (subr "sqrt" "d>d"))
+(define-function law-wilson (c n sign)	; the Wilson score interval's bound, low (sign -1) or high (1), at z = 6
+  (let* ((z2 36.0) (k (long->double c)) (m (long->double n)) (d (+ m z2)))
+    (+ (/ (+ k (/ z2 2.0)) d) (* (* sign (/ 6.0 d)) (law-sqrt (+ (/ (* k (- m k)) m) (/ z2 4.0)))))))
+(define-function law-decided (c n p)	; met, short, or () while chance could explain the share
+  (cond ((>= (* 100.0 (law-wilson c n -1.0)) (* 0.9 (long->double p)))	'met)
+	((< (* 100.0 (law-wilson c n 1.0)) (long->double p))		'short)))
+(define-function law-undecided? (n)	; some cover the counts so far can't decide
+  (let ((u ())) (list-do v *lcover* (or (law-decided (law-nth *lcounts* (law-index (cadr v) *lk*)) n (car v)) (set u 1))) u))
+(define-function law-short? (c n p)	; sampled and undecided after its last case, short too: it never showed its share
+  (if (= 'exhaustion *lmethod*) (< (* 100 c) (* p n)) (not (= 'met (law-decided c n p)))))
 (define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover;
   (let ((n (cadr r)) (short ()) (shares ()))	; no cases give no shares and meet no cover
     (list-do v *lcover*
@@ -232,16 +241,21 @@
 					       " is a verdict; compare it, e.g. `= accept`")))
 	(else		(cons 'INCONCLUSIVE *law-crash*))))
 
-;; TEST: trials values meeting the conditions, from at most trials x starved_ratio draws
+;; TEST: trials values meeting the conditions, from at most trials x starved_ratio draws; then, while a cover is
+;; undecided, trials more at a time, up to trials x cover_ratio
 (define-function law-test ()
-  (let* ((trials (law-setting 'trials)) (limit (* trials (law-setting 'starved_ratio))) (met 0) (drawn 0) (out ()))
-    (while (and (not out) (< met trials) (< drawn limit))
+  (let* ((trials (law-setting 'trials)) (target trials) (cap (* trials (law-setting 'cover_ratio)))
+	 (limit (* trials (law-setting 'starved_ratio))) (met 0) (drawn 0) (out ()))
+    (while (and (not out) (< drawn limit)
+		(or (< met target)
+		    (and *lcover* (< target cap) (law-undecided? met)
+			 (let () (set target (+ target trials)) (set limit (+ limit (* trials (law-setting 'starved_ratio)))) 1))))
       (set drawn (+ drawn 1))
       (let* ((vals (law-draw)) (r (if vals (law-try vals) 'skip)))
 	(and (= r 'hold) (set r (law-count vals)))
 	(if (= r 'hold) (set met (+ met 1))
 	  (or (= r 'skip) (set out (law-failed r vals))))))
-    (or out (if (< met trials) (list 'STARVED met drawn) (list 'TESTED met)))))
+    (or out (if (< met target) (list 'STARVED met drawn) (list 'TESTED met)))))
 ;; EXHAUST: every value up to the size
 (define *law-out* ())  (define *law-met* 0)  (define *law-drawn* 0)
 (define-function law-visit (vals)

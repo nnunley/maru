@@ -1,0 +1,5 @@
+-- a share too close to its cover to decide within trials x cover_ratio cases fails, as undecided
+under test: number
+defaults cover_ratio = 3
+let numerals = [0 .. 9]
+law undecided: all n: number(n). n >= 0 by test classify zero when n = 0 cover 10% zero

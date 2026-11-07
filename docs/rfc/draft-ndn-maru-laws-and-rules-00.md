@@ -136,6 +136,7 @@ how long generation takes.
 | `trials` | Integer | `100` | Values sampled per law under `TEST` |
 | `seed` | Integer | `42` | Start of the generator's sequence, so every run repeats |
 | `starved_ratio` | Integer | `20` | `STARVED` when fewer than 1 value in this many meets the conditions |
+| `cover_ratio` | Integer | `100` | A `TEST` law with an undecided cover draws at most `trials` times this many cases |
 
 The defaults are small because a small size already reaches the cases
 that matter (Appendix A's mutants are all caught at size 1) and keeps a
@@ -422,10 +423,14 @@ crashes in one makes the law `INCONCLUSIVE`. [R-law-classify]
 A law MAY then ask for a share: `cover P% NAME, ...`. A law that would pass but in
 which a class fell short of P percent of its cases, or which has no cases, is
 `UNDERCOVERED`. Under `EXHAUST` the count is exact, and short means fewer. Under `TEST`
-the cases are a sample, and short means the shortfall is more than 6 standard errors of
-a share of exactly P (the normal approximation, about one in a billion), so a run on a
-fresh seed does not fail a law whose share is near its cover by chance. A sample too
-small to tell passes; asking for more trials is the author's remedy. The line names each
+the cases are a sample, and a cover is decided sequentially, as QuickCheck's
+`checkCoverage` decides one: after `trials` cases, and after each `trials` more while any
+cover is undecided, a cover is met if the low bound of the Wilson score interval of its
+count, at z = 6 (about one in a billion each way), reaches 0.9 of P, and short if the
+high bound is under P. So a run on a fresh seed neither fails a law by chance nor lets a
+real shortfall through. The cases stop at `trials` times `cover_ratio` (default 100), and
+a cover still undecided then is short: the law never showed its share. `TESTED n` counts
+every case drawn. The line names each
 such class with its count, the cases and the share asked:
 `UNDERCOVERED two_buffers 20 of 1000 < 20%`. Counts, not rounded shares, so the line
 never reads `20% < 20%`. A cover is judged after `VACUOUS`, so
