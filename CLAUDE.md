@@ -537,6 +537,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   them by contention; each run keeps its own output, and a failure prints its
   last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
   forked question inherits from the law runner.
+- `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`, `check/hash-ops.g`): `hash.l`, a hash table in Maru on every
+  evaluator, keyed by identity (Smalltalk's `==`: a number by its value and kind, anything else by its address, as `=` compares
+  strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. Generated programs of
+  puts, removes and gets agree with an association list searched with the same equality, at every get and in the count, keys and
+  values after; sizes around each doubling of the buckets hold; and an identity table loaded from a saved image (where every
+  object has moved) rehashes before answering, since it notes where an anchor of its own lived. Planted bugs (an entry not
+  emptied on removal, 2.0 hashed apart from 2, a table that never rehashes) are each caught.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of
@@ -633,6 +640,8 @@ KSWorld work, whose first capability is that the dbjr documents can be fetched.
 - Cross-compiling: ir2 sizes follow the host's `osdefs.k`. Since that change
   (to fix the C backend on 64-bit hosts), `ir-gen-x86.k` emits 64-bit layouts
   on a 64-bit host, which is wrong for its 32-bit target.
+- tpeg's actions read no float literal (`tpeg.g`'s `sexpr` has integers only: `-> (* 1.0 n)` stops the grammar's parse);
+  compute a float in a Maru function the action calls.
 - `test-peg.l` loops forever on every platform: `peg.l`'s `definitions` rule
   matches empty input, so the parser never advances.
 - `make test-emit` runs `emit.l` as a shell script; use
