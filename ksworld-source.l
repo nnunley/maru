@@ -1,21 +1,51 @@
 ;;; ksworld-source.l -- KSWorld's own methods, from its sources (ksworld/CLASS.st, Squeak's file-out, read by st-fileout.g).
 ;;;
-;;;   (ks-source-methods path)      each method of the file-out: its class, category, selector and source, whether it's
-;;;                                 KScript ("selector = (params) ->") and, if kscript.g reads it, its tree, (fn PARAMS BODY...)
-;;;   (ks-load-source-class class)  each KScript method of ksworld/CLASS.st becomes a method of CLASS, answering the sends a
-;;;                                 document makes of its instances: documents keep the streams a class's methods made, but
-;;;                                 not the methods
+;;;   (ks-source-methods path)      each method of the file-out: its class, side (instance or class), category, selector and
+;;;                                 source, whether it's KScript ("selector = (params) ->"), and its tree, (fn PARAMS BODY...)
+;;;   (ks-source-class-of path)     (CLASS SUPERCLASS IVARS), from the class's definition
+;;;   (ks-load-source-class class)  each method of ksworld/CLASS.st becomes a method of CLASS, answering the sends a document
+;;;                                 makes of its instances: documents keep the streams a class's methods made, not the methods
 ;;;
-;;; Most of KSWorld is KScript kept in Smalltalk method chunks (ksworld/README.md), so nothing is transliterated: kscript.g
-;;; reads the bodies as they were written.  A Smalltalk method (the KScript compiler's, mostly, which kscript.l replaces)
-;;; has no tree.
+;;; Most of KSWorld is KScript kept in Smalltalk method chunks (ksworld/README.md): kscript.g reads those bodies as they were
+;;; written.  The rest is Smalltalk, which squeak.g reads to the same trees (self is this, an instance variable a field of
+;;; it, a keyword selector KScript's name for it, _at_put for at:put:), so the two call each other.  A Smalltalk method runs
+;;; under a tag of its own, so a ^ in one of its blocks returns from it, as in Squeak.
 (require "kscript.l")
 (require "recover.l")
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
 (tpeg-load "st-fileout.g")
 
-(define-structure <ks-source-method> (class category selector source kscript? tree))
+;; what squeak.g's actions build
+(define-function squeak-selector (keywords)	; at put -> _at_put, as KScript names Smalltalk's at:put:
+  (let ((s "")) (list-do k keywords (set s (concat-strings s "_" k))) (string->symbol s)))
+(define *squeak-ivars* ())	; the instance variables of the class whose method squeak.g is reading
+(define-function squeak-name (parser x)	; self, an instance variable, or a name
+  (cond ((= x "self") 'this)
+	((member? x *squeak-ivars*) `(field this ,(string->symbol x)))
+	(else (string->symbol x))))
+(define-function squeak-keyword-send (r parts)
+  `(send ,r ,(squeak-selector (map car parts)) ,@(map cdr parts)))
+(define-function squeak-cascade (first rest)	; each message of the cascade to the receiver of the first
+  `(cascade ,(cadr first) (,(caddr first) ,@(cdddr first))
+	    ,@(map (lambda (m) (cond ((= 'keyword (car m)) (cons (squeak-selector (map car (cdr m))) (map cdr (cdr m))))
+				     ((= 'binary (car m)) (cdr m))
+				     (else (cdr m))))
+		   rest)))
+(define-function squeak-assign (v e) `(assign ,v ,e))
+(define-function squeak-number (s)	; 12, -3, 2.5, 1e10, 16rFF
+  (let ((r (let ((i 0) (f ())) (for (k 0 (string-length s)) (and (= ?r (string-at s k)) (set f k))) f)))
+    (if r
+	(let ((radix (string->long (string-copy s 0 r))) (n 0) (neg ()))
+	  (for (k (+ r 1) (string-length s))
+	    (let ((c (string-at s k))) (set n (+ (* n radix) (if (<= ?A c) (+ 10 (- c ?A)) (- c ?0))))))
+	  (if (= ?- (string-at s 0)) (- 0 n) n))
+      (if (let ((d ())) (for (k 0 (string-length s)) (and (member? (string-at s k) '(46 101)) (set d 1))) d)
+	  (string->double s)
+	(string->long s)))))
+(tpeg-load "squeak.g")
+
+(define-structure <ks-source-method> (class side category selector source kscript? tree))
 
 (define-function ks-blank? (c) (member? c '(32 9 10 13)))
 (define-function ks-source-head (src)	; (selector . kscript?): KScript is "selector = (", Smalltalk a message pattern
@@ -31,15 +61,41 @@
   (let ((forms (try (kscript-parse src) (lambda (c) ()))))
     (and (pair? forms) (not (cdr forms)) (= 'assign (caar forms)) (pair? (caddr (car forms))) (= 'fn (car (caddr (car forms))))
 	 (caddr (car forms)))))
+(define-function ks-squeak-method (src ivars)	; (SELECTOR (fn PARAMS BODY...)) as squeak.g reads a Smalltalk method, or ()
+  (let ((p (text-parser-for-on <squeak> src)))
+    (set *squeak-ivars* ivars)
+    (and (try (text-parser-invoke-rule 'method $method p) (lambda (c) ())) (<text-parser>-result p))))
+(define-function ks-words (s)	; a string's blank-separated words
+  (let ((out ()) (w ()))
+    (for (i 0 (string-length s))
+      (let ((c (string-at s i)))
+	(if (ks-blank? c) (and w (let () (push out (list->string (list-reverse! w))) (set w ())))
+	  (push w c))))
+    (and w (push out (list->string (list-reverse! w))))
+    (list-reverse! out)))
+(define-function ks-source-forms (path) (parse-string <stfileout> $file (contents-of-file-named path)))
+(define-function ks-source-class-of (path)
+  (let ((d ())) (list-do x (ks-source-forms path) (and (pair? x) (= 'definition (car x)) (set d x)))
+    (and d (list (cadr d) (caddr d) (map string->symbol (ks-words (cadddr d)))))))
 (define-function ks-source-methods (path)
-  (let ((out ()))
-    (list-do x (parse-string <stfileout> $file (contents-of-file-named path))
-      (and x (list-do raw (cdddr x)
-	       (let* ((src raw) (head (ks-source-head src)))
-		 (push out (new <ks-source-method> (cadr x) (caddr x) (car head) src (cdr head) (and (cdr head) (ks-source-tree src))))))))
+  (let* ((forms (ks-source-forms path)) (def (let ((d ())) (list-do x forms (and (pair? x) (= 'definition (car x)) (set d x))) d))
+	 (ivars (and def (ks-words (cadddr def)))) (out ()))
+    (list-do x forms
+      (and (pair? x) (= 'section (car x))
+	   (list-do src (cddddr x)
+	     (let ((head (ks-source-head src)))
+	       (if (cdr head)
+		   (push out (new <ks-source-method> (cadr x) (cadddr x) (caddr x) (car head) src 1 (ks-source-tree src)))
+		 (let ((m (ks-squeak-method src (if (= 'class (cadddr x)) () ivars))))
+		   (push out (new <ks-source-method> (cadr x) (cadddr x) (caddr x) (if m (car m) (car head)) src () (and m (cadr m))))))))))
     (list-reverse! out)))
 (define-function ks-load-source-class (class)
   (list-do m (ks-source-methods (concat-strings "ksworld/" (symbol->string class) ".st"))
     (let ((tree (<ks-source-method>-tree m)))
-      (and tree (ks-method class (<ks-source-method>-selector m)
-			   (lambda (recv args env this) (ks-apply (ks-eval tree () recv) args env recv)))))))
+      (and tree (= 'instance (<ks-source-method>-side m))
+	   (ks-method class (<ks-source-method>-selector m)
+		      (if (<ks-source-method>-kscript? m)
+			  (lambda (recv args env this) (ks-apply (ks-eval tree () recv) args env recv))
+			(lambda (recv args env this)	; a Smalltalk method: a ^ anywhere in it throws to its tag
+			  (let ((tag (cons 'method ())))
+			    (catch tag (lambda () (ks-apply (ks-eval tree (list (cons '%method tag)) recv) args env recv)))))))))))

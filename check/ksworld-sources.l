@@ -30,4 +30,28 @@
 (ks-load-source-class 'KSTextLayout)
 (expect "a source method is the class's" (and (ks-method-for 'KSTextLayout 'do08) 1) 1)
 
+;; Smalltalk methods, read by squeak.g to KScript's trees: every one of KSContentsCollection's and KSBox's
+(list-do f '("ksworld/KSContentsCollection.st" "ksworld/KSBox.st")
+  (let ((unread ()) (n 0))
+    (list-do m (ks-source-methods f)
+      (unless (<ks-source-method>-kscript? m)
+	(set n (+ n 1))
+	(or (<ks-source-method>-tree m) (push unread (<ks-source-method>-selector m)))))
+    (expect (concat-string "every Smalltalk method read: " f) unread ())))
+(let ((ms (ks-source-methods "ksworld/KSContentsCollection.st")))
+  (expect "the class definition: its superclass and instance variables" (ks-source-class-of "ksworld/KSContentsCollection.st")
+	  '(KSContentsCollection Object (array firstIndex lastIndex indexCache)))
+  (let ((tree-of (lambda (sel) (let ((f ())) (list-do m ms (and (= sel (<ks-source-method>-selector m)) (set f (<ks-source-method>-tree m)))) f))))
+    (expect "a keyword method and its send, in KScript's naming of Smalltalk's selectors" (tree-of '_add)
+	    '(fn (newObject) (method-return (send this _addLast newObject))))
+    (expect "an instance variable, a temporary, a block and ^" (tree-of '_after_ifAbsent)
+	    '(fn (target exceptionBlock) (var index nil) (assign index (send this _indexOf target))
+		 (method-return (send (send (send index = 0) _or (fn () (send index = (send this size)))) _ifTrue_ifFalse
+				      (fn () (send exceptionBlock value)) (fn () (send this _at (send index + 1)))))))
+    (expect "assigning an instance variable" (tree-of '_addFirst)
+	    '(fn (newObject) (send (send (field this firstIndex) = 1) _ifTrue (fn () (send this makeRoomAtFirst)))
+		 (assign (field this firstIndex) (send (field this firstIndex) - 1))
+		 (send (field this array) _at_put (field this firstIndex) newObject)
+		 (method-return newObject)))))
+
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))
