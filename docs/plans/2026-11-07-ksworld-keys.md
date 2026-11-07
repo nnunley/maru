@@ -47,9 +47,15 @@ Steps, each a check first:
      KSBlockSimplifier, KSCompiler), OMeta2 tree grammars in Smalltalk. KSQuoteTranslator2 turns each send, call, and, or,
      if, fby and field reference inside the quote into a sub-stream (this.eventStream(#sel, #src, extraDep, [args]),
      added with addSubExpression, dependencies collected), then finalizeTopLevelCreationWith2. It and KSQuoteAttributor2
-     are ported, rule for rule and each citing its OMeta2 rule, as a Maru tree grammar over kscript.g's trees (the
-     transliteration the user allowed where it can't be helped, as Warth's OMeta rewriters become Maru grammars);
+     run from their sources (below);
      KSNewEventStream's runtime runs from its source;
+   - the pipeline's passes (KSQuoteTranslator2 and KSQuoteAttributor2 first, then KSDeclVisitor, KSVariableAttributor2,
+     KSReturnVisitor2, KSBlockSimplifier) run from their sources through an OMeta2 reader on Maru's PEG (the user's
+     choice, 2026-11-07, over porting them by hand): ometa2.g reads a rule method (name :args = choice) to a tpeg rule
+     over a source-parser (anything is ., { } a list pattern, #sym a literal, rule(args) {rule args}, x:name, & ~ * + ?),
+     and each Smalltalk action, predicate and result ([ ], ?[ ], -> [ ]) is read by squeak.g and run with the rule's
+     bindings and the grammar's own object as self, so self nextId and the like are the class's support methods from its
+     source; the class's grammar is its rule methods, its other methods its support;
    - acceptance: KSEventStreamTest's 17 tests, run from KSWorld's source (TestCase's assert: on the platform);
    - then documents' streams are KSNewEventStream objects, and KSWorld's evaluation loop (KSDependencySorter,
      KSDependencyEvaluator, KSWorldState) drives time in ksworld-run and the window. KSWorld's behaviour is the referee,
