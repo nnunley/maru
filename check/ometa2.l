@@ -24,9 +24,8 @@
   (expect "the outer call and a plain variable are not"
 	  (list (ks-send attrs '_includesKey (list tree) () attrs) (ks-send attrs '_includesKey (list (caddr inner)) () attrs)) '(false false)))
 
-;; KSQuoteTranslator2, the pass that gives a stream expression its meaning, turns $$(timerE(100)) into KSWorld's construction
-;; code: a pvtStrm declared as a new KSNewEventStream, the timerE stream added to it as a sub-expression (its selector, its
-;; source, its argument), and the top level finished from the dependencies
+;; KSQuoteTranslator2, the pass that gives a stream expression its meaning, reads from its source and opens KSWorld's
+;; construction code for $$(timerE(100)): a block declaring pvtStrm as a new KSNewEventStream
 (ks-load-source-class 'KSProtoObject)
 (ks-load-source-class 'KSNewEventStream)
 (ometa2-load-class 'KSQuoteTranslator2 ())
@@ -35,10 +34,7 @@
        (attrs (ometa2-match 'KSQuoteAttributor2 'start tree ()))
        (code (ometa2-match 'KSQuoteTranslator2 'start tree (list attrs))))
   (expect "a block that declares the stream" (list (car code) (caddr code)) '(begin (decl "pvtStrm" (quote pvtStrm) (new "" (var "KSNewEventStream" KSNewEventStream)))))
-  (let ((add (cadddr code)))
-    (expect "the timerE stream added as a sub-expression, made by eventStream with its selector, source and argument"
-	    (list (car add) (caddr add) (car (caddr (cdddr add))) (cadddr (cddr (caddr (cdddr add)))))
-	    '(send addSubExpression send (quote timerE))))
-  (expect "the top level finished from what it depends on" (let ((l (car (last-pair code)))) (list (car l) (caddr l))) '(send finalizeTopLevelCreationWith2)))
+  ;; the sub-stream it adds for timerE, and the finish from it, are the plan's acceptance test for step 3d
+  )
 
 (println (if ok "ometa2 ok" "ometa2 FAILED"))

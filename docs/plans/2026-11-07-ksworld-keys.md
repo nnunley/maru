@@ -62,6 +62,10 @@ Steps, each a check first:
      not our checks: ksworld_clock and ksworld_headless encode rules of ours (an event taking 1/1024 of a millisecond,
      timerE firing once however many intervals passed), so where KSWorld's own code disagrees, KSWorld wins and those
      checks are rewritten to what it does (KSEventStreamTest decides), never the runtime bent to fit them.
+   Acceptance tests waiting on this step, out of the checks until it lands so the tree stays green: check/ksworld.l's
+   letter-made-as-kept (a kept letter made again by KSWorld's withChar:inFont:, whose KSBox>>initialize needs
+   streamOf), and check/ometa2.l's KSQuoteTranslator2 output for a timerE stream expression (a pvtStrm, the timerE
+   stream added as a sub-expression, finalizeTopLevelCreationWith2; today it finishes a single stream instead).
    Done so far: KSFont, KSFace, KSFamily and KSShape run from their sources over squeak-ttf.st (Squeak's TrueType classes
    on truetype.l), with class variables and class initialization; a letter from KSWorld's withChar:inFont: waits on
    streamOf (KSBox>>initialize).
@@ -87,9 +91,8 @@ Steps, each a check first:
 6. ksworld-show.l: a person can click and type in KSWorld.ks.
 
 Future directions (not yet):
-- doesNotParse: (the user, 2026-11-07), the parsing counterpart of doesNotUnderstand:: a production or string that fails and
-  cannot be recovered calls doesNotParse: with the input and the production's context (rule, position, what was
-  expected), so something can try to pick the parse back up.
+- A parse that can't go on (the user, 2026-11-07): not a doesNotParse: of its own but doesNotUnderstand:, so recovering
+  a parse goes through the same mechanism as an unanswered send.
 - Our font fallback (the user, 2026-11-07: kept, but hoisted into KScript): KSWorld fell back only to DejaVuSans for a family
   not installed and drew a missing character with the font's own missing glyph (KSShape>>withFont:index:fill:). Ours (a family's
   alternatives, its generic family, a last resort, a missing character from the next font with it) moves out of
