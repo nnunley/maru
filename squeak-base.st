@@ -213,8 +213,8 @@ TTFontDescription class allInstances    [ #() ]
 List at: i                              { (let ((c self) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for a list of " (list-length self)))) }
 
 "Smalltalk, the system's dictionary: its classes and globals by name"
-SystemDictionary at: key                { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (and g (cdr g))) (error "Smalltalk: no global named " key)) }
-SystemDictionary at: key ifAbsent: aBlock { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (and g (cdr g))) (ks-apply aBlock () () ())) }
+SystemDictionary at: key                { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (if g (cdr g) (error "Smalltalk: no global named " key)))) }
+SystemDictionary at: key ifAbsent: aBlock { (or (ks-class-named (ks-dict-key key)) (let ((g (assq (ks-dict-key key) *ks-globals*))) (if g (cdr g) (ks-apply aBlock () () ())))) }
 SystemDictionary includesKey: key       { (ks-bool (or (ks-class-named (ks-dict-key key)) (assq (ks-dict-key key) *ks-globals*))) }
 Smalltalk := SystemDictionary new.
 

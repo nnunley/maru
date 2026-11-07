@@ -111,6 +111,9 @@
 	(list (array? (st "#() collect: [:x | x]")) (array? (st "OrderedCollection new asArray")) (array? (st "Set new asArray"))
 	      (array->list (ks-send (list 1 2) '_collect (list (ks-eval (car (kscript-parse "(x) -> x * 10")) () ())) () ())))
 	'(t t t (10 20)))
+;; a global holding nil or false is there, holding it
+(set *ks-globals* (cons (cons 'Nothing ()) *ks-globals*))
+(expect "a global holding nil is found" (list (st "Smalltalk at: #Nothing") (st "Smalltalk at: #Nothing ifAbsent: [1]") (st "Smalltalk includesKey: #Nothing")) '(() () t))
 ;; Smalltalk's true is Maru's t, and false and nil are one value, (), answering as nil does: ifTrue: does nothing, ifFalse: runs
 (expect "true is t, false and nil are ()" (list (st "true") (st "false") (st "nil") (st "false == nil") (st "3 > 2")) '(t () () t t))
 (expect "false is nil: isNil, ifTrue: and ifFalse:"

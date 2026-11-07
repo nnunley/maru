@@ -89,7 +89,10 @@ Steps, each a check first:
      Done: Maru's booleans. true is t, false and nil are (), undefined is neither (a stream a document saved with no
      value is undefined, as in KSWorld), and an OMeta2 repetition answers an array. A departure, from false and nil being
      one value (test-pepsi.l's false := nil): false prints as nil, where Squeak printed false; text a document keeps as
-     the strings "true" and "false" (attributes such as __dormant__) is unchanged.
+     the strings "true" and "false" (attributes such as __dormant__) is unchanged; and the symbol t is true, so a Smalltalk
+     #t or a document's Symbol t reads as true. A slot, element, global or accumulator holding false is there, holding it:
+     presence is asked of the slots, never of the value. As in Squeak, a box whose visible is nil is hidden, and a nil
+     enteredFill falls back to defaultFill (ifNil:).
    - one hash table under every dictionary (the user asked, 2026-11-07, whether Maru has a hash set or map: it has
      none; the evaluators hash only their global cache, and JOHN's seen states (john-eval.l) and the law engine's terms
      (rules.l) each keep their own buckets, while Dictionary, Set and a KSObject's slots are association lists). Written

@@ -296,8 +296,8 @@
 	      (when sz-str
 		(let ((sz (string->long sz-str)) (items ()))
 		  (for (i 1 (+ sz 1))
-		    (let ((it (ks-slot obj (string->symbol (long->string i)))))
-		      (and it (push items it))))
+		    (let ((it (assq (string->symbol (long->string i)) (<ks-object>-slots obj))))	; a nil or false element is one
+		      (and it (push items (cdr it)))))
 		  (set (<ks-object>-data obj) (list-reverse! items)))))))))
     ;; Pass 3: a text box's letters, which KSWorld wrote as spans, read back into its contents as KSWorld read them
     (array-do o table (and (ks-object? o) (ks-spans? o) (ks-letter-contents o)))

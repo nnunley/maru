@@ -268,8 +268,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
   collection, true as a test, never nil. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
-  them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. A departure: false prints
-  as `nil`, where Squeak printed `false`.
+  them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
+  as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`

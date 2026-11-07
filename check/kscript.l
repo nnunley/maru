@@ -118,4 +118,18 @@ for i in [0...10] by 5 total := total + i
 	  (list (ks-stream-curr none) (ks-stream-prev none) (ks-stream-curr off) (ks-stream-prev off)))
 	'(undefined undefined () ()))
 
+(let ((s (ks-make-stream () "exprE" "" 1)) (f (ks-eval (car (kscript-parse "(v, acc) -> acc && v > 3")) () ())))
+  (ks-send s 'collectE (list 't f) () ())
+  (ks-set-slot s '__currentValue__ 5)
+  (expect "collectE carries a false accumulator on, not its first value" (ks-send s 'collectE (list 't f) () ()) ()))
+(let ((ev (ks-evaluator-new)) (box (box-of "")) (none (new <ks-object> 'KSEventStream 0 () () () 0)))
+  (ks-set-slot box 'quiet none)
+  (ks-evaluator-add-from ev box)
+  (ks-sort-and-evaluate-at ev 1)
+  (expect "a stream with no value stays undefined in its previous value" (ks-stream-prev none) 'undefined))
+(let ((a (box-of "")) (b (box-of "")) (c (box-of "")))
+  (ks-set-val b 'x 5)
+  (ks-set-val c 'x 6)
+  (expect "anyE passes over a box without the slot" (ks-eval `(call anyE (global ,(list->array (list a b c))) "x") () ()) 5))
+
 (and ok (println "kscript ok"))

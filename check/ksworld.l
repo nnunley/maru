@@ -105,6 +105,8 @@
 	  (cadddr path)
 	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
 
+;; a collection a document saved with nil and false elements keeps them, each in its place
+(expect "nil and false elements are elements" (<ks-object>-data (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send 'Color 'white () () ())) (try (ks-send 'Color 'lighter () () ()) (lambda (c) (ksw-message c))))
 	'(1.0 "Smalltalk: ColorClass does not understand lighter"))

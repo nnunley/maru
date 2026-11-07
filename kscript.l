@@ -448,7 +448,8 @@
   (doE (let ((val (ks-stream-curr recv))) (if (ks-defined? val) (ks-apply (car args) () env this) 'undefined)))
   (collectE (let ((val (ks-stream-curr recv)))
 	      (if (ks-defined? val)
-		  (let* ((old (or (ks-slot recv '__collectAcc__) (car args)))
+		  (let* ((acc (assq '__collectAcc__ (<ks-object>-slots recv)))	; a false accumulator is carried on
+			 (old (if acc (cdr acc) (car args)))
 			 (res (ks-apply (cadr args) (list val old) env this)))
 		    (and (ks-defined? res) (ks-set-slot recv '__collectAcc__ res))
 		    res)
@@ -640,8 +641,8 @@
 		      (sname (string->symbol (ks-to-string (ks-stream-curr (ks-eval (cadr raw-args) env this)))))
 		      (res 'undefined))
 		 (while (and (pair? items) (= res 'undefined))
-		   (let ((v (ks-val (car items) sname)))
-		     (when (ks-defined? v) (set res v)))
+		   (let ((p (and (ks-object? (car items)) (assq sname (<ks-object>-slots (car items))))))	; a box without it is passed
+		     (when p (let ((v (ks-stream-curr (cdr p)))) (when (ks-defined? v) (set res v)))))
 		   (set items (cdr items)))
 		 res))
 	      ((= fn 'timerE)	; fires when a multiple of its step was reached since the last evaluation
@@ -960,7 +961,7 @@
   (let ((sorted (ks-topologically-sorted-streams ev)))
     ;; Snapshot previous values for lagged references (') at this logical tick
     (list-do s sorted
-      (ks-set-slot s '__prevValue__ (ks-slot s '__currentValue__)))
+      (ks-set-slot s '__prevValue__ (ks-stream-value s)))	; a stream with no value keeps undefined
     ;; Evaluate each stream in topological order
     (list-do s sorted
       (let ((ast (ks-stream-ast s))
