@@ -63,10 +63,11 @@ CHECK_LIBS = build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.
 	     sdl3.osdefs.k
 
 # Runs $(1) with MARU_DBJR naming the dbjr documents the KSWorld check reads: the caller's, or else fetched into a fresh
-# temporary directory (mktemp -d, under TMPDIR) and removed after.  Only when the KSWorld check is among those run.  If
+# temporary directory (mktemp -d, under TMPDIR) and removed after.  Only when the KSWorld checks are among those run (all
+# of them, when CHECKS names none: the test is on the stripped list, as " $(CHECKS) " is three blanks and matched none).  If
 # they can't be fetched it says so, and that check says it skipped them.
 define with-dbjr
-	@case " $(CHECKS) $(2) " in *ksworld*|"  ") fetch=yes ;; *) fetch= ;; esac; \
+	@case "$(strip $(CHECKS) $(2))" in *ksworld*|"") fetch=yes ;; *) fetch= ;; esac; \
 	if [ -n "$$MARU_DBJR" ] || [ -z "$$fetch" ]; then $(1); \
 	else dbjr=$$(mktemp -d "$${TMPDIR:-/tmp}/maru-dbjr.XXXXXX") && \
 	  if notes/plan/fetch-dbjr "$$dbjr"; then MARU_DBJR=$$dbjr $(1); else echo "dbjr documents not fetched: KSWorld.ks isn't checked"; $(1); fi; \
