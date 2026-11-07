@@ -359,6 +359,16 @@
     (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law")))
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (law-file-holds "gc_every" evaluator "check/laws/gc-reference.l" "check/laws/gc-every.law"))))
+;; hash.l's tables against an association list, on every evaluator, and an identity table across a saved image (only eval
+;; saves images), where every object has moved: it rehashes itself before answering
+(check "hash_table"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (law-file-holds "hash_table" evaluator "check/laws/hash.l" "check/laws/hash.law")))
+  (let ((image (concat-strings tmp "/hash-image")) (saver (concat-strings tmp "/hash-save.l")) (reader (concat-strings tmp "/hash-read.l")))
+    (run "hash_image_write" (concat-strings "printf '(require \"hash.l\")\\n(define keys (list \"a\" (quote b) (cons 1 2)))\\n(define h (identity-hash-table))\\n(list-do k keys (hash-at-put h k k))\\n(save \"" image "\")\\n' > " saver))
+    (run "hash_image_write2" (concat-strings "printf '(println (map (lambda (k) (= k (hash-at h k))) keys) \" \" (hash-at h \"a\" 0))\\n' > " reader))
+    (run "hash_image_save" (concat-strings "./eval " saver))
+    (unit-assert (equal (run "hash_image_load" (concat-strings "./eval -l " image " " reader)) '("(t t t) 0")))))
 ;; generated programs against a model of what they should do, and generated allocations; collecting on every allocation
 ;; is slow, so that runs on one evaluator with tagged integers and one without
 (check "gc_model"

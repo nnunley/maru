@@ -1,0 +1,42 @@
+-- hash.l's tables against an association list searched with the same equality (check/laws/hash.l): every get, the count,
+-- and the keys and values in the order they were first put
+reference programs_agree(p, k)
+reference grows(n, k)
+reference key_kinds(n)
+under test: program, op, key, kind, many, once
+defaults trials = 300, size = 6
+let numerals = [0, 1, 2, 3, 7]
+
+-- few keys, so puts overwrite, removes hit and gets find what was put
+rule k_number:  number(n) => key(num(n))
+rule k_double:  number(n) => key(dbl(n))
+rule k_string:  number(n) => key(str(n))
+rule k_symbol:  number(n) => key(sym(n))
+rule k_pair:    number(a), number(b) => key(pair(a, b))
+fact key(Nil)
+rule o_put:     key(k), number(v) => op(put(k, v))
+rule o_put2:    key(k), number(v) => op(put(k, v))
+rule o_remove:  key(k) => op(remove(k))
+rule o_get:     key(k) => op(get(k))
+rule o_grow:    number(n) => op(grow(n))
+fact program(End)
+rule p_one:     op(o), program(p) => program(seq(o, p))
+rule p_three:   op(a), op(b), op(c), program(p) => program(seq(a, seq(b, seq(c, p))))
+
+fact kind(Identity)
+fact kind(Equal)
+-- sizes around each growth: a table starts with 8 buckets and doubles past three quarters full
+fact many(0)
+fact many(1)
+fact many(5)
+fact many(6)
+fact many(7)
+fact many(13)
+fact many(100)
+fact many(700)
+fact once(1)
+
+law programs:  all p: program(p), k: kind(k). programs_agree(p, k) = accept
+law grows:     all n: many(n), k: kind(k). grows(n, k) = accept by exhaustion
+-- an identity table tells apart what an equality table takes as one key: two strings of the same text, 2 and 2.0
+law key_kinds: all n: once(n). key_kinds(n) = accept by exhaustion
