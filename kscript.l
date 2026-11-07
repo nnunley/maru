@@ -149,6 +149,9 @@
 ;; platform's (Object, Number, Array ...) from squeak-base.st, after test-pepsi.l's hierarchy.
 (define-structure <ks-class> (name super ivars))
 (define *ks-classes* ())	; (name . class)
+(define *ks-classvars* ())	; ((CLASS NAME) . value), Smalltalk's class variables
+(define-function ks-assoc (key l)	; the pair whose car is equal to key
+  (let ((found ())) (while (and l (not found)) (and (equal key (caar l)) (set found (car l))) (set l (cdr l))) found))
 (define-function ks-class-named (name) (cdr (assq name *ks-classes*)))
 (define-function ks-meta (name) (string->symbol (concat-string (symbol->string name) " class")))
 (define-function ks-define-class (name super ivars)
@@ -261,6 +264,7 @@
 (define-method ks-kind <ks-closure> () 'BlockClosure)
 (define-method ks-kind <ks-class> () (ks-meta self.name))
 (define-method ks-kind <pair> () 'List)
+(define-method ks-kind <undefined> () 'List)	; (), the empty list (KScript's nil is the symbol nil)
 (define-method ks-kind <ks-point> () 'Point)
 (define-method ks-kind <ks-rect> () 'Rectangle)
 (define-method ks-kind <ks-color> () 'Color)
@@ -555,6 +559,8 @@
 	 ((= op 'method-return)	; Smalltalk's ^, from a block too: to the tag of the method it's in
 	  ((eval 'throw) (ks-env-lookup env this '%method ()) (ks-stream-curr (ks-eval (cadr exp) env this))))	; catch.l's, loaded with the sources
 	 ((= op 'char) (cadr exp))
+	 ((= op 'symbol) (cadr exp))	; #'name', a Smalltalk Symbol: Maru's symbol, text as KScript's are
+	 ((= op 'classvar) (let ((p (ks-assoc (cdr exp) *ks-classvars*))) (if p (cdr p) 'nil)))	; Smalltalk's class variables
 	 ((= op 'call)
 	  (let ((fn (cadr exp))
 		(raw-args (cddr exp)))
@@ -702,6 +708,8 @@
 	  (let ((lhs (cadr exp))
 		(val (ks-stream-curr (ks-eval (caddr exp) env this))))
 	    (cond ((symbol? lhs) (ks-env-set! env this lhs val))
+		  ((and (pair? lhs) (= (car lhs) 'classvar))
+		   (let ((p (ks-assoc (cdr lhs) *ks-classvars*))) (if p (set-cdr p val) (push *ks-classvars* (cons (cdr lhs) val)))))
 		  ((and (pair? lhs) (= (car lhs) 'field))
 		   (let ((target (ks-stream-curr (ks-eval (cadr lhs) env this))))
 		     (ks-set-val target (caddr lhs) val)))

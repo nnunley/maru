@@ -38,6 +38,18 @@ Steps, each a check first:
      test-pepsi.l's base library is, with { } primitives, not Squeak's whole library.
    Check: KSContentsCollection's methods run from its source (add:, at:, add:afterIndex:, removeFirst ...), and KSWorld's
    layOut places KSWorld.ks's letters where KSWorld put them.
+3d. (The user's ruling, 2026-11-07: KSWorld's own streams.) KSNewEventStream (98 Smalltalk methods) and KSEventStream
+   (71 KScript) run from their sources in place of kscript.l's native stream runtime; kscript.l keeps evaluating KScript.
+   - evalToMethod: and eval: (where KSWorld called KSCompiler) compile with kscript.g into an object's methods;
+   - stream expressions and the stream functions (timerE, mapE, collectE ...) become what KSCompiler compiled them to,
+     calls on KSNewEventStream;
+   - acceptance: KSEventStreamTest's 17 tests, run from KSWorld's source (TestCase's assert: on the platform);
+   - then documents' streams are KSNewEventStream objects, and KSWorld's evaluation loop (KSDependencySorter,
+     KSDependencyEvaluator, KSWorldState) drives time in ksworld-run and the window, held to ksworld_clock and
+     ksworld_headless as they are.
+   Done so far: KSFont, KSFace, KSFamily and KSShape run from their sources over squeak-ttf.st (Squeak's TrueType classes
+   on truetype.l), with class variables and class initialization; a letter from KSWorld's withChar:inFont: waits on
+   streamOf (KSBox>>initialize).
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy

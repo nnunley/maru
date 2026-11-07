@@ -20,9 +20,11 @@
 (define-function squeak-selector (keywords)	; at put -> _at_put, as KScript names Smalltalk's at:put:
   (let ((s "")) (list-do k keywords (set s (concat-strings s "_" k))) (string->symbol s)))
 (define *squeak-ivars* ())	; the instance variables of the class whose method squeak.g is reading
-(define-function squeak-name (parser x)	; self, an instance variable, or a name
+(define *squeak-classvars* ())	; and its class variables, (CLASS . NAMES)
+(define-function squeak-name (parser x)	; self, an instance variable, a class variable, or a name
   (cond ((= x "self") 'this)
 	((member? x *squeak-ivars*) `(field this ,(string->symbol x)))
+	((member? x (cdr *squeak-classvars*)) `(classvar ,(car *squeak-classvars*) ,(string->symbol x)))
 	(else (string->symbol x))))
 (define-function squeak-keyword-send (r parts)
   `(send ,r ,(squeak-selector (map car parts)) ,@(map cdr parts)))
@@ -61,9 +63,10 @@
   (let ((forms (try (kscript-parse src) (lambda (c) ()))))
     (and (pair? forms) (not (cdr forms)) (= 'assign (caar forms)) (pair? (caddr (car forms))) (= 'fn (car (caddr (car forms))))
 	 (caddr (car forms)))))
-(define-function ks-squeak-method (src ivars)	; (SELECTOR (fn PARAMS BODY...)) as squeak.g reads a Smalltalk method, or ()
+(define-function ks-squeak-method (src ivars classvars)	; (SELECTOR (fn PARAMS BODY...)) as squeak.g reads a Smalltalk method, or ()
   (let ((p (text-parser-for-on <squeak> src)))
     (set *squeak-ivars* ivars)
+    (set *squeak-classvars* classvars)
     (and (try (text-parser-invoke-rule 'method $method p) (lambda (c) ())) (<text-parser>-result p))))
 (define-function ks-words (s)	; a string's blank-separated words
   (let ((out ()) (w ()))
@@ -74,19 +77,23 @@
     (and w (push out (list->string (list-reverse! w))))
     (list-reverse! out)))
 (define-function ks-source-forms (path) (parse-string <stfileout> $file (contents-of-file-named path)))
-(define-function ks-source-class-of (path)
+(define-function ks-source-class-of (path)	; (CLASS SUPERCLASS IVARS), and its class variables after
   (let ((d ())) (list-do x (ks-source-forms path) (and (pair? x) (= 'definition (car x)) (set d x)))
     (and d (list (cadr d) (caddr d) (map string->symbol (ks-words (cadddr d)))))))
+(define-function ks-source-classvars (path)	; (CLASS . NAMES): the class variables its definition names
+  (let ((d ())) (list-do x (ks-source-forms path) (and (pair? x) (= 'definition (car x)) (set d x)))
+    (and d (cons (cadr d) (and (car (cddddr d)) (ks-words (car (cddddr d))))))))
 (define-function ks-source-methods (path)
   (let* ((forms (ks-source-forms path)) (def (let ((d ())) (list-do x forms (and (pair? x) (= 'definition (car x)) (set d x))) d))
-	 (ivars (and def (ks-words (cadddr def)))) (out ()))
+	 (ivars (and def (ks-words (cadddr def)))) (classvars (and def (cons (cadr def) (and (car (cddddr def)) (ks-words (car (cddddr def)))))))
+	 (out ()))
     (list-do x forms
       (and (pair? x) (= 'section (car x))
 	   (list-do src (cddddr x)
 	     (let ((head (ks-source-head src)))
 	       (if (cdr head)
 		   (push out (new <ks-source-method> (cadr x) (cadddr x) (caddr x) (car head) src 1 (ks-source-tree src)))
-		 (let ((m (ks-squeak-method src (if (= 'class (cadddr x)) () ivars))))
+		 (let ((m (ks-squeak-method src (if (= 'class (cadddr x)) () ivars) classvars)))
 		   (push out (new <ks-source-method> (cadr x) (cadddr x) (caddr x) (if m (car m) (car head)) src () (and m (cadr m))))))))))
     (list-reverse! out)))
 ;; a method's function: KScript runs as a closure on its receiver; Smalltalk the same, under a tag of its own, so a ^
@@ -94,7 +101,7 @@
 ;; (a pepsi-style library method, like KScript, answers its last expression's value: test-pepsi.l's methods have no ^)
 (define-function ks-method-function (kind tree kscript? last-value?)
   (if kscript?
-      (lambda (recv args env this) (ks-apply (ks-eval tree () recv) args env recv))
+      (lambda (recv args env this) (ks-apply (ks-eval tree (list (cons '%class kind)) recv) args env recv))	; super.x() too
     (lambda (recv args env this)
       (let ((tag (cons 'method ())))
 	(catch tag (lambda () (let ((v (ks-apply (ks-eval tree (list (cons '%method tag) (cons '%class kind)) recv) args env recv)))
@@ -113,6 +120,14 @@
 (define-function ks-responds? (recv sel)	; a method of its kind, or a closure in a slot of that name
   (or (ks-method-for (ks-kind recv) sel)
       (and (ks-object? recv) (let ((p (assq sel (<ks-object>-slots recv)))) (and p (ks-closure? (ks-stream-curr (cdr p))))))))
+(define-function ks-subclasses-of (name)	; every loaded class whose superclasses include name
+  (let ((out ()))
+    (list-do e *ks-classes*
+      (let ((k (<ks-class>-super (cdr e))) (under ()))
+	(while (and k (not under)) (if (= k name) (set under 1) (set k (let ((c (ks-class-named k))) (and c (<ks-class>-super c))))))
+	(and under (push out (cdr e)))))
+    out))
+(define-function ks-dict-key (k) (cond ((symbol? k) k) ((string? k) (string->symbol k)) (else k)))
 (define-function ks-without (x l) (if l (if (= x (car l)) (cdr l) (cons (car l) (ks-without x (cdr l)))) ()))
 ;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)
 (define-function ks-primitive-function (f) (lambda (recv args env this) (apply f (cons recv args))))
@@ -128,6 +143,24 @@
 		 (ks-method kind (cadddr d) (ks-primitive-function (eval `(lambda (self ,@(car (cddddr d))) ,(cadr (cddddr d)))))))))))))
 (ks-load-library "squeak-base.st")
 
+;; what squeak-ttf.st's primitives need: a TTCFont (its description holding the font chain), a glyph of a character, the
+;; left side bearing hmtx keeps, and a glyph's outline as a FloatArray, the form a document's GeziraPath keeps its floats in
+(require "ksworld-text.l")	; the font chain (ks-fonts): a family, its alternatives, its generic family, a last resort
+(define-function ks-ttc-font (name size style)
+  (let ((d (new <ks-object> 'TTFontDescription 0 () (list (cons 'fonts (ks-fonts (string->symbol (if (symbol? name) (symbol->string name) name)) style))) () 0)))
+    (new <ks-object> 'TTCFont 0 () (list (cons 'description d) (cons 'pointSize size) (cons 'emphasis style)) () 0)))
+(define-function ks-ttc-glyph (description code)	; the first font of the chain with a glyph for code, or the first's missing glyph
+  (let* ((fonts (ks-slot description 'fonts)) (f (ks-char-font fonts code)))
+    (new <ks-object> 'TTGlyph 0 () (list (cons 'font f) (cons 'glyph (ttf-glyph f code))) () 0)))
+(define-function ttf-lsb (f glyph)
+  (ttf-i16 f (if (< glyph (<ttf>-metrics f)) (+ (<ttf>-hmtx f) (+ (* 4 glyph) 2))
+	       (+ (+ (<ttf>-hmtx f) (* 4 (<ttf>-metrics f))) (* 2 (- glyph (<ttf>-metrics f)))))))
+(define-function ks-glyph-float-array (f glyph)
+  (let* ((beziers (ttf-outline f glyph)) (floats (data (* 24 (list-length beziers)))) (i 0))
+    (list-do z beziers (list-do v z (set-float-at floats i (* 1.0 v)) (set i (+ i 1))))
+    (new <ks-object> 'FloatArray 0 () () floats (* 6 (list-length beziers)))))
+(ks-load-library "squeak-ttf.st")
+
 (define-function ks-readable-source? (class)
   (= 0 ((subr "access" "si>i") (concat-strings "ksworld/" (symbol->string class) ".st") 4)))
 ;; a KSWorld class from its source: its definition (its superclass's first, if KSWorld has it), then each method
@@ -142,4 +175,7 @@
 	(when tree	; a KScript method with parameters is its KSCompiler selector, as KSWorld compiled it: width = (aNumber) is
 	  ;; width:, which a KScript call width(n) reaches (ks-squeak-selector), while width() is another method, unary width
 	  (let ((f (ks-method-function kind tree (<ks-source-method>-kscript? m) ())) (sel (<ks-source-method>-selector m)))
-	    (ks-method kind (if (<ks-source-method>-kscript? m) (ks-squeak-selector sel (list-length (cadr tree))) sel) f)))))))
+	    (ks-method kind (if (<ks-source-method>-kscript? m) (ks-squeak-selector sel (list-length (cadr tree))) sel) f)))))
+    ;; as Squeak does when a class is loaded: its class side's own initialize, if it has one
+    (let ((init (assq 'initialize (cdr (assq (ks-meta class) *ks-methods*)))))
+      (and init ((cdr init) (ks-class-named class) () () ())))))

@@ -9,8 +9,12 @@ Object : ()
     True : Boolean ()
     False : Boolean ()
   BlockClosure : Object ()
+  Character : Object ()
   Magnitude : Object ()
     Number : Magnitude ()
+  Point : Object ()
+  Rectangle : Object ()
+  Color : Object ()
   Collection : Object ()
     HashedCollection : Collection ()
       Dictionary : HashedCollection ()
@@ -23,6 +27,7 @@ Object : ()
 
 "Objects"
 Object yourself                         [ self ]
+Object class                            { (or (ks-class-named (ks-kind self)) (error "Smalltalk: no class for " (ks-kind self))) }
 Object == other                         { (ks-bool (= self other)) }
 Object ~~ other                         [ (self == other) not ]
 Object = other                          [ self == other ]
@@ -39,14 +44,21 @@ Object perform: aSymbol with: a         { (ks-send self (ks-selector-of aSymbol)
 Object perform: aSymbol with: a with: b { (ks-send self (ks-selector-of aSymbol) (list a b) () self) }
 Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-selector-of aSymbol))) }
 
-"Dictionaries: a KSWorld object is an IdentityDictionary of its slots"
-IdentityDictionary at: key              { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
-IdentityDictionary at: key ifAbsent: aBlock { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
-IdentityDictionary at: key put: value   { (ks-set-slot self (ks-selector-of key) value) }
-IdentityDictionary includesKey: key     { (ks-bool (assq (ks-selector-of key) (<ks-object>-slots self))) }
-IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (assq (ks-selector-of key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
+"Dictionaries: a KSWorld object is an IdentityDictionary of its slots, so a symbol or string key is a slot's name; any other
+ key (a number, an object) is kept as it is, compared by value"
+IdentityDictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
+IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
+IdentityDictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
+IdentityDictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
+IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
+"Behavior: a class knows its name, its superclass and the classes under it (those loaded)"
+Object class name                       { (<ks-class>-name self) }
+Object class superclass                 { (or (ks-class-named (<ks-class>-super self)) 'nil) }
+Object class allSubclasses              { (ks-subclasses-of (<ks-class>-name self)) }
+Object class withAllSubclasses          { (cons self (ks-subclasses-of (<ks-class>-name self))) }
+Object class compileAll                 [ "a class here is compiled from its source as it loads" self ]
 UndefinedObject isNil                   [ true ]
 UndefinedObject notNil                  [ false ]
 UndefinedObject ifNil: aBlock           [ aBlock value ]
@@ -108,10 +120,50 @@ Number between: low and: high           [ (low <= self) and: [self <= high] ]
 Number negated                          [ 0 - self ]
 Number abs                              [ self < 0 ifTrue: [self negated] ifFalse: [self] ]
 Number isZero                           [ self = 0 ]
+Number @ y                              { (ks-point self y) }
 Number to: stop do: aBlock              [ | i | i := self.  [i <= stop] whileTrue: [aBlock value: i.  i := i + 1] ]
 Number to: stop by: step do: aBlock     [ | i | i := self.  step > 0
                                             ifTrue: [[i <= stop] whileTrue: [aBlock value: i.  i := i + step]]
                                             ifFalse: [[i >= stop] whileTrue: [aBlock value: i.  i := i + step]] ]
+
+"Points and rectangles (kscript.l answers x, y, extent, width, height, the corners and center natively)"
+Point + p                               { (if (ks-point? p) (ks-point (+ (<ks-point>-x self) (<ks-point>-x p)) (+ (<ks-point>-y self) (<ks-point>-y p))) (ks-point (+ (<ks-point>-x self) p) (+ (<ks-point>-y self) p))) }
+Point - p                               { (if (ks-point? p) (ks-point (- (<ks-point>-x self) (<ks-point>-x p)) (- (<ks-point>-y self) (<ks-point>-y p))) (ks-point (- (<ks-point>-x self) p) (- (<ks-point>-y self) p))) }
+Point * p                               { (if (ks-point? p) (ks-point (* (<ks-point>-x self) (<ks-point>-x p)) (* (<ks-point>-y self) (<ks-point>-y p))) (ks-point (* (<ks-point>-x self) p) (* (<ks-point>-y self) p))) }
+Point / p                               { (if (ks-point? p) (ks-point (/ (<ks-point>-x self) (<ks-point>-x p)) (/ (<ks-point>-y self) (<ks-point>-y p))) (ks-point (/ (<ks-point>-x self) p) (/ (<ks-point>-y self) p))) }
+Point negated                           { (ks-point (- 0 (<ks-point>-x self)) (- 0 (<ks-point>-y self))) }
+Point = p                               { (ks-bool (and (ks-point? p) (= (<ks-point>-x self) (<ks-point>-x p)) (= (<ks-point>-y self) (<ks-point>-y p)))) }
+Point corner: p                         { (ks-rect (<ks-point>-x self) (<ks-point>-y self) (<ks-point>-x p) (<ks-point>-y p)) }
+Rectangle left                          { (<ks-rect>-left self) }
+Rectangle top                           { (<ks-rect>-top self) }
+Rectangle right                         { (<ks-rect>-right self) }
+Rectangle bottom                        { (<ks-rect>-bottom self) }
+Rectangle origin                        [ self topLeft ]
+Rectangle corner                        [ self bottomRight ]
+Color asColor                           [ self ]
+Color isColor                           [ true ]
+Object isColor                          [ false ]
+
+"Characters are their codes, as KScript's key values are: Character's class side answers codes, its protocol is Number's"
+Character class value: n                [ n ]
+Character class space                   [ 32 ]
+Character class cr                      [ 13 ]
+Character class lf                      [ 10 ]
+Character class tab                     [ 9 ]
+Number asCharacter                      [ self ]
+Number asInteger                        [ self ]
+Number asciiValue                       [ self ]
+Number isSeparator                      { (ks-bool (member? self '(32 9 10 13 12))) }
+Number isDigit                          { (ks-bool (and (<= 48 self) (<= self 57))) }
+Number isLetter                         { (ks-bool (or (and (<= 65 self) (<= self 90)) (and (<= 97 self) (<= self 122)))) }
+Number isAlphaNumeric                   [ self isLetter or: [self isDigit] ]
+
+"Strings and symbols (KScript's text is Maru's strings and symbols alike)"
+String size                             { (if (symbol? self) (string-length (symbol->string self)) (string-length self)) }
+String at: i                            { (let ((s (if (symbol? self) (symbol->string self) self))) (if (and (long? i) (< 0 i) (<= i (string-length s))) (string-at s (- i 1)) (error "Smalltalk: index " i " out of bounds for a string of " (string-length s)))) }
+String asSymbol                         { (if (symbol? self) self (string->symbol self)) }
+String asString                         { (if (symbol? self) (symbol->string self) self) }
+String copyWithout: c                   { (let ((s (if (symbol? self) (symbol->string self) self)) (out ())) (for (i 0 (string-length s)) (or (= c (string-at s i)) (push out (string-at s i)))) (list->string (list-reverse! out))) }
 
 "Arrays, counting from 1"
 Array class new: n                      { (let ((a (array n))) (for (i 0 n) (set-array-at a i 'nil)) a) }
@@ -124,4 +176,13 @@ ArrayedCollection replaceFrom: start to: stop with: source startingAt: from
                                             ifTrue: [stop to: start by: -1 do: [:i | self at: i put: (source at: from + i - start)]]
                                             ifFalse: [start to: stop do: [:i | self at: i put: (source at: from + i - start)]] ]
 List size                               { (list-length self) }
+List do: aBlock                         { (let () (list-do x self (ks-apply aBlock (list x) () ())) self) }
+List collect: aBlock                    { (map (lambda (x) (ks-apply aBlock (list x) () ())) self) }
+List do: aBlock displayingProgress: b  [ self do: aBlock ]
+List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list-reverse! out)) }
+List isEmpty                            { (ks-bool (not self)) }
+
+"Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"
+TTFontDescription : Object ()
+TTFontDescription class allInstances    [ #() ]
 List at: i                              { (let ((c self) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for a list of " (list-length self)))) }

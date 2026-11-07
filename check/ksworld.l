@@ -4,6 +4,8 @@
 (require "ksworld-render.l")
 (require "truetype.l")
 (require "check/temp.l")
+(require "ksworld-source.l")
+(list-do c '(KSBox KSFamily KSFace KSFont KSShape) (ks-load-source-class c))
 (define ok 1)
 (define-function expect (what got want)
   (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
@@ -58,6 +60,23 @@
 	     (near (<ks-point>-x e) (<ks-point>-x ke)) (near (<ks-point>-y e) (<ks-point>-y ke))
 	     (set found 1))))
     found))
+;; a letter made by KSWorld's own code, KSBox withChar:inFont: on a font from KSFamily, KSFace and KSFont (their Smalltalk,
+;; over squeak-ttf.st's TrueType classes), against the letter KSWorld kept: its extent, pivot, glyph transform and bearing
+(define-function letter-made-as-kept (box)
+  (let* ((c (ks-slot (ks-slot box 'handler) 'lineStart)) (kf (ks-val c 'font)) (kface (ks-val kf 'face))
+	 (env (list (cons 'family (symbol->string (ks-val (ks-val kface 'family) 'name))) (cons 'style (ks-val kface 'style))
+		    (cons 'size (ks-val kf 'pointSize)) (cons 'code (ks-val c 'unicode))))
+	 (l (ks-eval (car (kscript-parse "KSBox._withChar_inFont(code, KSFamily._withName(family)._withStyle(style)._withSize(size))")) env ()))
+	 (s (ks-val l 'shape)) (ks (ks-val c 'shape)))
+    (and (ks-object? s)
+	 (near (<ks-point>-x (ks-val s 'extent)) (<ks-point>-x (ks-val ks 'extent))) (near (<ks-point>-y (ks-val s 'extent)) (<ks-point>-y (ks-val ks 'extent)))
+	 (near (<ks-point>-x (ks-val l 'pivotRatio)) (<ks-point>-x (ks-val c 'pivotRatio)))
+	 (near (<ks-point>-y (ks-val l 'pivotRatio)) (<ks-point>-y (ks-val c 'pivotRatio)))
+	 (near (<ks-matrix>-a (ks-val s 'transform)) (<ks-matrix>-a (ks-val ks 'transform)))
+	 (near (<ks-matrix>-e (ks-val s 'transform)) (<ks-matrix>-e (ks-val ks 'transform)))
+	 (near (<ks-matrix>-f (ks-val s 'transform)) (<ks-matrix>-f (ks-val ks 'transform)))
+	 (near (<ks-point>-y (ks-val s 'hBearing)) (<ks-point>-y (ks-val ks 'hBearing)))
+	 1)))
 (define-function text-as-kept (table doc)
   (let ((kept 0) (boxes 0))
     (array-do o table
@@ -73,7 +92,9 @@
 		(laid-out-as-kept o) 1)
 	;; its contents are letter boxes, as KSWorld read the spans it wrote, and the kept letter's is where KSWorld put it
 	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s letters, the kept one placed as KSWorld placed it")
-		(letter-as-kept o) 1)))
+		(letter-as-kept o) 1)
+	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s kept letter, made again by KSWorld's withChar:inFont:")
+		(letter-made-as-kept o) 1)))
     (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
     ;; its shapes, the carets of the three text boxes it kept showing their selection, and each character
     (expect "KSWorld.ks: the paths it draws, shapes, carets and characters" (list-length (drawn doc 1024 768)) 937)))

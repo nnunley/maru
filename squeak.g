@@ -78,7 +78,7 @@ sexpr		= "(" sspace (sexpr:e sspace -> e)*:es ")"			-> es
 		| "\"" ("\\" . | !"\"" .)* @ $:s "\""				-> s
 		| ("-"? digit+) @ $:s !schar					-> (string->long s)
 		| (schar+) @ $:s						-> (string->symbol s) ;
-libside		= "class" !letter _						-> 'class
+libside		= "class" !letter _ !("[" | "{")				-> 'class	# Object class { ... } is a method named class
 		|								-> 'instance ;
 libdef		= idpart:c _ ":" _ (idpart:s _ -> (string->symbol s))?:s "(" _ (idpart:v _ -> (string->symbol v))*:vs ")" _
 										-> `(class ,(string->symbol c) ,(car s) ,vs)
