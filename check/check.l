@@ -425,6 +425,8 @@
 (check "kscript" (unit-assert (equal (last (run "kscript" "./eval check/kscript.l notes/sources/grammars/*.kscript")) "kscript ok")))
 ;; KSWorld documents headless (ksworld-run.l): a fixture of ours, and KSWorld.ks where the dbjr documents are
 (check "ksworld_headless" (unit-assert (equal (last (run "ksworld_headless" "./eval check/ksworld.l")) "ksworld ok")))
+;; OMeta2 grammar classes (KSWorld's KScript2 compiler passes) run from their sources on Maru's PEG (ometa2.l)
+(check "ometa2" (unit-assert (equal (last (run "ometa2" "./eval check/ometa2.l")) "ometa2 ok")))
 ;; KSWorld's own methods from ksworld/*.st: every KScript method of KSTextLayout read, and each a method of the class
 (check "ksworld_sources" (unit-assert (equal (last (run "ksworld_sources" "./eval check/ksworld-sources.l")) "ksworld sources ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)

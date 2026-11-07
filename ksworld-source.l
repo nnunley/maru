@@ -127,6 +127,8 @@
 	(while (and k (not under)) (if (= k name) (set under 1) (set k (let ((c (ks-class-named k))) (and c (<ks-class>-super c))))))
 	(and under (push out (cdr e)))))
     out))
+(define-function ks-assq (key l)	; the pair whose car is key itself (an IdentityDictionary's lookup)
+  (let ((found ())) (while (and l (not found)) (and (= key (caar l)) (set found (car l))) (set l (cdr l))) found))
 (define-function ks-dict-key (k) (cond ((symbol? k) k) ((string? k) (string->symbol k)) (else k)))
 (define-function ks-without (x l) (if l (if (= x (car l)) (cdr l) (cons (car l) (ks-without x (cdr l)))) ()))
 ;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)

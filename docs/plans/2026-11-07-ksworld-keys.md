@@ -75,3 +75,8 @@ Future directions (not yet):
 - doesNotParse: (the user, 2026-11-07), the parsing counterpart of doesNotUnderstand:: a production or string that fails and
   cannot be recovered calls doesNotParse: with the input and the production's context (rule, position, what was
   expected), so something can try to pick the parse back up.
+- Our font fallback (the user, 2026-11-07: kept, but hoisted into KScript): KSWorld fell back only to DejaVuSans for a family
+  not installed and drew a missing character with the font's own missing glyph (KSShape>>withFont:index:fill:). Ours (a family's
+  alternatives, its generic family, a last resort, a missing character from the next font with it) moves out of
+  ksworld-text.l's Maru into KScript methods of ours on the font classes, loaded as KSWorld's are; the platform only reads
+  TrueType.

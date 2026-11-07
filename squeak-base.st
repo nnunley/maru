@@ -44,6 +44,12 @@ Message selector                        { (ks-slot self 'selector) }
 Message arguments                       { (ks-slot self 'arguments) }
 Message numArgs                         { (list-length (ks-slot self 'arguments)) }
 Object isBlock                          [ false ]
+Object isCollection                     [ false ]
+Collection isCollection                 [ true ]
+Object isString                         [ false ]
+String isString                         [ true ]
+Object isSymbol                         [ false ]
+String isSymbol                         { (ks-bool (symbol? self)) }
 BlockClosure isBlock                    [ true ]
 BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a args)) (for (i 0 n) (push out (if a (car a) 'nil)) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
 Object initialize                       [ self ]
@@ -53,13 +59,19 @@ Object perform: aSymbol with: a with: b { (ks-send self (ks-selector-of aSymbol)
 Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-selector-of aSymbol))) }
 
 "Dictionaries: a KSWorld object is an IdentityDictionary of its slots, so a symbol or string key is a slot's name; any other
- key (a number, an object) is kept as it is, compared by value"
-IdentityDictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
-IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
-IdentityDictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
-IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
-IdentityDictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
-IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
+ key (a number, an object) is kept as it is, compared by value in a Dictionary and by identity in an IdentityDictionary"
+Dictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
+Dictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
+Dictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
+Dictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
+Dictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
+Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
+IdentityDictionary at: key              { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
+IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
+IdentityDictionary at: key put: value   { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
+IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) 'nil)) }
+IdentityDictionary includesKey: key     { (ks-bool (ks-assq (ks-dict-key key) (<ks-object>-slots self))) }
+IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
 "Behavior: a class knows its name, its superclass and the classes under it (those loaded)"
@@ -193,6 +205,8 @@ List do: aBlock displayingProgress: b  [ self do: aBlock ]
 List asSet                              { (let ((out ())) (list-do x self (or (member? x out) (push out x))) (list-reverse! out)) }
 List isEmpty                            { (ks-bool (not self)) }
 List , other                            { (concat-list self other) }
+List reduce: aBlock                     { (let ((acc (car self))) (list-do x (cdr self) (set acc (ks-apply aBlock (list acc x) () ()))) acc) }
+List first                              { (car self) }
 
 "Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"
 TTFontDescription : Object ()
