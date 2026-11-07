@@ -1,0 +1,8 @@
+-- a rule concludes schedule([c | s]) from schedule(s); exhaustion over it reaches every list up to the size
+under test: as_list
+let numerals = [0, 1]
+rule first: number(c) => schedule([c])
+rule more: number(c), schedule(s) => schedule([c | s])
+law lists_size_one: all s: schedule(s). as_list(s) = "ok" by exhaustion size 1
+law lists_size_two: all s: schedule(s). as_list(s) = "ok" by exhaustion size 2
+law lists_test: all s: schedule(s). as_list(s) = "ok"

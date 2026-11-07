@@ -509,8 +509,26 @@
 		 ("verdict" "check/laws/fixtures/refs.l" 256 "law truthy: E_CLAIM the claim of truthy is a verdict; compare it, e.g. `= accept`"
 		  "law guarded: E_CLAIM a condition of guarded is a verdict; compare it, e.g. `= accept`" "law compared: TESTED 100")
 		 ("dup" ,d 256 "E_DUPLICATE check/laws/fixtures/dup.law: two laws are named twice, so none of its laws run")
-		 ("flaky" "check/laws/fixtures/flaky.l" 256 "law first: INCONCLUSIVE status=7 input=(A)" "law again: INCONCLUSIVE status=-1 input=(stand-in)"))
+		 ("flaky" "check/laws/fixtures/flaky.l" 256 "law first: INCONCLUSIVE status=7 input=(A)" "law again: INCONCLUSIVE status=-1 input=(stand-in)")
+		 ;; a per-case let is evaluated once per case, binds later domains, shrinks by recomputing (n=3 fails first; n=2 is the least)
+		 ("let" "check/laws/fixtures/let.l" 256 "law let_once: PROVED 3" "law let_domain: PROVED 3" "law let_shrink: REFUTED n=2 d=4 seed=44" "law let_test: TESTED 100")
+		 ;; shrinking stays in each domain, and a let after the shrunk value is computed only from values in their domains
+		 ("domain-shrink" "check/laws/fixtures/domain-shrink.l" 256 "law member_only: REFUTED w=2 seed=42"
+		  "law member_pair: REFUTED w=8 lw=1 seed=43" "law member_let: REFUTED w=2 r=1 seed=44")
+		 ;; a range in a list, A .. B, is the whole numbers A to B (numerals 1 .. 4 and 10: five values)
+		 ("range" "" 0 "law range_values: PROVED 5")
+		 ;; a record's fields, a list literal and = by value; a record printed readably in a refutation
+		 ("fields" "check/laws/fixtures/fields.l" 256 "law fields_read: TESTED 100" "law record_value: TESTED 100" "law record_equal: TESTED 100"
+		  "law shown: REFUTED n=0 r={a: 0, b: (0 0)} seed=45")
+		 ;; a rule's [c | s] is a Maru list of numbers, and exhaustion over it reaches every list up to the size (1: 2 + 4, 2: 2 + 4 + 8)
+		 ("lists" "check/laws/fixtures/lists.l" 0 "law lists_size_one: PROVED 6" "law lists_size_two: PROVED 14" "law lists_test: TESTED 100")
+		 ;; the runtime's layout claim, as schedule.law states it: 2 widths x 2 worker counts x 14 schedules
+		 ("schedule" "check/laws/fixtures/schedule.l" 0 "law layout_contracts: PROVED 56"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
+  ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
+  (list-do c '(("field-error" "no field c in the record, which has a, b") ("field-plain" "a is read from a value that is not a record"))
+    (let ((r (law-fixture (car c) "check/laws/fixtures/fields.l")))
+      (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/" (car c) ".out")) (concat-strings "E_FIELD: " (cadr c)))))))
   ;; a crashed reference is no verdict, in a claim or a condition; a claim that exits leaves its law's name last
   (let ((r (law-fixture "inconclusive" "check/laws/fixtures/inconclusive.l")))
     (unit-assert (and (= 256 (car r)) (starts (cadr r) "law answers: INCONCLUSIVE status=139 input=(")
@@ -952,10 +970,25 @@
 			  "law breaks_keep_words: PROVED 234" "law breaks_fit: PROVED 234" "law breaks_maximal: PROVED 234"
 			  "law points_placed: PROVED 234" "law layout_deterministic: PROVED 468")))))
 
+;; the runtime's contracts over PCT schedules (check/laws/runtime-schedules.law): the batch driver, its threads taking turns
+;; by a schedule the law generates, keeps them (no buffer dropped, no process queued while running or after it was freed,
+;; every block back, no deadlock) and gives one worker's output. TESTED, as a schedule is one interleaving of very many
+(check "nile_schedules"
+  (let* ((gen (concat-strings tmp "/nile-sched-gen"))
+	 (_   (run "nile-sched-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh text_layout $R/nile/examples/text-layout.nl")))
+	 (bin (nile-build "nile-sched-runtime" (list (concat-strings gen "/text_layout.k") (concat-strings nile-dir "test/law-runtime.k")) ""))
+	 (dir (concat-strings tmp "/nile-sched"))
+	 (_   (run "nile-sched-dir" (concat-strings "mkdir -p " dir)))
+	 (out (law-file-holds "nile_schedules" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
+			      "check/laws/runtime.l" "check/laws/runtime-schedules.law")))
+    (unit-assert out)
+    (unit-assert (equal (and out (lines (contents-of-file-named out)))
+			'("law layout_contracts: TESTED 1000" "law found_glyphs: PROVED 2" "law found_numbers: PROVED 1"
+			  "law builtin_contracts: TESTED 1000")))))
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")
-	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
+	(interface (words "nile_startup nile_shutdown nile_sync nile_status nile_error nile_dropped nile_requeued nile_unreturned nile_schedule nile_schedule_pct nile_deadlocks nile_handoffs nile_print_live nile_print_leaks nile_Process_pipe nile_Process_feed nile_Process_gate nile_Process_pipeline nile_Process_launch nile_Process nile_Process_memory nile_Process_advance_output nile_Process_advance_input nile_Process_prefix_input nile_Process_return nile_Process_reroute nile_PassThrough nile_Capture nile_Reverse nile_SortBy nile_DupZip nile_DupCat nile_Funnel nile_Funnel_pour")))
     (unit-assert (equal (run "externs" (concat-strings "grep -o '(extern [A-Za-z_0-9]*)' " n))
 			(map (lambda (name) (concat-strings "(extern " name ")")) interface)))
     ;; The link half: interface.k, with the runtime, asks dlsym for each call. Every call of

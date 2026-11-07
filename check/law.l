@@ -14,6 +14,9 @@
 (require "law-compile.l")
 (require "grammar-gen.l")
 
+(define *llets* ())		; the let forms the claim and conditions can reach, for VACUOUS
+(define law-recompute)		; forward: the shrinker recomputes lets, defined with the records below
+(define law-show)			; forward: a refutation prints a record, defined with the records below
 (define accept 'accept)		; a reference's verdicts, as claims name them
 (define reject 'reject)
 (define *law-config* ())	; the file's defaults
@@ -105,7 +108,8 @@
       (list v 'grammar d rule label))))
 (define-function law-binding (b)
   (let ((v (car b)) (d (cadr b)))
-    (cond ((and (pair? d) (= 'grammar (car d)))	(law-grammar v (cadr d) (caddr d)))
+    (cond ((and (pair? d) (= 'let (car d)))	(list v 'let (cdr d)))
+	  ((and (pair? d) (= 'grammar (car d)))	(law-grammar v (cadr d) (caddr d)))
 	  ((and (symbol? d) (assq d *law-sets*))	(list v 'set (cdr (assq d *law-sets*))))
 	  ((symbol? d)					(list v 'goal (list d v)))
 	  ((= v (rules-last d))				(list v 'goal d))
@@ -121,9 +125,10 @@
   (cond ((= 'set (cadr b))	(list (law-pick (caddr b))))
 	((= 'grammar (cadr b))	(let ((s (grammar-regenerate (caddr b) (cadddr b) size))) (and s (list s))))
 	(else			(law-gen (law-subst (caddr b) vars vals) size))))
-(define-function law-draw-value (b vars vals)	; the law's own draws, at its size, are counted
-  (if (= 'grammar (cadr b)) (let ((s (grammar-sentence (caddr b) (cadddr b) *ls*))) (and s (list s)))
-    (law-draw-at b vars vals *ls*)))
+(define-function law-draw-value (b vars vals)	; the law's own draws, at its size, are counted; a let is its value
+  (cond ((= 'let (cadr b))	(list (apply (caddr b) vals)))
+	((= 'grammar (cadr b))	(let ((s (grammar-sentence (caddr b) (cadddr b) *ls*))) (and s (list s))))
+	(else			(law-draw-at b vars vals *ls*))))
 (define-function law-draw ()		; every variable's value, earlier ones substituted into later domains
   (let ((vars ()) (vals ()) (bs *lb*) (ok 1))
     (while (and ok bs)
@@ -135,13 +140,15 @@
 (define-function law-ground? (x) (if (pair? x) (and (law-ground? (car x)) (law-ground? (cdr x))) (not (lv? x))))
 (define-function law-values (b vars vals)	; every value of a domain
   (let ((p (assq (car b) *law-focus*)) (out ()))
-    (cond ((not p)		(if (= 'set (cadr b)) (caddr b) (rules-enumerate *law-rules* (law-subst (caddr b) vars vals) *ls*)))
+    (cond ((= 'let (cadr b))	(list (apply (caddr b) vals)))	; a let is one value, from the values before it
+	  ((not p)		(if (= 'set (cadr b)) (caddr b) (rules-enumerate *law-rules* (law-subst (caddr b) vars vals) *ls*)))
 	  ((= 'set (cadr b))	(list-do m (caddr b) (and (unify (cdr p) m *rules-empty*) (push out m))) (list-reverse! out))
 	  (else			(list-do v (rules-enumerate *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) (cdr p)) *ls*)
 				  (and (law-ground? v) (push out v)))
 				(list-reverse! out)))))
 (define-function law-member? (b vars vals v)
-  (cond ((= 'set (cadr b)) (member? v (caddr b)))
+  (cond ((= 'let (cadr b))	1)	; a let's value is its function's, so it is always a member
+	((= 'set (cadr b)) (member? v (caddr b)))
 	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
 	(else (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*))))
 
@@ -160,7 +167,8 @@
     (list-reverse! out)))
 (define-function law-candidates (b vars vals v size)
   (let ((out ()))
-    (cond ((law-number? v)		(list-do n *rules-numbers* (and (< (law-abs n) (law-abs v)) (push out (cons n size)))))
+    (cond ((= 'let (cadr b))	())
+	  ((law-number? v)		(list-do n *rules-numbers* (and (< (law-abs n) (law-abs v)) (push out (cons n size)))))
 	  ((= 'set (cadr b))	(let ((l (caddr b))) (while (and l (not (= v (car l)))) (push out (cons (car l) size)) (set l (cdr l)))))
 	  (else			(set out (law-regen b vars vals size))))
     out))
@@ -173,8 +181,8 @@
 (define-function law-smaller (i vals sizes)	; (vals . sizes) with value i smaller, still failing, or ()
   (let ((out ()) (pre (law-take vals i)))
     (list-do c (law-candidates (law-nth *lb* i) (law-take *lvars* i) pre (law-nth vals i) (law-nth sizes i))
-      (or out (let ((vs (law-put vals i (car c))))
-		(and (law-valid? vs i) (= 'fail (law-try vs)) (set out (cons vs (law-put sizes i (cdr c))))))))
+      (or out (let ((vs (law-recompute (law-put vals i (car c)) i)))	; the lets after i follow the smaller value
+		(and vs (law-valid? vs i) (= 'fail (law-try vs)) (set out (cons vs (law-put sizes i (cdr c))))))))
     out))
 (define-function law-shrink (vals)
   (let ((sizes (map (lambda (b) *ls*) *lb*)) (more 1))
@@ -229,7 +237,7 @@
 	 (list-do u *law-under* (and (or (= u (car (caddr b))) (rules-reaches? (car (caddr b)) u *law-rules* ())) (set y 1))))
     y))
 (define-function law-names-under? ()
-  (or (law-names? *lclaim* *law-under*)
+  (or (law-names? (cons *lclaim* *llets*) *law-under*)
       (let ((y ()) (bs *lb*))
 	(list-do n *lnames* (and (law-names? *lclaim* (list n)) (law-uses? (car bs)) (set y 1)) (set bs (cdr bs)))
 	y)))
@@ -268,7 +276,7 @@
   (let ((k (car r)))
     (print k)
     (cond ((= k 'REFUTED)	(let ((ns *lnames*) (bs *lb*))	; a generated sentence is quoted, as it may hold a newline
-				  (list-do v (cadr r) (print " " (car ns) "=") (if (= 'grammar (cadar bs)) (dump v) (print (template-render v))) (set ns (cdr ns)) (set bs (cdr bs)))
+				  (list-do v (cadr r) (print " " (car ns) "=") (if (= 'grammar (cadar bs)) (dump v) (law-show v)) (set ns (cdr ns)) (set bs (cdr bs)))
 				  (print " seed=" *lseed*)))
 	  ((= k 'STARVED)	(print " " (cadr r) " of " (caddr r)))
 	  ((= k 'INCONCLUSIVE)	(print " status=" (cadr r) " input=") (dump (cddr r)))
@@ -277,6 +285,54 @@
     (println "")
     (or (law-pass? r) (set *law-failed* 1))))
 
+;; a let's value is a function of the values before it, its names the lambda's parameters
+(define-function law-let-fn (i form)
+  (let ((saved *lnames*))
+    (set *lnames* (law-take *lnames* i))
+    (let ((f (eval `(lambda ,*lnames* ,(law-form form)))))
+      (set *lnames* saved)
+      f)))
+(define-function law-compile-lets (bs)
+  (let ((out ()) (i 0))
+    (set *llets* ())
+    (list-do b bs
+      (set out (concat-list out (list (if (= 'let (cadr b))
+					  (let () (set *llets* (concat-list *llets* (list (caddr b)))) (list (car b) 'let (law-let-fn i (caddr b))))
+					b))))
+      (set i (+ i 1)))
+    out))
+;; the lets after position i, each from the values before it; () as soon as a value from i on is out of its domain, so
+;; no let is computed from one (a shrunk worker count of 0 reached the support function, which ran a driver with it)
+(define-function law-recompute (vals i)
+  (let ((vs vals) (j 0) (ok 1))
+    (list-do b *lb*
+      (and ok (<= i j)
+	   (if (= 'let (cadr b))
+	       (and (< i j) (set vs (law-put vs j (apply (caddr b) (law-take vs j)))))
+	       (set ok (law-member? b (law-take *lvars* j) (law-take vs j) (law-nth vs j)))))
+      (set j (+ j 1)))
+    (and ok vs)))
+;; a record: (law-record "name" value ...) answers (law-record (name . value) ...), tagged so that = compares it by value
+(define-function law-pairs (args) (if args (cons (cons (car args) (cadr args)) (law-pairs (cddr args))) ()))
+(define law-record (lambda args (cons 'law-record (law-pairs args))))
+(define-function law-record? (x) (and (pair? x) (= 'law-record (car x))))
+(define-function law-assoc (name pairs) (if pairs (if (equal name (caar pairs)) (car pairs) (law-assoc name (cdr pairs))) ()))
+(define-function law-field-names (pairs)
+  (if pairs (if (cdr pairs) (concat-strings (caar pairs) ", " (law-field-names (cdr pairs))) (caar pairs)) "nothing"))
+(define-function law-field (r name)	; r.name, E_FIELD (stops the run) when r is no record or has no such field
+  (if (law-record? r)
+      (let ((b (law-assoc name (cdr r))))
+	(or b (error "E_FIELD: no field " name " in the record, which has " (law-field-names (cdr r))))
+	(cdr b))
+    (error "E_FIELD: " name " is read from a value that is not a record")))
+(define-function law-show (v)	; a record as {name: value, ...}, anything else as print gives it
+  (if (law-record? v)
+      (let ((first 1))
+	(print "{")
+	(list-do f (cdr v) (or first (print ", ")) (set first ()) (print (car f) ": ") (law-show (cdr f)))
+	(print "}"))
+    (print (template-render v))))
+
 (define-function law-setup (it seed method size)	; it: (law name bindings conditions claim method size); *law-err* if it can't run
   (set *law-err* ())
   (set *lb* (map law-binding (caddr it)))
@@ -284,7 +340,7 @@
        (list-do b *lb* (and (= 'grammar (cadr b)) (set *law-err* (list 'E_EXHAUST (concat-string (symbol->string (car (cddddr b))) " is generated, not enumerated; use by test"))))))
   (or *law-err*
       (let ()
-	(set *lvars* (map car *lb*)) (set *lnames* (map law-plain *lvars*))
+	(set *lvars* (map car *lb*)) (set *lnames* (map law-plain *lvars*)) (set *lb* (law-compile-lets *lb*))
 	(set *lname* (cadr it)) (set *lclaim* (car (cddddr it))) (set *lseed* seed)
 	(set *lmethod* method) (set *ls* (or size (law-setting 'size)))
 	(set *lc* (eval `(lambda ,*lnames* (and 1 ,@(map (lambda (c) (list 'law-truth ''condition (law-form c))) (cadddr it))))))

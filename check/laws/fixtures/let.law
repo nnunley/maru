@@ -1,0 +1,13 @@
+-- a per-case let: evaluated once per case, usable in later bindings and in the claim, and not a domain
+under test: twice
+let numerals = [3, 0, 2]
+rule small_n: number(n) => small(n)
+fact pairs(0, 0)
+fact pairs(4, 4)
+fact pairs(6, 6)
+law let_once: all n: small(n), let d = twice(n). d = n + n by exhaustion
+-- a later binding reads the let's value: pairs(d, m) draws m for d only
+law let_domain: all n: small(n), let d = twice(n), m: pairs(d, m). m = n + n by exhaustion
+-- the first failing case is n = 3 (d = 6); shrinking n to 2 must recompute d (4), not keep 6
+law let_shrink: all n: small(n), let d = twice(n). d < 3 by exhaustion
+law let_test: all n: small(n), let d = twice(n). d = n + n

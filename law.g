@@ -24,16 +24,22 @@ arg		= pair | arg0 ;
 arg0		= list | template | expression ;
 pair		= identifier:a ":"_ arg:b					-> `(law-pair ,a ,b) ;
 args		= arg:a (","_ arg)*:b						-> `(,a ,@b) ;
-list		= "["_ args?:e ( "|"_ arg )?:r "]"_				-> `(law-list ,(car e) ,@r) ;
+list		= "["_ elems?:e ( "|"_ arg )?:r "]"_				-> `(law-list ,(car e) ,@r) ;
+elems		= elem:a (","_ elem)*:b						-> `(,a ,@b) ;
+elem		= expression:a ".."_ expression:b				-> `(law-range ,a ,b)	# whole numbers a to b
+		| arg ;
 
 tpart		= "{{" | "}}" | "{" idpart "}" | !"`" !"{" !"}" !eol . ;
 template	= idpart:l "`" tpart*@$:t "`"_					-> `(template ,l ,t) ;
 primary		= template						# a claim compares templates
+		| field							# r.name reads a record's field
+		| list							# [a, b | t], a list in a claim
 		| identifier
 		| number
 		| string
 		| "("_ xexpression:e ")"_					-> e
 		;
+field		= idpart:a "." idpart:f _				-> `(law-field ,a ,(symbol->string f)) ;
 
 goal		= identifier:n "("_ args?:a ")"_				-> `(,n ,@(car a))
 		| identifier:v ":"_ arg:t "in" keyword arg:e			-> `(in ,v ,t ,e)
@@ -59,7 +65,8 @@ item		= "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		;
 
 bindings	= binding:a (","_ binding)*:b					-> `(,a ,@b) ;
-binding		= names:n ":"_ domain:d						-> `(law-bind ,n ,d)
+binding		= "let" keyword xidentifier:n "="_ xarg:v			-> `(law-let ,n ,v)
+		| names:n ":"_ domain:d						-> `(law-bind ,n ,d)
 		| expression:e							-> `(law-bind () ,e)
 		;
 domain		= goal

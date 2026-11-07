@@ -1,0 +1,66 @@
+-- The Nile runtime's contracts over schedules. The batch driver (check/laws/runtime.l's scheduled) runs one pipeline with
+-- its threads taking turns by a PCT schedule (Burckhardt et al., ASPLOS 2010) that these rules generate in full: a priority
+-- for each thread, and the turns at which the running thread's priority drops below every other's. A run keeps the
+-- runtime's contracts when it drops no buffer with data for want of a consumer, queues no process while it runs or after it
+-- was freed, returns every block to a heap by the end of the sync, and never runs out of runnable threads; and it gives the
+-- output one worker gives.
+-- These laws are TESTED, never PROVED: a schedule is one interleaving of very many, so passing says no contract broke on the
+-- schedules drawn, as any quickcheck run does. Enumerating every schedule within two preemptions, or two delays of a round
+-- robin, found none of the races these schedules find (they need a long run, then one switch at the right lock).
+-- A refutation names its schedule, runs again the same way, and shrinks to earlier change points.
+-- With the races put back one at a time (the funnel's wakeup, a kernel's input position, a double queue), 1000 trials
+-- refute the first two; the double queue showed in 2 of 9000 schedules of dupzip alone, so the schedule that exposes each
+-- is kept below as a value, and checked by exhaustion.
+under test: scheduled, schedule, priorities, changes
+-- priorities and turns alike: every number to 400, as PCT draws its change points, then a few later turns (a run takes 300
+-- to 1700); a sparser set missed races these find
+let numerals = [0 .. 400, 610, 987, 1597]
+defaults trials = 1000, size = 4
+
+-- PCT's shape: a priority for every thread (unlisted ones tie at 0, and a tie goes to the lowest slot, collapsing schedules),
+-- and three change points (short or empty lists made most draws one thread doing all the work)
+rule prio_three:   number(a), number(b), number(c)   => priorities([a, b, c])
+rule prio_more:    number(p), priorities(ps)         => priorities([p | ps])
+rule change_three: number(a), number(b), number(c)   => changes([a, b, c])
+rule pct:          priorities(p), changes(c)         => schedule(pct(p, c))
+
+fact sched_workers(2)
+fact sched_workers(4)
+fact sched_workers(8)
+fact layout_kind("words")
+fact layout_kind("breaks")
+fact layout_kind("points")
+fact layout_width("words", 12)
+fact layout_width("breaks", 12)
+fact layout_width("points", 5)
+fact builtin_kind("pass")
+fact builtin_kind("reverse")
+fact builtin_kind("sort")
+fact builtin_kind("dupcat")
+fact builtin_kind("dupzip")
+
+-- text-layout.nl's stages, over 245 glyphs (two buffers crossed): MakeWords, InsertLineBreaks and LayoutText (a DupZip and a chain)
+law layout_contracts: all k: layout_kind(k), lw: layout_width(k, lw), w: sched_workers(w), s: schedule(s),
+                          let r = scheduled(k, w, lw, rt_glyphs(245, 7), s).
+    r.contracts = [0, 0, 0, 0] && r.output = layout(k, 1, lw, rt_glyphs(245, 7))
+
+-- The schedules that exposed each race fixed on 2026-11-06, kept as values so each race stays fixed: with it put back, the
+-- run on its schedule breaks a contract or the output (a kernel's input position: words at seed 307; the funnel's lost
+-- wakeup: words at 143, a deadlock; the double queue: dupzip over 1 .. 300 at 497, a process queued twice and 5 blocks
+-- out). PROVED here covers just these schedules, which is what it says. A change to the runtime can move which interleaving
+-- a seed gives, so a race put back should still be found on its schedule; check that when the scheduler or the runtime
+-- changes (each mutant was found anew on 2026-11-06, after the last fix).
+fact found("words", 2, 307)
+fact found("words", 2, 143)
+fact found("dupzip", 2, 497)
+law found_glyphs: all k: layout_kind(k), lw: layout_width(k, lw), w: sched_workers(w), seed: found(k, w, seed),
+                      let r = scheduled(k, w, lw, rt_glyphs(245, 7), seed).
+    r.contracts = [0, 0, 0, 0] && r.output = layout(k, 1, lw, rt_glyphs(245, 7)) by exhaustion
+law found_numbers: all k: builtin_kind(k), w: sched_workers(w), seed: found(k, w, seed),
+                       let r = scheduled(k, w, 10, [1 .. 300], seed).
+    r.contracts = [0, 0, 0, 0] && r.output = run_on(k, 1, [1 .. 300]) by exhaustion
+
+-- the built-ins, over 123 pairs (two buffers crossed)
+law builtin_contracts: all k: builtin_kind(k), w: sched_workers(w), s: schedule(s),
+                           let r = scheduled(k, w, 10, rt_pairs(123, 7), s).
+    r.contracts = [0, 0, 0, 0] && r.output = run_on(k, 1, rt_pairs(123, 7))

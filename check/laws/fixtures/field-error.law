@@ -1,0 +1,4 @@
+-- a field the record doesn't have is an error naming it
+under test: rec
+let numerals = [0]
+law no_field: all n: number, let r = rec(n). r.c = n

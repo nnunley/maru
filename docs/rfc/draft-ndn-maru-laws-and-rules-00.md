@@ -93,7 +93,7 @@ RECORD Rule:
 
 RECORD Law:
     name        : Symbol
-    variables   : List(Binding)     -- each variable and its domain
+    variables   : List(Binding)     -- each variable and its domain, or a per-case let and its value
     conditions  : List(Expression)  -- preconditions on the variables
     claim       : Expression        -- what must hold
     size        : Integer = 3       -- the bound on every rule domain
@@ -195,6 +195,46 @@ A value is a constant (`Number`, `"+"`, `2`), a list `[a, b]`, a pair
 Name = A | B | C` declares a finite set, which `EXHAUST` enumerates and
 `TEST` samples uniformly. A law file names what it tests in one `under
 test:` line; those are the names the vacuity and mutant checks replace.
+
+### Lists
+
+A list `[a, b | t]` is a term in a rule and in a claim or condition. A rule can
+conclude a list term from its premises: `schedule([c | s])` from `schedule(s)`,
+with `schedule([c])` from `number(c)` as its base. No new support is needed for
+this: a rule's list term is a cons term the engine already unifies, and the
+value a support function receives is the Maru list those cells make, its
+elements in order and ending in nil (`lists.law` checks that its argument is
+such a list of numbers). In a claim, `[a, b | t]` builds that list from the
+values of `a`, `b` and `t`, and `[]` is nil. [R-list-terms]
+
+```maru-check @R-list-terms
+law_rules
+```
+
+The size bounds rule nesting, and a list's length follows from it. A recursive
+rule (one whose premise reaches its own relation) applies only at size one or
+more, and each application spends one unit of size; a rule with no recursive
+premise applies at size 0. So a list that takes k applications of the recursive
+rule is reached at size k - 1 and no more. For `schedule` above, a list of
+length L is reached at size L - 1, and `by exhaustion size n` over k numerals
+enumerates every list of length 1 to n + 1: k + k^2 + ... + k^(n+1) of them,
+each once. `PROVED n` then says every such list passed; it says nothing about
+longer lists. `lists.law` counts this (2 numerals: 6 at size 1, 14 at size 2).
+[R-list-bound]
+
+```maru-check @R-list-bound
+law_rules
+```
+
+An element of a list MAY be a range, `A .. B`: the whole numbers from A to B in
+order, put in place where the range stands, so `let numerals = [0 .. 400, 610]`
+is 402 numerals written on one readable line. A range's ends MUST be whole
+numbers written as constants; anything else is `E_RANGE`, which stops the file.
+`range.law` checks `[1 .. 4, 10]` is five values. [R-list-range]
+
+```maru-check @R-list-range
+law_rules
+```
 
 ### Higher-order rules
 
@@ -328,6 +368,43 @@ without an `under test:` line is rejected (`E_NO_UNDER_TEST`).
 law_rules
 ```
 
+### Per-case lets
+
+A binding `let NAME = ARG` among a law's bindings is evaluated once per case:
+its value is ARG's value with the names bound before it, and the later
+bindings, the conditions and the claim read it as `NAME`. It is not a domain,
+so it adds no cases and the counts of `TESTED` and `PROVED` are those of the
+domains alone. A let reads only the names before it; a later name is an
+error that stops the run. A refutation prints a let's value with the others
+(`NAME=v`). Shrinking recomputes every let after a value it changed, from the
+values before it, so a refutation's values agree with one another. A later
+binding that names a let (a goal's argument) gets the let's value.
+[R-per-case-let]
+
+```maru-check @R-per-case-let
+law_rules
+```
+
+### Records and fields
+
+A support function or reference answers a record with `law-record`, which
+`check/law.l` defines: `(law-record "name" value "name" value ...)`. Its Maru
+representation is `(law-record (name . value) ...)`, the tag first and the
+names strings. `=` is Maru's structural `equal`, so two records are equal when
+their fields are, and a refutation prints one as `{name: value, ...}`. A claim
+or condition reads a field as `r.name`, one level, from a name bound by a let or
+a domain. [R-record-fields]
+
+```maru-check @R-record-fields
+law_rules
+```
+
+A field the record does not have, or a field read from a value that is not a
+record, is `E_FIELD`: the run stops and names the field and the record's fields.
+A field in a rule or domain is `E_FIELD` when the file is read. Postfix indexing
+(`r[0]`) is not in `cexpr.g`, whose only postfix form is a call, so it is left
+out; a list is read by a support function instead, and there is no index error.
+
 ### References
 
 A reference is declared with `reference name(args)` and is a Maru
@@ -420,6 +497,8 @@ the file, so adding a law does not change the values another draws.
 | `E_DUPLICATE` | two laws in a file have one name | Reject the file; none of its laws run, as adequacy names laws |
 | `E_CLAIM` | a claim is `nile_accepts(e, t)`, not `nile_accepts(e, t) = accept` | Reject the law, naming it; the next law runs |
 | `E_ADEQUATE` | an adequacy law names a law that does not exist, or a relation with no mutants (no rule concludes it) | Reject the adequacy law; the next law runs |
+| `E_FIELD` | `r.c` where `r` is a record with no field `c`, or a value that is not a record; a field in a rule or domain | The run stops with the message, naming the field and the record's fields; a field in a rule or domain stops the file when it is read |
+| `E_RANGE` | a range `A .. B` whose ends are not whole-number constants | The file stops when it is read, naming the ends |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
 ## Formal Grammar
@@ -443,15 +522,18 @@ schema      = %s"for" name %s"in" arg *( "|" arg ) ":" item
 premises    = goal *( "," goal )
 goal        = name "(" [ arg *( "," arg ) ] ")" / name ":" arg %s"in" arg
 arg         = list / pair / template / expression
-list        = "[" [ arg *( "," arg ) [ "|" arg ] ] "]"
+list        = "[" [ elem *( "," elem ) [ "|" arg ] ] "]"
+elem        = range / arg
+range       = expression ".." expression
 pair        = name ":" arg
 template    = name "`" *( text / hole ) "`"
 hole        = "{" name "}"
+field       = name "." name
 defaults    = %s"defaults" setting *( "," setting )
 setting     = name "=" number
 law         = %s"law" name ":" %s"all" binding *( "," binding ) "." claim [ method ]
 law         =/ %s"law" name ":" %s"mutants" %s"of" name %s"by" %s"exhaustion" [ %s"size" number ] "." name *( "," name )
-binding     = name *( "," name ) ":" domain / expression
+binding     = name *( "," name ) ":" domain / "let" name "=" arg / expression
 domain      = goal / name "." name / name
 claim       = expression
 method      = %s"by" ( %s"test" / %s"exhaustion" ) [ %s"size" number ]

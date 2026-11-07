@@ -31,11 +31,25 @@
 (define-function law-var (x) (string->symbol (concat-string "$" (symbol->string x))))
 (define law-conv)
 (define template-holes)
+;; a list's elements with each range A .. B (constant whole numbers) put in place as the numbers A to B
+(define-function law-range? (x) (and (pair? x) (= 'law-range (car x))))
+(define-function law-ranges (elems)
+  (cond ((not elems) ())
+	((law-range? (car elems))
+	 (let ((a (cadr (car elems))) (b (caddr (car elems))) (out ()))
+	   (or (and (long? a) (long? b)) (error "E_RANGE: a range's ends are whole numbers, not " a " and " b))
+	   (while (<= a b) (push out a) (set a (+ a 1)))
+	   (concat-list (list-reverse! out) (law-ranges (cdr elems)))))
+	(else (cons (car elems) (law-ranges (cdr elems))))))
 ;; in a rule a template is a term, (template lang text ((hole . $hole)...)), so it unifies
 (define-function law-template-term (x)
   (list 'template (cadr x) (caddr x) (map (lambda (n) (cons n (law-conv n 1))) (template-holes (caddr x)))))
 (define-function law-list-from (elems tail var)
   (if elems (cons (law-conv (car elems) var) (law-list-from (cdr elems) tail var)) (and tail (law-conv (car tail) var))))
+;; a list literal in a claim or condition is a form that builds the list: its elements are claim values, its tail a list
+(define-function law-list-form (elems tail)
+  (if elems (list 'cons (law-conv (car elems) 'claim) (law-list-form (cdr elems) tail))
+    (if tail (law-conv (car tail) 'claim) (list 'quote ()))))
 (define-function law-conv (x var)	; var: lower-case names become variables
   (cond
     ((symbol? x)		(let ((l (assq x *law-lets*)))
@@ -44,7 +58,9 @@
 					(else		x))))
     ((not (pair? x))		x)
     ((= 'law-pair (car x))	(cons (law-conv (cadr x) var) (law-conv (caddr x) var)))
-    ((= 'law-list (car x))	(law-list-from (cadr x) (cddr x) var))
+    ((and (= var 1) (= 'law-field (car x)))	(error "E_FIELD: " (caddr x) " is read in a rule or domain; a field is read in a claim or condition"))
+    ((= 'law-list (car x))	(let ((elems (law-ranges (cadr x))))
+				  (if (= var 'claim) (law-list-form elems (cddr x)) (law-list-from elems (cddr x) var))))
     ((= 'template (car x))	(if (= var 1) (law-template-term x) x))
     (else			(cons (car x) (map (lambda (a) (law-conv a var)) (cdr x))))))
 (define-function law-goal (g scope)	; a goal's relation is a variable only if a parameter or schema variable
@@ -54,11 +70,13 @@
   (cond ((symbol? d)		(law-conv d ()))
 	((= 'law-grammar (car d))	(cons 'grammar (cdr d)))
 	(else			(law-goal d ()))))
-(define-function law-bindings (raw)	; (law-bind (names) domain) -> (name domain)...
+(define-function law-bindings (raw)	; (law-bind (names) domain) -> (name domain)...; (law-let n v) -> (name (let . form))
   (let ((out ()))
     (list-do b raw
-      (list-do n (cadr b)
-	(set out (concat-list out (list (list (law-var n) (law-domain (caddr b))))))))
+      (if (= 'law-let (car b))
+	  (set out (concat-list out (list (list (law-var (cadr b)) (cons 'let (law-conv (caddr b) 'claim))))))
+	(list-do n (cadr b)
+	  (set out (concat-list out (list (list (law-var n) (law-domain (caddr b)))))))))
     out))
 (define-function law-conditions (raw)
   (let ((out ()))

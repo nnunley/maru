@@ -1,0 +1,16 @@
+-- shrinking keeps a value in its domain: a fact domain's value shrinks only to another of its facts, never to a number
+-- the facts don't hold (a driver given 0 workers fails for that, not for what the law says)
+under test: workers
+let numerals = [0, 1, 2, 3, 4, 5, 8]
+fact workers(2)
+fact workers(4)
+fact workers(8)
+fact width(2, 3)
+fact width(4, 5)
+fact width(8, 1)
+-- fails for every member, so the shrunk value is the least member, 2
+law member_only: all w: workers(w). w = 1
+-- a dependent fact domain: w's width shrinks with w, and both stay facts
+law member_pair: all w: workers(w), lw: width(w, lw). lw = 0
+-- a let after a shrinking value is computed only from values in their domains: checked stops the run on any other
+law member_let: all w: workers(w), let r = checked(w). r = 0

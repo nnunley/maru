@@ -176,6 +176,15 @@
 						  "unsatisfiable"))
   (expect "nim from 4, Black at its best" (equal (last (run-text (concat-string nim "make Game G 4 White. set-opt two-player-game [ White, Black ]. White satisfy win.")))
 						  "satisfied by: [ White take1 , Black take2 , White take1 ]"))
+  ;; time-limit (ours): satisfy looks this many steps ahead, 16 unless set, for this program only
+  (let ((count "create Counter n. make Counter K 0. action Counter up consequence its n = its n + 1.
+		goal Counter twenty try its n = 20. "))
+    (expect "past the default limit" (equal (last (run-text (concat-string count "K satisfy twenty.")))
+					    "not satisfied within the time limit"))
+    (expect "a time limit reaches it" (member? "satisfied at time: 20"
+					       (run-text (concat-string count "set-opt time-limit 25. K satisfy twenty."))))
+    (expect "the limit is the program's own" (equal (last (run-text (concat-string count "K satisfy twenty.")))
+						    "not satisfied within the time limit")))
   ;; merge-worlds (ours, G12): a state reached before is not searched again, so Hanoi3 looks at 8
   ;; worlds at its last level instead of 1086, and Hanoi4 (15 moves) is in reach; plans stay shortest
   (let ((lines (hanoi "check/john/hanoi3.john" '((set-opt merge-worlds yes)))))

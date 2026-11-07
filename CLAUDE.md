@@ -438,7 +438,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   else `REFUTED k of n survive` (`fixtures/adequacy.law`). `let numerals = [1, 2]`
   replaces `number`'s numerals (`fixtures/numerals.law`). The mutant focus follows where a law
   uses the relation (`reach.law`), and a reference's answers are kept by name and text
-  (`refs.law`). `.law` files count toward `lines`.
+  (`refs.law`). A per-case `let NAME = EXPR` binding is evaluated once per case, is no domain, and shrinks by recomputing (`let.law`); `law-record` answers a record and `r.name` reads its field, `=` by value, E_FIELD otherwise (`fields.law`, `field-error.law`, `field-plain.law`); list terms `[c | s]` in rules and claims, and by exhaustion's bound on lists: size n reaches lengths 1 to n + 1 (`lists.law`, `schedule.law`); a range `A .. B` in a list is the whole numbers A to B, `E_RANGE` for ends that aren't (`range.law`). Shrinking keeps each value in its domain, and a let after a shrunk value is computed only from values in their domains (`domain-shrink.law`: a driver once got 0 workers). `.law` files count toward `lines`.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
   well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
   are sound (Nile's own resolver and type checker, forked per question, accept what they
@@ -543,6 +543,22 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   that breaks before every word `breaks_maximal`, MakeWords without its width split `words_partition`, and PlaceWords
   without its line feed or its return to the margin `points_placed`. The driver exits 2 on a missing or unknown mode or a
   worker count outside 1 to 64. `make check-sweep` runs the file once on each evaluator.
+- `nile_schedules` (`check/laws/runtime-schedules.law`): the runtime's contracts over schedules. The batch driver takes a
+  schedule as its fifth argument: a number seeds `nile-sync.k`'s scheduler, under which the threads take turns (one at a
+  time; at every `nile_lock` the runnable thread of highest priority runs, a thread's priority dropping below every other's
+  at change points: PCT, Burckhardt et al.), and `pct:P0,P1,.../C1,C2,...` gives that schedule in full. A run keeps the
+  contracts when no buffer with data is dropped for want of a consumer, no process is queued while it runs or after it was
+  freed, every block is back in a heap after the sync and no schedule runs out of runnable threads (`nile_dropped`,
+  `nile_requeued`, `nile_unreturned`, `nile_deadlocks`; the driver prints them last, and lists the live processes when
+  blocks stay out). The law generates the PCT schedule term (three or more priorities, three change points up to 400) and
+  claims, in the law file, that the contracts are all 0 and the output is one worker's, for text-layout's three stages and
+  the built-ins: TESTED 1000 each, never PROVED, as a schedule is one interleaving of very many. With the races fixed on
+  2026-11-06 put back, 1000 trials refute the funnel's lost wakeup and a kernel saving its input position in a buffer handed
+  in since; the double queue showed in 2 of 9000 seeded dupzip schedules. So the schedule that exposed each race is kept in
+  the law file as a value (`found`: words at seeds 307 and 143, dupzip over `1 .. 300` at 497) and checked by exhaustion,
+  PROVED for just those schedules; each race put back fails its own. A change to the scheduler or runtime can move what a
+  seed gives, so recheck that each race is still found then. Enumerating every schedule within two preemptions, or two
+  delays of a round robin, found none of them.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
 - `lines`: the source line count equals the sum of `check/lines`. Any change

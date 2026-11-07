@@ -198,3 +198,40 @@
   (let ((out ()))
     (list-do x xs (set out (rt_insert x out)))
     out))
+
+;;; Schedules (check/laws/runtime-schedules.law). A schedule is the term the law's rules generate, pct(priorities, changes):
+;;; the driver's threads take turns by that PCT schedule in full (nile_schedule_pct: slot i starts at priority i of the
+;;; list, and at each turn in changes the running thread drops below every other), so a refutation names an interleaving
+;;; that runs again, and shrinking the term shrinks the schedule. The claim is the law file's; here is only the run.
+
+;; the driver's argument for a schedule: a number is a seed, as is; a term pct(P, C) is "pct:P0,P1,.../C1,C2,..."
+(define-function rt_pct_text (s)
+  (if (long? s)
+      (long->string s)
+      (let ((text "pct:") (sep ""))
+	(list-do p (cadr s) (set text (concat-strings text sep (long->string p))) (set sep ","))
+	(set text (concat-strings text "/")) (set sep "")
+	(list-do c (caddr s) (set text (concat-strings text sep (long->string c))) (set sep ","))
+	text)))
+
+;; the driver's run of kind on workers threads, line width w, input ints, under schedule s: a record of its contracts
+;; (dropped, requeued, unreturned, deadlocks: the driver's last line) and its output
+(define-function scheduled (kind workers w ints s)
+  (let* ((dir (rt_env "NILE_LAW_TMP"))
+	 (in (concat-strings dir "/in"))
+	 (out (concat-strings dir "/out"))
+	 (f (fopen in "w")))
+    (or (and f (!= 0 f)) (error "runtime: can't write " in))
+    (list-do x ints (fprintf f "%ld\n" x))
+    (fclose f)
+    (rt_shell (concat-strings (rt_env "NILE_LAW_RUNTIME") " " (long->string workers) " " kind " " (long->string w)
+			      " " (rt_pct_text s) " < " in " > " out " 2>/dev/null"))
+    (let* ((text (contents-of-file-named out))
+	   (end (string-length text))
+	   (k (- end 2)))
+      (while (and (>= k 0) (!= 10 (string-at text k))) (set k (- k 1)))	; the start of the last line, "contracts D R U K"
+      (let ((counts (string-copy text (+ k 11) (- end (+ k 11)))))
+	(for (i 0 (string-length counts))	; the four counts are on one line: one to a line, as rt_numbers reads them
+	  (and (= 32 (string-at counts i)) (set-string-at counts i 10)))
+	(law-record "contracts" (rt_numbers counts)
+		    "output" (rt_numbers (string-copy text 0 (+ k 1))))))))

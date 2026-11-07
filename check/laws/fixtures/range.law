@@ -1,0 +1,4 @@
+-- a range in a list, A .. B, stands for the whole numbers from A to B: numerals 1 .. 4 and 10 are five values
+under test: number
+let numerals = [1 .. 4, 10]
+law range_values: all n: number(n). (n >= 1 && n <= 4) || n = 10 by exhaustion

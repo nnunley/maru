@@ -1,0 +1,8 @@
+-- a record's named fields are read as r.name; a list literal is a claim's list; = compares records by value
+under test: rec
+let numerals = [0, 1, 2]
+rule small_n: number(n) => small(n)
+law fields_read: all n: small(n), let r = rec(n). r.a = n && r.b = [n, n]
+law record_value: all n: small(n). rec(n + 1) != rec(n)
+law record_equal: all n: small(n), let r = rec(n), let q = rec(n). r = q && r.a = n
+law shown: all n: small(n), let r = rec(n). r.b = [n]

@@ -35,7 +35,7 @@
 (define *john-options* ())	; (name . value), from set-opt
 (define *john-world* ())	; the current world
 (define *john-out* ())		; lines printed, newest first
-(define *john-limit* 16)	; satisfy gives up after this many time steps
+(define *john-limit* 16)	; satisfy gives up after this many time steps: set-opt time-limit N (ours), 16 unless set
 
 (define-function john-fail args (apply error (cons "john: " args)))
 (define-function john-say (s) (push *john-out* s))
@@ -523,7 +523,8 @@
 	  ((= op 'rule) (set *john-rules* (concat-list *john-rules* (list (cdr s)))))
 	  ((= op 'goal) (push *john-goals* (cdr s)))
 	  ((= op 'heuristic) (set *john-heuristics* (concat-list *john-heuristics* (list (cdr s)))))
-	  ((= op 'set-opt) (push *john-options* (cons (cadr s) (if (symbol? (caddr s)) (caddr s) (john-eval (caddr s) *john-world* ())))))	; a word is itself: planner sat
+	  ((= op 'set-opt) (push *john-options* (cons (cadr s) (if (symbol? (caddr s)) (caddr s) (john-eval (caddr s) *john-world* ()))))	; a word is itself: planner sat
+	   (and (= (cadr s) 'time-limit) (set *john-limit* (cdar *john-options*))))
 	  ((= op 'action-optimization) (set *john-aopts* (concat-list *john-aopts* (list (cdr s)))))
 	  ((= op 'goal-strategy) (set *john-goal-strategies* (concat-list *john-goal-strategies* (list (cdr s)))))
 	  ((= op 'goal-optimization) (set *john-gopts* (concat-list *john-gopts* (list (cdr s)))))
@@ -535,6 +536,7 @@
 	  ((= op 'do) (john-do (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cdddr s))))
 	  (else (john-fail "statement not read yet: " op)))))
 (define-function john-reset ()
+  (set *john-limit* 16)
   (set *john-classes* ()) (set *john-objects* ()) (set *john-quals* ()) (set *john-rels* ()) (set *john-actions* ())
   (set *john-rules* ()) (set *john-goals* ()) (set *john-aopts* ()) (set *john-gopts* ()) (set *john-goal-strategies* ()) (set *john-enumerations* (john-prelude-enumerations)) (set *john-heuristics* ()) (set *john-options* ()) (set *john-out* ()) (set *john-world* (new <john-world>))
   (set (<john-world>-time *john-world*) 0))

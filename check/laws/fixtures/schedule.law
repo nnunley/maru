@@ -1,0 +1,10 @@
+-- the runtime's layout contracts, as the claim the schedule law states: contracts all zero, output one worker's
+under test: scheduled, layout
+let numerals = [0, 1]
+rule sched_one: number(c) => schedule([c])
+rule sched_more: number(c), schedule(s) => schedule([c | s])
+fact sched_workers(2)
+fact sched_workers(4)
+fact sched_layout("words")
+fact sched_layout("breaks")
+law layout_contracts: all k: sched_layout(k), w: sched_workers(w), s: schedule(s), let lw = sched_width(k), let r = scheduled(k, w, lw, rt_glyphs(245, 7), s). r.contracts = [0, 0, 0, 0] && r.output = layout(k, 1, lw, rt_glyphs(245, 7)) by exhaustion size 2
