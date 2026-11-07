@@ -42,7 +42,14 @@ Steps, each a check first:
    (71 KScript) run from their sources in place of kscript.l's native stream runtime; kscript.l keeps evaluating KScript.
    - evalToMethod: and eval: (where KSWorld called KSCompiler) compile with kscript.g into an object's methods;
    - stream expressions and the stream functions (timerE, mapE, collectE ...) become what KSCompiler compiled them to,
-     calls on KSNewEventStream;
+     calls on KSNewEventStream. Found: a stream expression's meaning is a compile-time rewrite, KScript2's pipeline
+     (KSParser2, KSDeclVisitor, KSVariableAttributor2, KSQuoteAttributor2, KSQuoteTranslator2, KSReturnVisitor2,
+     KSBlockSimplifier, KSCompiler), OMeta2 tree grammars in Smalltalk. KSQuoteTranslator2 turns each send, call, and, or,
+     if, fby and field reference inside the quote into a sub-stream (this.eventStream(#sel, #src, extraDep, [args]),
+     added with addSubExpression, dependencies collected), then finalizeTopLevelCreationWith2. It and KSQuoteAttributor2
+     are ported, rule for rule and each citing its OMeta2 rule, as a Maru tree grammar over kscript.g's trees (the
+     transliteration the user allowed where it can't be helped, as Warth's OMeta rewriters become Maru grammars);
+     KSNewEventStream's runtime runs from its source;
    - acceptance: KSEventStreamTest's 17 tests, run from KSWorld's source (TestCase's assert: on the platform);
    - then documents' streams are KSNewEventStream objects, and KSWorld's evaluation loop (KSDependencySorter,
      KSDependencyEvaluator, KSWorldState) drives time in ksworld-run and the window, held to ksworld_clock and
