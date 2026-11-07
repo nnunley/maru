@@ -181,15 +181,21 @@
 (define-function law-decided (c n p)	; met, short, or () while chance could explain the share
   (cond ((>= (* 100.0 (law-wilson c n -1.0)) (* 0.9 (long->double p)))	'met)
 	((< (* 100.0 (law-wilson c n 1.0)) (long->double p))		'short)))
+(define *lmet* ())	; the covers decided met so far in this run: one met stays met while others are still drawn for
 (define-function law-undecided? (n)	; some cover the counts so far can't decide
-  (let ((u ())) (list-do v *lcover* (or (law-decided (law-nth *lcounts* (law-index (cadr v) *lk*)) n (car v)) (set u 1))) u))
-(define-function law-short? (c n p)	; sampled and undecided after its last case, short too: it never showed its share
-  (if (= 'exhaustion *lmethod*) (< (* 100 c) (* p n)) (not (= 'met (law-decided c n p)))))
+  (let ((u ()))
+    (list-do v *lcover*
+      (or (member? v *lmet*)
+	  (let ((d (law-decided (law-nth *lcounts* (law-index (cadr v) *lk*)) n (car v))))
+	    (if (= 'met d) (push *lmet* v) (or d (set u 1))))))
+    u))
+(define-function law-short? (v c n)	; sampled and undecided after its last case, short too: it never showed its share
+  (if (= 'exhaustion *lmethod*) (< (* 100 c) (* (car v) n)) (not (or (member? v *lmet*) (= 'met (law-decided c n (car v)))))))
 (define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover;
   (let ((n (cadr r)) (short ()) (shares ()))	; no cases give no shares and meet no cover
     (list-do v *lcover*
       (let ((c (law-nth *lcounts* (law-index (cadr v) *lk*))))
-	(and (or (= 0 n) (law-short? c n (car v))) (push short (list (cadr v) c n (car v))))))
+	(and (or (= 0 n) (law-short? v c n)) (push short (list (cadr v) c n (car v))))))
     (cond (short (cons 'UNDERCOVERED (list-reverse! short)))
 	  ((= 0 n) (list (car r) n))
 	  (else
@@ -246,16 +252,17 @@
 (define-function law-test ()
   (let* ((trials (law-setting 'trials)) (target trials) (cap (* trials (law-setting 'cover_ratio)))
 	 (limit (* trials (law-setting 'starved_ratio))) (met 0) (drawn 0) (out ()))
-    (while (and (not out) (< drawn limit)
-		(or (< met target)
-		    (and *lcover* (< target cap) (law-undecided? met)
-			 (let () (set target (+ target trials)) (set limit (+ limit (* trials (law-setting 'starved_ratio)))) 1))))
+    (set *lmet* ())
+    (while (and (not out)
+		(or (and (< met target) (< drawn limit))
+		    (and (>= met target) *lcover* (< target cap) (law-undecided? met)	; each extension brings its own draws
+			 (let () (set target (+ target trials)) (set limit (+ drawn (* trials (law-setting 'starved_ratio)))) 1))))
       (set drawn (+ drawn 1))
       (let* ((vals (law-draw)) (r (if vals (law-try vals) 'skip)))
 	(and (= r 'hold) (set r (law-count vals)))
 	(if (= r 'hold) (set met (+ met 1))
 	  (or (= r 'skip) (set out (law-failed r vals))))))
-    (or out (if (< met target) (list 'STARVED met drawn) (list 'TESTED met)))))
+    (or out (if (< met trials) (list 'STARVED met drawn) (list 'TESTED met)))))	; draws running out while extending leave a cover undecided, so short, not the law starved
 ;; EXHAUST: every value up to the size
 (define *law-out* ())  (define *law-met* 0)  (define *law-drawn* 0)
 (define-function law-visit (vals)
@@ -325,7 +332,7 @@
     (when (= 0 pid) (law-quiet) (run))
     (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
 (define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
-  (let ((st (law-child (lambda () (law-limit 60) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+  (let ((st (law-child (lambda () (law-limit 60) (set *lcover* ()) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
     (cond ((< st 0) 'crash) ((= 0 st) 1))))
 (define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))

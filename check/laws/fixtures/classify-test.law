@@ -5,3 +5,4 @@ let numerals = [0 .. 9]
 law sampled_short: all n: number(n). n >= 0 by test classify zero when n = 0 cover 50% zero
 law sampled_near: all n: number(n). n >= 0 by test classify zero when n = 0 cover 12% zero
 law sampled_met: all n: number(n). n >= 0 by test classify zero when n = 0 cover 9% zero
+law sampled_two: all n: number(n). n >= 0 by test classify zero when n = 0, low when n < 5 cover 9% zero, 40% low

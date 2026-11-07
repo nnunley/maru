@@ -429,8 +429,12 @@ cover is undecided, a cover is met if the low bound of the Wilson score interval
 count, at z = 6 (about one in a billion each way), reaches 0.9 of P, and short if the
 high bound is under P. So a run on a fresh seed neither fails a law by chance nor lets a
 real shortfall through. The cases stop at `trials` times `cover_ratio` (default 100), and
-a cover still undecided then is short: the law never showed its share. `TESTED n` counts
-every case drawn. The line names each
+a cover still undecided then is short: the law never showed its share. A cover once met
+stays met while others are still drawn for, and running out of draws while extending
+leaves a cover undecided, not the law `STARVED`. The stand-ins that judge vacuity draw no
+more for covers. A cover set at a class's true share cannot be met within the default cap
+(reaching 0.9 of a share takes cases in proportion to 1/P), as with `checkCoverage`; ask a
+share below the one expected. `TESTED n` counts every case drawn. The line names each
 such class with its count, the cases and the share asked:
 `UNDERCOVERED two_buffers 20 of 1000 < 20%`. Counts, not rounded shares, so the line
 never reads `20% < 20%`. A cover is judged after `VACUOUS`, so

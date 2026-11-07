@@ -538,7 +538,7 @@
 		 ;; by test a cover is decided sequentially: 11 of 100 is short of 50% at once, a tenth is short of 12% and meets 9% only
 		 ;; after thousands of cases, and a tenth against 10% can't be decided within 300, so fails
 		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 11 of 100 < 50%" "law sampled_near: UNDERCOVERED zero 915 of 9200 < 12%"
-		  "law sampled_met: TESTED 8700 (zero 10%)")
+		  "law sampled_met: TESTED 8700 (zero 10%)" "law sampled_two: TESTED 5800 (zero 10%, low 50%)")
 		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 32 of 300 < 10%"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
