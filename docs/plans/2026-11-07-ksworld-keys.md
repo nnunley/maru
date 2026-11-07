@@ -52,8 +52,10 @@ Steps, each a check first:
      KSNewEventStream's runtime runs from its source;
    - acceptance: KSEventStreamTest's 17 tests, run from KSWorld's source (TestCase's assert: on the platform);
    - then documents' streams are KSNewEventStream objects, and KSWorld's evaluation loop (KSDependencySorter,
-     KSDependencyEvaluator, KSWorldState) drives time in ksworld-run and the window, held to ksworld_clock and
-     ksworld_headless as they are.
+     KSDependencyEvaluator, KSWorldState) drives time in ksworld-run and the window. KSWorld's behaviour is the referee,
+     not our checks: ksworld_clock and ksworld_headless encode rules of ours (an event taking 1/1024 of a millisecond,
+     timerE firing once however many intervals passed), so where KSWorld's own code disagrees, KSWorld wins and those
+     checks are rewritten to what it does (KSEventStreamTest decides), never the runtime bent to fit them.
    Done so far: KSFont, KSFace, KSFamily and KSShape run from their sources over squeak-ttf.st (Squeak's TrueType classes
    on truetype.l), with class variables and class initialization; a letter from KSWorld's withChar:inFont: waits on
    streamOf (KSBox>>initialize).
