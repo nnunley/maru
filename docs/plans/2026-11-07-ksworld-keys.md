@@ -77,7 +77,9 @@ Steps, each a check first:
      dictionary (it is an IdentityDictionary) on the platform's Dictionary, so KScript's this.x and Smalltalk's self at: #x
      reach one storage;
    - KScript (kscript.l) evaluates onto that layer: Maru's booleans, the shared objects and dispatch, no tables of its own.
-   Every KScript and KSWorld check moves with it.
+   Every KScript and KSWorld check moves with it. The same rule covers JOHN (its objects, classes, yes/no truth and
+   valued sets) and the laws runtime (law-record, law-truth): each moves onto the shared objects and Maru's booleans, as
+   its own step after KSWorld's, with its checks.
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy
