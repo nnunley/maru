@@ -415,14 +415,18 @@ the conditions and passes the claim counts toward every class whose EXPR is true
 so classes can overlap, and a case can be in none. A `TESTED` or `PROVED` line
 then ends with each class's share of those cases, in the order declared, as whole
 percents rounded to nearest: `TESTED 1000 (empty 6%, two_buffers 31%)`. A law that
-fails prints no classes. [R-law-classify]
+fails, or passes with no cases (`TESTED 0`), prints no classes. A class is held to a
+claim's rules: one valued a reference's verdict is `E_CLAIM`, and a reference that
+crashes in one makes the law `INCONCLUSIVE`. [R-law-classify]
 
 A law MAY then ask for a share: `cover P% NAME, ...`. A law that would pass but in
-which a class met fewer than P percent of its cases (counted exactly, not from the
-rounded share) is `UNDERCOVERED`, naming each such class, its share and the share
-asked: `UNDERCOVERED two_buffers 2% < 20%`. A cover is judged after `VACUOUS`, so
+which a class met fewer than P percent of its cases, or which has no cases, is
+`UNDERCOVERED`, naming each such class with its count, the cases and the share asked:
+`UNDERCOVERED two_buffers 20 of 1000 < 20%`. Counts, not rounded shares, so the line
+never reads `20% < 20%`. A cover is judged after `VACUOUS`, so
 the stand-ins that judge vacuity are not judged for cover. A cover naming no declared
-class, or asking for more than 100%, is `E_COVER`, and the law does not run.
+class, or asking for more than 100%, and a class declared twice, are `E_COVER`, and the
+law does not run.
 [R-law-cover]
 
 A reader of the report doesn't need the classes: `notes/plan/law-report.g` reads
@@ -530,7 +534,7 @@ the file, so adding a law does not change the values another draws.
 | `E_CLAIM` | a claim is `nile_accepts(e, t)`, not `nile_accepts(e, t) = accept` | Reject the law, naming it; the next law runs |
 | `E_ADEQUATE` | an adequacy law names a law that does not exist, or a relation with no mutants (no rule concludes it) | Reject the adequacy law; the next law runs |
 | `E_FIELD` | `r.c` where `r` is a record with no field `c`, or a value that is not a record; a field in a rule or domain | The run stops with the message, naming the field and the record's fields; a field in a rule or domain stops the file when it is read |
-| `E_COVER` | `cover 20% big` with no class `big`, or `cover 120% big` | Reject the law, naming the class or the share; the next law runs |
+| `E_COVER` | `cover 20% big` with no class `big`, `cover 120% big`, or `classify a when ..., a when ...` | Reject the law, naming the class or the share; the next law runs |
 | `E_RANGE` | a range `A .. B` whose ends are not whole-number constants | The file stops when it is read, naming the ends |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 

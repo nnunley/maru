@@ -9,3 +9,9 @@ law undercovered: all n: number(n). n >= 0 by exhaustion classify zero when n = 
 law refuted_classes: all n: number(n). n < 5 by exhaustion classify zero when n = 0
 law cover_unknown: all n: number(n). n >= 0 by exhaustion classify zero when n = 0 cover 5% big
 law cover_over: all n: number(n). n >= 0 by exhaustion classify zero when n = 0 cover 120% zero
+-- a class is held to a claim's rules: a verdict is no truth value, and a reference that crashes is no answer
+reference no(x)
+reference boom(x)
+law class_verdict: all n: number(n). n >= 0 by exhaustion classify v when no(n)
+law class_crash: all n: number(n). n >= 0 by exhaustion classify c when boom(n) = accept
+law class_twice: all n: number(n). n >= 0 by exhaustion classify zero when n = 0, zero when n = 1

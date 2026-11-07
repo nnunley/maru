@@ -161,20 +161,25 @@
 	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
 	(else (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*))))
 
-;; classes: a passing case counts toward each class whose expression is true of it
+;; classes: a passing case counts toward each class whose expression is true of it.  A class is held to a claim's
+;; rules, so the case is hold, or verdict (a class valued a reference's verdict) or crash (a reference in one crashed)
 (define-function law-count (vals)
+  (set *law-crash* ()) (set *law-verdict* ())
   (let ((cs *lcounts*))
-    (list-do k *lk* (and (apply (cdr k) vals) (set-car cs (+ 1 (car cs)))) (set cs (cdr cs)))))
+    (list-do k *lk* (and (law-truth 'class (apply (cdr k) vals)) (set-car cs (+ 1 (car cs)))) (set cs (cdr cs))))
+  (cond (*law-crash* 'crash) (*law-verdict* 'verdict) (else 'hold)))
 (define-function law-percent (c n) (/ (+ (* 100 c) (/ n 2)) n))	; a share in whole percents, rounded to nearest
 (define-function law-index (name ks) (if (= name (caar ks)) 0 (+ 1 (law-index name (cdr ks)))))
-(define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover
-  (let ((n (cadr r)) (short ()) (shares ()))
+(define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover;
+  (let ((n (cadr r)) (short ()) (shares ()))	; no cases give no shares and meet no cover
     (list-do v *lcover*
       (let ((c (law-nth *lcounts* (law-index (cadr v) *lk*))))
-	(and (< (* 100 c) (* (car v) n)) (push short (list (cadr v) (law-percent c n) (car v))))))
-    (if short (cons 'UNDERCOVERED (list-reverse! short))
+	(and (or (= 0 n) (< (* 100 c) (* (car v) n))) (push short (list (cadr v) c n (car v))))))
+    (cond (short (cons 'UNDERCOVERED (list-reverse! short)))
+	  ((= 0 n) (list (car r) n))
+	  (else
       (let ((cs *lcounts*)) (list-do k *lk* (push shares (cons (car k) (law-percent (car cs) n))) (set cs (cdr cs))))
-      (list (car r) n (list-reverse! shares)))))
+      (list (car r) n (list-reverse! shares))))))
 
 ;; one set of values: skip (conditions false), hold, fail, crash or verdict (a claim or condition valued a verdict)
 (define-function law-try (vals)
@@ -217,7 +222,7 @@
     vals))
 (define-function law-failed (r vals)	; the outcome of a failing, crashing or verdict-valued try
   (cond ((= r 'fail)	(list 'REFUTED (law-shrink vals)))
-	((= r 'verdict)	(list 'E_CLAIM (concat-strings (if (= 'claim *law-verdict*) "the claim of " "a condition of ") (symbol->string *lname*)
+	((= r 'verdict)	(list 'E_CLAIM (concat-strings (cond ((= 'claim *law-verdict*) "the claim of ") ((= 'class *law-verdict*) "a class of ") (else "a condition of ")) (symbol->string *lname*)
 					       " is a verdict; compare it, e.g. `= accept`")))
 	(else		(cons 'INCONCLUSIVE *law-crash*))))
 
@@ -227,7 +232,8 @@
     (while (and (not out) (< met trials) (< drawn limit))
       (set drawn (+ drawn 1))
       (let* ((vals (law-draw)) (r (if vals (law-try vals) 'skip)))
-	(if (= r 'hold) (let () (set met (+ met 1)) (law-count vals))
+	(and (= r 'hold) (set r (law-count vals)))
+	(if (= r 'hold) (set met (+ met 1))
 	  (or (= r 'skip) (set out (law-failed r vals))))))
     (or out (if (< met trials) (list 'STARVED met drawn) (list 'TESTED met)))))
 ;; EXHAUST: every value up to the size
@@ -235,7 +241,8 @@
 (define-function law-visit (vals)
   (set *law-drawn* (+ *law-drawn* 1))
   (let ((r (law-try vals)))
-    (if (= r 'hold) (let () (set *law-met* (+ *law-met* 1)) (law-count vals))
+    (and (= r 'hold) (set r (law-count vals)))
+    (if (= r 'hold) (set *law-met* (+ *law-met* 1))
       (or (= r 'skip) (set *law-out* (law-failed r vals))))))
 (define-function law-every (bs vars vals f)
   (if bs
@@ -314,7 +321,7 @@
 	  ((= k 'INCONCLUSIVE)	(print " status=" (cadr r) " input=") (dump (cddr r)))
 	  ((= k 'VACUOUS))
 	  ((= k 'UNDERCOVERED)	(let ((first 1))
-				  (list-do u (cdr r) (print (if first " " ", ") (car u) " " (cadr u) "% < " (caddr u) "%") (set first ()))))
+				  (list-do u (cdr r) (print (if first " " ", ") (car u) " " (cadr u) " of " (caddr u) " < " (cadddr u) "%") (set first ()))))
 	  (else			(print " " (cadr r))
 				(and (cddr r) (let ((first 1))
 						(print " (")
@@ -385,6 +392,9 @@
 	(set *lf* (eval `(lambda ,*lnames* (law-truth 'claim ,(law-form *lclaim*)))))
 	(set *lk* (map (lambda (k) (cons (car k) (eval `(lambda ,*lnames* ,(law-form (cadr k)))))) (car (cdddr (cddddr it)))))
 	(set *lcover* (cadr (cdddr (cddddr it))))
+	(let ((seen ()))
+	  (list-do k *lk* (if (member? (car k) seen) (or *law-err* (set *law-err* (list 'E_COVER (concat-strings "classify names " (symbol->string (car k)) " twice"))))
+			    (push seen (car k)))))
 	(list-do v *lcover*
 	  (or *law-err*
 	      (cond ((not (assq (cadr v) *lk*))	(set *law-err* (list 'E_COVER (concat-strings "cover names " (symbol->string (cadr v)) ", which no classify declares"))))

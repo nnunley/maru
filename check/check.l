@@ -526,10 +526,13 @@
 		 ;; the runtime's layout claim, as schedule.law states it: 2 widths x 2 worker counts x 14 schedules
 		 ("schedule" "check/laws/fixtures/schedule.l" 0 "law layout_contracts: PROVED 56")
 		 ;; classes: each passing case's share, whole percents; a cover short of its share fails the law, a cover of no class is E_COVER
-		 ("classify" "" 256 "law classes_proved: PROVED 10 (zero 10%, small 50%)" "law classes_tested: TESTED 100 (always 100%)"
+		 ("classify" "check/laws/fixtures/classify.l" 256 "law classes_proved: PROVED 10 (zero 10%, small 50%)" "law classes_tested: TESTED 100 (always 100%)"
 		  "law classes_let: PROVED 10 (big 40%)" "law covered: PROVED 10 (zero 10%)"
-		  "law undercovered: UNDERCOVERED zero 10% < 20%, small 50% < 60%" "law refuted_classes: REFUTED n=5 seed=47"
-		  "law cover_unknown: E_COVER cover names big, which no classify declares" "law cover_over: E_COVER cover asks 120% of zero, more than all"))
+		  "law undercovered: UNDERCOVERED zero 1 of 10 < 20%, small 5 of 10 < 60%" "law refuted_classes: REFUTED n=5 seed=47"
+		  "law cover_unknown: E_COVER cover names big, which no classify declares" "law cover_over: E_COVER cover asks 120% of zero, more than all"
+		  "law class_verdict: E_CLAIM a class of class_verdict is a verdict; compare it, e.g. `= accept`"
+		  "law class_crash: INCONCLUSIVE status=7 input=(0)" "law class_twice: E_COVER classify names zero twice")
+		 ("classify-none" "" 256 "law none: TESTED 0" "law none_covered: UNDERCOVERED zero 0 of 0 < 5%"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (list-do c '(("field-error" "no field c in the record, which has a, b") ("field-plain" "a is read from a value that is not a record"))

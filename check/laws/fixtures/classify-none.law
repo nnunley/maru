@@ -1,0 +1,6 @@
+-- no trials: a law that passes with no cases gives no shares, and a cover can't be met
+under test: number
+defaults trials = 0
+let numerals = [0 .. 9]
+law none: all n: number(n). n >= 0 by test classify zero when n = 0
+law none_covered: all n: number(n). n >= 0 by test classify zero when n = 0 cover 5% zero
