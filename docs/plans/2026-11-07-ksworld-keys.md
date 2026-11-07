@@ -27,6 +27,17 @@ Steps, each a check first:
 3b. KSWorld's layout: KSTextLayout's own layout methods, with the KSBox methods they send, place each letter. Check:
    the five kept letters where KSWorld put them (check/ksworld.l's letter-as-kept), 937 paths; ksworld-text.l's layout
    goes. Then KSWorld's handleButtonDown/handlePointerMotion/installSelection replace ksworld-events.l's.
+3c. KSWorld's Smalltalk methods (KSContentsCollection's 103, KSBox's 54 ...), which KSWorld's KScript calls on every step
+   (contents isEmpty, first, at:, add:afterIndex:, removeAt:):
+   - squeak.g, a tpeg grammar for Squeak method source, from test-pepsi.l's Smalltalk grammar (message sends, blocks,
+     assignment, temporaries, literals) plus what Squeak methods add (a pattern with no brackets, ^, cascades, literal
+     and brace arrays);
+   - each Smalltalk method compiled, as pepsi compiles one, to a Maru function, registered beside the KScript ones so the
+     two call each other through ks-send; ^ inside a block a non-local return (catch.l);
+   - the platform under them (Object, the booleans, blocks, numbers, Array, String) in Smalltalk on Maru's types, as
+     test-pepsi.l's base library is, with { } primitives, not Squeak's whole library.
+   Check: KSContentsCollection's methods run from its source (add:, at:, add:afterIndex:, removeFirst ...), and KSWorld's
+   layOut places KSWorld.ks's letters where KSWorld put them.
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy
