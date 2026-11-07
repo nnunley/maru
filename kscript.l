@@ -56,13 +56,18 @@
 
 (define-function number? (x)		(or (long? x) (double? x)))
 
+(define ks-equal-arrays?)
 (define-function ks-equal? (a b)
   (cond ((and (number? a) (number? b)) (= (* 1.0 a) (* 1.0 b)))
 	((and (ks-point? a) (ks-point? b))
 	 (and (= (<ks-point>-x a) (<ks-point>-x b))
 	      (= (<ks-point>-y a) (<ks-point>-y b))))
 	((or (and (= a 'nil) (= b ())) (and (= a ()) (= b 'nil))) 1)
+	((and (array? a) (array? b)) (ks-equal-arrays? a b))	; arrays by their elements, as Squeak's Array>>=
 	(else (equal a b))))
+(define-function ks-equal-arrays? (a b)
+  (and (= (array-length a) (array-length b))
+       (let ((same 1)) (for (i 0 (array-length a)) (or (ks-equal? (array-at a i) (array-at b i)) (set same ()))) same)))
 
 (define-function ks-num (x)
   (cond ((number? x) x)
@@ -333,7 +338,7 @@
 	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args))))))
 	   (dnu (and (not m) (ks-method-for kind '_doesNotUnderstand))))
       (cond (m (m recv args env this))
-	    (dnu (dnu recv (list (new <ks-object> 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments args)) () 0))
+	    (dnu (dnu recv (list (new <ks-object> 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
 		      env this))
 	    (else (ks-native-send recv sel args env this))))))
 
@@ -379,6 +384,18 @@
   (findTokens (ks-split (ks-to-string recv) (string-at (ks-to-string (car args)) 0)))
   (match (ks-bool (ks-match (ks-to-string recv) 0 (ks-to-string (car args)) 0)))	; Squeak's match:, * any run, # any one
   (asBoolean (ks-bool (ks-truthy? recv))))
+
+(ks-methods Array			; KScript's lists, Smalltalk's Arrays: Maru arrays
+  (first (array-at recv 0))
+  (second (array-at recv 1))
+  (size (array-length recv))
+  (isEmpty (ks-bool (= 0 (array-length recv))))
+  (copy (list->array (array->list recv)))
+  (findFirst (let ((pred (car args)) (found 0))
+	       (for (i 0 (array-length recv))
+		 (and (= found 0) (ks-truthy? (ks-apply pred (list (array-at recv i)) env this)) (set found (+ i 1))))
+	       found))
+  (sort (list->array (ks-sort (array->list recv) (lambda (a b) (ks-truthy? (if args (ks-apply (car args) (list a b) env this) (ks-cmp '<= a b))))))))
 
 (ks-methods List
   (first (car recv))
@@ -475,8 +492,13 @@
 	   (if p (cdr p) 'nil)))
 	(else (ks-send obj field () () ()))))	; a value's field is a message with no arguments, answered or an error
 
+(define-function ks-elements (v)	; what a for, a comprehension or anyE walks: an array's, a list's or a box's elements
+  (cond ((array? v) (array->list v)) ((ks-object? v) (ks-items v)) ((pair? v) v) (else ())))
 (define-function ks-index (obj idx)
-  (cond ((and (pair? obj) (number? idx))
+  (cond ((and (array? obj) (number? idx))	; counting from 0
+	 (let ((k (if (double? idx) (double->long idx) idx)))
+	   (if (and (<= 0 k) (< k (array-length obj))) (array-at obj k) 'nil)))
+	((and (pair? obj) (number? idx))
 	 (let ((cur obj) (k (if (double? idx) (double->long idx) idx)))
 	   (while (and cur (< 0 k)) (set cur (cdr cur)) (decr k))
 	   (if cur (car cur) 'nil)))
@@ -519,7 +541,7 @@
     (if (< 0 st)
 	(while (<= na nb) (push out na) (set na (+ na st)))
       (while (>= na nb) (push out na) (set na (+ na st))))
-    (list-reverse! out)))
+    (list->array (list-reverse! out))))
 
 (define-function ks-eval (exp env this)
   (cond
@@ -545,7 +567,7 @@
 		  (else (ks-stream-prev (ks-eval inner env this))))))
 	 ((= op 'global) (cadr exp))
 	 ((= op 'list)
-	  (map (lambda (e) (ks-stream-curr (ks-eval e env this))) (cdr exp)))
+	  (list->array (map (lambda (e) (ks-stream-curr (ks-eval e env this))) (cdr exp))))
 	 ((= op 'dict)
 	  (map (lambda (p) (cons (car p) (ks-stream-curr (ks-eval (cadr p) env this)))) (cdr exp)))
 	 ((= op 'range)
@@ -615,7 +637,7 @@
 		 res))
 	      ((or (= fn 'anyE) (= fn 'switchColE))
 	       (let* ((col (ks-stream-curr (ks-eval (car raw-args) env this)))
-		      (items (if (ks-object? col) (ks-items col) col))
+		      (items (ks-elements col))
 		      (sname (string->symbol (ks-to-string (ks-stream-curr (ks-eval (cadr raw-args) env this)))))
 		      (res 'undefined))
 		 (while (and (pair? items) (= res 'undefined))
@@ -704,7 +726,7 @@
 	  (let* ((body-exp (cadr exp))
 		 (vname (caddr exp))
 		 (col-val (ks-stream-curr (ks-eval (cadddr exp) env this)))
-		 (items (if (ks-object? col-val) (ks-items col-val) col-val))
+		 (items (ks-elements col-val))
 		 (cond-exp (car (cddddr exp)))
 		 (out ()))
 	    (when (pair? items)
@@ -712,11 +734,11 @@
 		(let ((sub-env (cons (cons vname it) env)))
 		  (when (or (not cond-exp) (ks-truthy? (ks-stream-curr (ks-eval cond-exp sub-env this))))
 		    (push out (ks-stream-curr (ks-eval body-exp sub-env this)))))))
-	    (list-reverse! out)))
+	    (list->array (list-reverse! out))))
 	 ((= op 'detect-comp)
 	  (let* ((vname (cadr exp))
 		 (col-val (ks-stream-curr (ks-eval (caddr exp) env this)))
-		 (items (if (ks-object? col-val) (ks-items col-val) col-val))
+		 (items (ks-elements col-val))
 		 (cond-exp (cadddr exp))
 		 (found 'nil))
 	    (while (and (pair? items) (= found 'nil))
@@ -782,12 +804,12 @@
 	  (let* ((vname (cadr exp))
 		 (col-val (ks-stream-curr (ks-eval (caddr exp) env this)))
 		 (step-val (and (cadddr exp) (ks-stream-curr (ks-eval (cadddr exp) env this))))
-		 (items (cond ((ks-object? col-val) (ks-items col-val))
-			      ((and step-val (pair? (caddr exp)) (= (caaddr exp) 'range))
-			       (ks-range (ks-stream-curr (ks-eval (cadr (caddr exp)) env this))
-					 (ks-stream-curr (ks-eval (caddr (caddr exp)) env this))
-					 step-val))
-			      (else col-val)))
+		 (items (ks-elements
+			 (if (and step-val (pair? (caddr exp)) (= (caaddr exp) 'range))
+			     (ks-range (ks-stream-curr (ks-eval (cadr (caddr exp)) env this))
+				       (ks-stream-curr (ks-eval (caddr (caddr exp)) env this))
+				       step-val)
+			   col-val)))
 		 (body (car (cddddr exp)))
 		 (res 'nil))
 	    (when (pair? items)
@@ -853,7 +875,7 @@
 	    (when (and (ks-object? home) (string? sname-exp))
 	      (let* ((sname (string->symbol sname-exp))
 		     (col (ks-val home (if (symbol? col-exp) col-exp (cadr col-exp))))
-		     (items (if (ks-object? col) (ks-items col) col)))
+		     (items (ks-elements col)))
 		(when (pair? items)
 		  (list-do it items
 		    (let ((s (ks-slot it sname)))

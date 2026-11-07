@@ -57,8 +57,9 @@
 ;; running them: a KSContentsCollection made and used from KScript runs its own Smalltalk (new: through super basicNew,
 ;; setCollection:, addLast:'s makeRoomAtLast, addFirst:, at:'s bounds, removeFirst), on the platform squeak-base.st gives
 (ks-load-source-class 'KSContentsCollection)
-(define-function run (text)	; a KScript program's statements in one environment; the last one's value
-  (let ((r 'nil) (env (list (cons '%top 1)))) (list-do s (kscript-parse text) (set r (ks-stream-curr (ks-eval s env ())))) r))
+(define-function listed (v) (if (array? v) (map listed (array->list v)) v))	; an array, and arrays in it, as lists
+(define-function run (text)	; a KScript program's statements in one environment; the last one's value, arrays as lists
+  (let ((r 'nil) (env (list (cons '%top 1)))) (list-do s (kscript-parse text) (set r (ks-stream-curr (ks-eval s env ())))) (listed r)))
 (expect "a collection from its class, grown and read by its own methods"
 	(run "var c = KSContentsCollection.new()\nc._add(1)\nc._add(2)\nc._addFirst(0)\n[c.size(), c._at(1), c._at(3), c.removeFirst(), c.size(), c.first()]")
 	'(3 0 2 0 2 1))
@@ -93,5 +94,17 @@
   (ks-eval (car (kscript-parse "this.s = $$(2 + 3)")) () o)
   (expect "a stream expression makes a stream" (list (ks-stream? (ks-slot o 's)) (ks-val o 's)) '(t 5)))
 (expect "a form the evaluator doesn't know is an error naming it" (try (ks-eval '(no-such-form 1) () ()) (lambda (c) 'refused)) 'refused)
+
+;; Smalltalk's literal and brace arrays are Maru arrays, KScript's too, and an empty one isn't nil
+(define-function st (text)	; a Smalltalk expression's value, as a method answering it
+  ((ks-method-function 'Object (cadr (ks-squeak-method (concat-string "f\n\t^ " text) () ())) () ()) 'nil () () ()))
+(expect "a literal array and a brace array are arrays"
+	(list (array? (st "#(1 2 3)")) (array->list (st "#(1 2 3)")) (array->list (st "{1. 1 + 1}"))) '(t (1 2 3) (1 2)))
+(expect "an empty array is empty, and not nil"
+	(list (ks-truthy? (st "#() isEmpty")) (ks-truthy? (st "#() isNil")) (ks-truthy? (st "nil isNil"))) '(t () t))
+(expect "an array's collect:, inject:into: and , answer arrays and values"
+	(list (array->list (st "#(1 2 3) collect: [:x | x * x]")) (st "#(1 2 3) inject: 0 into: [:a :x | a + x]") (array->list (st "#(1) , #(2)")))
+	'((1 4 9) 6 (1 2)))
+(expect "KScript and Smalltalk share arrays" (st "#(1 2 3) = {1. 2. 3}") 'true)
 
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

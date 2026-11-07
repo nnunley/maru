@@ -144,7 +144,7 @@
     out))
 (define-function ks-assq (key l)	; the pair whose car is key itself (an IdentityDictionary's lookup)
   (let ((found ())) (while (and l (not found)) (and (= key (caar l)) (set found (car l))) (set l (cdr l))) found))
-(define-function ks-elements-of (c) (cond ((pair? c) c) ((ks-object? c) (ks-slot c 'items)) (else ())))	; a collection's elements
+(define-function ks-elements-of (c) (cond ((pair? c) c) ((array? c) (array->list c)) ((ks-object? c) (ks-slot c 'items)) (else ())))	; a collection's elements
 (define-function ks-last (l) (if (cdr l) (ks-last (cdr l)) (car l)))
 (define-function ks-but-last (l) (if (cdr l) (cons (car l) (ks-but-last (cdr l))) ()))
 (define-function ks-set-has? (set x)	; a Set by equality, an IdentitySet by identity

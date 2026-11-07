@@ -14,6 +14,12 @@
 (expect "a string literal" (try <trees> $name '("plus")) '(got-string))
 (expect "strings inside a list, with their own limits" (try <trees> $digits '("12" "345")) '(357))
 
+;; an array is entered as a list is: KScript's and Smalltalk's lists are Maru arrays
+(expect "into an array" (try <trees> $node (list (list->array '(add 1 2)))) '((1 2)))
+(expect "nested arrays" (try <trees> $deep (list (list->array (list 'add 3 (list->array '(mul 4)))))) '((3 4)))
+(expect "the whole array must match" (try <trees> $node (list (list->array '(add 1 2 3)))) ())
+(expect "an empty array" (try <trees> $empty (list (array 0))) '(none))
+
 ;; failing in the second node puts the input back
 (expect "backtracks" (try <trees> $two '((add 1 2) (bad))) ())
 (expect "position back" (stays-at-start <trees> $two '((add 1 2) (bad))) 1)

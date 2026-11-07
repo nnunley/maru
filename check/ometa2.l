@@ -2,6 +2,7 @@
 ;;; their rule methods a tpeg grammar each, their Smalltalk actions run with the rules' bindings and the grammar's object.
 (require "ometa2.l")
 (define ok 1)
+(define-function listed (v) (if (array? v) (map listed (array->list v)) v))	; an array, and arrays in it, as lists
 (define-function expect (what got want)
   (or (equal got want) (let () (set ok ()) (print "FAIL " what ": got ") (dump got) (print ", want ") (dump want) (println))))
 
@@ -33,6 +34,7 @@
        (tree (list 'call "$$(timerE(100))" (list 'var "$$" (string->symbol "$$")) call))
        (attrs (ometa2-match 'KSQuoteAttributor2 'start tree ()))
        (code (ometa2-match 'KSQuoteTranslator2 'start tree (list attrs))))
+  (set code (listed code))	; its trees are Smalltalk's brace arrays, Maru arrays
   (expect "a block that declares the stream" (list (car code) (caddr code)) '(begin (decl "pvtStrm" (quote pvtStrm) (new "" (var "KSNewEventStream" KSNewEventStream)))))
   ;; the sub-stream it adds for timerE, and the finish from it, are the plan's acceptance test for step 3d
   )

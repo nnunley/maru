@@ -84,6 +84,13 @@ Steps, each a check first:
    - an Array is a Maru array everywhere (the user, 2026-11-07): KScript's [a, b], Smalltalk's {a. b} and #(...) all make
      one, as Array new: already does, so KSWorld's compiler trees built with { } are arrays and tpeg's tree matching
      enters arrays as it enters lists.
+     Done: KScript's lists, Smalltalk's brace and literal arrays, asArray and Message arguments are Maru arrays, and tpeg
+     enters arrays (input.l), so KSQuoteTranslator2's trees match.
+   - one hash table under every dictionary (the user asked, 2026-11-07, whether Maru has a hash set or map: it has
+     none; the evaluators hash only their global cache, and JOHN's seen states (john-eval.l) and the law engine's terms
+     (rules.l) each keep their own buckets, while Dictionary, Set and a KSObject's slots are association lists). Written
+     in a Maru language, not C, keyed by identity or by equality, it holds Dictionary and IdentityDictionary, Set and
+     IdentitySet, KSObject's slots, and JOHN's and rules.l's buckets, each moved onto it with its checks.
    Order and tests (the user, 2026-11-07: "make sure there's solid testing that the change in semantics is accounted for,
    and fixed at the KScript level if it causes breakages"): in Maru false, nil and the empty list are one value, (), so
    arrays become Maru arrays first, and only then KScript's truth becomes Maru's; an empty collection is then an empty

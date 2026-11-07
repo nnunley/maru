@@ -1,6 +1,6 @@
 "squeak-base.st -- the platform under KSWorld's Smalltalk methods, in test-pepsi.l's form (read by squeak.g's library rule):
- Squeak's classes as test-pepsi.l lays them out, on the values KScript computes with (numbers, strings, KScript's lists,
- Maru's arrays, true, false and nil, blocks), with Squeak's meanings where pepsi's differ: an Array counts from 1.  Only
+ Squeak's classes as test-pepsi.l lays them out, on the values KScript computes with (numbers, strings,
+ Maru's arrays (KScript's lists too), true, false and nil, blocks), with Squeak's meanings where pepsi's differ: an Array counts from 1.  Only
  what KSWorld's methods reach is here; a send nothing answers is an error naming it."
 
 Object : ()
@@ -43,10 +43,10 @@ Object ifNil: aBlock                    [ self ]
 Object ifNotNil: aBlock                 [ aBlock numArgs = 0 ifTrue: [aBlock value] ifFalse: [aBlock value: self] ]
 Object ifNil: nilBlock ifNotNil: aBlock [ self ifNotNil: aBlock ]
 Object error: message                   { (error "Smalltalk: " message) }
-Object doesNotUnderstand: aMessage      { (ks-native-send self (ks-slot aMessage 'name) (ks-slot aMessage 'arguments) () self) }
+Object doesNotUnderstand: aMessage      { (ks-native-send self (ks-slot aMessage 'name) (array->list (ks-slot aMessage 'arguments)) () self) }
 Message selector                        { (ks-slot self 'selector) }
 Message arguments                       { (ks-slot self 'arguments) }
-Message numArgs                         { (list-length (ks-slot self 'arguments)) }
+Message numArgs                         { (array-length (ks-slot self 'arguments)) }
 Object isBlock                          [ false ]
 Object isCollection                     [ false ]
 Collection isCollection                 [ true ]
@@ -55,7 +55,7 @@ String isString                         [ true ]
 Object isSymbol                         [ false ]
 String isSymbol                         { (ks-bool (symbol? self)) }
 BlockClosure isBlock                    [ true ]
-BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a args)) (for (i 0 n) (push out (if a (car a) 'nil)) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
+BlockClosure ksValueWithEnoughArguments: args { (let ((n (list-length (<ks-closure>-params self))) (out ()) (a (ks-elements-of args))) (for (i 0 n) (push out (if a (car a) 'nil)) (set a (cdr a))) (ks-apply self (list-reverse! out) () ())) }
 Object initialize                       [ self ]
 Object perform: aSymbol                 { (ks-send self (ks-selector-of aSymbol) () () self) }
 Object perform: aSymbol with: a         { (ks-send self (ks-selector-of aSymbol) (list a) () self) }
@@ -197,6 +197,8 @@ String copyWithout: c                   { (let ((s (if (symbol? self) (symbol->s
 Array class new: n                      { (let ((a (array n))) (for (i 0 n) (set-array-at a i 'nil)) a) }
 Array size                              { (array-length self) }
 Array at: i                             { (if (and (long? i) (< 0 i) (<= i (array-length self))) (array-at self (- i 1)) (error "Smalltalk: index " i " out of bounds for an Array of " (array-length self))) }
+Array = other                           { (ks-bool (ks-equal? self other)) }
+Array , other                           { (list->array (concat-list (array->list self) (ks-elements-of other))) }
 Array at: i put: v                      { (if (and (long? i) (< 0 i) (<= i (array-length self))) (set-array-at self (- i 1) v) (error "Smalltalk: index " i " out of bounds for an Array of " (array-length self))) }
 ArrayedCollection replaceFrom: start to: stop with: source startingAt: from
                                         [ "as Squeak's primitive does, so a copy within one array moves as memmove would"
@@ -223,14 +225,14 @@ SystemDictionary at: key ifAbsent: aBlock { (or (ks-class-named (ks-dict-key key
 SystemDictionary includesKey: key       { (ks-bool (or (ks-class-named (ks-dict-key key)) (assq (ks-dict-key key) *ks-globals*))) }
 Smalltalk := SystemDictionary new.
 
-"An OrderedCollection keeps its elements in order (in a KScript list, items), a Set each one once (equal), an IdentitySet each
+"An OrderedCollection keeps its elements in order (in a Maru list, items), a Set each one once (equal), an IdentitySet each
  object once (itself); what they answer is what KSWorld's compiler passes send them"
 OrderedCollection initialize            { (let () (ks-set-slot self 'items ()) self) }
 OrderedCollection add: x                { (let () (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x))) x) }
 OrderedCollection addAll: c             { (let () (list-do x (ks-elements-of c) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) c) }
 OrderedCollection removeLast            { (let* ((l (ks-slot self 'items)) (x (ks-last l))) (ks-set-slot self 'items (ks-but-last l)) x) }
 OrderedCollection size                  { (list-length (ks-slot self 'items)) }
-OrderedCollection asArray               { (ks-slot self 'items) }
+OrderedCollection asArray               { (list->array (ks-slot self 'items)) }
 Set initialize                          { (let () (ks-set-slot self 'items ()) self) }
 Set add: x                              { (let () (or (ks-set-has? self x) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) x) }
 Set includes: x                         { (ks-bool (ks-set-has? self x)) }
@@ -238,10 +240,10 @@ Set do: aBlock                          { (let () (list-do x (ks-slot self 'item
 Set collect: aBlock                     { (map (lambda (x) (ks-apply aBlock (list x) () ())) (ks-slot self 'items)) }
 Set size                                { (list-length (ks-slot self 'items)) }
 Set isEmpty                             { (ks-bool (not (ks-slot self 'items))) }
-Set asArray                             { (ks-slot self 'items) }
-List asArray                            [ self ]
+Set asArray                             { (list->array (ks-slot self 'items)) }
+List asArray                            { (list->array self) }
 
-"What every sequence answers, as Squeak's SequenceableCollection does, from at: and size (an Array, a String, KScript's lists
+"What every sequence answers, as Squeak's SequenceableCollection does, from at: and size (an Array, a String, a Maru list
  and an OrderedCollection answer those themselves); ArrayedCollection (fixed size) and OrderedCollection (grows) are siblings"
 SequenceableCollection first            [ self at: 1 ]
 SequenceableCollection second           [ self at: 2 ]

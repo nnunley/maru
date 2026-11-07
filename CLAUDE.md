@@ -266,6 +266,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   Methods are defined per kind of receiver (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), and
   a send no method answers is an error naming kind and selector; a KSWorld object's send sets or reads a field it already has, but
   never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
+  A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
+  collection, true as a test, never nil.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
@@ -433,7 +435,7 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `tree_foreign`, `tree_literals`, `tree_calc`, `tree_interleave`, `tree_text_refuses`, `tree_parse_complete`
   (`check/tpeg-*`): stage 1 of `docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`, on every evaluator. A grammar whose
   parent is `<source-parser>` matches any source through the input selectors (`input.l`, `source-parser.l`): lists,
-  a user's type, bytes (`input-binary.l`; not on `eval2`, which says it skipped them). A pattern enters a list, a rule's
+  a user's type, bytes (`input-binary.l`; not on `eval2`, which says it skipped them). A pattern enters a list or an array, a rule's
   arguments are cells on its input and leaving one unread is an error, memos live on the stream's cells, and a foreign
   rule reads through proxy cells with fresh memos. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
   interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.

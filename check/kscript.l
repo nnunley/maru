@@ -85,4 +85,22 @@ for i in [0...10] by 5 total := total + i
 	      (ks-send 'true 'printString () () ()) (ks-send 'false 'asString () () ()))
 	'(true false false "true" "false"))
 
+;; KScript's lists are Maru arrays (one representation with Smalltalk's Arrays): a literal, a range and a comprehension
+;; each make one, counted from 0 by an index, and an empty one is a collection, true as a test, never nil or false
+(define-function ks-run (text) (ks-stream-curr (ks-eval (car (kscript-parse text)) () ())))
+(let ((a (ks-run "[1, 2, 3]")))
+  (expect "a literal is an array" (and (array? a) (array->list a)) '(1 2 3)))
+(expect "a range is an array" (let ((a (ks-run "[1...3]"))) (and (array? a) (array->list a))) '(1 2 3))
+(expect "a comprehension is an array" (let ((a (ks-run "[x * 2 for x in [1, 2, 3] when x > 1]"))) (and (array? a) (array->list a))) '(4 6))
+(expect "an index counts from 0" (ks-run "[10, 20, 30][1]") 20)
+(expect "an empty array: size 0, isEmpty, and true as a test"
+	(list (ks-run "[].size()") (ks-truthy? (ks-run "[].isEmpty()")) (ks-run "if [] then 1 else 2") (ks-run "if nil then 1 else 2"))
+	'(0 t 1 2))
+(expect "for, a comprehension and a detect over an array"
+	(list (ks-val (box-of "total := 0\nfor i in [1, 2, 3] total := total + i\n") 'total) (ks-run "(x in [1, 2, 3] when x > 1)"))
+	'(6 2))
+(expect "first, second, copy and sort of an array"
+	(list (ks-run "[3, 1, 2].first()") (ks-run "[3, 1, 2].second()") (array->list (ks-run "[3, 1, 2].copy()")) (array->list (ks-run "[3, 1, 2].sort()")))
+	'(3 1 (3 1 2) (1 2 3)))
+
 (and ok (println "kscript ok"))
