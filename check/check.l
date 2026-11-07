@@ -428,7 +428,8 @@
 ;; OMeta2 grammar classes (KSWorld's KScript2 compiler passes) run from their sources on Maru's PEG (ometa2.l)
 (check "ometa2" (unit-assert (equal (last (run "ometa2" "./eval check/ometa2.l")) "ometa2 ok")))
 ;; KSWorld's own methods from ksworld/*.st: every KScript method of KSTextLayout read, and each a method of the class
-(check "ksworld_sources" (unit-assert (equal (last (run "ksworld_sources" "./eval check/ksworld-sources.l")) "ksworld sources ok")))
+;; reading KSWorld's sources is the work (KSBox's 370 methods through the grammars, about 20 s alone), so 600 s as the heavy cases
+(check "ksworld_sources" (unit-assert (equal (last (run "ksworld_sources" "./eval check/ksworld-sources.l" 600)) "ksworld sources ok")))
 ;; the pointer in KSWorld.ks: a press, a drag, the selection drawn, a release (check/ksworld-mouse.l)
 (check "ksworld_mouse" (unit-assert (equal (last (run "ksworld_mouse" "./eval check/ksworld-mouse.l")) "ksworld mouse ok")))
 ;; png.irl under AddressSanitizer: every fixture, good and hostile, read into a buffer of exactly its size by

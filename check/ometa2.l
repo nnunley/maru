@@ -37,4 +37,8 @@
   ;; the sub-stream it adds for timerE, and the finish from it, are the plan's acceptance test for step 3d
   )
 
+;; a match that fails leaves the reader as it found it: the running grammar and parser are restored
+(ks-parse-or-nil (lambda () (ometa2-match 'KSQuoteAttributor2 'hasStreamInnerNoSuchRule '(x) ())))
+(expect "after a failed match, no grammar or parser is left running" (list *ometa2-host* *ometa2-parser*) '(() ()))
+
 (println (if ok "ometa2 ok" "ometa2 FAILED"))

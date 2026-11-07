@@ -80,7 +80,17 @@ Steps, each a check first:
    - KSWorld's classes are Smalltalk classes, a document's objects their instances, and their slots KSObject's own
      dictionary (it is an IdentityDictionary) on the platform's Dictionary, so KScript's this.x and Smalltalk's self at: #x
      reach one storage;
-   - KScript (kscript.l) evaluates onto that layer: Maru's booleans, the shared objects and dispatch, no tables of its own.
+   - KScript (kscript.l) evaluates onto that layer: Maru's booleans, the shared objects and dispatch, no tables of its own;
+   - an Array is a Maru array everywhere (the user, 2026-11-07): KScript's [a, b], Smalltalk's {a. b} and #(...) all make
+     one, as Array new: already does, so KSWorld's compiler trees built with { } are arrays and tpeg's tree matching
+     enters arrays as it enters lists.
+   Order and tests (the user, 2026-11-07: "make sure there's solid testing that the change in semantics is accounted for,
+   and fixed at the KScript level if it causes breakages"): in Maru false, nil and the empty list are one value, (), so
+   arrays become Maru arrays first, and only then KScript's truth becomes Maru's; an empty collection is then an empty
+   array, never (), and () answers as UndefinedObject, not List. Checks pinned before the switch: an empty array is
+   neither false nor nil and answers isEmpty; nil and false are one value; a test of an empty collection against one
+   of nil, in KScript and in Smalltalk; every KScript listing (kscript) and KSWorld document check (ksworld_*) before
+   and after. A breakage is fixed in KScript, not by bending the shared representation.
    Every KScript and KSWorld check moves with it. The same rule covers JOHN (its objects, classes, yes/no truth and
    valued sets) and the laws runtime (law-record, law-truth): each moves onto the shared objects and Maru's booleans, as
    its own step after KSWorld's, with its checks.

@@ -151,6 +151,7 @@
 (define *ks-classes* ())	; (name . class)
 (define *ks-globals* ())	; (name . value), Smalltalk's globals (squeak-base.st's Smalltalk)
 (define *ks-classvars* ())	; ((CLASS NAME) . value), Smalltalk's class variables
+(define-function ks-bit-or (a b) (| a b))	; cexpr.g's |
 (define-function ks-assoc (key l)	; the pair whose car is equal to key
   (let ((found ())) (while (and l (not found)) (and (equal key (caar l)) (set found (car l))) (set l (cdr l))) found))
 (define-function ks-class-named (name) (cdr (assq name *ks-classes*)))
@@ -392,6 +393,11 @@
 	       found))
   (sort (ks-sort recv (lambda (a b) (ks-truthy? (if args (ks-apply (car args) (list a b) env this) (ks-cmp '<= a b)))))))
 
+;; true, false and nil: Smalltalk's kinds, answering what they answered when they were text
+(ks-methods True (asBoolean 'true) ((asString printString) "true"))
+(ks-methods False (asBoolean 'false) ((asString printString) "false"))
+(ks-methods UndefinedObject (asBoolean 'false) ((asString printString) (ks-to-string recv)))
+
 (ks-methods ColorClass			; Color, the class, a global
   (white (ks-color 1.0 1.0 1.0 1.0))
   (black (ks-color 0.0 0.0 0.0 1.0))
@@ -577,6 +583,16 @@
 	    res))
 	 ((= op 'method-return)	; Smalltalk's ^, from a block too: to the tag of the method it's in
 	  ((eval 'throw) (ks-env-lookup env this '%method ()) (ks-stream-curr (ks-eval (cadr exp) env this))))	; catch.l's, loaded with the sources
+	 ((= op 'assign-add) (ks-eval `(assign ,(cadr exp) (+ ,(cadr exp) ,(caddr exp))) env this))	; x += e
+	 ((= op 'assign-sub) (ks-eval `(assign ,(cadr exp) (- ,(cadr exp) ,(caddr exp))) env this))	; x -= e
+	 ((or (= op '&) (= op '^) (= op '<<) (= op '>>) (= op (string->symbol "|")))	; cexpr.g's bitwise operators and shifts
+	  (let ((a (ks-stream-curr (ks-eval (cadr exp) env this))) (b (ks-stream-curr (ks-eval (caddr exp) env this))))
+	    (cond ((= op '&) (& a b)) ((= op '^) (^ a b)) ((= op '<<) (<< a b)) ((= op '>>) (>> a b)) (else (ks-bit-or a b)))))
+	 ((= op '~) (^ (ks-stream-curr (ks-eval (cadr exp) env this)) -1))
+	 ((= op 'stream-expr)	; a stream of an expression, as <- makes one (KSWorld's own construction is the plan's step 3d)
+	  (let ((ns (ks-make-stream this "exprE" "" (ks-stream-curr (ks-eval (cadr exp) env this)))))
+	    (set (<ks-object>-attrs ns) (cons ':__ast__ (cons (cadr exp) (<ks-object>-attrs ns))))
+	    ns))
 	 ((= op 'char) (cadr exp))
 	 ((= op 'symbol) (cadr exp))	; #'name', a Smalltalk Symbol: Maru's symbol, text as KScript's are
 	 ((= op 'classvar) (let ((p (ks-assoc (cdr exp) *ks-classvars*))) (if p (cdr p) 'nil)))	; Smalltalk's class variables
@@ -723,6 +739,11 @@
 	      (set-cdr env (cons (car env) (cdr env)))
 	      (set-car env (cons vname val)))
 	    val))
+	 ((and (= op 'assign) (pair? (caddr exp)) (= 'stream-expr (car (caddr exp))) (pair? (cadr exp)) (= 'field (car (cadr exp))))
+	  ;; this.x = a stream expression: the slot holds the stream itself, not its value
+	  (let ((target (ks-stream-curr (ks-eval (cadr (cadr exp)) env this))) (s (ks-eval (caddr exp) env this)))
+	    (ks-set-slot target (caddr (cadr exp)) s)
+	    s))
 	 ((= op 'assign)
 	  (let ((lhs (cadr exp))
 		(val (ks-stream-curr (ks-eval (caddr exp) env this))))

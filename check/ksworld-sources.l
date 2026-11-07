@@ -80,6 +80,18 @@
 (expect "Object>>doesNotUnderstand: names what was sent"
 	(try (ks-send 3 'frobnicate () () ()) (lambda (c) (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (symbol? p) (symbol->string p) p)))) s)))
 	"Smalltalk: Number does not understand frobnicate")
+;; Squeak's numbers and binary selectors: a negative radix literal, and a negative literal after a binary operator
+(expect "a negative radix literal" (squeak-number "-16rFF") -255)
+(expect "a>-1 is a > -1" (cadr (ks-squeak-method "f\n\t^ a>-1" () ())) '(fn () (method-return (send a > -1))))
+;; every form the grammar makes evaluates: += and -= on a field and a variable, the bitwise operators and shifts (cexpr.g's),
+;; and a stream expression making a stream as <- does
+(let ((o (ks-basic-new (ks-class-named 'KSObject))))
+  (ks-set-slot o 'n 5)
+  (expect "+= and -= on a field" (list (ks-eval (car (kscript-parse "this.n += 3")) () o) (ks-eval (car (kscript-parse "this.n -= 1")) () o) (ks-val o 'n)) '(8 7 7))
+  (expect "+= on a variable" (run "var k = 1\nk += 41\nk") 42)
+  (expect "bitwise operators and shifts" (list (run "6 & 3") (run "6 | 3") (run "6 ^ 3") (run "1 << 4") (run "32 >> 2") (run "~0")) '(2 7 5 16 8 -1))
+  (ks-eval (car (kscript-parse "this.s = $$(2 + 3)")) () o)
+  (expect "a stream expression makes a stream" (list (ks-stream? (ks-slot o 's)) (ks-val o 's)) '(t 5)))
 (expect "a form the evaluator doesn't know is an error naming it" (try (ks-eval '(no-such-form 1) () ()) (lambda (c) 'refused)) 'refused)
 
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

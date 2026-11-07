@@ -17,7 +17,7 @@ binchar		= [-!%&*+,/<=>?@\\~|] ;
 idpart		= (letter (letter | digit)*) @ $:s				-> s ;
 identifier	= idpart:x !(":" !"=") _					-> (squeak-name self x) ;
 keyword		= idpart:x ":" !"=" _						-> x ;
-binsel		= (binchar+) @ $:s _						-> (string->symbol s) ;
+binsel		= (binchar (!("-" digit) binchar)*) @ $:s _			-> (string->symbol s) ;	# a>-1 is a > -1
 
 number		= ("-"? digit+ ("r" [0-9A-Z]+)? ("." digit+)? ("e" "-"? digit+)?) @ $:s _	-> (squeak-number s) ;
 string		= "'" ("''" -> 39 | !"'" .)* $:s "'" _				-> s ;

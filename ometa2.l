@@ -102,7 +102,8 @@
 	 (p (if (string? input) (text-parser-for-on g input) (source-parser-for g (list input))))
 	 (saved-host *ometa2-host*) (saved-parser *ometa2-parser*))
     (set *ometa2-host* host) (set *ometa2-parser* p)
-    (let ((ok (apply (if (string? input) text-parser-invoke-rule source-parser-invoke-args)
-		     (cons rule (cons (eval (concat-symbol '$ rule)) (cons p args))))))
-      (set *ometa2-host* saved-host) (set *ometa2-parser* saved-parser)
-      (if ok (if (string? input) (<text-parser>-result p) (<source-parser>-result p)) (error "OMeta2: " class " didn't match " rule)))))
+    (unwind-protect	; however the match ends, the grammar and parser running before it are running again
+	(let ((ok (apply (if (string? input) text-parser-invoke-rule source-parser-invoke-args)
+			 (cons rule (cons (eval (concat-symbol '$ rule)) (cons p args))))))
+	  (if ok (if (string? input) (<text-parser>-result p) (<source-parser>-result p)) (error "OMeta2: " class " didn't match " rule)))
+      (set *ometa2-host* saved-host) (set *ometa2-parser* saved-parser))))

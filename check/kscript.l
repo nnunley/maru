@@ -79,4 +79,10 @@ c <- 0 fby when t then c' + 1
 for i in [0...10] by 5 total := total + i
 ") 'total) 15)
 
+;; true, false and nil have kinds of their own (True, False, UndefinedObject), and answer what they answered as text
+(expect "true, false and nil as booleans and text"
+	(list (ks-send 'true 'asBoolean () () ()) (ks-send 'false 'asBoolean () () ()) (ks-send 'nil 'asBoolean () () ())
+	      (ks-send 'true 'printString () () ()) (ks-send 'false 'asString () () ()))
+	'(true false false "true" "false"))
+
 (and ok (println "kscript ok"))
