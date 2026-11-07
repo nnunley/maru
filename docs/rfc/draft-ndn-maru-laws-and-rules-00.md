@@ -661,6 +661,19 @@ reference that exits on error runs in-process and its fatal errors become
 often. Excluded until a measured distribution needs it; laws can already
 assert coverage. Extension point: a weight after a rule's name.
 
+**Quotas on rules (stratified generation).** A domain's values are made by
+rules, so its arms are known: a law could say how its trials split across a
+relation's rules (`20% two_buffers, 5% empty, rest by chance`), drawing each
+arm's cases with that rule forced at the top. Each arm's count is then exact
+and fixed by the seed, so a cover on it is judged as under `EXHAUST`, with no
+sequential drawing, and a slow law (each case a run of the Nile driver) draws
+exactly `trials` cases; a class stays a check on the value, and a case from
+an arm that isn't in its class is a bug in the rule. The sequential test stays
+for shares nobody controls (what a schedule or a grammar happens to give) and
+classes that cut across arms. Excluded until a law's testing needs it: no law
+has a cover yet. Extension point: a quota clause after a law's method, naming
+rules; naming classes instead needs a generator that can aim at a class.
+
 ## Alternatives Considered
 
 **Why not generate from the grammar and filter by the reference?** It is
