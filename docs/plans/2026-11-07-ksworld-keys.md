@@ -20,8 +20,13 @@ Steps, each a check first:
    caret where ours did; our stand-ins go.
    KSWorld's handleButtonDown works on letter boxes (letterNearest, localPointFor, selectWord), so ours give way to
    KSWorld's together with step 3.
-3. Letter boxes: a text box's spans expand into letter boxes as KSWorld held them, and layout and rendering read them.
+   The user's rule (2026-11-07): everything runs KSWorld's own code via KScript, nothing hand-rolled where KSWorld's
+   exists. So layout too: KSTextLayout's place, rule1..5 and adjustJustification place the letters, not ksworld-text.l.
+3. (Done: ksworld-pp.l's ks-letter-contents; positions still from ksworld-text.l, to be replaced in 3b.) Letter boxes: a text box's spans expand into letter boxes as KSWorld held them, and layout and rendering read them.
    Check: KSWorld.ks draws the same 937 paths, each text box's kept character where it was.
+3b. KSWorld's layout: KSTextLayout's own layout methods, with the KSBox methods they send, place each letter. Check:
+   the five kept letters where KSWorld put them (check/ksworld.l's letter-as-kept), 937 paths; ksworld-text.l's layout
+   goes. Then KSWorld's handleButtonDown/handlePointerMotion/installSelection replace ksworld-events.l's.
 4. Keys: (ksworld-key session value modifiers) makes a KSWorld keyStroke event and announces it to the focus. Check: a
    typed letter inserts a letter box after the caret; backspace removes it; arrows move the caret (KSWorld's textAction).
 5. Window: SDL3 key and text events become keys (Squeak values, CMD from the command modifier). Check on the dummy

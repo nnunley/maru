@@ -99,23 +99,24 @@
   (let ((v (map (lambda (x) (/ (ks-parse-num x) 255.0)) (ks-split fill 32))))
     (list 'uniform (cadddr v) (car v) (cadr v) (caddr v))))
 
-(define-structure <ks-char> (code font scale paint advance x index))
+(define-structure <ks-char> (code font scale paint advance x index letter))
 (define-structure <ks-glyph> (font glyph scale x y paint))
 
-;; the spans' characters, each knowing its font, scale, paint and place in the text
-(define-function ks-span-chars (spans)
-  (let ((out ()) (index 0))
-    (list-do s spans
-      (let* ((pl (cdr s))
-	     (fonts (ks-fonts (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
-	     (size (string->double (ks-plist-get pl ':size)))
-	     (paint (ks-span-paint (ks-plist-get pl ':fill)))
-	     (text (ks-plist-get pl ':data)))
-	(for (i 0 (string-length text))
-	  (let* ((code (string-at text i)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
-	    (push out (new <ks-char> code font scale paint
-			   (* scale (ttf-advance font (ttf-glyph font code))) 0 index))
-	    (set index (+ index 1))))))
+;; a text box's letter boxes (its contents, ksworld-pp.l's ks-letter-contents) as characters, each knowing its font,
+;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts
+(define-function ks-letter-chars (letters)
+  (let ((out ()) (index 0) (font-of ()) (fonts ()) (size 0) (paint ()))
+    (list-do l letters
+      (let ((f (ks-slot l 'font)))
+	(unless (= f font-of)
+	  (let ((pl (<ks-object>-attrs f)))
+	    (set font-of f)
+	    (set fonts (ks-fonts (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
+	    (set size (string->double (ks-plist-get pl ':size)))
+	    (set paint (ks-span-paint (ks-plist-get pl ':fill)))))
+	(let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
+	  (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
+	  (set index (+ index 1)))))
     (list-reverse! out)))
 
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
@@ -168,9 +169,24 @@
   (if ink (let ((c (car (last-pair ink)))) (+ (<ks-char>-x c) (ks-char-width c (<ks-char>-x c) tabs origin))) 0))
 
 ;; a box holding text: its data are spans and its handler lays them out
-(define-function ks-text-box? (box)
-  (let ((d (<ks-object>-data box)) (layout (ks-slot box 'handler)))
-    (and (pair? d) (pair? (car d)) (= 'span (caar d))
+;; where KSWorld put a glyph's own box: at its bounding box's top left
+(define-function ks-glyph-box (g)
+  (let ((b (ttf-bounds (<ks-glyph>-font g) (<ks-glyph>-glyph g))) (s (<ks-glyph>-scale g)))
+    (ks-point (+ (<ks-glyph>-x g) (* s (car b))) (- (<ks-glyph>-y g) (* s (cadddr b))))))
+(define-function ks-glyph-extent (g)	; as KSWorld's letters kept it: the glyph's advance wide, its ink tall
+  (let ((b (ttf-bounds (<ks-glyph>-font g) (<ks-glyph>-glyph g))) (s (<ks-glyph>-scale g)))
+    (ks-point (* s (ttf-advance (<ks-glyph>-font g) (<ks-glyph>-glyph g))) (* s (- (cadddr b) (cadr b))))))
+;; a letter box placed as KSWorld placed its glyph: its transformation at the glyph's box, its extent and bounds that box
+(define-function ks-place-letter (letter g)
+  (let ((p (ks-glyph-box g)) (e (ks-glyph-extent g)))
+    (ks-set-slot letter 'transformation (ks-matrix 1 0 0 1 (<ks-point>-x p) (<ks-point>-y p)))
+    (ks-set-slot letter 'extent e)
+    (ks-set-slot letter 'bounds (ks-rect (<ks-point>-x p) (<ks-point>-y p)
+					 (+ (<ks-point>-x p) (<ks-point>-x e)) (+ (<ks-point>-y p) (<ks-point>-y e))))))
+
+(define-function ks-text-box? (box)	; a KSTextLayout's box whose contents are letters
+  (let ((c (ks-val box 'contents)) (layout (ks-slot box 'handler)))
+    (and (ks-object? c) (= 'KSContentsCollection (<ks-object>-class c))
 	 (ks-object? layout) (= 'KSTextLayout (<ks-object>-class layout)))))
 
 ;; a text box laid out: its glyphs, and its lines, each (top bottom start cells), start the index its first character
@@ -182,7 +198,7 @@
 	 (justification (string->symbol (ks-slot layout 'justification)))
 	 (interval (ks-slot layout 'tabArray))
 	 (tabs (and (ks-object? interval) (list (ks-slot interval 'start) (ks-slot interval 'stop) (ks-slot interval 'step))))
-	 (chars (ks-span-chars (<ks-object>-data box)))
+	 (chars (ks-letter-chars (ks-items (ks-val box 'contents))))
 	 (y top) (out ()) (lines ()) (next 0))
     (list-do line (ks-break-lines chars width tabs (not (= 'true (ks-slot layout 'noWrap))) left)
       (let* ((hard (car line)) (origin (cadr line)) (chars (cddr line)) (ink (ks-line-ink chars))
@@ -199,9 +215,10 @@
 	(list-do c chars
 	  (let ((x (+ (+ left offset) (+ (<ks-char>-x c) extra))))
 	    (push cells (list (<ks-char>-index c) x (+ x (ks-char-width c (<ks-char>-x c) tabs origin))))
-	    (or (ks-space? c) (not (memq c ink))
-		(push out (new <ks-glyph> (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)) (<ks-char>-scale c)
-			       x (+ y ascent) (<ks-char>-paint c))))
+	    (let ((g (new <ks-glyph> (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)) (<ks-char>-scale c)
+			  x (+ y ascent) (<ks-char>-paint c))))
+	      (ks-place-letter (<ks-char>-letter c) g)
+	      (or (ks-space? c) (not (memq c ink)) (push out g)))
 	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
 	(push lines (list y (+ (+ y ascent) descent) next (list-reverse! cells)))
 	(and chars (set next (+ 1 (<ks-char>-index (car (last-pair chars))))))
@@ -236,11 +253,6 @@
 	     (set left end) (set right (+ end 1)))
 	(and left (push out (list left top right bottom)))))
     (list-reverse! out)))
-
-;; where KSWorld put a glyph's own box: at its bounding box's top left
-(define-function ks-glyph-box (g)
-  (let ((b (ttf-bounds (<ks-glyph>-font g) (<ks-glyph>-glyph g))) (s (<ks-glyph>-scale g)))
-    (ks-point (+ (<ks-glyph>-x g) (* s (car b))) (- (<ks-glyph>-y g) (* s (cadddr b))))))
 
 ;; what a Gezira draws for a glyph: its outline as floats, and the matrix from font units to the box
 (define-function ks-glyph-floats (g)

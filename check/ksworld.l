@@ -48,6 +48,16 @@
 	     (near (<ks-point>-x p) (<ks-matrix>-e m)) (near (<ks-point>-y p) (<ks-matrix>-f m))
 	     (set found 1))))
     found))
+(define-function letter-as-kept (box)	; a letter box of box's contents with the kept one's character, bounds and extent
+  (let ((c (ks-slot (ks-slot box 'handler) 'lineStart)) (found ()))
+    (ks-text-layout box)
+    (list-do l (ks-items (ks-val box 'contents))
+      (let ((m (ks-val l 'transformation)) (k (ks-val c 'transformation)) (e (ks-val l 'extent)) (ke (ks-val c 'extent)))
+	(and (= 'KSBox (<ks-object>-class l)) (= box (ks-val l 'container)) (= (ks-val c 'unicode) (ks-val l 'unicode))
+	     (near (<ks-matrix>-e m) (<ks-matrix>-e k)) (near (<ks-matrix>-f m) (<ks-matrix>-f k))
+	     (near (<ks-point>-x e) (<ks-point>-x ke)) (near (<ks-point>-y e) (<ks-point>-y ke))
+	     (set found 1))))
+    found))
 (define-function text-as-kept (table doc)
   (let ((kept 0) (boxes 0))
     (array-do o table
@@ -60,7 +70,10 @@
       (when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o))
 	(set boxes (+ boxes 1))
 	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s last line, laid out as KSWorld did")
-		(laid-out-as-kept o) 1)))
+		(laid-out-as-kept o) 1)
+	;; its contents are letter boxes, as KSWorld read the spans it wrote, and the kept letter's is where KSWorld put it
+	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s letters, the kept one placed as KSWorld placed it")
+		(letter-as-kept o) 1)))
     (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
     ;; its shapes, the carets of the three text boxes it kept showing their selection, and each character
     (expect "KSWorld.ks: the paths it draws, shapes, carets and characters" (list-length (drawn doc 1024 768)) 937)))
