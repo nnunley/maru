@@ -1,0 +1,11 @@
+-- classify counts the passing cases each class holds (classes can overlap); cover asks a class for a share of them
+under test: number
+let numerals = [0 .. 9]
+law classes_proved: all n: number(n). n >= 0 by exhaustion classify zero when n = 0, small when n < 5
+law classes_tested: all n: number(n). n >= 0 by test classify always when n >= 0
+law classes_let: all n: number(n), let m = n * 2. m >= n by exhaustion classify big when m > 10
+law covered: all n: number(n). n >= 0 by exhaustion classify zero when n = 0 cover 10% zero
+law undercovered: all n: number(n). n >= 0 by exhaustion classify zero when n = 0, small when n < 5 cover 20% zero, 50% small, 60% small
+law refuted_classes: all n: number(n). n < 5 by exhaustion classify zero when n = 0
+law cover_unknown: all n: number(n). n >= 0 by exhaustion classify zero when n = 0 cover 5% big
+law cover_over: all n: number(n). n >= 0 by exhaustion classify zero when n = 0 cover 120% zero

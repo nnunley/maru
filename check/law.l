@@ -26,6 +26,7 @@
 (define *law-crash* ())		; (status arg...) once a reference answers neither accept nor reject
 (define *law-failed* ())
 (define *lb* ())  (define *lvars* ())  (define *lnames* ())	; the law: bindings (var kind data), $vars, plain names
+(define *lk* ())  (define *lcover* ())  (define *lcounts* ())	; the law's classes (name . function), covers (percent name), counts
 (define *lname* ())  (define *lc* ())  (define *lf* ())  (define *ls* 3)  (define *lclaim* ())  (define *lseed* 42)  (define *lmethod* ())
 
 ;; the environment overrides a file's defaults, so a sweep can try fresh seeds and more trials (check/sweep.l)
@@ -160,6 +161,21 @@
 	((= 'grammar (cadr b)) (grammar-accepts? (caddr b) (cadddr b) v))
 	(else (rules-holds? *law-rules* (rules-subst (law-subst (caddr b) vars vals) (car b) v) *ls*))))
 
+;; classes: a passing case counts toward each class whose expression is true of it
+(define-function law-count (vals)
+  (let ((cs *lcounts*))
+    (list-do k *lk* (and (apply (cdr k) vals) (set-car cs (+ 1 (car cs)))) (set cs (cdr cs)))))
+(define-function law-percent (c n) (/ (+ (* 100 c) (/ n 2)) n))	; a share in whole percents, rounded to nearest
+(define-function law-index (name ks) (if (= name (caar ks)) 0 (+ 1 (law-index name (cdr ks)))))
+(define-function law-classed (r)	; a passing outcome with its classes' shares, or UNDERCOVERED naming each class short of its cover
+  (let ((n (cadr r)) (short ()) (shares ()))
+    (list-do v *lcover*
+      (let ((c (law-nth *lcounts* (law-index (cadr v) *lk*))))
+	(and (< (* 100 c) (* (car v) n)) (push short (list (cadr v) (law-percent c n) (car v))))))
+    (if short (cons 'UNDERCOVERED (list-reverse! short))
+      (let ((cs *lcounts*)) (list-do k *lk* (push shares (cons (car k) (law-percent (car cs) n))) (set cs (cdr cs))))
+      (list (car r) n (list-reverse! shares)))))
+
 ;; one set of values: skip (conditions false), hold, fail, crash or verdict (a claim or condition valued a verdict)
 (define-function law-try (vals)
   (set *law-crash* ()) (set *law-verdict* ())
@@ -211,7 +227,7 @@
     (while (and (not out) (< met trials) (< drawn limit))
       (set drawn (+ drawn 1))
       (let* ((vals (law-draw)) (r (if vals (law-try vals) 'skip)))
-	(if (= r 'hold) (set met (+ met 1))
+	(if (= r 'hold) (let () (set met (+ met 1)) (law-count vals))
 	  (or (= r 'skip) (set out (law-failed r vals))))))
     (or out (if (< met trials) (list 'STARVED met drawn) (list 'TESTED met)))))
 ;; EXHAUST: every value up to the size
@@ -219,7 +235,7 @@
 (define-function law-visit (vals)
   (set *law-drawn* (+ *law-drawn* 1))
   (let ((r (law-try vals)))
-    (if (= r 'hold) (set *law-met* (+ *law-met* 1))
+    (if (= r 'hold) (let () (set *law-met* (+ *law-met* 1)) (law-count vals))
       (or (= r 'skip) (set *law-out* (law-failed r vals))))))
 (define-function law-every (bs vars vals f)
   (if bs
@@ -232,7 +248,7 @@
   (cond (*law-out* *law-out*)
 	((or (= 0 *law-met*) (< (* *law-met* (law-setting 'starved_ratio)) *law-drawn*))	(list 'STARVED *law-met* *law-drawn*))
 	(else (list 'PROVED *law-met*))))
-(define-function law-method () (rules-seed *lseed*) (if (= 'exhaustion *lmethod*) (law-exhaust) (law-test)))
+(define-function law-method () (rules-seed *lseed*) (set *lcounts* (map (lambda (k) 0) *lk*)) (if (= 'exhaustion *lmethod*) (law-exhaust) (law-test)))
 (define-function law-pass? (r) (member? (car r) '(TESTED PROVED)))
 
 ;; VACUOUS: the claim names nothing under test (directly or through a variable's
@@ -297,7 +313,13 @@
 	  ((= k 'STARVED)	(print " " (cadr r) " of " (caddr r)))
 	  ((= k 'INCONCLUSIVE)	(print " status=" (cadr r) " input=") (dump (cddr r)))
 	  ((= k 'VACUOUS))
-	  (else			(print " " (cadr r))))
+	  ((= k 'UNDERCOVERED)	(let ((first 1))
+				  (list-do u (cdr r) (print (if first " " ", ") (car u) " " (cadr u) "% < " (caddr u) "%") (set first ()))))
+	  (else			(print " " (cadr r))
+				(and (cddr r) (let ((first 1))
+						(print " (")
+						(list-do c (caddr r) (print (if first "" ", ") (car c) " " (cdr c) "%") (set first ()))
+						(print ")")))))
     (println "")
     (or (law-pass? r) (set *law-failed* 1))))
 
@@ -360,13 +382,19 @@
 	(set *lname* (cadr it)) (set *lclaim* (car (cddddr it))) (set *lseed* seed)
 	(set *lmethod* method) (set *ls* (or size (law-setting 'size)))
 	(set *lc* (eval `(lambda ,*lnames* (and 1 ,@(map (lambda (c) (list 'law-truth ''condition (law-form c))) (cadddr it))))))
-	(set *lf* (eval `(lambda ,*lnames* (law-truth 'claim ,(law-form *lclaim*))))))))
+	(set *lf* (eval `(lambda ,*lnames* (law-truth 'claim ,(law-form *lclaim*)))))
+	(set *lk* (map (lambda (k) (cons (car k) (eval `(lambda ,*lnames* ,(law-form (cadr k)))))) (car (cdddr (cddddr it)))))
+	(set *lcover* (cadr (cdddr (cddddr it))))
+	(list-do v *lcover*
+	  (or *law-err*
+	      (cond ((not (assq (cadr v) *lk*))	(set *law-err* (list 'E_COVER (concat-strings "cover names " (symbol->string (cadr v)) ", which no classify declares"))))
+		    ((< 100 (car v))		(set *law-err* (list 'E_COVER (concat-strings "cover asks " (long->string (car v)) "% of " (symbol->string (cadr v)) ", more than all"))))))))))
 (define-function law-one (it seed)
   (print "law " (cadr it) ": ")
   (law-setup it seed (cadr (cddddr it)) (caddr (cddddr it)))
   (if *law-err* (law-report *law-err*)
     (let* ((r (law-method)) (v (and (law-pass? r) (law-vacuous?))))	; a probe that can't fork is no verdict
-      (law-report (cond ((= 'crash v) '(INCONCLUSIVE -1 stand-in)) (v '(VACUOUS)) (else r))))))
+      (law-report (cond ((= 'crash v) '(INCONCLUSIVE -1 stand-in)) (v '(VACUOUS)) ((and *lk* (law-pass? r)) (law-classed r)) (else r))))))
 
 ;; ADEQUATE: (adequacy name rel size law...): every mutant of the rules rel reaches fails a named law, each
 ;; exhausted at the size over domains from the file's own rules, its conditions and claim run under the mutant.

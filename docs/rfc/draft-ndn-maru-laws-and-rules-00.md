@@ -110,6 +110,7 @@ ENUM Outcome:
     STARVED     -- too few values met the conditions to judge
     VACUOUS     -- the claim does not depend on the code under test
     INCONCLUSIVE -- a reference crashed instead of answering
+    UNDERCOVERED -- passed, but a class met fewer cases than its cover asks
 ```
 
 **Field constraints:** logic variables in rules are lower-case names;
@@ -125,6 +126,7 @@ how long generation takes.
 | `STARVED` | Fails; prints how many values were drawn and how few met the conditions. |
 | `VACUOUS` | Fails; names the law. |
 | `INCONCLUSIVE` | Fails; prints the reference's status and the input it crashed on. |
+| `UNDERCOVERED` | Fails; names each class whose share fell short, its share and the share asked. |
 
 ### Configuration
 
@@ -405,6 +407,36 @@ A field in a rule or domain is `E_FIELD` when the file is read. Postfix indexing
 (`r[0]`) is not in `cexpr.g`, whose only postfix form is a call, so it is left
 out; a list is read by a support function instead, and there is no index error.
 
+### Classes and cover
+
+A law MAY classify its cases after its method: `classify NAME when EXPR, ...`.
+EXPR reads the law's names, lets included, as a claim does. Each case that meets
+the conditions and passes the claim counts toward every class whose EXPR is true,
+so classes can overlap, and a case can be in none. A `TESTED` or `PROVED` line
+then ends with each class's share of those cases, in the order declared, as whole
+percents rounded to nearest: `TESTED 1000 (empty 6%, two_buffers 31%)`. A law that
+fails prints no classes. [R-law-classify]
+
+A law MAY then ask for a share: `cover P% NAME, ...`. A law that would pass but in
+which a class met fewer than P percent of its cases (counted exactly, not from the
+rounded share) is `UNDERCOVERED`, naming each such class, its share and the share
+asked: `UNDERCOVERED two_buffers 2% < 20%`. A cover is judged after `VACUOUS`, so
+the stand-ins that judge vacuity are not judged for cover. A cover naming no declared
+class, or asking for more than 100%, is `E_COVER`, and the law does not run.
+[R-law-cover]
+
+A reader of the report doesn't need the classes: `notes/plan/law-report.g` reads
+`TESTED n` with or without them, and `UNDERCOVERED` as a failure.
+
+```maru-check @R-law-classify
+law_rules
+plan_evidence
+```
+
+```maru-check @R-law-cover
+law_rules
+```
+
 ### References
 
 A reference is declared with `reference name(args)` and is a Maru
@@ -498,6 +530,7 @@ the file, so adding a law does not change the values another draws.
 | `E_CLAIM` | a claim is `nile_accepts(e, t)`, not `nile_accepts(e, t) = accept` | Reject the law, naming it; the next law runs |
 | `E_ADEQUATE` | an adequacy law names a law that does not exist, or a relation with no mutants (no rule concludes it) | Reject the adequacy law; the next law runs |
 | `E_FIELD` | `r.c` where `r` is a record with no field `c`, or a value that is not a record; a field in a rule or domain | The run stops with the message, naming the field and the record's fields; a field in a rule or domain stops the file when it is read |
+| `E_COVER` | `cover 20% big` with no class `big`, or `cover 120% big` | Reject the law, naming the class or the share; the next law runs |
 | `E_RANGE` | a range `A .. B` whose ends are not whole-number constants | The file stops when it is read, naming the ends |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
@@ -531,12 +564,16 @@ hole        = "{" name "}"
 field       = name "." name
 defaults    = %s"defaults" setting *( "," setting )
 setting     = name "=" number
-law         = %s"law" name ":" %s"all" binding *( "," binding ) "." claim [ method ]
+law         = %s"law" name ":" %s"all" binding *( "," binding ) "." claim [ method ] [ classify ] [ cover ]
 law         =/ %s"law" name ":" %s"mutants" %s"of" name %s"by" %s"exhaustion" [ %s"size" number ] "." name *( "," name )
 binding     = name *( "," name ) ":" domain / "let" name "=" arg / expression
 domain      = goal / name "." name / name
 claim       = expression
 method      = %s"by" ( %s"test" / %s"exhaustion" ) [ %s"size" number ]
+classify    = %s"classify" class *( "," class )
+class       = name %s"when" expression
+cover       = %s"cover" share *( "," share )
+share       = number "%" name
 name        = ALPHA *( ALPHA / DIGIT / "_" )
 number      = 1*DIGIT
 text        = 1*( %x20-5F / %x61-7A / %x7C / %x7E / %x80-10FFFF )

@@ -524,7 +524,12 @@
 		 ;; a rule's [c | s] is a Maru list of numbers, and exhaustion over it reaches every list up to the size (1: 2 + 4, 2: 2 + 4 + 8)
 		 ("lists" "check/laws/fixtures/lists.l" 0 "law lists_size_one: PROVED 6" "law lists_size_two: PROVED 14" "law lists_test: TESTED 100")
 		 ;; the runtime's layout claim, as schedule.law states it: 2 widths x 2 worker counts x 14 schedules
-		 ("schedule" "check/laws/fixtures/schedule.l" 0 "law layout_contracts: PROVED 56"))
+		 ("schedule" "check/laws/fixtures/schedule.l" 0 "law layout_contracts: PROVED 56")
+		 ;; classes: each passing case's share, whole percents; a cover short of its share fails the law, a cover of no class is E_COVER
+		 ("classify" "" 256 "law classes_proved: PROVED 10 (zero 10%, small 50%)" "law classes_tested: TESTED 100 (always 100%)"
+		  "law classes_let: PROVED 10 (big 40%)" "law covered: PROVED 10 (zero 10%)"
+		  "law undercovered: UNDERCOVERED zero 10% < 20%, small 50% < 60%" "law refuted_classes: REFUTED n=5 seed=47"
+		  "law cover_unknown: E_COVER cover names big, which no classify declares" "law cover_over: E_COVER cover asks 120% of zero, more than all"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (list-do c '(("field-error" "no field c in the record, which has a, b") ("field-plain" "a is read from a value that is not a record"))

@@ -31,7 +31,7 @@
 	     (rule e_num () (expr $env Number $n) (number $n))
 	     (rule e_prefix () (expr $env $t (template nile "{op}({a})" ((op . $op) (a . $a)))) (prefix $op $at $t) (expr $env $at $a))
 	     (rule e_infix () (expr $env $t (template nile "({a} {op} {b})" ((a . $a) (op . $op) (b . $b)))) (infix $op $at $bt $t) (expr $env $at $a) (expr $env $bt $b))
-	     (law sound (($t Type) ($e (expr ((a . Number) (b . Number) (p . Boolean) (q . Boolean)) $t $e))) () (= (nile_accepts e t) accept) () ()))))
+	     (law sound (($t Type) ($e (expr ((a . Number) (b . Number) (p . Boolean) (q . Boolean)) $t $e))) () (= (nile_accepts e t) accept) () () () ()))))
   (let ((items (law-file-read "check/laws/fixtures/more.law")))
     (expect "defaults, lists, schemas, parameters, grammar domains, conditions"
       (equal items
@@ -42,8 +42,8 @@
 	       (rule nil () (painted_list ()))
 	       (schema $r (color painted) (rule both_r () (both $r $x) ($r $x)))
 	       (rule lst ($r) (all_r $r $x) ($r $x))
-	       (law small (($n number) ($g (grammar cexpr primary))) ((> n 2) (< n 40)) (= (f n g) 3) exhaustion 4)
-	       (law plain (($a Type) ($b Type)) () (= (+ a b) (+ b a)) () ()))))
+	       (law small (($n number) ($g (grammar cexpr primary))) ((> n 2) (< n 40)) (= (f n g) 3) exhaustion 4 () ())
+	       (law plain (($a Type) ($b Type)) () (= (+ a b) (+ b a)) () () () ()))))
     (expect "numbers the file mentions, in order, once"
       (equal (law-file-numbers items) '(2 40 3))))
   (let ((rs (rules-expand (law-text-read "fact color(Red)\nrule paint: color(c) => painted(c)\n"))))
@@ -65,11 +65,14 @@
     (expect "a non-rule item is rejected by name" (and msg (has? msg "E_UNKNOWN_ITEM"))))
   (expect "let names resolve where used"
     (equal (law-text-read "let k = [a: N]\nrule r: p(k) => q(k)\nlaw l: all x: T. f(k, x)\n")
-	   '((let k ((a . N))) (rule r () (q ((a . N))) (p ((a . N)))) (law l (($x T)) () (f (quote ((a . N))) x) () ()))))
+	   '((let k ((a . N))) (rule r () (q ((a . N))) (p ((a . N)))) (law l (($x T)) () (f (quote ((a . N))) x) () () () ()))))
   (expect "-- comments sit between items, and after a claim"
     (equal (law-text-read "-- one\nset T = A | B -- two\nlaw l: all x: T. x == 1 -- three\n-- four\n--five\n")
-	   '((set T (A B)) (law l (($x T)) () (= x 1) () ()))))
-  (expect "a - -1 is not a comment" (equal (law-text-read "law l: all x: T. a - -1 == 0\n") '((law l (($x T)) () (= (- a -1) 0) () ()))))
+	   '((set T (A B)) (law l (($x T)) () (= x 1) () () () ()))))
+  (expect "classes and covers follow the method"
+	  (equal (law-text-read "law l: all x: T. x >= 0 by test classify zero when x = 0, big when x > 9 cover 5% zero\n")
+		 '((law l (($x T)) () (>= x 0) test () ((zero (= x 0)) (big (> x 9))) ((5 zero))))))
+  (expect "a - -1 is not a comment" (equal (law-text-read "law l: all x: T. a - -1 == 0\n") '((law l (($x T)) () (= (- a -1) 0) () () () ()))))
   (expect "a filler is inserted as written"
     (equal (template-parse 'cexpr (template-fill 'cexpr "{x} * c" '((x . "a + b")))) '(+ a (* b c))))
   (expect "a parenthesised filler groups"

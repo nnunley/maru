@@ -58,8 +58,8 @@ item		= "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		| "facts"     keyword names:r "from" keyword xidentifier:f	-> `(facts ,r ,f)
 		| "for"       keyword xidentifier:v "in" keyword arg0:a ("|"_ arg0)*:b ":"_ item:i	-> `(schema ,v (,a ,@b) ,i)
 		| "defaults"  keyword setting:a (","_ setting)*:b		-> `(defaults ,a ,@b)
-		| "law"       keyword xidentifier:n ":"_ "all" keyword bindings:b "."_ xexpression:c method:m
-									-> `(law ,n ,b ,c ,(car m) ,(cadr m))
+		| "law"       keyword xidentifier:n ":"_ "all" keyword bindings:b "."_ xexpression:c method:m classes?:k covers?:v
+									-> `(law ,n ,b ,c ,(car m) ,(cadr m) ,(car k) ,(car v))
 		| "law"       keyword xidentifier:n ":"_ "mutants" keyword "of" keyword xidentifier:r "by" keyword "exhaustion" keyword
 		  ( "size" keyword number )?:s "."_ names:l			-> `(adequacy ,n ,r ,(car s) ,@l)
 		;
@@ -75,6 +75,11 @@ domain		= goal
 		;
 method		= ( "by" keyword ( "test" keyword -> 'test | "exhaustion" keyword -> 'exhaustion ):m
 		    ( "size" keyword number )?:s -> `(,m ,@s) )?:m		-> (car m) ;
+
+classes		= "classify" keyword class:a (","_ class)*:b			-> `(,a ,@b) ;
+class		= xidentifier:n "when" keyword xexpression:e			-> `(,n ,e) ;
+covers		= "cover" keyword share:a (","_ share)*:b			-> `(,a ,@b) ;
+share		= number:p "%"_ xidentifier:n					-> `(,p ,n) ;
 
 entry		= item:i gap							-> i ;
 program		= gap entry*:p (!. ~"item")					-> p ;

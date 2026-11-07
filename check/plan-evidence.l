@@ -10,7 +10,7 @@
   "set Evidence = untested | passed(tree) | failed(tree) | tested(tree, trials) | proved(tree, cases) | refuted(tree, counterexample) | starved(tree, met, drawn) | vacuous(tree) | inconclusive(tree, input).
 create Code tree. make Code Now \"abc\".
 create Law evidence.
-make Law a_b untested. make Law c untested. make Law d untested. make Law e untested. make Law f untested. make Law g untested. make Law h untested. make Law never untested.
+make Law a_b untested. make Law c untested. make Law d untested. make Law e untested. make Law f untested. make Law g untested. make Law h untested. make Law i untested. make Law j untested. make Law never untested.
 action Law observed Answer consequence its evidence = Answer.
 group Good passed tested proved.
 qualify Law holds if its evidence is Good and its evidence tree = Now tree.
@@ -24,6 +24,8 @@ qualify Law holds if its evidence is Good and its evidence tree = Now tree.
 (expect "each verdict is its kind"
 	(equal '(tested proved refuted starved vacuous inconclusive failed)
 	       (map (lambda (l) (ask (ask l 'evidence) 'kind)) '(a_b c d e f g h))))
+(expect "classes after a count are optional, and a law short of its cover failed"
+	(and (holds? 'i) (= 1000 (ask (ask 'i 'evidence) 'trials)) (not (holds? 'j)) (= 'failed (ask (ask 'j 'evidence) 'kind))))
 (expect "a count reads back as a number" (= 100 (ask (ask 'a_b 'evidence) 'trials)))
 (expect "a counterexample with quotes reads back whole"
 	(equal "x=\"p\\\"q\" y=3 seed=42" (ask (ask 'd 'evidence) 'counterexample)))

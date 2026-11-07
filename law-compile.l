@@ -98,10 +98,11 @@
 (define-function select-binds (raw)
   (let ((out ())) (list-do b raw (and (cadr b) (set out (concat-list out (list b))))) out))
 
-(define-function law-conv-law (it)	; (law n raw claim method size)
-  (let ((raw (caddr it)))
+(define-function law-conv-law (it)	; (law n raw claim method size classes covers); a class is (name expression), a cover (percent name)
+  (let ((raw (caddr it)) (more (cddddr it)))
     (list 'law (cadr it) (law-bindings (select-binds raw)) (law-conditions raw)
-	  (law-conv (cadddr it) 'claim) (car (cddddr it)) (cadr (cddddr it)))))
+	  (law-conv (cadddr it) 'claim) (car more) (cadr more)
+	  (map (lambda (k) (list (car k) (law-conv (cadr k) 'claim))) (caddr more)) (cadddr more))))
 (define-function law-item (it scope)
   (let ((k (car it)))
     (cond
