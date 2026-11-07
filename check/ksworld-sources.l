@@ -54,4 +54,22 @@
 		 (send (field this array) _at_put (field this firstIndex) newObject)
 		 (method-return newObject)))))
 
+;; running them: a KSContentsCollection made and used from KScript runs its own Smalltalk (new: through super basicNew,
+;; setCollection:, addLast:'s makeRoomAtLast, addFirst:, at:'s bounds, removeFirst), on the platform squeak-base.st gives
+(ks-load-source-class 'KSContentsCollection)
+(define-function run (text)	; a KScript program's statements in one environment; the last one's value
+  (let ((r 'nil) (env (list (cons '%top 1)))) (list-do s (kscript-parse text) (set r (ks-stream-curr (ks-eval s env ())))) r))
+(expect "a collection from its class, grown and read by its own methods"
+	(run "var c = KSContentsCollection.new()\nc._add(1)\nc._add(2)\nc._addFirst(0)\n[c.size(), c._at(1), c._at(3), c.removeFirst(), c.size(), c.first()]")
+	'(3 0 2 0 2 1))
+(expect "eleven elements in a collection made for ten: makeRoomAtLast grows it"
+	(run "var c = KSContentsCollection.new()\nfor i in [1...11]\n\tc._add(i * i)\n[c.size(), c._at(11), c.last()]")
+	'(11 121 121))
+(expect "add:afterIndex: and removeAt:, as KSWorld's editing uses them"
+	(run "var c = KSContentsCollection.new()\nc._add(10)\nc._add(30)\nc._add_afterIndex(20, 1)\nvar a = [c._at(1), c._at(2), c._at(3)]\nc._removeAt(1)\n[a, c.size(), c.first()]")
+	'((10 20 30) 2 20))
+(expect "an index past the end is Squeak's error, not a quiet nil"
+	(try (run "var c = KSContentsCollection.new()\nc._at(1)") (lambda (c) 'refused)) 'refused)
+(expect "a form the evaluator doesn't know is an error naming it" (try (ks-eval '(no-such-form 1) () ()) (lambda (c) 'refused)) 'refused)
+
 (println (if ok "ksworld sources ok" "ksworld sources FAILED"))

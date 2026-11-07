@@ -89,13 +89,43 @@
 		 (let ((m (ks-squeak-method src (if (= 'class (cadddr x)) () ivars))))
 		   (push out (new <ks-source-method> (cadr x) (cadddr x) (caddr x) (if m (car m) (car head)) src () (and m (cadr m))))))))))
     (list-reverse! out)))
+;; a method's function: KScript runs as a closure on its receiver; Smalltalk the same, under a tag of its own, so a ^
+;; anywhere in it returns from it, knowing its class, so super looks up from there, and answering self if it ends without ^
+;; (a pepsi-style library method, like KScript, answers its last expression's value: test-pepsi.l's methods have no ^)
+(define-function ks-method-function (kind tree kscript? last-value?)
+  (if kscript?
+      (lambda (recv args env this) (ks-apply (ks-eval tree () recv) args env recv))
+    (lambda (recv args env this)
+      (let ((tag (cons 'method ())))
+	(catch tag (lambda () (let ((v (ks-apply (ks-eval tree (list (cons '%method tag) (cons '%class kind)) recv) args env recv)))
+				(if last-value? v recv))))))))
+(define-function ks-basic-new (class)	; Behavior>>basicNew: an instance with each instance variable nil
+  (let ((name (<ks-class>-name class)))
+    (new <ks-object> name 0 () (map (lambda (v) (cons v 'nil)) (ks-all-ivars name)) () 0)))
+
+;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)
+(define-function ks-primitive-function (f) (lambda (recv args env this) (apply f (cons recv args))))
+;; the platform, in test-pepsi.l's form: classes, methods and primitives (Maru with self and the arguments bound)
+(define-function ks-load-library (path)
+  (list-do d (parse-string <squeak> $library (contents-of-file-named path))
+    (let ((op (car d)))
+      (cond ((= op 'class) (ks-define-class (cadr d) (caddr d) (cadddr d)))
+	    (else
+	     (let* ((class (cadr d)) (kind (if (= 'class (caddr d)) (ks-meta class) class)))
+	       (if (= op 'method)
+		   (ks-method kind (cadddr d) (ks-method-function kind (car (cddddr d)) () 1))
+		 (ks-method kind (cadddr d) (ks-primitive-function (eval `(lambda (self ,@(car (cddddr d))) ,(cadr (cddddr d)))))))))))))
+(ks-load-library "squeak-base.st")
+
+(define-function ks-readable-source? (class)
+  (= 0 ((subr "access" "si>i") (concat-strings "ksworld/" (symbol->string class) ".st") 4)))
+;; a KSWorld class from its source: its definition (its superclass's first, if KSWorld has it), then each method
 (define-function ks-load-source-class (class)
-  (list-do m (ks-source-methods (concat-strings "ksworld/" (symbol->string class) ".st"))
-    (let ((tree (<ks-source-method>-tree m)))
-      (and tree (= 'instance (<ks-source-method>-side m))
-	   (ks-method class (<ks-source-method>-selector m)
-		      (if (<ks-source-method>-kscript? m)
-			  (lambda (recv args env this) (ks-apply (ks-eval tree () recv) args env recv))
-			(lambda (recv args env this)	; a Smalltalk method: a ^ anywhere in it throws to its tag
-			  (let ((tag (cons 'method ())))
-			    (catch tag (lambda () (ks-apply (ks-eval tree (list (cons '%method tag)) recv) args env recv)))))))))))
+  (let* ((path (concat-strings "ksworld/" (symbol->string class) ".st")) (def (ks-source-class-of path)))
+    (when def
+      (let ((super (cadr def)))
+	(and (not (ks-class-named super)) (ks-readable-source? super) (ks-load-source-class super))
+	(ks-define-class class super (caddr def))))
+    (list-do m (ks-source-methods path)
+      (let ((tree (<ks-source-method>-tree m)) (kind (if (= 'class (<ks-source-method>-side m)) (ks-meta class) class)))
+	(and tree (ks-method kind (<ks-source-method>-selector m) (ks-method-function kind tree (<ks-source-method>-kscript? m) ())))))))

@@ -143,6 +143,26 @@
       (or (ks-slot x '__prevValue__) (ks-slot x '__currentValue__))
     x))
 
+;; Classes, as Smalltalk has them: a class is a value (its name, its superclass, its instance variables), named where code
+;; names it; a kind's methods are found on it or up its superclasses, and a class's own (its class side) on its metaclass,
+;; "NAME class", whose superclass is its superclass's.  KSWorld's classes come from their sources (ksworld-source.l), the
+;; platform's (Object, Number, Array ...) from squeak-base.st, after test-pepsi.l's hierarchy.
+(define-structure <ks-class> (name super ivars))
+(define *ks-classes* ())	; (name . class)
+(define-function ks-class-named (name) (cdr (assq name *ks-classes*)))
+(define-function ks-meta (name) (string->symbol (concat-string (symbol->string name) " class")))
+(define-function ks-define-class (name super ivars)
+  (let ((c (ks-class-named name)))
+    (if c (let () (set (<ks-class>-super c) super) (set (<ks-class>-ivars c) ivars) c)
+      (cdar (push *ks-classes* (cons name (new <ks-class> name super ivars)))))))
+(define-function ks-superclass (kind)	; a kind's superclass, a metaclass's its superclass's metaclass, or ()
+  (let* ((s (symbol->string kind)) (n (string-length s)))
+    (if (and (< 6 n) (= " class" (string-copy s (- n 6) 6)))
+	(let ((c (ks-class-named (string->symbol (string-copy s 0 (- n 6))))))
+	  (and c (<ks-class>-super c) (ks-meta (<ks-class>-super c))))
+      (let ((c (ks-class-named kind))) (and c (<ks-class>-super c))))))
+(define-function ks-all-ivars (name)	; a class's instance variables, its superclasses' first
+  (let ((c (ks-class-named name))) (if c (concat-list (and (<ks-class>-super c) (ks-all-ivars (<ks-class>-super c))) (<ks-class>-ivars c)) ())))
 (define-function ks-env-lookup (env this name lag?)
   (let ((pair (assq name env)))
     (cond (pair (cdr pair))
@@ -151,6 +171,7 @@
 	  ((= name 'false) 'false)
 	  ((or (= name 'nil) (= name 'null)) 'nil)
 	  ((= name 'undefined) 'undefined)
+	  ((ks-class-named name) (ks-class-named name))
 	  ((ks-object? this)
 	   (let ((s (ks-slot this name)))
 	     (cond ((ks-stream? s) (if lag? (ks-stream-prev s) (ks-stream-curr s)))
@@ -222,14 +243,23 @@
 		  `(ks-method ',kind ',(car c) ,fn))))
 	    clauses)))
 (define-function ks-method-for (kind sel)
-  (let ((table (assq kind *ks-methods*)))
-    (and table (cdr (assq sel (cdr table))))))
+  (let ((m ()))
+    (while (and kind (not m))
+      (let ((table (assq kind *ks-methods*)))
+	(set m (and table (cdr (assq sel (cdr table)))))
+	(set kind (ks-superclass kind))))
+    m))
 
 (define-selector ks-kind (v) 'Value)
 (define-method ks-kind <long> () 'Number)
 (define-method ks-kind <double> () 'Number)
 (define-method ks-kind <string> () 'String)
-(define-method ks-kind <symbol> () (if (= self 'Color) 'ColorClass 'String))	; Color names a class; other symbols are text
+(define-method ks-kind <symbol> ()	; Color names a class; true, false and nil are Smalltalk's; other symbols are text
+  (cond ((= self 'Color) 'ColorClass) ((= self 'true) 'True) ((= self 'false) 'False)
+	((or (= self 'nil) (= self 'undefined)) 'UndefinedObject) (else 'String)))
+(define-method ks-kind <array> () 'Array)
+(define-method ks-kind <ks-closure> () 'BlockClosure)
+(define-method ks-kind <ks-class> () (ks-meta self.name))
 (define-method ks-kind <pair> () 'List)
 (define-method ks-kind <ks-point> () 'Point)
 (define-method ks-kind <ks-rect> () 'Rectangle)
@@ -502,11 +532,23 @@
 	 ((= op 'index)
 	  (ks-index (ks-stream-curr (ks-eval (cadr exp) env this))
 		    (ks-stream-curr (ks-eval (caddr exp) env this))))
+	 ((and (= op 'send) (= 'super (cadr exp)))	; Smalltalk's super: the method's class's superclass up
+	  (let* ((sel (caddr exp)) (args (map (lambda (a) (ks-stream-curr (ks-eval a env this))) (cdddr exp)))
+		 (from (ks-superclass (ks-env-lookup env this '%class ()))) (m (ks-method-for from sel)))
+	    (if m (m this args env this) (ks-no-method this sel))))
 	 ((= op 'send)
 	  (let ((recv (ks-eval (cadr exp) env this))
 		(sel (caddr exp))
 		(args (map (lambda (a) (ks-stream-curr (ks-eval a env this))) (cdddr exp))))
 	    (ks-send recv sel args env this)))
+	 ((= op 'cascade)	; each message to the one receiver; the last one's answer
+	  (let ((recv (ks-eval (cadr exp) env this)) (res 'nil))
+	    (list-do m (cddr exp)
+	      (set res (ks-send recv (car m) (map (lambda (a) (ks-stream-curr (ks-eval a env this))) (cdr m)) env this)))
+	    res))
+	 ((= op 'method-return)	; Smalltalk's ^, from a block too: to the tag of the method it's in
+	  ((eval 'throw) (ks-env-lookup env this '%method ()) (ks-stream-curr (ks-eval (cadr exp) env this))))	; catch.l's, loaded with the sources
+	 ((= op 'char) (cadr exp))
 	 ((= op 'call)
 	  (let ((fn (cadr exp))
 		(raw-args (cddr exp)))
@@ -707,7 +749,7 @@
 	    'nil))
 	 ((= op 'return)
 	  (new <ks-return> (ks-stream-curr (ks-eval (cadr exp) env this))))
-	 (else 'nil))))))
+	 (else (error "KScript: no form " op " (" exp ")")))))))	; never a quiet nil
 
 ;;; ---------------------------------------------------------------- Evaluator (Figure 2, TR-2012-001)
 
