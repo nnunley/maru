@@ -34,8 +34,8 @@
 ;; same character from the same font, and each text box's last line, the one KSWorld left laid out, against where
 ;; ksworld-text.l puts its first character: Times New Roman, which KSWorld.ks's are, where this system has it.
 (define-function shape-beziers (shape)
-  (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (<ks-object>-data (ks-slot path 'floats))) (out ()))
-    (for (i 0 (/ (<ks-object>-count (ks-slot path 'floats)) 6))
+  (let* ((path (car (ks-items (ks-slot shape 'elements)))) (floats (ks-slot (ks-slot path 'floats) 'data)) (out ()))
+    (for (i 0 (/ (ks-slot (ks-slot path 'floats) 'count) 6))
       (let ((z ())) (for (k 0 6) (push z (float-at floats (+ (* 6 i) k)))) (push out (list-reverse! z))))
     (list-reverse! out)))
 (define-function box-style (box) (ks-slot (ks-slot (ks-val box 'font) 'face) 'style))
@@ -53,7 +53,7 @@
     (ks-text-layout box)
     (list-do l (ks-items (ks-val box 'contents))
       (let ((m (ks-val l 'transformation)) (k (ks-val c 'transformation)) (e (ks-val l 'extent)) (ke (ks-val c 'extent)))
-	(and (= 'KSBox (<ks-object>-class l)) (= box (ks-val l 'container)) (= (ks-val c 'unicode) (ks-val l 'unicode))
+	(and (ks-instance? l 'KSBox) (= box (ks-val l 'container)) (= (ks-val c 'unicode) (ks-val l 'unicode))
 	     (near (<ks-matrix>-e m) (<ks-matrix>-e k)) (near (<ks-matrix>-f m) (<ks-matrix>-f k))
 	     (near (<ks-point>-x e) (<ks-point>-x ke)) (near (<ks-point>-y e) (<ks-point>-y ke))
 	     (set found 1))))
@@ -61,18 +61,18 @@
 (define-function text-as-kept (table doc)
   (let ((kept 0) (boxes 0))
     (array-do o table
-      (when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (< 0 (or (ks-val o 'unicode) 0)) (ks-object? (ks-val o 'shape)))
+      (when (and (ks-object? o) (ks-instance? o 'KSBox) (< 0 (or (ks-val o 'unicode) 0)) (ks-object? (ks-val o 'shape)))
 	(set kept (+ kept 1))
 	(let ((font (ks-font 'TimesNewRoman (box-style o))))
 	  (expect (concat-string "the glyph KSWorld kept for U+" (long->string (ks-val o 'unicode)))
 		  (shape-beziers (ks-val o 'shape))
 		  (map (lambda (z) (map (lambda (v) (* 1.0 v)) z)) (ttf-outline font (ttf-glyph font (ks-val o 'unicode)))))))
-      (when (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o))
+      (when (and (ks-object? o) (ks-instance? o 'KSBox) (ks-text-box? o))
 	(set boxes (+ boxes 1))
-	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s last line, laid out as KSWorld did")
+	(expect (concat-strings "text box " (long->string (ks-ref o)) "'s last line, laid out as KSWorld did")
 		(laid-out-as-kept o) 1)
 	;; its contents are letter boxes, as KSWorld read the spans it wrote, and the kept letter's is where KSWorld put it
-	(expect (concat-strings "text box " (long->string (<ks-object>-ref o)) "'s letters, the kept one placed as KSWorld placed it")
+	(expect (concat-strings "text box " (long->string (ks-ref o)) "'s letters, the kept one placed as KSWorld placed it")
 		(letter-as-kept o) 1)))
     (expect "KSWorld.ks's kept glyphs and text boxes, each compared" (list kept boxes) '(5 5))
     ;; its shapes, the carets of the three text boxes it kept showing their selection, and each character
@@ -92,8 +92,8 @@
   ;; those in Palatino Linotype aren't (Palatino's metrics are its own)
   (let ((matched ()))
     (array-do o (cadr (ksworld-load (concat-string dir "/Front page Onward Full v8.ks/index.pp")))
-      (and (ks-object? o) (= 'KSBox (<ks-object>-class o)) (ks-text-box? o) (laid-out-as-kept o)
-	   (push matched (<ks-object>-ref o))))
+      (and (ks-object? o) (ks-instance? o 'KSBox) (ks-text-box? o) (laid-out-as-kept o)
+	   (push matched (ks-ref o))))
     (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 411 479))))
 
 (require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
@@ -106,10 +106,10 @@
 	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
 
 ;; a collection a document saved with nil and false elements keeps them, each in its place
-(expect "nil and false elements are elements" (<ks-object>-data (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
+(expect "nil and false elements are elements, of a Maru array" (array->list (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
 (expect "Color's class and its colours answer apart"
-	(list (<ks-color>-r (ks-send 'Color 'white () () ())) (try (ks-send 'Color 'lighter () () ()) (lambda (c) (ksw-message c))))
-	'(1.0 "Smalltalk: ColorClass does not understand lighter"))
+	(list (<ks-color>-r (ks-send (ks-class-named 'Color) 'white () () ())) (try (ks-send (ks-class-named 'Color) 'lighter () () ()) (lambda (c) (ksw-message c))))
+	'(1.0 "Smalltalk: Color class does not understand lighter"))
 (expect "match (the pattern receives it) and sort, as a listing uses them"
 	(list (ks-send "*.jpg" 'match '("photo.JPG") () ()) (ks-send "*.jpg" 'match '("a.txt") () ()) (ks-send '(3 1 2) 'sort () () ()))
 	'(t () (1 2 3)))

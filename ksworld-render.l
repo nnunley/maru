@@ -69,15 +69,15 @@
 
 ;; what a fill paints, as a Gezira is told it: (uniform alpha red green blue), or an image (ksworld-image-paint)
 (define-function ksworld-paint (fill m gezira)
-  (cond ((and (ks-object? fill) (= 'GeziraFillUniform (<ks-object>-class fill)))
+  (cond ((and (ks-object? fill) (ks-instance? fill 'GeziraFillUniform))
 	 (list 'uniform (* 1.0 (ks-slot fill 'alpha)) (* 1.0 (ks-slot fill 'red)) (* 1.0 (ks-slot fill 'green)) (* 1.0 (ks-slot fill 'blue))))
-	((and (ks-object? fill) (= 'GeziraFillImage (<ks-object>-class fill))) (ksworld-image-paint fill m gezira))
+	((and (ks-object? fill) (ks-instance? fill 'GeziraFillImage)) (ksworld-image-paint fill m gezira))
 	(else (error "ksworld-render: can't paint with " fill))))
 
 (define-function ksworld-render-path (path m gezira width height)
-  (let ((floats (<ks-object>-data (ks-slot path 'floats))))
+  (let ((floats (ks-slot (ks-slot path 'floats) 'data)))
     (and floats
-	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill) m gezira) floats (<ks-object>-count (ks-slot path 'floats))))))
+	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill) m gezira) floats (ks-slot (ks-slot path 'floats) 'count)))))
 
 ;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
 (define-function ksworld-render-selection (box m gezira width height)
@@ -101,7 +101,7 @@
       (when (ks-object? shape)
 	(let ((sm (ks-compose here (ks-matrix-of (ks-slot shape 'transform)))))
 	  (list-do element (ks-items (ks-slot shape 'elements))
-	    (and (ks-object? element) (= 'GeziraPath (<ks-object>-class element))
+	    (and (ks-object? element) (ks-instance? element 'GeziraPath)
 		 (ksworld-render-path element sm gezira width height)))))
       (when (ks-text-box? box)
 	(ksworld-render-selection box here gezira width height)

@@ -3,9 +3,9 @@
  family is found as ksworld-text.l's font chain finds one, and a character the font lacks in the next font with a glyph for
  it (TTCFont's fallbackFont).  Lengths are in font units, y up, as a TTGlyph's are."
 
-TTCFont : Object ()
-TTGlyph : Object ()
-GeziraPath : Object ()
+TTCFont : Object (description pointSize emphasis)
+TTGlyph : Object (font glyph)
+GeziraPath : Object (points floats myFill)
 
 TTCFont class familyName: name pointSize: size emphasis: style { (ks-ttc-font name size style) }
 TTCFont isTTCFont                       [ true ]
@@ -26,7 +26,7 @@ TTGlyph transformFor: scale             [ | b | b := self bounds.
                                           "font units to the box: scaled, y down, the ink's top left at the origin"
                                           MatrixTransform2x3 a: scale b: 0 c: 0 d: scale negated e: b left * scale negated f: b bottom * scale ]
 
-GeziraPath class path: floats           { (ks-new-object 'GeziraPath 0 () (list (cons 'floats floats) (cons 'fill ())) () 0) }
-GeziraPath fill: aColor                 { (let () (ks-set-slot self 'fill aColor) self) }
+GeziraPath class path: floats           { (ks-new-object 'GeziraPath 0 () (list (cons 'floats floats) (cons 'myFill ())) () 0) }
+GeziraPath fill: aColor                 { (let () (ks-set-slot self 'myFill aColor) self) }
 MatrixTransform2x3 : Object ()
 MatrixTransform2x3 class a: a b: b c: c d: d e: e f: f { (ks-matrix a b c d e f) }

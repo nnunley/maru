@@ -109,11 +109,11 @@
     (list-do l letters
       (let ((f (ks-slot l 'font)))
 	(unless (= f font-of)
-	  (let ((pl (<ks-object>-attrs f)))
+	  (let ()	; a span's font keeps what the document wrote as entries under its keywords
 	    (set font-of f)
-	    (set fonts (ks-fonts (string->symbol (ks-plist-get pl ':family)) (string->long (ks-plist-get pl ':style))))
-	    (set size (string->double (ks-plist-get pl ':size)))
-	    (set paint (ks-span-paint (ks-plist-get pl ':fill)))))
+	    (set fonts (ks-fonts (string->symbol (ks-attr f ':family)) (string->long (ks-attr f ':style))))
+	    (set size (string->double (ks-attr f ':size)))
+	    (set paint (ks-span-paint (ks-attr f ':fill)))))
 	(let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
 	  (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
 	  (set index (+ index 1)))))
@@ -186,8 +186,8 @@
 
 (define-function ks-text-box? (box)	; a KSTextLayout's box whose contents are letters
   (let ((c (ks-val box 'contents)) (layout (ks-slot box 'handler)))
-    (and (ks-object? c) (= 'KSContentsCollection (<ks-object>-class c))
-	 (ks-object? layout) (= 'KSTextLayout (<ks-object>-class layout)))))
+    (and (ks-object? c) (ks-instance? c 'KSContentsCollection)
+	 (ks-object? layout) (ks-instance? layout 'KSTextLayout))))
 
 ;; a text box laid out: its glyphs, and its lines, each (top bottom start cells), start the index its first character
 ;; would have and each cell (index left right) a character's place, spaces too

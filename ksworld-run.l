@@ -33,10 +33,10 @@
 	 (objects 0) (streams ()) (setters 0) (dormant 0) (code ())
 	 (unreadable 0) (evaluations 0) (fired 0)
 	 (failed (list ())) (failed-streams ()))
-    (array-do o table
-      (when (ks-object? o)
+    (array-do o table	; every object the document numbered, its Arrays (Maru arrays) among them
+      (when o
 	(set objects (+ objects 1))
-	(and (ks-stream? o) (push streams o))))
+	(and (ks-object? o) (ks-stream? o) (push streams o))))
     (list-do s streams
       (cond ((= (ks-attr s ':__type__) "setter") (set setters (+ setters 1)))
 	    ((= (ks-attr s ':__dormant__) "true") (set dormant (+ dormant 1)))

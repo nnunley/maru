@@ -84,10 +84,10 @@ for i in [0...10] by 5 total := total + i
 (expect "true, false and nil are Maru's t and ()" (list (ks-run "true") (ks-run "false") (ks-run "nil") (ks-run "false == nil")) '(t () () t))
 (expect "comparisons and not answer t and ()" (list (ks-run "1 < 2") (ks-run "2 < 1") (ks-run "not true") (ks-run "not nil")) '(t () () t))
 (expect "undefined is neither, and stops a change" (list (ks-run "undefined") (ks-run "not undefined")) '(undefined undefined))
-(expect "t answers as True, () as UndefinedObject"
-	(list (ks-kind 't) (ks-kind ()) (ks-send 't 'asBoolean () () ()) (ks-send () 'asBoolean () () ())
+(expect "t is a Symbol (as test-pepsi.l's true is #true), () an UndefinedObject"
+	(list (ks-class-of 't) (ks-class-of ()) (ks-send 't 'asBoolean () () ()) (ks-send () 'asBoolean () () ())
 	      (ks-send 't 'printString () () ()) (ks-send () 'printString () () ()))
-	'(True UndefinedObject t () "true" "nil"))
+	'(Symbol UndefinedObject t () "true" "nil"))
 (let ((box (box-of "flag := false\n")))
   (expect "a field holding false is a field: read and set by a send, never missing"
 	  (list (ks-send box 'flag () () box) (ks-send box 'flag '(t) () box) (ks-val box 'flag)) '(() t t)))

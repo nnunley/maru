@@ -141,8 +141,75 @@
 (expect "a KSWorld object's slots are a table, read and written by KScript and Smalltalk alike"
 	(let ((o (ks-basic-new (ks-class-named 'KSObject))))
 	  (ks-set-slot o 'colour 'red)
-	  (list (hash-table? (<ks-object>-slots o)) (ks-send o '_at (list 'colour) () o)))
+	  (list (hash-table? (ks-table o)) (ks-send o '_at (list 'colour) () o)))
 	'(t red))
+;; a class is a Maru type (boot.l's define-class) under its superclass's type, and an object's class is its type's: a
+;; document's object too, and one made before its class's source still reaches the superclass's methods once the class is
+;; defined
+(let ((o (ks-new-object 'KSBox 0 () () () 0)))
+  (expect "a document's object is an instance of its class's type"
+	  (list (array-at %type-names (type-of o)) (ks-object? o) (ks-class-of o)) '(<KSBox> t KSBox)))
+(let ((o (ks-new-object 'LateChild 0 () () () 0)))
+  (ks-set-slot o 'colour 'blue)
+  (ks-define-class 'LateChild 'KSObject ())
+  (expect "an object made before its class is defined reaches the superclass's methods" (ks-send o '_at (list 'colour) () o) 'blue))
+;; the platform's classes keep what their primitives give them in fields, their instance variables
+(let ((f (ks-ttc-font 'TimesNewRoman 12 1)))
+  (expect "a TTCFont's description, point size and emphasis are fields, and its description's fonts"
+	  (list (array-at %structure-fields (type-of f)) (ks-slot f 'pointSize) (ks-slot f 'emphasis)
+		(array-at %structure-fields (type-of (ks-slot f 'description))))
+	  '((description pointSize emphasis) 12 1 (fonts))))
+(expect "a TTGlyph's font and glyph, a GeziraPath's points, floats and fill"
+	(map (lambda (c) (array-at %structure-fields (ks-class-type c))) '(TTGlyph GeziraPath))
+	'((font glyph) (points floats myFill)))
+(expect "a GeziraPath made and filled in Smalltalk keeps its fill where a document's does, in myFill"
+	(ks-slot (st "(GeziraPath path: nil) fill: 3") 'myFill) 3)
+(let ((shape (ks-new-object 'KSShape 0 () (list (cons 'elements (array 0))) () 0)))
+  (expect "a document's KSShape is KSWorld's, an Object with its instance variables as fields and no dictionary"
+	  (list (array-at %structure-fields (type-of shape)) (ks-table shape) (ks-slot shape 'elements))
+	  (list '(whole fill extent borderFill borderWidth infinite isRectangle cornerRadius shadowFill shadowOffset shadowBlur
+		  elements transform offset drawingBounds hBearing) () (array 0))))
+(ks-new-object 'EarlyBird 0 () () () 0)
+(expect "a class whose type was made before it, with other instance variables, is refused, not given a second layout"
+	(try (ks-define-class 'EarlyBird 'KSObject '(song)) (lambda (c) 'refused)) 'refused)
+;; review of classes as types
+(let ((shape (ks-new-object 'KSShape 7 '(:foo "x") () () 0)) (o (ks-new-object 'KSObject 8 '(:foo "y") () () 0)))
+  (expect "a document's attributes are its dictionary's entries; an object with none keeps none"
+	  (list (ks-ref o) (ks-attr o ':foo) (ks-ref shape) (ks-attr shape ':foo)) '(8 "y" 0 ()))
+  (expect "setting an attribute on an object with no dictionary is refused, never lost"
+	  (list (try (ks-set-attr shape ':__path__ "p") (lambda (c) 'refused)) (try (ks-set-attr (array 1) ':__path__ "p") (lambda (c) 'refused)))
+	  '(refused refused)))
+(expect "a Maru array has no named slots to set" (try (ks-set-slot (array 1) 'colour 1) (lambda (c) 'refused)) 'refused)
+(ks-new-object 'Plain 0 () () () 0)
+(expect "a class a document met as a dictionary, redefined as an Object subclass, is refused"
+	(try (ks-define-class 'Plain 'Object ()) (lambda (c) 'refused)) 'refused)
+(ks-new-object 'Ordered 0 () () () 0)
+(expect "and redefined under a superclass with other fields, refused"
+	(try (ks-define-class 'Ordered 'OrderedCollection ()) (lambda (c) 'refused)) 'refused)
+(ks-new-object 'Reparented 0 () () () 0)
+(ks-define-class 'Reparented 'IdentityDictionary ())
+(expect "redefined under a superclass with the same fields, it moves under it"
+	(array-at %type-names (array-at %structure-bases (ks-class-type 'Reparented))) '<IdentityDictionary>)
+(ks-new-object 'Novel 0 () () () 0)
+(expect "a class first met in a document has a class object, under KSObject's"
+	(list (ks-class-of (ks-class-named 'Novel)) (ks-send (ks-class-named 'Novel) 'name () () ())
+	      (ks-send (ks-send (ks-class-named 'Novel) 'superclass () () ()) 'name () () ()))
+	(list (ks-meta 'Novel) 'Novel 'KSObject))
+(expect "a declared class's class side reaches Object's" (ks-send (ks-class-named 'KSShape) 'name () () ()) 'KSShape)
+(ks-instance? 3 'NeverSeen)
+(expect "asking whether a value is an instance makes no class" (assq 'NeverSeen *ks-class-types*) ())
+(let ((members (ks-new-object 'Set 0 () () '(1 2 1) 0)))
+  (expect "a document's Set is a Set: its members once each, which Smalltalk counts and lists"
+	  (list (ks-send members 'size () () ()) (ks-items members)) '(2 (1 2))))
+(let ((o (ks-new-object 'KSObject 0 () (list (cons 'slots 5)) () 0)))
+  (expect "a slot named slots is an entry, never the dictionary's own table"
+	  (list (ks-slot o 'slots) (hash-table? (ks-table o)) (ks-send o '_at (list 'slots) () o)) '(5 t 5)))
+(ks-define-class 'FieldHolder 'Object '(clock))
+(let ((o (ks-new-object 'FieldHolder 0 () () () 0)) (ev (ks-evaluator-new)))
+  (ks-set-slot o 'clock (ks-make-stream o "code" "timerE(1)" 0))
+  (ks-evaluator-add-from ev o)
+  (expect "a stream an instance variable holds is evaluated, as one a dictionary holds is"
+	  (list-length (<ks-evaluator>-streams ev)) 1))
 ;; Smalltalk's true is Maru's t, and false and nil are one value, (), answering as nil does: ifTrue: does nothing, ifFalse: runs
 (expect "true is t, false and nil are ()" (list (st "true") (st "false") (st "nil") (st "false == nil") (st "3 > 2")) '(t () () t t))
 (expect "false is nil: isNil, ifTrue: and ifFalse:"

@@ -11,8 +11,6 @@
 
 (define-structure <ks-hand> (focus))
 (define-structure <ks-event> (position hand))
-(define-method ks-kind <ks-hand> () 'Hand)
-(define-method ks-kind <ks-event> () 'Event)
 (ks-methods Hand (focus (set (<ks-hand>-focus recv) (car args)) (car args)))
 (ks-methods Event (hand (<ks-event>-hand recv)) (position (<ks-event>-position recv)))
 
@@ -91,7 +89,7 @@
 	 (ks-set-slot recv 'selectionAnchor gap)
 	 (ks-select recv gap gap)
 	 (list-do s '(buttonUp pointerMotion)
-	   (set (<ks-object>-attrs (ks-slot box s)) (cons ':__dormant__ (cons "false" (<ks-object>-attrs (ks-slot box s))))))
+	   (ks-set-attr (ks-slot box s) ':__dormant__ "false"))
 	 (set (<ks-hand>-focus (<ks-event>-hand ev)) box)
 	 (ks-fire (ks-slot box 'showSelection) 't)
 	 gap))))

@@ -263,9 +263,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `nat <- 0 fby nat' + 1` never updates), and undefined keeps the value and stops the change. `timerE`
   is the only source. Untyped, so it runs on `eval`, not through ir2; `anyE` and `switchColE` still
   read held values, and layout and rendering don't exist yet.
-  Methods are defined per kind of receiver (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), and
-  a send no method answers is an error naming kind and selector; a KSWorld object's send sets or reads a field it already has, but
-  never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
+  Methods are defined per class (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), each a method of
+  the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
+  field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
   collection, true as a test, never nil. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
   them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
@@ -338,12 +338,19 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   grammar) its Smalltalk ones to the same trees, so neither is transliterated by hand; `ksworld-source.l` makes each a method
   of its class. A selector is named as KSCompiler named it (`at:put:` is `_at_put`; a KScript method with parameters is its
   keyword selector, and KScript's `rec.abc(a, b)` reaches `abc:with:`), `self` is `this`, an instance variable a field of it,
-  and a Smalltalk method answers `self` without `^`, whose `^` leaves it from a block too (`catch.l`). Classes are values in
-  `kscript.l`, with superclasses (a send climbs them) and metaclasses for class sides, and an unknown form is an error, never a
-  quiet nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
+  and a Smalltalk method answers `self` without `^`, whose `^` leaves it from a block too (`catch.l`). A class is a Maru type
+  (`st-classes.l`, boot.l's `define-structure` and `define-class`) under its superclass's type, a message a Maru selector
+  (`#name`) with a method per class's type and Object's methods as its default, there being no root type, and a class object
+  an instance of its metaclass type, under its superclass's metaclass, for class sides. Maru's values are instances of
+  fieldless classes over their types (Number over `<long>` and `<double>`, String over `<string>` and `<symbol>`, Array,
+  UndefinedObject …), and a Maru type's base is only ever such a class, so no selector of Maru's own reaches another Maru
+  type. Instance variables are fields, the superclass's first; a Dictionary's include `slots`, its table; a document's Array
+  is a Maru array, and its attributes (`:ref`, `:__type__` …) are table entries. A class whose type was made (a document met
+  it) with other instance variables is refused, never given a second layout. An unknown form is an error, never a quiet
+  nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
   primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), Maru's
   booleans (`t`, and `()` for false and nil alike: false answers as nil does), and a KSWorld object an IdentityDictionary of its slots:
-  every object's slots are a `hash.l` table, by identity, or by Maru's `equal` for a Dictionary (and its subclasses: an array key
+  a dictionary's entries are a `hash.l` table, by identity, or by Maru's `equal` for a Dictionary (and its subclasses: an array key
   by its elements, a point by x and y, as Squeak's `=` has them), so one set of
   Dictionary methods serves both, and a Set or IdentitySet keeps its members as a table's keys, in the order added. Every KScript method of KSTextLayout and
   every Smalltalk method of KSContentsCollection and KSBox reads, and a KSContentsCollection is made, grown and edited by its

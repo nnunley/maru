@@ -9,7 +9,7 @@ Object : ()
     True : Boolean ()
     False : Boolean ()
   BlockClosure : Object ()
-  Message : Object ()
+  Message : Object (selector name arguments)
   Character : Object ()
   Magnitude : Object ()
     Number : Magnitude ()
@@ -20,7 +20,7 @@ Object : ()
     HashedCollection : Collection ()
       Set : HashedCollection (items)
         IdentitySet : Set ()
-      Dictionary : HashedCollection ()
+      Dictionary : HashedCollection (slots)
         IdentityDictionary : Dictionary ()
           SystemDictionary : IdentityDictionary ()
     SequenceableCollection : Collection ()
@@ -32,7 +32,7 @@ Object : ()
 
 "Objects"
 Object yourself                         [ self ]
-Object class                            { (or (ks-class-named (ks-kind self)) (error "Smalltalk: no class for " (ks-kind self))) }
+Object class                            { (or (ks-class-named (ks-class-of self)) (error "Smalltalk: no class for " (ks-class-of self))) }
 Object == other                         { (ks-bool (= self other)) }
 Object ~~ other                         [ (self == other) not ]
 Object = other                          [ self == other ]
@@ -67,11 +67,11 @@ Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-select
  IdentityDictionary, so the one set of methods serves both"
 Dictionary at: key              { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
 Dictionary at: key ifAbsent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
-Dictionary at: key put: value   { (hash-at-put (<ks-object>-slots self) (ks-dict-key key) value) }
+Dictionary at: key put: value   { (hash-at-put (ks-table self) (ks-dict-key key) value) }
 Dictionary at: key ifPresent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
 Dictionary includesKey: key     { (ks-bool (ks-slot-entry self (ks-dict-key key))) }
-Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (hash-remove (<ks-object>-slots self) (ks-dict-key key)) (ks-apply aBlock () () ()))) }
-Dictionary size                 { (hash-count (<ks-object>-slots self)) }
+Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (hash-remove (ks-table self) (ks-dict-key key)) (ks-apply aBlock () () ()))) }
+Dictionary size                 { (hash-count (ks-table self)) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
 Object class initialize                 [ self ]
@@ -97,16 +97,17 @@ UndefinedObject not                     [ true ]
 UndefinedObject & aBoolean              [ nil ]
 UndefinedObject | aBoolean              [ aBoolean ]
 
-"Booleans"
-True ifTrue: aBlock                     [ aBlock value ]
-True ifFalse: aBlock                    [ nil ]
-True ifTrue: aBlock ifFalse: bBlock     [ aBlock value ]
-True ifFalse: bBlock ifTrue: aBlock     [ aBlock value ]
-True and: aBlock                        [ aBlock value ]
-True or: aBlock                         [ true ]
-True & aBoolean                         [ aBoolean ]
-True | aBoolean                         [ true ]
-True not                                [ false ]
+"Booleans: true is any value but nil (Maru's t a Symbol, as test-pepsi.l's true is #true), so True's tests are Object's,
+ and UndefinedObject's (above) answer them for nil and false"
+Object ifTrue: aBlock                     [ aBlock value ]
+Object ifFalse: aBlock                    [ nil ]
+Object ifTrue: aBlock ifFalse: bBlock     [ aBlock value ]
+Object ifFalse: bBlock ifTrue: aBlock     [ aBlock value ]
+Object and: aBlock                        [ aBlock value ]
+Object or: aBlock                         [ true ]
+Object & aBoolean                         [ aBoolean ]
+Object | aBoolean                         [ true ]
+Object not                                [ false ]
 
 "Blocks"
 BlockClosure numArgs                    { (list-length (<ks-closure>-params self)) }
@@ -204,7 +205,7 @@ List , other                            { (concat-list self (ks-elements-of othe
 List reduce: aBlock                     { (let ((acc (car self))) (list-do x (cdr self) (set acc (ks-apply aBlock (list acc x) () ()))) acc) }
 
 "Squeak's fonts: TTFontDescription allInstances are the fonts installed; KSFamily names families on demand, so none here"
-TTFontDescription : Object ()
+TTFontDescription : Object (fonts)
 TTFontDescription class allInstances    [ #() ]
 List at: i                              { (let ((c self) (k 1)) (while (and (pair? c) (< k i)) (set c (cdr c)) (set k (+ k 1))) (if (and (long? i) (< 0 i) (pair? c)) (car c) (error "Smalltalk: index " i " out of bounds for a list of " (list-length self)))) }
 
@@ -222,7 +223,7 @@ OrderedCollection addAll: c             { (let () (list-do x (ks-elements-of c) 
 OrderedCollection removeLast            { (let* ((l (ks-slot self 'items)) (x (ks-last l))) (ks-set-slot self 'items (ks-but-last l)) x) }
 OrderedCollection size                  { (list-length (ks-slot self 'items)) }
 OrderedCollection asArray               { (list->array (ks-slot self 'items)) }
-Set initialize                          { (let () (ks-set-slot self 'items (if (= 'IdentitySet (<ks-object>-class self)) (identity-hash-table) (equal-hash-table))) self) }
+Set initialize                          { (let () (ks-set-slot self 'items (if (ks-instance? self 'IdentitySet) (identity-hash-table) (equal-hash-table))) self) }
 Set add: x                              { (let () (hash-at-put (ks-slot self 'items) x 't) x) }
 Set includes: x                         { (ks-bool (hash-includes? (ks-slot self 'items) x)) }
 Set do: aBlock                          { (let () (hash-do (ks-slot self 'items) (lambda (x v) (ks-apply aBlock (list x) () ()))) self) }

@@ -102,7 +102,7 @@
 	((long? v) (long->string v))
 	((double? v) (format "%g" v))
 	((ks-point? v) (concat-strings (ks-to-string (<ks-point>-x v)) "@" (ks-to-string (<ks-point>-y v))))
-	((ks-object? v) (or (ks-val v 'name) (concat-strings "<" (symbol->string (<ks-object>-class v)) "#" (long->string (<ks-object>-ref v)) ">")))
+	((ks-object? v) (or (ks-val v 'name) (concat-strings "<" (symbol->string (ks-class-of v)) "#" (long->string (ks-ref v)) ">")))
 	(else "")))
 
 ;;; ---------------------------------------------------------------- environments & streams
@@ -127,7 +127,7 @@
     s))
 
 (define-function ks-stream? (x)
-  (and (ks-object? x) (= (<ks-object>-class x) 'KSEventStream)))
+  (and (ks-object? x) (ks-instance? x 'KSEventStream)))
 
 (define-function ks-stream-curr (x)
   (if (ks-stream? x) (ks-stream-value x) x))
@@ -142,28 +142,11 @@
 ;; names it; a kind's methods are found on it or up its superclasses, and a class's own (its class side) on its metaclass,
 ;; "NAME class", whose superclass is its superclass's.  KSWorld's classes come from their sources (ksworld-source.l), the
 ;; platform's (Object, Number, Array ...) from squeak-base.st, after test-pepsi.l's hierarchy.
-(define-structure <ks-class> (name super ivars))
-(define *ks-classes* ())	; (name . class)
 (define *ks-globals* ())	; (name . value), Smalltalk's globals (squeak-base.st's Smalltalk)
 (define *ks-classvars* ())	; ((CLASS NAME) . value), Smalltalk's class variables
 (define-function ks-bit-or (a b) (| a b))	; cexpr.g's |
 (define-function ks-assoc (key l)	; the pair whose car is equal to key
-  (let ((found ())) (while (and l (not found)) (and (equal key (caar l)) (set found (car l))) (set l (cdr l))) found))
-(define-function ks-class-named (name) (cdr (assq name *ks-classes*)))
-(define-function ks-meta (name) (string->symbol (concat-string (symbol->string name) " class")))
-(define-function ks-define-class (name super ivars)
-  (let ((c (ks-class-named name)))
-    (if c (let () (set (<ks-class>-super c) super) (set (<ks-class>-ivars c) ivars) c)
-      (cdar (push *ks-classes* (cons name (new <ks-class> name super ivars)))))))
-(define-function ks-superclass (kind)	; a kind's superclass, a metaclass's its superclass's metaclass, or ()
-  (let* ((s (symbol->string kind)) (n (string-length s)))
-    (if (and (< 6 n) (= " class" (string-copy s (- n 6) 6)))
-	(let ((c (ks-class-named (string->symbol (string-copy s 0 (- n 6))))))
-	  (and c (<ks-class>-super c) (ks-meta (<ks-class>-super c))))
-      (let ((c (ks-class-named kind))) (and c (<ks-class>-super c))))))
-(define-function ks-all-ivars (name)	; a class's instance variables, its superclasses' first
-  (let ((c (ks-class-named name))) (if c (concat-list (and (<ks-class>-super c) (ks-all-ivars (<ks-class>-super c))) (<ks-class>-ivars c)) ())))
-(define-function ks-env-lookup (env this name lag?)
+  (let ((found ())) (while (and l (not found)) (and (equal key (caar l)) (set found (car l))) (set l (cdr l))) found))(define-function ks-env-lookup (env this name lag?)
   (let ((pair (assq name env)))
     (cond (pair (cdr pair))
 	  ((= name 'this) this)
@@ -226,14 +209,9 @@
     (ks-box-set-topleft box (ks-point (- (<ks-point>-x pt) (* 0.5 w))
 				      (- (<ks-point>-y pt) (* 0.5 h))))))
 
-;; Methods by the kind of their receiver.  (ks-methods Kind (name body...) ...) defines each name (or a list of names, all
-;; the same method) with recv, args, env and this bound; a KSWorld object's kind is its class, and a value's kind is named
-;; by ks-kind.  A send no method answers is an error naming kind and selector: nothing is quietly nil.
-(define *ks-methods* ())	; ((kind (selector . function) ...) ...)
-(define-function ks-method (kind sel fn)
-  (let ((table (assq kind *ks-methods*)))
-    (or table (push *ks-methods* (set table (list kind))))
-    (set-cdr table (cons (cons sel fn) (cdr table)))))
+;; Methods by the class of their receiver (st-classes.l: a Maru selector per selector, a method per class's type).
+;; (ks-methods Class (name body...) ...) defines each name (or a list of names, all the same method) with recv, args, env
+;; and this bound.  A send no method answers is an error naming class and selector: nothing is quietly nil.
 (define-form ks-methods (kind . clauses)
   `(let ()
      ,@(map (lambda (c)
@@ -242,29 +220,12 @@
 		    `(let ((f ,fn)) ,@(map (lambda (n) `(ks-method ',kind ',n f)) (car c)))
 		  `(ks-method ',kind ',(car c) ,fn))))
 	    clauses)))
-(define-function ks-method-for (kind sel)
-  (let ((m ()))
-    (while (and kind (not m))
-      (let ((table (assq kind *ks-methods*)))
-	(set m (and table (cdr (assq sel (cdr table)))))
-	(set kind (ks-superclass kind))))
-    m))
-
-(define-selector ks-kind (v) 'Value)
-(define-method ks-kind <long> () 'Number)
-(define-method ks-kind <double> () 'Number)
-(define-method ks-kind <string> () 'String)
-(define-method ks-kind <symbol> ()	; Color names a class; t is true; undefined answers as nil; other symbols are text
-  (cond ((= self 'Color) 'ColorClass) ((= self 't) 'True) ((= self 'undefined) 'UndefinedObject) (else 'String)))
-(define-method ks-kind <array> () 'Array)
-(define-method ks-kind <ks-closure> () 'BlockClosure)
-(define-method ks-kind <ks-class> () (ks-meta self.name))
-(define-method ks-kind <pair> () 'List)
-(define-method ks-kind <undefined> () 'UndefinedObject)	; (), Maru's false and nil, as Smalltalk's (an empty list is an empty array)
-(define-method ks-kind <ks-point> () 'Point)
-(define-method ks-kind <ks-rect> () 'Rectangle)
-(define-method ks-kind <ks-color> () 'Color)
-(define-method ks-kind <ks-object> () self.class)
+(define-form ks-class-methods (class . clauses)	; a class's own side, its metaclass's methods
+  `(let ()
+     ,@(map (lambda (c)
+	      `(let ((f (lambda (recv args env this) ,@(cdr c))))
+		 ,@(map (lambda (n) `(ks-method (ks-meta ',class) ',n f)) (if (pair? (car c)) (car c) (list (car c))))))
+	    clauses)))
 
 ;; whether pattern from p matches text from t: * matches any run, # any one character, case aside (Squeak's String>>match:)
 (define-function ks-lower (c) (if (and (<= ?A c) (<= c ?Z)) (+ c 32) c))
@@ -290,7 +251,7 @@
 	  (for (i 1 (string-length s)) (push out (if (= ?_ (string-at s i)) ?: (string-at s i))))
 	  (string->symbol (concat-string (list->string (list-reverse! out)) ":")))
       sel)))
-(define-function ks-no-method (recv sel) (error "Smalltalk: " (ks-kind recv) " does not understand " (ks-squeak-name sel)))
+(define-function ks-no-method (recv sel) (error "Smalltalk: " (ks-class-of recv) " does not understand " (ks-squeak-name sel)))
 
 ;; a KSWorld object's own kind, then what every KSWorld object answers: a closure in a slot of that name, or setting or reading
 ;; a field it has
@@ -299,7 +260,7 @@
     (if m (m recv args env this)
       (let ((slot (ks-slot-entry recv sel)))
 	(cond ((and slot (or (ks-closure? (ks-stream-curr (cdr slot)))
-			     (and (ks-object? (ks-stream-curr (cdr slot))) (= 'KSClosure (<ks-object>-class (ks-stream-curr (cdr slot)))))))
+			     (and (ks-object? (ks-stream-curr (cdr slot))) (ks-instance? (ks-stream-curr (cdr slot)) 'KSClosure))))
 	       (ks-apply (ks-stream-curr (cdr slot)) args env recv))
 	      ((and args slot (not (ks-stream? (cdr slot)))) (ks-set-val recv sel (car args)))	; a field it has; a stream is set with set()
 	      ((or (not slot) args) (ks-no-method recv sel))	; a field it lacks: making one would hide a missing method
@@ -322,9 +283,9 @@
 ;; selector in Squeak's form and ours, its arguments), which KSObject answers from its slots and Object at the root natively
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
-    (let* ((kind (ks-kind recv))
-	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args))))))
-	   (dnu (and (not m) (ks-method-for kind '_doesNotUnderstand))))
+    (let* ((type (type-of recv))	; a class object's type is its metaclass
+	   (m (or (ks-method-for-type type sel) (and args (ks-method-for-type type (ks-squeak-selector sel (list-length args))))))
+	   (dnu (and (not m) (ks-method-for-type type '_doesNotUnderstand))))
       (cond (m (m recv args env this))
 	    (dnu (dnu recv (list (ks-new-object 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
 		      env this))
@@ -399,10 +360,10 @@
   (sort (ks-sort recv (lambda (a b) (ks-truthy? (if args (ks-apply (car args) (list a b) env this) (ks-cmp '<= a b)))))))
 
 ;; Maru's t and (): true, and false and nil as one value
-(ks-methods True (asBoolean 't) ((asString printString) "true"))
 (ks-methods UndefinedObject (asBoolean ()) ((asString printString) "nil"))
 
-(ks-methods ColorClass			; Color, the class, a global
+(ks-define-class 'Color () ())	; Color, the class, a global
+(ks-class-methods Color
   (white (ks-color 1.0 1.0 1.0 1.0))
   (black (ks-color 0.0 0.0 0.0 1.0))
   (yellow (ks-color 1.0 1.0 0.0 1.0))
@@ -427,8 +388,7 @@
 (ks-methods KSEventStream
   (set (ks-set-slot recv '__currentValue__ (car args)))
   (currentValue (ks-stream-curr recv))
-  (dormant (set (<ks-object>-attrs recv)
-		(cons ':__dormant__ (cons (if (ks-truthy? (car args)) "true" "false") (<ks-object>-attrs recv))))
+  (dormant (ks-set-attr recv ':__dormant__ (if (ks-truthy? (car args)) "true" "false"))
 	   (car args))
   (asBoolean (let ((val (ks-stream-curr recv))) (if (ks-defined? val) (ks-bool (ks-truthy? val)) 'undefined)))
   (delayE (ks-stream-curr recv))
@@ -509,14 +469,14 @@
 	       (set res (ks-eval (car stmts) new-env (<ks-closure>-this fn)))
 	       (set stmts (cdr stmts)))
 	     (if (ks-return? res) (<ks-return>-value res) res))))
-	((and (ks-object? fn) (= (<ks-object>-class fn) 'KSClosure))
+	((and (ks-object? fn) (ks-instance? fn 'KSClosure))
 	 (let ((cached (ks-attr fn ':__compiled__))
 	       (clos-this (or (ks-slot fn 'this) caller-this)))
 	   (or cached
 	       (let* ((src (ks-attr fn ':source))
 		      (ast (car (kscript-parse src))))
 		 (set cached (new <ks-closure> (cadr ast) (cddr ast) () clos-this))
-		 (set (<ks-object>-attrs fn) (cons ':__compiled__ (cons cached (<ks-object>-attrs fn))))))
+		 (ks-set-attr fn ':__compiled__ cached)))
 	   (ks-apply cached args env clos-this)))
 	(else ())))
 
@@ -601,7 +561,7 @@
 	 ((= op '~) (^ (ks-stream-curr (ks-eval (cadr exp) env this)) -1))
 	 ((= op 'stream-expr)	; a stream of an expression, as <- makes one (KSWorld's own construction is the plan's step 3d)
 	  (let ((ns (ks-make-stream this "exprE" "" (ks-stream-curr (ks-eval (cadr exp) env this)))))
-	    (set (<ks-object>-attrs ns) (cons ':__ast__ (cons (cadr exp) (<ks-object>-attrs ns))))
+	    (ks-set-attr ns ':__ast__ (cadr exp))
 	    ns))
 	 ((= op 'char) (cadr exp))
 	 ((= op 'symbol) (cadr exp))	; #'name', a Smalltalk Symbol: Maru's symbol, text as KScript's are
@@ -786,10 +746,10 @@
 	      (let ((s (ks-slot this name)))
 		(if (ks-stream? s)
 		    (let ()
-		      (set (<ks-object>-attrs s) (cons ':__ast__ (cons rhs (<ks-object>-attrs s))))
+		      (ks-set-attr s ':__ast__ rhs)
 		      (when (ks-defined? val) (ks-set-slot s '__currentValue__ val)))
 		  (let ((ns (ks-make-stream this "exprE" "" val)))
-		    (set (<ks-object>-attrs ns) (cons ':__ast__ (cons rhs (<ks-object>-attrs ns))))
+		    (ks-set-attr ns ':__ast__ rhs)
 		    (ks-set-slot this name ns)))))
 	    val))
 	 ((= op 'for-in)
@@ -832,7 +792,7 @@
 	    (type (ks-attr s ':__type__)))
 	(when (and code (not (= type "setter")))
 	  (let ((ast (car (kscript-parse code))))
-	    (set (<ks-object>-attrs s) (cons ':__ast__ (cons ast (<ks-object>-attrs s))))
+	    (ks-set-attr s ':__ast__ ast)
 	    ast)))))
 
 ;; Collect synchronous stream dependencies of AST; lag (') and delayE break cycles (section 3.2).
@@ -906,13 +866,12 @@
       (ks-any-fired? (ks-stream-deps ast home 1))))
 
 (define-function ks-evaluator-add-from (ev obj)
-  (when (ks-object? obj)
-    (hash-do (<ks-object>-slots obj) (lambda (name v)
-	(when (and (ks-stream? v)
-		   (not (= (ks-attr v ':__type__) "setter"))
-		   (not (= (ks-attr v ':__dormant__) "true"))
-		   (not (memq v (<ks-evaluator>-streams ev))))
-	  (set (<ks-evaluator>-streams ev) (cons v (<ks-evaluator>-streams ev))))))))
+  (ks-slots-do obj (lambda (name v)
+      (when (and (ks-stream? v)
+		 (not (= (ks-attr v ':__type__) "setter"))
+		 (not (= (ks-attr v ':__dormant__) "true"))
+		 (not (memq v (<ks-evaluator>-streams ev))))
+	(set (<ks-evaluator>-streams ev) (cons v (<ks-evaluator>-streams ev)))))))
 
 (define-function ks-visit-stream (s visited visiting sorted)
   (when (and (not (memq s (car visited))) (not (memq s (car visiting))))

@@ -121,9 +121,8 @@
       (let ((tag (cons 'method ())))
 	(catch tag (lambda () (let ((v (ks-apply (ks-eval tree (list (cons '%method tag) (cons '%class kind)) recv) args env recv)))
 				(if last-value? v recv))))))))
-(define-function ks-basic-new (class)	; Behavior>>basicNew: an instance with each instance variable nil
-  (let ((name (<ks-class>-name class)))
-    (ks-new-object name 0 () (map (lambda (v) (cons v ())) (ks-all-ivars name)) () 0)))
+(define-function ks-basic-new (class)	; Behavior>>basicNew: an instance with each instance variable nil (a dictionary's table empty)
+  (ks-new-object (<ks-class>-name class) 0 () () () 0))
 
 ;; what squeak-base.st's primitives need: a Squeak symbol (#at:put:, a string or symbol) as the selector we name it by
 (define-function ks-selector-of (x)
@@ -132,8 +131,8 @@
       (let ((c (string-at s i)))
 	(if (= c ?:) (let () (set colon 1) (push parts (list->string (list-reverse! w))) (set w ())) (push w c))))
     (if colon (squeak-selector (list-reverse! parts)) (string->symbol s))))
-(define-function ks-responds? (recv sel)	; a method of its kind, or a closure in a slot of that name
-  (or (ks-method-for (ks-kind recv) sel)
+(define-function ks-responds? (recv sel)	; a method of its class, or a closure in a slot of that name
+  (or (ks-method-for-type (type-of recv) sel)
       (and (ks-object? recv) (let ((p (ks-slot-entry recv sel))) (and p (ks-closure? (ks-stream-curr (cdr p))))))))
 (define-function ks-subclasses-of (name)	; every loaded class whose superclasses include name
   (let ((out ()))
@@ -195,5 +194,5 @@
 	  (let ((f (ks-method-function kind tree (<ks-source-method>-kscript? m) ())) (sel (<ks-source-method>-selector m)))
 	    (ks-method kind (if (<ks-source-method>-kscript? m) (ks-squeak-selector sel (list-length (cadr tree))) sel) f)))))
     ;; as Squeak does when a class is loaded: its class side's own initialize, if it has one
-    (let ((init (assq 'initialize (cdr (assq (ks-meta class) *ks-methods*)))))
-      (and init ((cdr init) (ks-class-named class) () () ())))))
+    (let ((init (ks-own-method (ks-meta class) 'initialize)))
+      (and init (init (ks-class-named class) () () ())))))
