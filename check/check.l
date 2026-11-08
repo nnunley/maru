@@ -23,6 +23,7 @@
 (define-function lines (str) (split str ?\n))
 (define-function words (str) (let ((ws ())) (list-do w (split str 32) (or (= 0 (string-length w)) (push ws w))) (list-reverse! ws)))
 (define-function starts (str prefix) (and (<= (string-length prefix) (string-length str)) (= 0 (string-compare str prefix 0 (string-length prefix)))))
+(define-function join-words (ws) (let ((s "")) (list-do w ws (set s (if (= 0 (string-length s)) w (concat-strings s " " w)))) s))
 (define-function last (list) (while (cdr list) (set list (cdr list))) (car list))
 (define-function after (line list) (while (and list (not (= line (car list)))) (set list (cdr list))) (cdr list))
 (define-function until-blank (list) (let ((out ())) (while (and list (< 0 (string-length (car list)))) (push out (car list)) (set list (cdr list))) (list-reverse! out)))
@@ -1073,6 +1074,22 @@
     (or (= n sum) (error "FAIL lines: " n " source lines, but check/lines accounts for " sum
 			 "; add an entry for " (- n sum) " saying why"))
     (println "lines: " n ", tests included; the budget of 20000 is soft")))
+
+;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
+;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
+;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
+;; still fail to read.
+(define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
+			 "test-repl.l" "test.l"))
+(check "erosion"
+  (unit-assert (equal (last (run "erosion_fixtures" "./eval check/erosion.l")) "erosion ok"))
+  (let ((files (run "erosion_files" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k)$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | sed \"s,^[.]/,,\""))
+	(measured ()))
+    (list-do f files (or (member? f erosion-unread) (push measured f)))
+    (let ((out (run "erosion" (concat-strings "./eval erosion-run.l --ledger check/erosion --unread " (join-words erosion-unread)
+					     " -- " (join-words (list-reverse! measured))) 300)))
+      (list-do l out (println l))
+      (or (equal (last out) "erosion matches its ledger") (error "FAIL erosion: " (car out) " per mille, but " (last out))))))
 
 (let ((missing (unmatched *selected* *ran*)))
   (and missing (error "FAIL no check named: " missing)))

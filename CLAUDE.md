@@ -647,6 +647,19 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   delays of a round robin, found none of the races.
 - `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
   the check) by an alarm set in the child, through `subr` (no perl or coreutils).
+- `erosion` (`check/erosion.l`, `erosion-run.l`, `docs/plans/2026-11-08-erosion-metrics.md`): SlopCodeBench's erosion and verbosity
+  (Orlanski et al., NeurIPS 2026), per mille, over Maru's `.l` and `.k` files in the `lines` check's set, held to `check/erosion`'s
+  ledger as `lines` is to `check/lines`: each metric equals the sum of its entries (`erosion-ledger.g`), so a rise or a fall is
+  written down with its reason. Erosion is the share of complexity mass, CC x sqrt(SLOC), held by callables (each top-level
+  definition, nested lambdas counted in it) of CC over 10; verbosity the share of source lines a verbose pattern
+  (`erosion-verbose.g`) flags or a clone covers, a list of at least 12 atoms met twice once its definition's variables are
+  renamed to one placeholder (`erosion-binders.g`), keyed by a 61-bit hash of its renamed form. CC counts decisions
+  (`erosion-complexity.g`, a table of decision forms), and source lines leave out blanks and comments (`erosion-lines.g`).
+  `maru-lines.g` reads each file to the forms Maru's own reader makes, which the run checks, each list's first pair holding a
+  `<source-span>` (file, first and last line) in its source where `eval.c`'s reader holds `(path . line)`. Eight files that
+  don't read whole (they change language partway, or are broken: `compile.l`) aren't measured, and must still fail to read.
+  The fixtures are worked out by hand: CC 1, 2, 4 and 3 for a line, an if, a cond and an and; erosion 0 at CC 10 and all of it
+  at 11; each rule's example flagged and its plain form not; a clone at exactly 12 atoms and none at 11.
 - `lines`: the source line count equals the sum of `check/lines`. Any change
   in line count needs an entry there with its delta, and an entry that adds
   lines must say why. Derived files are marked `derived` in `.gitattributes`
