@@ -3,6 +3,10 @@ under test: scaled, few
 let keys = [1, 2, 5 .. 7]
 let scaled = (x) -> x * 10
 for k in keys: fact few(k)
+-- a schema over a let that isn't a list is over that one value
+let five = 5
+for k in five: fact one(k)
 law listed: all a in keys, b in [10, 20]. scaled(a) + 20 > b by exhaustion
 law named:  all k: few(k). scaled(k) >= 10 by exhaustion
 law drawn:  all a in keys. scaled(a) >= 10
+law single: all k: one(k). scaled(k) = 50 by exhaustion

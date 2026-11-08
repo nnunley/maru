@@ -1,0 +1,4 @@
+-- run after functions.law in one process: its functions are its own, so double here names nothing
+under test: double
+let numerals = [1]
+law leaked: all n: number(n). double(n) = n * 2

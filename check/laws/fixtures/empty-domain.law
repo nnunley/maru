@@ -1,0 +1,4 @@
+-- an empty list is no domain
+under test: f
+let f = (x) -> x
+law empty: all a in []. f(a) = a

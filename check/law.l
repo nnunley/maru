@@ -70,14 +70,28 @@
   (and (or (= v 'accept) (= v 'reject) (and (pair? v) (= 'crash (car v)))) (not *law-verdict*) (set *law-verdict* what))
   v)
 (define-function law-relation? (x) (and (member? x *law-under*) (rules-concludes? x *law-rules*)))
+(define *law-err* ())
+(define *law-fns* ())	; (name . global) for each function this file defines; its global is its own, apart from Maru's
+(define-function law-fn-global (name) (string->symbol (concat-string "law-file-function:" (symbol->string name))))
+(define *law-form-locals* ())	; a function's parameters, while its body is compiled: calls to them are calls
+(define-function law-no-function args ())	; stands for a call to a name nothing defines, so the claim still compiles
+(define-function law-head (h)	; a call's head: this file's function, a name something defines, or E_UNDEFINED
+  (cond ((not (symbol? h))		h)
+	((member? h *law-form-locals*)	h)
+	((assq h *law-fns*)		(cdr (assq h *law-fns*)))
+	((defined? h)			h)
+	(else				(or *law-err* (set *law-err* (list 'E_UNDEFINED (symbol->string h)))) 'law-no-function)))
 (define-function law-form (x)
-  (cond ((symbol? x)		(if (or (law-upper? x) (law-relation? x)) (list 'quote x) x))
+  (cond ((and (symbol? x) (assq x *law-fns*))	(cdr (assq x *law-fns*)))	; a function passed by name
+	((symbol? x)		(if (or (law-upper? x) (law-relation? x)) (list 'quote x) x))
 	((not (pair? x))	x)
 	((= 'quote (car x))	x)
-	((= 'lambda (car x))	(list 'lambda (cadr x) (law-form (caddr x))))	; a function's parameters are names, not a call
+	((= 'lambda (car x))	(let ((outer *law-form-locals*))	; a function's parameters are names, not a call
+				  (set *law-form-locals* (concat-list (cadr x) outer))
+				  (let ((body (law-form (caddr x)))) (set *law-form-locals* outer) (list 'lambda (cadr x) body))))
 	((= 'template (car x))	(list 'law-template (list 'quote (cadr x)) (caddr x)
 				      (cons 'list (map (lambda (n) (list 'cons (list 'quote n) n)) *lnames*))))
-	(else			(cons (cond ((= '= (car x)) 'law-equal) ((= '!= (car x)) 'law-ne) (else (car x)))
+	(else			(cons (cond ((= '= (car x)) 'law-equal) ((= '!= (car x)) 'law-ne) (else (law-head (car x))))
 				      (map law-form (cdr x))))))
 
 ;; references: a template term is passed as its text; anything but accept or reject
@@ -104,7 +118,6 @@
 
 ;; domains: a set, a goal whose last argument is the variable, or a grammar's
 ;; rule, lang.rule, its sentences generated with the law's size as fuel
-(define *law-err* ())
 (define *law-domains* ())	; (lang . domain), each built when first drawn from
 (define *law-drawn-from* ())	; (label domain rule) for each grammar domain in this file
 (define-function law-grammar-domain (lang)
@@ -619,20 +632,24 @@
 (define-function law-file (path)
   (let ((items (law-file-read path)) (saved *rules-numbers*) (pos 0))
     (set *law-config* ()) (set *law-sets* ()) (set *law-under* ()) (set *law-drawn-from* ())
-    (list-do it items (and (law-function-item? it) (eval (list 'define (cadr it) ()))))	; every function named first, so any can call any
     (list-do it items
       (let ((k (car it)))
 	(cond ((= k 'defaults)		(set *law-config* (cdr it)))
 	      ((= k 'set)		(push *law-sets* (cons (cadr it) (caddr it))))
 	      ((= k 'under-test)	(set *law-under* (concat-list *law-under* (cdr it))))
-	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (cadr it) (eval (cadr it)))))
-	      ((= k 'fn)		(law-set-global (cadr it) (law-function (cadr it) (caddr it))))
-	      ((law-function-item? it)	(law-set-global (cadr it) (eval (law-form (caddr it))))))))
+	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (cadr it) (eval (cadr it))))))))
     (let ((ns ()))	; let numerals = [...] replaces the number builtin's numerals; else the file's numbers join them
       (list-do it items (and (= 'let (car it)) (= 'numerals (cadr it)) (set ns (list (caddr it)))))
       (if ns (set *rules-numbers* (car ns))
 	(list-do n (law-file-numbers items) (or (member? n *rules-numbers*) (set *rules-numbers* (concat-list *rules-numbers* (list n)))))))
     (set *law-rules* (rules-expand (law-rules items)))
+    ;; this file's functions, named first so any can call any, compiled once the rules are known
+    (set *law-fns* ())
+    (list-do it items (and (law-function-item? it) (let ((g (law-fn-global (cadr it)))) (push *law-fns* (cons (cadr it) g)) (eval (list 'define g ())))))
+    (list-do it items
+      (and (law-function-item? it)
+	   (law-set-global (cdr (assq (cadr it) *law-fns*))
+			   (if (= 'fn (car it)) (law-function (cadr it) (caddr it)) (eval (law-form (caddr it)))))))
     (or *law-under* (let () (println "E_NO_UNDER_TEST " path ": no under test: line, so its laws test nothing") (set *law-failed* 1) (set items ())))
     (let ((seen ()) (dup ()))	; a law's name is its own in the file, as adequacy names laws
       (list-do it items (and (member? (car it) '(law adequacy)) (if (member? (cadr it) seen) (or dup (set dup (cadr it))) (push seen (cadr it)))))

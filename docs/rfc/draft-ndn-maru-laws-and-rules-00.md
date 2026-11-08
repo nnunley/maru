@@ -434,7 +434,12 @@ law_rules
   nil for arguments no case matches: that is `E_NO_CASE`, naming the function and
   the term.
 - Every function is a name the whole file can call, from claims, from other
-  functions and from itself.
+  functions and from itself, and passed by name to another. A function's name is
+  the file's own: it MUST NOT replace a definition of the language underneath
+  (a law file's `list` is not Maru's), nor reach another law file run in the same
+  process. A function's parameters and a case's pattern variables are its own: a
+  file `let` of the same name is not put in their place.
+- A call to a name nothing defines is `E_UNDEFINED`, naming it, before the law runs.
 
 A law's variable MAY range over a list: `all a in [1, 2, 5 .. 7]`, or
 `all a in keys` after `let keys = [...]`. A list domain is exhausted element by
@@ -590,7 +595,8 @@ the file, so adding a law does not change the values another draws.
 | `E_COVER` | `cover 20% big` with no class `big`, `cover 120% big`, or `classify a when ..., a when ...` | Reject the law, naming the class or the share; the next law runs |
 | `E_RANGE` | a range `A .. B` whose ends are not whole-number constants | The file stops when it is read, naming the ends |
 | `E_NO_CASE` | `value(other(0))` where no case of `value` matches `other(0)` | The run stops with the message, naming the function and the term |
-| `E_DOMAIN` | `all a in n` where `n` is not a list, nor a let naming one | The file stops when it is read, naming the domain |
+| `E_DOMAIN` | `all a in n` where `n` is not a list with elements, nor a let naming one | The file stops when it is read |
+| `E_UNDEFINED` | a claim calls `double(n)` where neither the file nor the language defines `double` | Reject the law, naming the call; the next law runs |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
 ## Formal Grammar

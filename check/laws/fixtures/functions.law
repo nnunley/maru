@@ -1,7 +1,14 @@
 -- functions in a law file: a function, one taking a function, a function by cases calling itself and another, and one
 -- written an equation per line
-under test: double, twice, value, size
+under test: double, twice, value, size, list, addone
 let numerals = [0, 1, 2]
+-- lets named as a function's parameter or a case's variable: neither is inlined into the function
+let x = 3
+let a = 7
+let addone = (x) -> x + 1
+-- a function named as a Maru global is the law file's own, and the runner's list is untouched
+let list(Zero) = 0
+let list(num(n)) = n
 let double = (x) -> x + x
 let twice = (f, x) -> f(f(x))
 let value = num(n) -> n
@@ -14,8 +21,12 @@ let size(pair(a, b)) = 1 + size(a) + size(b)
 rule w_num:     number(n) => wrapped(n, num(n))
 rule w_pair:    number(n) => wrapped(n, pair(num(n), Zero))
 rule w_doubled: number(n) => doubled_of(n, doubled(n))
+rule w_only:    number(n) => numbered(n, num(n))
 law doubles: all n: number(n). double(n) = n * 2 by exhaustion
 law applied: all n: number(n). twice((y) -> y + 1, n) = n + 2 by exhaustion
 law valued:  all n: number(n), k: wrapped(n, k). value(k) = n by exhaustion
 law twofold: all n: number(n), k: doubled_of(n, k). value(k) = n * 2 by exhaustion
 law sized:   all n: number(n), k: wrapped(n, k). size(k) >= 1 by exhaustion
+law byname:  all n: number(n). twice(double, n) = n * 4 by exhaustion
+law local:   all n: number(n). addone(n) = n + 1 by exhaustion
+law own:     all n: number(n), k: numbered(n, k). list(k) = n by exhaustion

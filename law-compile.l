@@ -64,9 +64,11 @@
 	(tail	(law-conv (car tail) 'claim))
 	(else	(list 'quote ()))))
 (define *law-schema-vars* ())	; the variables of the schemas around the item being read
+(define *law-local-names* ())	; a function's parameters or a case's pattern variables, never a file let's value
+(define *law-list-lets* ())	; the lets whose value is a list, which a domain or a schema may name
 (define-function law-conv (x var)	; var: lower-case names become variables
   (cond
-    ((symbol? x)		(let ((l (assq x *law-lets*)))
+    ((symbol? x)		(let ((l (and (not (member? x *law-local-names*)) (assq x *law-lets*))))
 				  (cond (l		(if (and (pair? (cdr l)) (= var 'claim)) (list 'quote (cdr l)) (cdr l)))
 					((and (= var 1) (law-lower? x))	(law-var x))
 					(else		x))))
@@ -76,7 +78,9 @@
     ((= 'law-list (car x))	(let ((elems (law-ranges (cadr x))))
 				  (if (= var 'claim) (law-list-form elems (cddr x)) (law-list-from elems (cddr x) var))))
     ((= 'template (car x))	(if (= var 1) (law-template-term x) x))
-    ((= 'law-fn (car x))	(list 'lambda (cadr x) (law-conv (caddr x) 'claim)))	; (x, y) -> e, a function of claim values
+    ((= 'law-fn (car x))	(let ((outer *law-local-names*))	; (x, y) -> e, its parameters its own
+				  (set *law-local-names* (concat-list (cadr x) outer))
+				  (let ((body (law-conv (caddr x) 'claim))) (set *law-local-names* outer) (list 'lambda (cadr x) body))))
     (else			(cons (if (member? (car x) *law-schema-vars*) (law-var (car x)) (car x))	; a schema's function name
 				      (map (lambda (a) (law-conv a var)) (cdr x))))))
 (define-function law-goal (g scope)	; a goal's relation is a variable only if a parameter or schema variable
@@ -86,9 +90,11 @@
   (cond ((symbol? d)		(law-conv d ()))
 	((= 'law-grammar (car d))	(cons 'grammar (cdr d)))
 	(else			(law-goal d ()))))
+(define-function law-list-source? (a)	; written as a list, or the name of a let whose value is one
+  (or (and (pair? a) (= 'law-list (car a))) (and (symbol? a) (member? a *law-list-lets*))))
 (define-function law-list-domain (d)	; a list's elements, inline or named by a let; E_DOMAIN for anything else
-  (let ((v (law-conv d ())))
-    (and v (not (pair? v)) (error "E_DOMAIN: a domain after in is a list, or a let's name for one: " v))
+  (let ((v (and (law-list-source? d) (law-conv d ()))))
+    (or (pair? v) (error "E_DOMAIN: a domain after in is a list with elements, or a let's name for one"))
     v))
 (define-function law-bindings (raw)	; (law-bind (names) domain) -> (name domain)...; (law-let n v) -> (name (let . form))
   (let ((out ()))
@@ -118,18 +124,28 @@
   (cond ((and (symbol? x) (= ?$ (string-at (symbol->string x) 0)))	(if (member? x out) out (concat-list out (list x))))
 	((pair? x)	(law-pattern-vars (cdr x) (law-pattern-vars (car x) out)))
 	(else		out)))
+(define-function law-raw-names (x out)	; the lower-case names a pattern binds, as written
+  (cond ((and (symbol? x) (law-lower? x))	(if (member? x out) out (cons x out)))
+	((pair? x)				(let () (list-do e (cdr x) (set out (law-raw-names e out))) out))
+	(else					out)))
 (define-function law-case (c)
-  (let ((pats (map (lambda (p) (law-conv p 1)) (car c))))
-    (list pats (law-pattern-vars pats ()) (law-conv (cadr c) 'claim))))
+  (let ((outer *law-local-names*))
+    (set *law-local-names* (concat-list (law-raw-names (cons 'args (car c)) ()) outer))
+    (let* ((pats (map (lambda (p) (law-conv p 1)) (car c))) (out (list pats (law-pattern-vars pats ()) (law-conv (cadr c) 'claim))))
+      (set *law-local-names* outer)
+      out)))
 (define-function law-schema-values (raw)	; a sole list, written out or a let's name, is its elements
   (let ((a (car raw)))
-    (if (and (not (cdr raw)) (or (and (symbol? a) (assq a *law-lets*)) (and (pair? a) (= 'law-list (car a)))))
+    (if (and (not (cdr raw)) (law-list-source? a))
 	(law-conv a ())
       (map (lambda (v) (law-conv v ())) raw))))
 (define-function law-item (it scope)
   (let ((k (car it)))
     (cond
-      ((= k 'let)	(let ((v (law-conv (caddr it) ()))) (set *law-lets* (cons (cons (cadr it) v) *law-lets*)) (list 'let (cadr it) v)))
+      ((= k 'let)	(let ((v (law-conv (caddr it) ())))	; a function is called by name, never inlined
+			  (or (and (pair? v) (= 'lambda (car v))) (set *law-lets* (cons (cons (cadr it) v) *law-lets*)))
+			  (and (pair? (caddr it)) (= 'law-list (car (caddr it))) (push *law-list-lets* (cadr it)))
+			  (list 'let (cadr it) v)))
       ((= k 'let-cases)	(list 'fn (cadr it) (map law-case (caddr it))))	; a function, by cases or one equation
       ((= k 'rule)	(cons 'rule (cons (cadr it) (cons (map law-var (caddr it))
 			    (map (lambda (g) (law-goal g (concat-list scope (caddr it)))) (cdddr it))))))
@@ -149,6 +165,8 @@
     (or ($program parser) (error "syntax error"))
     (set *law-lets* ())
     (set *law-schema-vars* ())
+    (set *law-local-names* ())
+    (set *law-list-lets* ())
     (let ((out ()))
       (list-do it (<law>-result parser)
 	(let* ((i (law-item it ())) (same (and (= 'fn (car i)) (law-fn-named (cadr i) out))))
