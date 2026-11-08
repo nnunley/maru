@@ -4,8 +4,14 @@
 ;;; passes over, and the array is compacted, and its buckets rebuilt, when as many are gone as remain.  Buckets hold the entries' indices.  An identity hash is an address,
 ;;; and loading a saved image moves every object, so a table keeps an anchor of its own and rehashes, before answering,
 ;;; once the anchor has moved.
+;;;
+;;; A weak table holds its keys weakly: an entry is an ephemeron (gc.c), a pair whose value the collector keeps only while
+;;; something other than the table keeps the key, so an entry goes with its key, and a value holding its own key doesn't
+;;; keep it.  A collected entry is cleared, key and value (), and the table drops it the next time it's used.  Its keys
+;;; are objects: a number or nil has no identity to outlive, so neither is a weak key.
 
-(define-structure <hash-table> (hash same buckets entries count removed anchor stamp))
+(define-structure <hash-table> (hash same buckets entries count removed anchor stamp weak))	; weak: () or the
+;; collection count when cleared entries were last dropped
 
 ;; identity, as Smalltalk's ==: a number is itself (eval2 and eval3 box them, so two 5s needn't share an address), and
 ;; of one kind only (2 isn't 2.0); anything else is where it lives (Maru's = compares strings by their text)
@@ -22,9 +28,13 @@
 ;; and arrays by their elements, and a type that defines equal defines equal-hash beside it
 (define-function make-hash-table (hash same)
   (let ((anchor (cons () ())))
-    (new <hash-table> hash same (array 8) (array 0) 0 0 anchor (address-of anchor))))
+    (new <hash-table> hash same (array 8) (array 0) 0 0 anchor (address-of anchor) ())))
 (define-function identity-hash-table () (make-hash-table hash-identity hash-identical?))
 (define-function equal-hash-table () (make-hash-table equal-hash equal))
+(define hash-collections (subr "GC_collection_count" ">l"))
+(define hash-weaken (subr "GC_weaken" "l"))
+(define-function weak-identity-hash-table ()
+  (let ((table (identity-hash-table))) (set (<hash-table>-weak table) (hash-collections)) table))
 (define-function hash-table-same? (table a b) ((<hash-table>-same table) a b))
 
 (define-function hash-bucket-of (table key)
@@ -36,16 +46,31 @@
   (let ((old (<hash-table>-entries table)) (entries (array 0)) (buckets (array n)))
     (set (<hash-table>-buckets table) buckets)
     (array-do e old
-      (when e
+      (when (and e (or (car e) (not (<hash-table>-weak table))))	; a weak table's cleared entries go
 	(let ((b (hash-bucket-of table (car e))))
 	  (set-array-at buckets b (cons (array-length entries) (array-at buckets b)))
 	  (array-append entries e))))
     (set (<hash-table>-entries table) entries)
+    (set (<hash-table>-count table) (array-length entries))	; what it kept: an entry cleared meanwhile isn't among them
     (set (<hash-table>-removed table) 0)
     (set (<hash-table>-stamp table) (address-of (<hash-table>-anchor table)))))
-(define-function hash-current (table)	; rehashed if a loaded image moved what its hashes were made from
-  (or (= (<hash-table>-stamp table) (address-of (<hash-table>-anchor table)))
-      (hash-rebuild table (array-length (<hash-table>-buckets table)))))
+(define-function hash-drop-cleared (table)	; a weak table's entries the collector cleared, gone
+  (let ((entries (<hash-table>-entries table)) (i 0))
+    (set (<hash-table>-weak table) (hash-collections))
+    (while (< i (array-length entries))
+      (let ((e (array-at entries i)))
+	(when (and e (not (car e)))
+	  (set-array-at entries i ())
+	  (set (<hash-table>-count table) (- (<hash-table>-count table) 1))
+	  (set (<hash-table>-removed table) (+ 1 (<hash-table>-removed table)))))
+      (set i (+ i 1)))
+    (and (< (<hash-table>-count table) (<hash-table>-removed table))	; as many gone as remain: compact, as hash-remove does
+	 (hash-rebuild table (array-length (<hash-table>-buckets table))))))
+(define-function hash-current (table)	; rehashed if a loaded image moved what its hashes were made from; a weak one rid of
+  (let ((w (<hash-table>-weak table)))	; what the collector cleared since it last looked (and after a move: a loaded image's
+    (and w (not (= w (hash-collections))) (hash-drop-cleared table))	; count says nothing of when it last looked)
+    (or (= (<hash-table>-stamp table) (address-of (<hash-table>-anchor table)))
+	(let () (and w (hash-drop-cleared table)) (hash-rebuild table (array-length (<hash-table>-buckets table)))))))
 
 ;; the index of key's entry, or ()
 (define-function hash-index (table key)
@@ -65,13 +90,19 @@
 (define-function hash-at (table key . default)
   (let ((i (hash-index table key)))
     (if i (cdr (array-at (<hash-table>-entries table) i)) (car default))))
+(define-function hash-new-entry (table key value)	; (key . value), an ephemeron in a weak table
+  (if (not (<hash-table>-weak table))
+      (cons key value)
+    (and (or (not key) (long? key) (double? key)) (error "hash-at-put: " key " can't be a weak table's key: it has no identity"))
+    (let ((e (cons key value))) (hash-weaken (address-of e)) e)))
 (define-function hash-at-put (table key value)
   (let ((i (hash-index table key)))
     (if i
 	(set-cdr (array-at (<hash-table>-entries table) i) value)
-      (let ((entries (<hash-table>-entries table)) (b (hash-bucket-of table key)) (buckets (<hash-table>-buckets table)))
+      (let ((entries (<hash-table>-entries table)) (b (hash-bucket-of table key)) (buckets (<hash-table>-buckets table))
+	    (e (hash-new-entry table key value)))	; refused before the table is touched
 	(set-array-at buckets b (cons (array-length entries) (array-at buckets b)))
-	(array-append entries (cons key value))
+	(array-append entries e)
 	(set (<hash-table>-count table) (+ 1 (<hash-table>-count table)))
 	(and (< (* 3 (array-length buckets)) (* 4 (<hash-table>-count table)))	; past three quarters full: twice the buckets
 	     (hash-rebuild table (* 2 (array-length buckets))))))
@@ -87,8 +118,10 @@
 	(and (< (<hash-table>-count table) (<hash-table>-removed table))	; as many gone as remain: compact (a bucket's
 	     (hash-rebuild table (array-length (<hash-table>-buckets table))))	; index of a removed entry finds () till then)
 	(cdr e)))))
-(define-function hash-count (table) (<hash-table>-count table))
-(define-function hash-do (table fn)	; (fn key value) for each entry, in the order first put
-  (array-do e (<hash-table>-entries table) (and e (fn (car e) (cdr e)))))
+(define-function hash-count (table) (hash-current table) (<hash-table>-count table))
+(define-function hash-do (table fn)	; (fn key value) for each entry, in the order first put (in a weak table, each not yet
+  (hash-current table)			; collected: fn may collect one)
+  (let ((weak (<hash-table>-weak table)))
+    (array-do e (<hash-table>-entries table) (and e (or (car e) (not weak)) (fn (car e) (cdr e))))))
 (define-function hash-keys (table)
   (let ((out (array 0))) (hash-do table (lambda (k v) (array-append out k))) out))

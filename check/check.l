@@ -367,6 +367,12 @@
 (check "equal_selector"
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (equal (last (run "equal_selector" (concat-strings evaluator " check/equal.l"))) "equal ok"))))
+;; hash.l's weak tables on every evaluator: an entry goes with its key, and its value keeps its key no more than the
+;; table does (an ephemeron)
+(check "weak_table"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "weak_table" (concat-strings evaluator " check/weak.l"))) "weak ok"))
+    (unit-assert (law-file-holds "weak_table" evaluator "check/laws/weak.l" "check/laws/weak.law"))))
 ;; hash.l's tables against an association list, on every evaluator, and an identity table across a saved image (only eval
 ;; saves images), where every object has moved: it rehashes itself before answering
 (check "hash_table"
@@ -375,7 +381,7 @@
   (let ((image (concat-strings tmp "/hash-image")))
     (run "hash_image_save" (concat-strings "./eval check/hash-image-save.l " image))
     (unit-assert (equal (run "hash_image_load" (concat-strings "./eval -l " image " check/hash-image-read.l"))
-			'("(t t t) 0" "b t s 2 gone Array<4>(b () s 2)" "23 of 23")))))
+			'("(t t t) 0" "b t s 2 gone Array<4>(b () s 2)" "23 of 23" "weak held 1")))))
 ;; generated programs against a model of what they should do, and generated allocations; collecting on every allocation
 ;; is slow, so that runs on one evaluator with tagged integers and one without
 (check "gc_model"

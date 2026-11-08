@@ -1,0 +1,47 @@
+-- hash.l's weak tables over generated graphs (check/laws/weak.l): after a collection, exactly the entries whose keys are
+-- live survive, a key being live if a root holds it or the value of a live key's entry does, however the entries are
+-- ordered; an entry's value keeps its own key no more than the table does
+reference survives_as(run, want)
+under test: refs, entry, entries, graph
+defaults trials = 300, size = 4
+let numerals = [0, 1, 2, 3, 4, 5]
+
+-- keys are numbered 0 to 5; an entry is e(key, the keys its value holds), and a graph its entries and its roots; the
+-- lists are terms, item(x, s) and Nil, so functions can take them apart by cases
+fact refs(Nil)
+rule r_more:  number(k), refs(s) => refs(item(k, s))
+rule e_one:   number(k), refs(s) => entry(e(k, s))
+fact entries(Nil)
+rule es_more: entry(x), entries(s) => entries(item(x, s))
+rule g_one:   entries(es), refs(roots) => graph(g(es, roots))
+
+let tolist = Nil -> []
+           | item(a, s) -> [a | tolist(s)]
+-- what a graph means: entries are put last first, so the first entry naming a key is its value
+let then = (a, b) -> b
+let put_entries = Nil -> 0
+                | item(x, es) -> then(put_entries(es), put_entry(x))
+let put_entry = e(k, s) -> weak_put(k, tolist(s))
+let run_graph = g(es, roots) -> then(put_entries(es), hold(tolist(roots)))
+
+-- the model works on Maru lists, taken apart with Maru's car and cdr; ent is an entry as [key, refs]
+let ent = e(k, s) -> [k, tolist(s)]
+let ents = Nil -> []
+         | item(x, es) -> [ent(x) | ents(es)]
+let has = (x, s) -> s = [] ? 0 : (car(s) = x ? 1 : has(x, cdr(s)))
+let value_of = (k, es) -> es = [] ? [] : (car(car(es)) = k ? car(cdr(car(es))) : value_of(k, cdr(es)))
+let held = (k, es) -> es = [] ? 0 : (car(car(es)) = k ? 1 : held(k, cdr(es)))
+let keys = [0, 1, 2, 3, 4, 5]
+-- one round: a key stays live, or becomes live when the value of a live key's entry holds it
+let reached = (i, live, ks, es) -> ks = [] ? 0 :
+              (has(car(ks), live) = 1 && has(i, value_of(car(ks), es)) = 1 ? 1 : reached(i, live, cdr(ks), es))
+let lives = (i, live, es) -> has(i, live) = 1 ? 1 : reached(i, live, keys, es)
+let step = (live, ks, es) -> ks = [] ? [] :
+           (lives(car(ks), live, es) = 1 ? cons(car(ks), step(live, cdr(ks), es)) : step(live, cdr(ks), es))
+-- six rounds reach every key a path can (a path visits each of the six at most once)
+let settle = (live, n, es) -> n = 0 ? live : settle(step(live, keys, es), n - 1, es)
+let kept = (live, ks, es) -> ks = [] ? [] :
+           (has(car(ks), live) = 1 && held(car(ks), es) = 1 ? cons(car(ks), kept(live, cdr(ks), es)) : kept(live, cdr(ks), es))
+let survivors = g(es, roots) -> kept(settle(tolist(roots), 6, ents(es)), keys, ents(es))
+
+law survivors: all p: graph(p). survives_as(() -> run_graph(p), survivors(p)) = accept

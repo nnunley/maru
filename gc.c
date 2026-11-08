@@ -42,11 +42,12 @@ typedef struct _gcheader
 {
   unsigned long		size  : BITS_PER_WORD - 8	__attribute__((__packed__));
   union {
-    unsigned int	flags : 3;
+    unsigned int	flags : 4;
     struct {
       unsigned int	used  : 1;
       unsigned int	atom  : 1;
       unsigned int	mark  : 1;
+      unsigned int	weak  : 1;	/* an ephemeron: its first word a key, the rest marked only while the key lives */
     }							__attribute__((__packed__));
   }							__attribute__((__packed__));
   struct _gcheader *next;
@@ -371,6 +372,59 @@ static size_t  gcMarkTop=   0;
 static size_t  gcMarkMax=   0;
 static int     gcMarking=   0;
 
+/* ephemerons met while marking (Hayes, "Ephemerons", 1997): each waits here until its key is marked from elsewhere, and
+   only then are its other words marked; one whose key never is has every word cleared before the sweep */
+static void  **gcWeak= 0;
+static size_t  gcWeakTop= 0;
+static size_t  gcWeakMax= 0;
+
+static void GC_weak_push(void *ptr)
+{
+  if (gcWeakTop == gcWeakMax) {
+    gcWeakMax= gcWeakMax ? gcWeakMax * 2 : 1024;
+    gcWeak= realloc(gcWeak, sizeof(void *) * gcWeakMax);
+    if (!gcWeak) { fprintf(stderr, "GC: out of memory for ephemerons\n"); abort(); }
+  }
+  gcWeak[gcWeakTop++]= ptr;
+}
+
+GC_API void GC_mark(void *ptr);
+
+static int GC_weak_key_live(void *key)
+{
+  return !key || ((long)key & 1) || ptr2hdr(key)->mark;
+}
+
+/* after the roots: mark what each ephemeron with a live key holds, which may make more keys live, until none does; then
+   clear the rest, whose keys only ephemerons held */
+static void GC_weak_settle(void)
+{
+  int progress= 1;
+  while (progress) {
+    size_t i= 0;
+    progress= 0;
+    while (i < gcWeakTop) {
+      void **obj= gcWeak[i];
+      if (GC_weak_key_live(obj[0])) {
+	void **pos= obj + 1;
+	void **lim= hdr2ptr(ptr2hdr(obj)) + ptr2hdr(obj)->size - sizeof(void *);
+	gcWeak[i]= gcWeak[--gcWeakTop];
+	while (pos <= lim) { void *field= *pos++;  if (field && !((long)field & 1)) GC_mark(field); }
+	progress= 1;
+      }
+      else
+	++i;
+    }
+  }
+  while (gcWeakTop) {
+    void **obj= gcWeak[--gcWeakTop];
+    memset(obj, 0, ptr2hdr(obj)->size);
+  }
+}
+
+/* an object becomes an ephemeron; by address, so any evaluator reaches it through subr */
+GC_API void GC_weaken(long address)	{ ptr2hdr((void *)address)->weak= 1; }
+
 GC_API void GC_mark(void *ptr)
 {
   if ((long)ptr & 1) return;
@@ -381,6 +435,7 @@ GC_API void GC_mark(void *ptr)
   if (hdr->mark) return;
   hdr->mark= 1;
   if (hdr->atom) return;
+  if (hdr->weak) { GC_weak_push(ptr);  return; }
   if (gcMarkTop == gcMarkMax) {
     gcMarkMax= gcMarkMax ? gcMarkMax * 2 : 4096;
     gcMarkStack= realloc(gcMarkStack, sizeof(void *) * gcMarkMax);
@@ -484,6 +539,7 @@ GC_API void GC_delete_root(void *root)
 }
 
 GC_API long GC_collections= 0;
+GC_API long GC_collection_count(void)	{ return GC_collections; }	/* a weak table drops cleared entries when this moves */
 
 GC_API void GC_gcollect(void)
 {
@@ -525,6 +581,7 @@ GC_API void GC_gcollect(void)
 #endif
     if (*(sr->root)) GC_mark(*(sr->root));
   }
+  GC_weak_settle();
 #if VERBOSE > 0
   fprintf(stderr, "*** GC: sweep\n");
 #endif

@@ -496,7 +496,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   have no `ir-` form.
 - `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
   by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil), variadic
-  calls and raw byte access.
+  calls and raw byte access. On `eval` a function `subr` made by name survives a saved image: it keeps a copy of its name and
+  its signature's text, which the image holds and loading reads again.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose
@@ -580,6 +581,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   own lived and rehashes once it has moved. Planted bugs (an entry not emptied on removal, 2.0 hashed apart from 2, a table that
   never rehashes) are each caught. NaN is no key: `=` doesn't find it equal to itself. JOHN's seen states (`merge-worlds`),
   `rules.l`'s seen solutions and `check/law.l`'s cache of reference answers are its tables, by `equal`.
+- `weak_table` (`check/weak.l`, `check/laws/weak.law`): `hash.l`'s `(weak-identity-hash-table)`, on every evaluator, holds its keys
+  weakly. An entry is an ephemeron (Hayes, 1997): a pair with `gc.c`'s weak bit (set by `GC_weaken`, through `subr`), whose first
+  word is its key and whose other words the collector marks only once something else has marked the key, round after round until
+  no more keys come alive; an entry whose key never is has every word cleared before the sweep, and the table drops it the next
+  time it's used (`GC_collection_count` says when). So an entry goes with its key, a value holding its own key doesn't keep it,
+  and a key held only by a live entry's value lives, in any order (a chain of thirty, put so one round can't settle it). A
+  number or nil is no weak key. Generated graphs of entries and roots, put and collected, leave exactly the entries the law
+  file's own model of reachability says; leaving out the rounds, or the weak bit, is refuted. The weak bit is kept in a saved
+  image (`hash_table`'s image holds a weak table).
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

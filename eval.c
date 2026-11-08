@@ -70,6 +70,7 @@ typedef struct {
     cast_t	 arg_casts[32];
     ffi_type	*ret_type;	/* 0: an integer or pointer, as when no '>' is given */
     int		 ret_kind;	/* the signature letter after '>' */
+    wchar_t	*spec;		/* the signature's text, kept so a saved image can make it again */
 } proto_t;
 
 #define nil ((oop)0)
@@ -2558,31 +2559,17 @@ static subr(native_call)
 # undef __USE_GNU
 #endif
 
-static subr(subr)
+/* a subr's signature, from its text ("dd>d": two doubles, a double result) */
+static proto_t *newProto(wchar_t *spec)
 {
-        oop arg= car(args);
-    wchar_t *name= 0;
-    void *addr= 0;
-    switch (getType(arg))
+    wchar_t  *text = spec;
+    proto_t  *sig  = 0;
     {
-	case String:	name= get(arg, String,bits);  break;
-	case Symbol:	name= get(arg, Symbol,bits);  break;
-	case Long:	name= L"<address>";  addr= (void *)getLong(arg);  break;
-	default:	fatal("subr: argument must be string, symbol or address");
-    }
-    if (!addr) {
-	char *sym= wcs2mbs(name);
-	addr= dlsym(RTLD_DEFAULT, sym);
-	if (!addr) fatal("could not find symbol: %s", sym);
-    }
-    proto_t *sig= 0;
-    arg= cadr(args);
-    if (nil != arg) {				if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);  fatal(0); }
-	wchar_t  *spec = get(arg, String,bits);
 	int       mode = 0;
 	cast_t    cast = 0;
 	ffi_type *type = 0;
 	sig= calloc(1, sizeof(proto_t));
+	sig->spec= wcsdup(text);
 	sig->arg_count= 0;
 	sig->arg_rest=  0;
 	while ((mode= *spec++)) {
@@ -2607,11 +2594,11 @@ static subr(subr)
 				    case 'l':	sig->ret_type= &ffi_type_slong;		break;
 				    case 'p':	sig->ret_type= &ffi_type_pointer;	break;
 				    case 's':	sig->ret_type= &ffi_type_pointer;	break;	/* a char *, copied to a String; NULL is nil */
-				    default:	fatal("illegal return type specification: %s", get(arg, String,bits));
+				    default:	fatal("illegal return type specification: %s", text);
 				}
-				if (spec[1]) fatal("characters after the return type in: %s", get(arg, String,bits));
+				if (spec[1]) fatal("characters after the return type in: %s", text);
 				break;
-		default:	fatal("illegal type specification: %s", get(arg, String,bits));
+		default:	fatal("illegal type specification: %s", text);
 	    }
 	    	    	    if ('>' == mode) break;
 	    if (sig->arg_rest) {
@@ -2622,6 +2609,32 @@ static subr(subr)
 	    sig->arg_casts[sig->arg_count]= cast;
 	    sig->arg_count++;
 	}
+    }
+    return sig;
+}
+
+static subr(subr)
+{
+        oop arg= car(args);
+    wchar_t *name= 0;
+    void *addr= 0;
+    switch (getType(arg))
+    {
+	case String:	name= wcsdup(get(arg, String,bits));  break;	/* a copy: the string may be collected */
+	case Symbol:	name= wcsdup(get(arg, Symbol,bits));  break;
+	case Long:	name= L"<address>";  addr= (void *)getLong(arg);  break;
+	default:	fatal("subr: argument must be string, symbol or address");
+    }
+    if (!addr) {
+	char *sym= wcs2mbs(name);
+	addr= dlsym(RTLD_DEFAULT, sym);
+	if (!addr) fatal("could not find symbol: %s", sym);
+    }
+    proto_t *sig= 0;
+    arg= cadr(args);
+    if (nil != arg) {
+	if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);  fatal(0); }
+	sig= newProto(get(arg, String,bits));
     }
     return newSubr(name, addr, sig);
 }
@@ -2820,13 +2833,19 @@ static void saver(FILE *out, void *ptr)
 	    }
 	    break;
 	}
-	case Subr: {
+	case Subr: {	/* its name, then its signature's text, or -1 for none */
 	    wchar_t *str= get(obj, Subr,name);
 	    int      len= wcslen(str);
+	    proto_t *sig= get(obj, Subr,sig);
 	    if (out) {
 		int i;
 		put32(out, len);
 		for (i= 0;  i < len;  ++i) put32(out, str[i]);
+		if (sig) {
+		    put32(out, wcslen(sig->spec));
+		    for (i= 0;  sig->spec[i];  ++i) put32(out, sig->spec[i]);
+		}
+		else put32(out, -1);
 	    }
 	    break;
 	}
@@ -2885,6 +2904,14 @@ static void loader(FILE *in, void *ptr)
 		if (!addr) fatal("loader: could not find Subr name: %s", sym);
 	    }
 	    set(obj, Subr,imp, addr);
+	    int slen= get32(in, &tmp32);
+	    set(obj, Subr,sig, 0);
+	    if (slen >= 0) {
+		wchar_t *spec= (wchar_t *)alloca(4 * slen + 4);
+		for (i= 0;  i < slen;  ++i) spec[i]= get32(in, &tmp32);
+		spec[i]= 0;
+		set(obj, Subr,sig, newProto(spec));
+	    }
 	    break;
 	}
 	default:
