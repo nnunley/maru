@@ -40,7 +40,7 @@ primary		= template						# a claim compares templates
 		| function						# (x, y) -> expression
 		| "("_ xexpression:e ")"_					-> e
 		;
-function	= "("_ ( xidentifier:a (","_ xidentifier)*:b -> `(,a ,@b) )?:p ")"_ "->"_ xexpression:e	-> `(law-fn ,(car p) ,e) ;
+function	= "("_ ( identifier:a (","_ identifier)*:b -> `(,a ,@b) )?:p ")"_ "->"_ xexpression:e	-> `(law-fn ,(car p) ,e) ;	# identifier, not xidentifier: a failed parameter list must fall back to a parenthesised expression
 field		= idpart:a "." idpart:f _				-> `(law-field ,a ,(symbol->string f)) ;
 
 goal		= identifier:n "("_ args?:a ")"_				-> `(,n ,@(car a))
@@ -55,6 +55,7 @@ item		= "let"       keyword xidentifier:n "="_ case:a ("|"_ case)*:b	-> `(let-ca
 		| "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		| "set"       keyword xidentifier:n "="_ xidentifier:a ("|"_ xidentifier)*:b	-> `(set ,n (,a ,@b))
 		| "under"     keyword "test" keyword ":"_ names:n		-> `(under-test ,@n)
+		| "use"       keyword string:s					-> `(use ,s)	# another law file's items, as this one's
 		| "reference" keyword xidentifier:n "("_ names:p ")"_		-> `(reference ,n ,@p)
 		| "rule"      keyword xidentifier:n ( "("_ names:q ")"_ -> q )?:p
 		  ":"_ goals?:g "=>"_ xgoal:c					-> `(rule ,n ,(car p) ,c ,@(car g))

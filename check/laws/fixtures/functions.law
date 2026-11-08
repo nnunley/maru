@@ -30,3 +30,5 @@ law sized:   all n: number(n), k: wrapped(n, k). size(k) >= 1 by exhaustion
 law byname:  all n: number(n). twice(double, n) = n * 4 by exhaustion
 law local:   all n: number(n). addone(n) = n + 1 by exhaustion
 law own:     all n: number(n), k: numbered(n, k). list(k) = n by exhaustion
+-- a parenthesised expression that doesn't start with a name is still one, not a function's parameters
+law parens:  all n: number(n). double((1 + 1) * n) = 4 * n + (0 << 3) by exhaustion

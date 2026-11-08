@@ -520,7 +520,8 @@
 		  "law typo: E_ADEQUATE no rule concludes paintd, so it has no mutants")
 		 ;; functions in a law file, by cases too, and a list as a domain, named and shared with a schema
 		 ("functions" "" 0 "law doubles: PROVED 3" "law applied: PROVED 3" "law valued: PROVED 6" "law twofold: PROVED 3" "law sized: PROVED 6"
-		  "law byname: PROVED 3" "law local: PROVED 3" "law own: PROVED 3")
+		  "law byname: PROVED 3" "law local: PROVED 3" "law own: PROVED 3" "law parens: PROVED 3")
+		 ("use" "" 0 "law named: PROVED 3" "law shapes: PROVED 6")
 		 ("list-domain" "" 0 "law listed: PROVED 10" "law named: PROVED 5" "law drawn: TESTED 100" "law single: PROVED 1")
 		 ("numerals" "" 0 "law few: PROVED 2") ("refs" "check/laws/fixtures/refs.l" 0 "law differ: TESTED 100")
 		 ("reach" "check/laws/fixtures/holds.l" 256 "law sound: PROVED 9" "law sound_uv: PROVED 9" "law direct: PROVED 2"

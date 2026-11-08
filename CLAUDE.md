@@ -473,8 +473,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `list` isn't Maru's, and doesn't reach the next file: `leak.law`), its parameters and pattern variables shadow file lets; no
   case is `E_NO_CASE` (`functions.law`, `no-case.law`), a call to a name nothing defines `E_UNDEFINED`, an empty list domain
   `E_DOMAIN` (`empty-domain.law`);
-  and a law's variable may range over a list, inline or a `let`'s name, which a schema shares (`list-domain.law`). `.law`
-  files count toward `lines`.
+  and a law's variable may range over a list, inline or a `let`'s name, which a schema shares (`list-domain.law`). A file may
+  `use "other.law"`, read in its place once however often used (`use.law`). `.law` files count toward `lines`.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
   well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
   are sound (Nile's own resolver and type checker, forked per question, accept what they
@@ -535,7 +535,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   repeatedly, without the reserve creeping, and running out again with no room made is a final exit. Free blocks are in lists by
   size, so a small allocation walks nothing; blocks over a thousand bytes share one list.
 - `gc_model` (`check/laws/gc-model.law`, `gc-model-paced.law`): generated programs (writes to a few slots, nested worlds that
-  end, fail or are thrown out of, collections) run on real objects and on a pure model, and must agree in everything observable,
+  end, fail or are thrown out of, collections) run on real objects and on a pure model, and must agree in everything observable
+  (both use `check/laws/gc-programs.law`: the rules that make the programs, and what each means, `model_run` on the model and
+  `real_program`, closures over real objects; a model that kept a failed body's writes is refuted),
   with an empty log and balanced heap after; allocation sequences of many sizes; collections every allocation and every seventh.
   A world keeps one record per slot however often it writes it, and a commit hands its parent only what the parent lacks, so a
   loop in a `try` doesn't grow the log, though each call that sets a fresh local still adds a record. Generators are aimed by
@@ -545,12 +547,13 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   them by contention; each run keeps its own output, and a failure prints its
   last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
   forked question inherits from the law runner.
-- `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`, `check/hash-ops.g`): `hash.l`, a hash table in Maru on every
+- `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`): `hash.l`, a hash table in Maru on every
   evaluator, keyed by identity (Smalltalk's `==`: a number by its value and kind, anything else by its address, as `=` compares
   strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. A number hashes by its
   double (a long past 2^53 is equal to the double it rounds to), and a bucket index wraps, never negates (the least long's
   negation is itself). Generated programs of puts, removes and gets, over numbers (negative, past 2^53, halves, the least long),
-  strings, symbols, nested and deep pairs, nil and keys kept as one object, agree with an association list searched with an
+  strings, symbols, nested and deep pairs, nil and keys kept as one object (what each means, `make_key`, and what a program
+  does, `run_program`, written in the law file), agree with an association list searched with an
   equality of its own, at every get and in the count, keys and values after; every pair of those numbers is found exactly when
   equal; sizes around each doubling hold, compacting at three quarters removed; and tables saved in an image (`check/hash-image-
   save.l`, where loading moves every object) answer as before, keep their order and grow, since each notes where an anchor of its

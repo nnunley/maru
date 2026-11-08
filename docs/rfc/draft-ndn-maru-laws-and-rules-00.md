@@ -448,6 +448,10 @@ one list, written out or named, has one item per element: `for k in keys: fact
 few(k)`. So a named list is one set of values, shared by laws and schemas alike.
 [R-list-domains]
 
+A law file MAY `use "path.law"` another, whose items are read in its place, as if
+written there: its rules, lists and functions are the using file's. A file is
+read once however often it is used, so a cycle of uses ends.
+
 ```maru-check @R-list-domains
 law_rules
 ```

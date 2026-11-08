@@ -1,5 +1,6 @@
 ;;; gc-model.law's references: generated programs, on real objects and on a model that must agree, and generated
-;;; allocation sequences on the real heap.  Each in a forked child, since what these find usually crashes.
+;;; allocation sequences on the real heap.  Each in a forked child, since what these find usually crashes.  What a program
+;;; means is written in check/laws/gc-programs.law; here are the operations its meanings call.
 (require "recover.l")
 (define gc-collect (subr "GC_gcollect"))
 (define gc-check-heap (subr "GC_check_heap" ">l"))
@@ -33,9 +34,16 @@
 (define-function real-failed (steps) (lambda () (try (let () (real-run steps) (error "failed")) (lambda (c) c))))
 (define-function real-thrown (steps)
   (lambda () (catch 'out (lambda () (try (let () (real-run steps) (throw 'out 0)) (lambda (c) c))))))
-(define real-compile)
-(require "build/gc-real.g.l")
-(set real-compile (lambda (p) (parse-source <gc-real> $run (list p))))
+(define-function real_global (s v) (real-global s v))
+(define-function real_car (s v) (set-car (real-cell s) v))
+(define-function real_cdr (s v) (set-cdr (real-cell s) v))
+(define-function real_slot (i v) (set-array-at real-array i v))
+(define-function real_char (i c) (set-string-at real-text i c))
+(define-function real_capture (v) (real-captured v))
+(define collect_now gc-collect)
+(define real_ended real-ended)
+(define real_failed real-failed)
+(define real_thrown real-thrown)
 
 ;;; the model: an association list, never changed in place
 (define *model* ())
@@ -55,21 +63,21 @@
     (while (<= len i) (set len (* len 2)))
     (model-put 'text-size len)
     (model-put (list 'char i) c)))
-(define model-run)
-(define-function model-discard (p)
-  (let ((saved *model*)) (model-run p) (set *model* saved)))
-(require "build/gc-model.g.l")
-(set model-run (lambda (p) (parse-source <gc-model> $run (list p))))
+(define-function model_discard (run)	; a failed or thrown body: its writes are dropped
+  (let ((saved *model*)) (run) (set *model* saved)))
+(define model_put model-put)
+(define model_array model-array)
+(define model_char model-char)
 
 ;; every observable the program could have changed, the real one against the model's
 (define-function agree? ()
   (let ((good 1))
     (define-function same (got want) (or (equal got want) (set good ())))
-    (same g0 (model-get '(g 0) 0)) (same g1 (model-get '(g 1) 0)) (same g2 (model-get '(g 2) 0))
-    (same (real-read-captured) (model-get 'captured 0))
+    (same g0 (model-get '(G 0) 0)) (same g1 (model-get '(G 1) 0)) (same g2 (model-get '(G 2) 0))
+    (same (real-read-captured) (model-get 'Captured 0))
     (for (s 0 4)
-      (same (car (real-cell s)) (model-get (list 'car s) 0))
-      (same (cdr (real-cell s)) (model-get (list 'cdr s) 0)))
+      (same (car (real-cell s)) (model-get (list 'Car s) 0))
+      (same (cdr (real-cell s)) (model-get (list 'Cdr s) 0)))
     (same (array-length real-array) (model-get 'array-size 1))
     (for (i 0 (array-length real-array))
       (same (array-at real-array i) (model-get (list 'slot i) (if (= i 0) 0 ()))))
@@ -78,17 +86,18 @@
       (same (string-at real-text i) (model-get (list 'char i) (if (< i 2) ?- 0))))
     good))
 (define undo-log-size (subr "maru_undo_log_size" ">l"))
-;; the program in a world of its own, which must leave nothing in the log, at a given collection pace
-(define-function run-and-compare (p every)
-  (model-run p)
-  (let ((steps (real-compile p)))
+;; the program in a world of its own, which must leave nothing in the log, at a given collection pace: model runs it on
+;; the model, real compiles it to closures, each as gc-programs.law means it
+(define-function run-and-compare (model real every)
+  (model)
+  (let ((steps (real)))
     (gc-collect-every every)
     (real-run steps))
   (gc-collect-every 32768)
   (gc-collect)
   (and (agree?) (= 0 (undo-log-size)) (= 0 (gc-check-heap))))
-(define-function programs_agree (p) (verdict (lambda () (run-and-compare p 32768))))
-(define-function programs_agree_every (p every) (verdict (lambda () (run-and-compare p every))))
+(define-function programs_agree (model real) (verdict (lambda () (run-and-compare model real 32768))))
+(define-function programs_agree_every (model real every) (verdict (lambda () (run-and-compare model real every))))
 
 ;; a world's log holds one record per slot, however many writes: the same at any length of loop
 (define-function loop-log-size (n)

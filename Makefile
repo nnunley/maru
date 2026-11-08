@@ -57,7 +57,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c undo-irl.c osdefs.k
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
-CHECK_LIBS = build/hash-ops.g.l build/gc-shapes.g.l build/gc-real.g.l build/gc-model.g.l build/sat.$(SO) build/png.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/library-mode.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
+CHECK_LIBS = build/gc-shapes.g.l build/sat.$(SO) build/png.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/library-mode.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l \
 	     sdl3.osdefs.k

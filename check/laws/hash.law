@@ -1,10 +1,10 @@
 -- hash.l's tables against an association list searched with the same equality (check/laws/hash.l): every get, the count,
 -- and the keys and values in the order they were first put
-reference programs_agree(p, k)
+reference programs_agree(k, run)
 reference grows(n, k)
 reference finds_iff_same(a, b, k)
 reference key_kinds(n)
-under test: program, op, key, kind, many, once, numkey
+under test: program, op, key, kind, many, once, numkey, make_key, apply_op, run_program
 defaults trials = 300, size = 6
 let numerals = [0, 1, 2, 3, 7]
 
@@ -31,8 +31,31 @@ fact once(1)
 -- least long (whose negation is itself), and 2 against 2.0
 for k in num(0) | num(2) | dbl(2) | neg(7) | half(1) | big(0) | big(1) | bigdbl(0) | bigdbl(1) | Min: fact numkey(k)
 
-law programs:  all p: program(p), k: kind(k). programs_agree(p, k) = accept
+-- what a program means: a key is made afresh each time it is named (a string, symbol, pair or list), so an identity
+-- table sees two mentions as two keys, while kept(n) is one object however often it is named
+let then = (a, b) -> b
+let make_key = Nil        -> []
+             | Min        -> 1 << 63
+             | num(n)     -> n
+             | dbl(n)     -> n * 1.0
+             | neg(n)     -> 0 - n
+             | big(n)     -> 9007199254740992 + n
+             | bigdbl(n)  -> (9007199254740992 + n) * 1.0
+             | half(n)    -> n + 0.5
+             | str(n)     -> fresh_text(n)
+             | sym(n)     -> name_symbol(n)
+             | pair(a, b) -> [make_key(a) | make_key(b)]
+             | deep(n)    -> nested(n)
+             | kept(n)    -> kept_key(n)
+let apply_op = put(k, v)  -> table_put(make_key(k), v)
+             | remove(k)  -> table_remove(make_key(k))
+             | get(k)     -> table_get(make_key(k))
+             | grow(n)    -> table_grow(n)
+let run_program = seq(o, p) -> then(apply_op(o), run_program(p))
+                | End       -> 0
+
+law programs:  all p: program(p), k: kind(k). programs_agree(k, () -> run_program(p)) = accept
 law grows:     all n: many(n), k: kind(k). grows(n, k) = accept by exhaustion
-law numbers:   all a: numkey(a), b: numkey(b), k: kind(k). finds_iff_same(a, b, k) = accept by exhaustion
+law numbers:   all a: numkey(a), b: numkey(b), k: kind(k). finds_iff_same(make_key(a), make_key(b), k) = accept by exhaustion
 -- an identity table tells apart what an equality table takes as one key: two strings of the same text, 2 and 2.0
 law key_kinds: all n: once(n). key_kinds(n) = accept by exhaustion

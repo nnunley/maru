@@ -1,0 +1,62 @@
+-- The programs gc-model.law and gc-model-paced.law generate, and what they mean on the model and on real objects
+-- (check/laws/gc-model.l has the operations both meanings use)
+let numerals = [0, 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 63, 64, 65, 127, 128, 129, 255, 256, 1000, 4097]
+
+-- few slots and many writes, so worlds overwrite each other: what a mistake in the log needs in order to show
+fact on(0)
+fact on(1)
+-- a few places past the end: growing, failing, and growing past the same place again is what shows stale data
+fact past(2)
+fact past(3)
+fact past(5)
+fact past(9)
+fact program(End)
+rule p_one:      op(o), program(p)                      => program(seq(o, p))
+rule p_three:    op(a), op(b), op(c), program(p)        => program(seq(a, seq(b, seq(c, p))))
+rule o_global:   on(s), number(v) => op(global(s, v))
+rule o_global2:  on(s), number(v) => op(global(s, v))
+rule o_car:      on(s), number(v) => op(car(s, v))
+rule o_cdr:      on(s), number(v) => op(cdr(s, v))
+rule o_slot:     on(s), number(v) => op(slot(s, v))
+rule o_grow:     past(s), number(v) => op(slot(s, v))
+rule o_grow3:    past(s), number(v) => op(slot(s, v))
+rule o_char:     on(s), number(v) => op(char(s, v))
+rule o_grow2:    past(s), number(v) => op(char(s, v))
+rule o_grow4:    past(s), number(v) => op(char(s, v))
+rule o_captured: number(v)            => op(captured(v))
+fact op(Collect)
+fact op(Churn)
+rule o_ended:    op(a), program(p)    => op(ended(seq(a, p)))
+rule o_failed:   op(a), program(p)    => op(failed(seq(a, p)))
+rule o_failed2:  op(a), op(b)         => op(failed(seq(a, seq(b, End))))
+rule o_thrown:   op(a), program(p)    => op(thrown(seq(a, p)))
+
+-- what a program means, twice: on the model, a value with nothing to undo (a failed or thrown body's writes are dropped),
+-- and on real objects, a list of closures, so running it allocates only what its own operations do, not what reading it does
+let then = (a, b) -> b
+let model_run = seq(o, p)   -> then(model_op(o), model_run(p))
+              | End         -> 0
+let model_op = global(s, v) -> model_put([G, s % 3], v)
+             | car(s, v)    -> model_put([Car, s % 4], v)
+             | cdr(s, v)    -> model_put([Cdr, s % 4], v)
+             | slot(i, v)   -> model_array(i % 64, v)
+             | char(i, v)   -> model_char(i % 64, 97 + v % 26)
+             | captured(v)  -> model_put(Captured, v)
+             | Collect      -> 0
+             | Churn        -> 0
+             | ended(p)     -> model_run(p)
+             | failed(p)    -> model_discard(() -> model_run(p))
+             | thrown(p)    -> model_discard(() -> model_run(p))
+let real_program = seq(o, p) -> [real_op(o) | real_program(p)]
+                 | End       -> []
+let real_op = global(s, v)  -> () -> real_global(s, v)
+            | car(s, v)     -> () -> real_car(s % 4, v)
+            | cdr(s, v)     -> () -> real_cdr(s % 4, v)
+            | slot(i, v)    -> () -> real_slot(i % 64, v)
+            | char(i, v)    -> () -> real_char(i % 64, 97 + v % 26)
+            | captured(v)   -> () -> real_capture(v)
+            | Collect       -> collect_now
+            | Churn         -> () -> churn(200)
+            | ended(p)      -> real_ended(real_program(p))
+            | failed(p)     -> real_failed(real_program(p))
+            | thrown(p)     -> real_thrown(real_program(p))

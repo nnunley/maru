@@ -160,26 +160,35 @@
 
 (define-function law-fn-named (name items)
   (let ((f ())) (list-do i items (and (= 'fn (car i)) (= name (cadr i)) (set f i))) f))
-(define-function law-text-read (text)
+(define law-text-items)
+(define *law-used* ())	; the files used so far: each is read once, so a cycle of uses ends
+(define-function law-text-read (text . path)	; path, if the text is a file's, counts as used
+  (set *law-lets* ())
+  (set *law-schema-vars* ())
+  (set *law-local-names* ())
+  (set *law-list-lets* ())
+  (set *law-used* path)
+  (law-text-items text ()))
+;; a file's items, those of each file it uses read in its place, in one scope: the lets and functions of a used file are this one's
+(set law-text-items (lambda (text out)
   (let ((parser (text-parser-for-on <law> text)))
     (or ($program parser) (error "syntax error"))
-    (set *law-lets* ())
-    (set *law-schema-vars* ())
-    (set *law-local-names* ())
-    (set *law-list-lets* ())
-    (let ((out ()))
+    (let ()
       (list-do it (<law>-result parser)
-	(let* ((i (law-item it ())) (same (and (= 'fn (car i)) (law-fn-named (cadr i) out))))
-	  (if same (set-car (cddr same) (concat-list (caddr same) (caddr i)))	; equations of one name are one function, in order
-	    (set out (concat-list out (list i))))))
-      out)))
+	(if (= 'use (car it))
+	    (or (member? (cadr it) *law-used*)
+		(let () (push *law-used* (cadr it)) (set out (law-text-items (contents-of-file-named (cadr it)) out))))
+	  (let* ((i (law-item it ())) (same (and (= 'fn (car i)) (law-fn-named (cadr i) out))))
+	    (if same (set-car (cddr same) (concat-list (caddr same) (caddr i)))	; equations of one name are one function, in order
+	      (set out (concat-list out (list i)))))))
+      out))))
 
 ;;; The items rules-expand takes: rules, facts, schemas and facts-from-function.
 (define-function law-rules (items)
   (let ((out ()))
     (list-do it items (and (member? (car it) '(rule fact schema facts)) (set out (concat-list out (list it)))))
     out))
-(define-function law-file-read (path) (law-text-read (contents-of-file-named path)))
+(define-function law-file-read (path) (law-text-read (contents-of-file-named path) path))
 
 ;;; The numbers a file mentions in its rules, facts, lets and laws, not its
 ;;; defaults or a law's size.

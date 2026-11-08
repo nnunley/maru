@@ -1,0 +1,7 @@
+-- rules, a list and functions another law file uses (use.law)
+let sizes = [1, 2, 3]
+for n in sizes: fact size(n)
+let tripled = (x) -> x * 3
+let shape = sq(n) -> n * n | line(n) -> n
+rule s_sq:   size(n) => shape_of(sq(n))
+rule s_line: size(n) => shape_of(line(n))

@@ -1,41 +1,12 @@
 -- Generated programs against a model, and generated allocation sequences (check/laws/gc-model.l)
-reference programs_agree(p)
+reference programs_agree(model, real)
 reference log_is_bounded(n)
 reference merge_is_bounded(n)
 reference many_slots(n)
 reference allocations(ops, every)
 under test: program, op, on, past, ops, pace, loops, slots, once
 defaults trials = 100, size = 5
-let numerals = [0, 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 63, 64, 65, 127, 128, 129, 255, 256, 1000, 4097]
-
--- few slots and many writes, so worlds overwrite each other: what a mistake in the log needs in order to show
-fact on(0)
-fact on(1)
--- a few places past the end: growing, failing, and growing past the same place again is what shows stale data
-fact past(2)
-fact past(3)
-fact past(5)
-fact past(9)
-fact program(End)
-rule p_one:      op(o), program(p)                      => program(seq(o, p))
-rule p_three:    op(a), op(b), op(c), program(p)        => program(seq(a, seq(b, seq(c, p))))
-rule o_global:   on(s), number(v) => op(global(s, v))
-rule o_global2:  on(s), number(v) => op(global(s, v))
-rule o_car:      on(s), number(v) => op(car(s, v))
-rule o_cdr:      on(s), number(v) => op(cdr(s, v))
-rule o_slot:     on(s), number(v) => op(slot(s, v))
-rule o_grow:     past(s), number(v) => op(slot(s, v))
-rule o_grow3:    past(s), number(v) => op(slot(s, v))
-rule o_char:     on(s), number(v) => op(char(s, v))
-rule o_grow2:    past(s), number(v) => op(char(s, v))
-rule o_grow4:    past(s), number(v) => op(char(s, v))
-rule o_captured: number(v)            => op(captured(v))
-fact op(Collect)
-fact op(Churn)
-rule o_ended:    op(a), program(p)    => op(ended(seq(a, p)))
-rule o_failed:   op(a), program(p)    => op(failed(seq(a, p)))
-rule o_failed2:  op(a), op(b)         => op(failed(seq(a, seq(b, End))))
-rule o_thrown:   op(a), program(p)    => op(thrown(seq(a, p)))
+use "check/laws/gc-programs.law"
 
 fact ops(Done)
 rule a_keep:     number(n), ops(p)    => ops(step(Keep, n, p))
@@ -52,7 +23,7 @@ fact loops(100000)
 fact slots(500)
 fact slots(50000)
 
-law programs:       all p: program(p). programs_agree(p) = accept
+law programs:       all p: program(p). programs_agree(() -> model_run(p), () -> real_program(p)) = accept
 law log_bounded:    all n: loops(n). log_is_bounded(n) = accept by exhaustion
 law merge_bounded:  all n: loops(n). merge_is_bounded(n) = accept by exhaustion
 law many_slots:     all n: slots(n). many_slots(n) = accept by exhaustion

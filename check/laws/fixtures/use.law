@@ -1,0 +1,5 @@
+-- a law file uses another's rules, lists and functions, as its own
+use "check/laws/fixtures/shared.law"
+under test: tripled, shape
+law named:  all n in sizes. tripled(n) = n + n + n by exhaustion
+law shapes: all s: shape_of(s). shape(s) >= 1 by exhaustion
