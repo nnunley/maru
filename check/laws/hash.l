@@ -31,6 +31,7 @@
 (define-function table_get (key)
   (let ((cell (model-cell key)))
     (same-answer (hash-at *table* key 'absent) (if cell (cdr cell) 'absent))
+    (same-answer (let ((e (hash-entry *table* key))) (if e (cdr e) 'absent)) (if cell (cdr cell) 'absent))
     (same-answer (hash-includes? *table* key) (and cell 't))))
 (define-function table_grow (n) (for (i 0 n) (table_put (+ 100 i) i)))
 (define-function fresh_text (n) (concat-string "k" (long->string n)))

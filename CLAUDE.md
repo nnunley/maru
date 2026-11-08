@@ -342,7 +342,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   `kscript.l`, with superclasses (a send climbs them) and metaclasses for class sides, and an unknown form is an error, never a
   quiet nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
   primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), Maru's
-  booleans (`t`, and `()` for false and nil alike: false answers as nil does), and a KSWorld object an IdentityDictionary of its slots. Every KScript method of KSTextLayout and
+  booleans (`t`, and `()` for false and nil alike: false answers as nil does), and a KSWorld object an IdentityDictionary of its slots:
+  every object's slots are a `hash.l` table, by identity, or by equality for a Dictionary (and its subclasses), so one set of
+  Dictionary methods serves both, and a Set or IdentitySet keeps its members as a table's keys, in the order added. Every KScript method of KSTextLayout and
   every Smalltalk method of KSContentsCollection and KSBox reads, and a KSContentsCollection is made, grown and edited by its
   own Smalltalk. A text box's letters are letter boxes, as KSWorld read the spans it wrote (`ksworld-pp.l`), checked in
   `ksworld_headless` against the five letters KSWorld kept.

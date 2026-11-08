@@ -98,6 +98,9 @@ Steps, each a check first:
      (rules.l) each keep their own buckets, while Dictionary, Set and a KSObject's slots are association lists). Written
      in a Maru language, not C, keyed by identity or by equality, it holds Dictionary and IdentityDictionary, Set and
      IdentitySet, KSObject's slots, and JOHN's and rules.l's buckets, each moved onto it with its checks.
+     Done: hash.l, with laws; every object's slots are a table (identity, or equality for a Dictionary), so Dictionary,
+     IdentityDictionary and KSWorld objects share one store and one set of methods; Set and IdentitySet keep their members
+     as a table's keys. JOHN's seen states and rules.l's buckets are still their own.
    Order and tests (the user, 2026-11-07: "make sure there's solid testing that the change in semantics is accounted for,
    and fixed at the KScript level if it causes breakages"): in Maru false, nil and the empty list are one value, (), so
    arrays become Maru arrays first, and only then KScript's truth becomes Maru's; an empty collection is then an empty

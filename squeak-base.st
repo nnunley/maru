@@ -63,19 +63,15 @@ Object perform: aSymbol with: a with: b { (ks-send self (ks-selector-of aSymbol)
 Object respondsTo: aSymbol              { (ks-bool (ks-responds? self (ks-selector-of aSymbol))) }
 
 "Dictionaries: a KSWorld object is an IdentityDictionary of its slots, so a symbol or string key is a slot's name; any other
- key (a number, an object) is kept as it is, compared by value in a Dictionary and by identity in an IdentityDictionary"
-Dictionary at: key              { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
-Dictionary at: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
-Dictionary at: key put: value   { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
-Dictionary at: key ifPresent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
-Dictionary includesKey: key     { (ks-bool (ks-assoc (ks-dict-key key) (<ks-object>-slots self))) }
-Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assoc (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
-IdentityDictionary at: key              { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
-IdentityDictionary at: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
-IdentityDictionary at: key put: value   { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (set-cdr p value) (set (<ks-object>-slots self) (cons (cons (ks-dict-key key) value) (<ks-object>-slots self)))) value) }
-IdentityDictionary at: key ifPresent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
-IdentityDictionary includesKey: key     { (ks-bool (ks-assq (ks-dict-key key) (<ks-object>-slots self))) }
-IdentityDictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-assq (ks-dict-key key) (<ks-object>-slots self)))) (if p (let () (set (<ks-object>-slots self) (ks-without p (<ks-object>-slots self))) (cdr p)) (ks-apply aBlock () () ()))) }
+ key (a number, an object) is kept as it is; the slots are a hash.l table, by equality in a Dictionary and by identity in an
+ IdentityDictionary, so the one set of methods serves both"
+Dictionary at: key              { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (cdr p) (error "Smalltalk: key not found: " key))) }
+Dictionary at: key ifAbsent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (cdr p) (ks-apply aBlock () () ()))) }
+Dictionary at: key put: value   { (hash-at-put (<ks-object>-slots self) (ks-dict-key key) value) }
+Dictionary at: key ifPresent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (ks-apply aBlock (list (ks-stream-curr (cdr p))) () ()) ())) }
+Dictionary includesKey: key     { (ks-bool (ks-slot-entry self (ks-dict-key key))) }
+Dictionary removeKey: key ifAbsent: aBlock { (let ((p (ks-slot-entry self (ks-dict-key key)))) (if p (hash-remove (<ks-object>-slots self) (ks-dict-key key)) (ks-apply aBlock () () ()))) }
+Dictionary size                 { (hash-count (<ks-object>-slots self)) }
 Object class basicNew                   { (ks-basic-new self) }
 Object class new                        [ self basicNew initialize ]
 Object class initialize                 [ self ]
@@ -226,14 +222,14 @@ OrderedCollection addAll: c             { (let () (list-do x (ks-elements-of c) 
 OrderedCollection removeLast            { (let* ((l (ks-slot self 'items)) (x (ks-last l))) (ks-set-slot self 'items (ks-but-last l)) x) }
 OrderedCollection size                  { (list-length (ks-slot self 'items)) }
 OrderedCollection asArray               { (list->array (ks-slot self 'items)) }
-Set initialize                          { (let () (ks-set-slot self 'items ()) self) }
-Set add: x                              { (let () (or (ks-set-has? self x) (ks-set-slot self 'items (concat-list (ks-slot self 'items) (list x)))) x) }
-Set includes: x                         { (ks-bool (ks-set-has? self x)) }
-Set do: aBlock                          { (let () (list-do x (ks-slot self 'items) (ks-apply aBlock (list x) () ())) self) }
-Set collect: aBlock                     { (list->array (map (lambda (x) (ks-apply aBlock (list x) () ())) (ks-slot self 'items))) }
-Set size                                { (list-length (ks-slot self 'items)) }
-Set isEmpty                             { (ks-bool (not (ks-slot self 'items))) }
-Set asArray                             { (list->array (ks-slot self 'items)) }
+Set initialize                          { (let () (ks-set-slot self 'items (if (= 'IdentitySet (<ks-object>-class self)) (identity-hash-table) (equal-hash-table))) self) }
+Set add: x                              { (let () (hash-at-put (ks-slot self 'items) x 't) x) }
+Set includes: x                         { (ks-bool (hash-includes? (ks-slot self 'items) x)) }
+Set do: aBlock                          { (let () (hash-do (ks-slot self 'items) (lambda (x v) (ks-apply aBlock (list x) () ()))) self) }
+Set collect: aBlock                     { (list->array (map (lambda (x) (ks-apply aBlock (list x) () ())) (array->list (hash-keys (ks-slot self 'items))))) }
+Set size                                { (hash-count (ks-slot self 'items)) }
+Set isEmpty                             { (ks-bool (= 0 (hash-count (ks-slot self 'items)))) }
+Set asArray                             { (hash-keys (ks-slot self 'items)) }
 List asArray                            { (list->array self) }
 
 "What every sequence answers, as Squeak's SequenceableCollection does, from at: and size (an Array, a String, a Maru list

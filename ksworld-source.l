@@ -123,7 +123,7 @@
 				(if last-value? v recv))))))))
 (define-function ks-basic-new (class)	; Behavior>>basicNew: an instance with each instance variable nil
   (let ((name (<ks-class>-name class)))
-    (new <ks-object> name 0 () (map (lambda (v) (cons v ())) (ks-all-ivars name)) () 0)))
+    (ks-new-object name 0 () (map (lambda (v) (cons v ())) (ks-all-ivars name)) () 0)))
 
 ;; what squeak-base.st's primitives need: a Squeak symbol (#at:put:, a string or symbol) as the selector we name it by
 (define-function ks-selector-of (x)
@@ -134,7 +134,7 @@
     (if colon (squeak-selector (list-reverse! parts)) (string->symbol s))))
 (define-function ks-responds? (recv sel)	; a method of its kind, or a closure in a slot of that name
   (or (ks-method-for (ks-kind recv) sel)
-      (and (ks-object? recv) (let ((p (assq sel (<ks-object>-slots recv)))) (and p (ks-closure? (ks-stream-curr (cdr p))))))))
+      (and (ks-object? recv) (let ((p (ks-slot-entry recv sel))) (and p (ks-closure? (ks-stream-curr (cdr p))))))))
 (define-function ks-subclasses-of (name)	; every loaded class whose superclasses include name
   (let ((out ()))
     (list-do e *ks-classes*
@@ -142,17 +142,10 @@
 	(while (and k (not under)) (if (= k name) (set under 1) (set k (let ((c (ks-class-named k))) (and c (<ks-class>-super c))))))
 	(and under (push out (cdr e)))))
     out))
-(define-function ks-assq (key l)	; the pair whose car is key itself (an IdentityDictionary's lookup)
-  (let ((found ())) (while (and l (not found)) (and (= key (caar l)) (set found (car l))) (set l (cdr l))) found))
 (define-function ks-elements-of (c) (cond ((pair? c) c) ((array? c) (array->list c)) ((ks-object? c) (ks-slot c 'items)) (else ())))	; a collection's elements
 (define-function ks-last (l) (if (cdr l) (ks-last (cdr l)) (car l)))
 (define-function ks-but-last (l) (if (cdr l) (cons (car l) (ks-but-last (cdr l))) ()))
-(define-function ks-set-has? (set x)	; a Set by equality, an IdentitySet by identity
-  (let ((same (if (= 'IdentitySet (<ks-object>-class set)) (lambda (a b) (= a b)) equal)) (found ()))
-    (list-do e (ks-slot set 'items) (and (same e x) (set found 1)))
-    found))
 (define-function ks-dict-key (k) (cond ((symbol? k) k) ((string? k) (string->symbol k)) (else k)))
-(define-function ks-without (x l) (if l (if (= x (car l)) (cdr l) (cons (car l) (ks-without x (cdr l)))) ()))
 ;; a primitive's method: made in a function, so each closes over its own f (a closure made in a loop shares the loop's)
 (define-function ks-primitive-function (f) (lambda (recv args env this) (apply f (cons recv args))))
 ;; the platform, in test-pepsi.l's form: classes, methods and primitives (Maru with self and the arguments bound)
@@ -172,18 +165,18 @@
 ;; left side bearing hmtx keeps, and a glyph's outline as a FloatArray, the form a document's GeziraPath keeps its floats in
 (require "ksworld-text.l")	; the font chain (ks-fonts): a family, its alternatives, its generic family, a last resort
 (define-function ks-ttc-font (name size style)
-  (let ((d (new <ks-object> 'TTFontDescription 0 () (list (cons 'fonts (ks-fonts (string->symbol (if (symbol? name) (symbol->string name) name)) style))) () 0)))
-    (new <ks-object> 'TTCFont 0 () (list (cons 'description d) (cons 'pointSize size) (cons 'emphasis style)) () 0)))
+  (let ((d (ks-new-object 'TTFontDescription 0 () (list (cons 'fonts (ks-fonts (string->symbol (if (symbol? name) (symbol->string name) name)) style))) () 0)))
+    (ks-new-object 'TTCFont 0 () (list (cons 'description d) (cons 'pointSize size) (cons 'emphasis style)) () 0)))
 (define-function ks-ttc-glyph (description code)	; the first font of the chain with a glyph for code, or the first's missing glyph
   (let* ((fonts (ks-slot description 'fonts)) (f (ks-char-font fonts code)))
-    (new <ks-object> 'TTGlyph 0 () (list (cons 'font f) (cons 'glyph (ttf-glyph f code))) () 0)))
+    (ks-new-object 'TTGlyph 0 () (list (cons 'font f) (cons 'glyph (ttf-glyph f code))) () 0)))
 (define-function ttf-lsb (f glyph)
   (ttf-i16 f (if (< glyph (<ttf>-metrics f)) (+ (<ttf>-hmtx f) (+ (* 4 glyph) 2))
 	       (+ (+ (<ttf>-hmtx f) (* 4 (<ttf>-metrics f))) (* 2 (- glyph (<ttf>-metrics f)))))))
 (define-function ks-glyph-float-array (f glyph)
   (let* ((beziers (ttf-outline f glyph)) (floats (data (* 24 (list-length beziers)))) (i 0))
     (list-do z beziers (list-do v z (set-float-at floats i (* 1.0 v)) (set i (+ i 1))))
-    (new <ks-object> 'FloatArray 0 () () floats (* 6 (list-length beziers)))))
+    (ks-new-object 'FloatArray 0 () () floats (* 6 (list-length beziers)))))
 (ks-load-library "squeak-ttf.st")
 
 (define-function ks-readable-source? (class)

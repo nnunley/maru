@@ -1,12 +1,29 @@
 ;;; ksworld-pp.l -- Deserializer and object model for KSWorld / Frank (.pp bundles)
 
+(require "hash.l")
+;; an object's slots are a hash table (hash.l), keyed by identity, as an IdentityDictionary's (every KSWorld object is one),
+;; or by equality for a Dictionary
 (define-structure <ks-object> (class ref attrs slots data count))
+(define ks-superclass)	; kscript.l's, once classes are known: a Dictionary's subclass keys by equality too
+(define-function ks-slots-table (class)
+  (let ((c class) (kind ()))
+    (while (and c (not kind))
+      (cond ((= c 'IdentityDictionary)	(set kind 'identity))
+	    ((= c 'Dictionary)		(set kind 'equal))
+	    (else			(set c (and ks-superclass (ks-superclass c))))))
+    (if (= kind 'equal) (equal-hash-table) (identity-hash-table))))
+(define-function ks-new-object (class ref attrs slots data count)	; slots: ((name . value) ...), first first
+  (let ((t (ks-slots-table class)))
+    (list-do p slots (hash-at-put t (car p) (cdr p)))
+    (new <ks-object> class ref attrs t data count)))
 (define-structure <ks-point>  (x y))
 (define-structure <ks-rect>   (left top right bottom))
 (define-structure <ks-matrix> (a b c d e f))	; Gezira's: x' = a x + c y + e, y' = b x + d y + f
 (define-structure <ks-color>  (r g b a))
 
 (define-function ks-object? (x)	(= <ks-object> (type-of x)))
+(define-function ks-slot-entry (obj key)	; (key . value), or () for a slot obj hasn't
+  (and (ks-object? obj) (hash-entry (<ks-object>-slots obj) key)))
 (define-function ks-point? (x)	(= <ks-point>  (type-of x)))
 (define-function ks-rect? (x)	(= <ks-rect>   (type-of x)))
 (define-function ks-matrix? (x)	(= <ks-matrix> (type-of x)))
@@ -52,19 +69,16 @@
 
 (define-function ks-slot (obj key)
   (and (ks-object? obj)
-       (let ((pair (assq key (<ks-object>-slots obj))))
+       (let ((pair (hash-entry (<ks-object>-slots obj) key)))
 	 (and pair (cdr pair)))))
 
 (define-function ks-set-slot (obj key val)
   (when (ks-object? obj)
-    (let ((pair (assq key (<ks-object>-slots obj))))
-      (if pair
-	  (set-cdr pair val)
-	(set (<ks-object>-slots obj) (cons (cons key val) (<ks-object>-slots obj)))))
+    (hash-at-put (<ks-object>-slots obj) key val)
     val))
 
 (define-function ks-stream-value (s)	; a stream's current value; one it was saved without is undefined, as in KSWorld
-  (let ((p (assq '__currentValue__ (<ks-object>-slots s))))
+  (let ((p (hash-entry (<ks-object>-slots s) '__currentValue__)))
     (if p (cdr p) 'undefined)))
 
 (define-function ks-val (obj key)
@@ -74,7 +88,7 @@
       v)))
 
 (define-function ks-slot-false? (obj key)	; has the slot, and it holds false (a slot it lacks isn't false, it's missing)
-  (let ((p (and (ks-object? obj) (assq key (<ks-object>-slots obj)))))
+  (let ((p (ks-slot-entry obj key)))
     (and p (not (ks-val obj key)))))
 
 (define-function ks-set-val (obj key val)
@@ -218,14 +232,14 @@
 (define-function ks-letter-contents (box)
   (let ((letters ()))
     (list-do s (<ks-object>-data box)
-      (let ((font (new <ks-object> 'KSFont 0 (cdr s) () () 0)) (text (ks-plist-get (cdr s) ':data)))
+      (let ((font (ks-new-object 'KSFont 0 (cdr s) () () 0)) (text (ks-plist-get (cdr s) ':data)))
 	(for (i 0 (string-length text))
-	  (push letters (new <ks-object> 'KSBox 0 ()
+	  (push letters (ks-new-object 'KSBox 0 ()
 			     (list (cons 'container box) (cons 'unicode (string-at text i)) (cons 'font font)
 				   (cons 'transformation ()) (cons 'extent ()) (cons 'bounds ()))
 			     () 0)))))
     (set (<ks-object>-data box) ())
-    (ks-set-slot box 'contents (new <ks-object> 'KSContentsCollection 0 () () (list-reverse! letters) 0))))
+    (ks-set-slot box 'contents (ks-new-object 'KSContentsCollection 0 () () (list-reverse! letters) 0))))
 
 (define-function ksworld-load (path)
   (let* ((form (ksworld-read-pp path))
@@ -240,7 +254,7 @@
 	    (and (= k ':ref) (set ref (string->long v)))
 	    (set attrs (cons k (cons v attrs)))
 	    (set rest (cddr rest))))
-	(set-array-at table ref (new <ks-object> cls ref attrs () () 0))
+	(set-array-at table ref (ks-new-object cls ref attrs () () 0))
 	;; a Form's image is a file beside the document
 	(let ((href (ks-plist-get attrs ':href)))
 	  (and href (= cls 'Form)
@@ -287,7 +301,7 @@
 				  ((and items (string? (car items)))
 				   (map (lambda (id) (array-at table (string->long id))) items))
 				  (else items))))))))
-	  (set (<ks-object>-slots obj) (list-reverse! slots))
+	  (list-do p (list-reverse! slots) (hash-at-put (<ks-object>-slots obj) (car p) (cdr p)))	; in the document's order
 	  ;; Populate ordered items for collections that store indexed elements in slots 1..size
 	  (when (and (not (<ks-object>-data obj))
 		     (or (= cls 'OrderedCollection) (= cls 'SortedCollection)
@@ -296,7 +310,7 @@
 	      (when sz-str
 		(let ((sz (string->long sz-str)) (items ()))
 		  (for (i 1 (+ sz 1))
-		    (let ((it (assq (string->symbol (long->string i)) (<ks-object>-slots obj))))	; a nil or false element is one
+		    (let ((it (ks-slot-entry obj (string->symbol (long->string i)))))	; a nil or false element is one
 		      (and it (push items (cdr it)))))
 		  (set (<ks-object>-data obj) (list-reverse! items)))))))))
     ;; Pass 3: a text box's letters, which KSWorld wrote as spans, read back into its contents as KSWorld read them

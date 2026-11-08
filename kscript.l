@@ -132,7 +132,7 @@
     (if (< q (long->double n)) (- n 1) n)))
 
 (define-function ks-make-stream (home type code init-val)
-  (let ((s (new <ks-object> 'KSEventStream 0
+  (let ((s (ks-new-object 'KSEventStream 0
 		(list ':__type__ type ':__code__ code ':__home__ home ':__dormant__ "false")
 		(list (cons '__currentValue__ init-val) (cons '__prevValue__ init-val))
 		() 0)))
@@ -146,7 +146,7 @@
 
 (define-function ks-stream-prev (x)
   (if (ks-stream? x)
-      (let ((p (assq '__prevValue__ (<ks-object>-slots x))))	; a previous false is false; a stream read without one has its current
+      (let ((p (ks-slot-entry x '__prevValue__)))	; a previous false is false; a stream read without one has its current
 	(if p (cdr p) (ks-stream-value x)))
     x))
 
@@ -309,7 +309,7 @@
 (define-function ks-object-send (recv sel args env this)
   (let ((m (ks-method-for 'KSObject sel)))
     (if m (m recv args env this)
-      (let ((slot (assq sel (<ks-object>-slots recv))))
+      (let ((slot (ks-slot-entry recv sel)))
 	(cond ((and slot (or (ks-closure? (ks-stream-curr (cdr slot)))
 			     (and (ks-object? (ks-stream-curr (cdr slot))) (= 'KSClosure (<ks-object>-class (ks-stream-curr (cdr slot)))))))
 	       (ks-apply (ks-stream-curr (cdr slot)) args env recv))
@@ -338,7 +338,7 @@
 	   (m (or (ks-method-for kind sel) (and args (ks-method-for kind (ks-squeak-selector sel (list-length args))))))
 	   (dnu (and (not m) (ks-method-for kind '_doesNotUnderstand))))
       (cond (m (m recv args env this))
-	    (dnu (dnu recv (list (new <ks-object> 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
+	    (dnu (dnu recv (list (ks-new-object 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
 		      env this))
 	    (else (ks-native-send recv sel args env this))))))
 
@@ -448,7 +448,7 @@
   (doE (let ((val (ks-stream-curr recv))) (if (ks-defined? val) (ks-apply (car args) () env this) 'undefined)))
   (collectE (let ((val (ks-stream-curr recv)))
 	      (if (ks-defined? val)
-		  (let* ((acc (assq '__collectAcc__ (<ks-object>-slots recv)))	; a false accumulator is carried on
+		  (let* ((acc (ks-slot-entry recv '__collectAcc__))	; a false accumulator is carried on
 			 (old (if acc (cdr acc) (car args)))
 			 (res (ks-apply (cadr args) (list val old) env this)))
 		    (and (ks-defined? res) (ks-set-slot recv '__collectAcc__ res))
@@ -641,7 +641,7 @@
 		      (sname (string->symbol (ks-to-string (ks-stream-curr (ks-eval (cadr raw-args) env this)))))
 		      (res 'undefined))
 		 (while (and (pair? items) (= res 'undefined))
-		   (let ((p (and (ks-object? (car items)) (assq sname (<ks-object>-slots (car items))))))	; a box without it is passed
+		   (let ((p (ks-slot-entry (car items) sname)))	; a box without it is passed
 		     (when p (let ((v (ks-stream-curr (cdr p)))) (when (ks-defined? v) (set res v)))))
 		   (set items (cdr items)))
 		 res))
@@ -919,8 +919,7 @@
 
 (define-function ks-evaluator-add-from (ev obj)
   (when (ks-object? obj)
-    (list-do pair (<ks-object>-slots obj)
-      (let ((v (cdr pair)))
+    (hash-do (<ks-object>-slots obj) (lambda (name v)
 	(when (and (ks-stream? v)
 		   (not (= (ks-attr v ':__type__) "setter"))
 		   (not (= (ks-attr v ':__dormant__) "true"))

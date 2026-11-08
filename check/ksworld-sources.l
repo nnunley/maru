@@ -75,8 +75,7 @@
 ;; block kept in the slot of that name, and Object's, at the root, refuses it naming the selector
 (ks-load-source-class 'KSObject)
 (define o (ks-basic-new (ks-class-named 'KSObject)))
-(ks-set-slot o 'twice (car (kscript-parse "(self, n) -> n * 2")))
-(set (cdr (assq 'twice (<ks-object>-slots o))) (ks-eval (cdr (assq 'twice (<ks-object>-slots o))) () ()))
+(ks-set-slot o 'twice (ks-eval (car (kscript-parse "(self, n) -> n * 2")) () ()))
 (expect "KSObject>>doesNotUnderstand: calls the block in the slot named by the selector" (ks-send o '_twice '(21) () o) 42)
 (expect "Object>>doesNotUnderstand: names what was sent"
 	(try (ks-send 3 'frobnicate () () ()) (lambda (c) (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (symbol? p) (symbol->string p) p)))) s)))
@@ -114,6 +113,28 @@
 ;; a global holding nil or false is there, holding it
 (set *ks-globals* (cons (cons 'Nothing ()) *ks-globals*))
 (expect "a global holding nil is found" (list (st "Smalltalk at: #Nothing") (st "Smalltalk at: #Nothing ifAbsent: [1]") (st "Smalltalk includesKey: #Nothing")) '(() () t))
+;; dictionaries and sets keep their keys in hash.l's tables: a Dictionary and a Set by equality (2 and 2.0 one key, two
+;; equal strings one member), an IdentityDictionary and an IdentitySet by identity, and a KSWorld object's slots are its own
+(define-function st-body (text)	; a Smalltalk method body's answer, with temporaries d and s
+  ((ks-method-function 'Object (cadr (ks-squeak-method (concat-string "f\n\t| d s |\n\t" text) () ())) () ()) () () () ()))
+(expect "a Dictionary takes 2.0 as 2, an IdentityDictionary doesn't"
+	(list (st-body "d := Dictionary new. d at: 2 put: 1. d at: 2.0 put: 2. ^ d at: 2")
+	      (st-body "d := IdentityDictionary new. d at: 2 put: 1. d at: 2.0 put: 2. ^ d at: 2"))
+	'(2 1))
+(expect "removeKey:, includesKey: and at:ifAbsent: on a Dictionary"
+	(list (st-body "d := Dictionary new. d at: #a put: 1. d removeKey: #a ifAbsent: [0]. ^ d includesKey: #a")
+	      (st-body "d := Dictionary new. ^ d at: #b ifAbsent: [7]"))
+	'(() 7))
+(expect "a Set keeps equal strings once and an IdentitySet each, in the order added"
+	(list (st-body "s := Set new. s add: 'ab'. s add: 'ab'. s add: 3. ^ s size")
+	      (st-body "s := IdentitySet new. s add: 'ab'. s add: 'ab'. s add: 3. ^ s size")
+	      (array->list (st-body "s := Set new. s add: 3. s add: 1. s add: 3. s add: 2. ^ s asArray")))
+	'(2 3 (3 1 2)))
+(expect "a KSWorld object's slots are a table, read and written by KScript and Smalltalk alike"
+	(let ((o (ks-basic-new (ks-class-named 'KSObject))))
+	  (ks-set-slot o 'colour 'red)
+	  (list (hash-table? (<ks-object>-slots o)) (ks-send o '_at (list 'colour) () o)))
+	'(t red))
 ;; Smalltalk's true is Maru's t, and false and nil are one value, (), answering as nil does: ifTrue: does nothing, ifFalse: runs
 (expect "true is t, false and nil are ()" (list (st "true") (st "false") (st "nil") (st "false == nil") (st "3 > 2")) '(t () () t t))
 (expect "false is nil: isNil, ifTrue: and ifFalse:"

@@ -77,6 +77,9 @@
       (set is (cdr is)))
     found))
 
+(define-function hash-table? (x) (= <hash-table> (type-of x)))
+(define-function hash-entry (table key)	; key's entry, (key . value), to read or set its value; or ()
+  (let ((i (hash-index table key))) (and i (array-at (<hash-table>-entries table) i))))
 (define-function hash-includes? (table key) (and (hash-index table key) 't))
 (define-function hash-at (table key . default)
   (let ((i (hash-index table key)))

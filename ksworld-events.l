@@ -78,7 +78,7 @@
 ;; a text layout's selection, from gap to gap
 (define-function ks-select (layout from to)
   (ks-fire (ks-slot layout 'selection)
-	   (new <ks-object> 'Interval 0 () (list (cons 'start from) (cons 'stop (+ to 1)) (cons 'step 1)) () 0)))
+	   (ks-new-object 'Interval 0 () (list (cons 'start from) (cons 'stop (+ to 1)) (cons 'step 1)) () 0)))
 (define-function ks-selection-gaps (layout)
   (let ((i (ks-val layout 'selection))) (cons (ks-slot i 'start) (- (ks-slot i 'stop) 1))))
 

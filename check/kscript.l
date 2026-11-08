@@ -8,7 +8,7 @@
       (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
 
 (define-function box-of (source)
-  (let ((box (new <ks-object> 'KSBox 1 () () () 0)))
+  (let ((box (ks-new-object 'KSBox 1 () () () 0)))
     (list-do st (kscript-parse source) (ks-eval st () box))
     box))
 
@@ -114,7 +114,7 @@ for i in [0...10] by 5 total := total + i
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 
 (expect "a stream with no value is undefined, one holding false is false"
-	(let ((none (new <ks-object> 'KSEventStream 0 () () () 0)) (off (ks-make-stream () "exprE" "" ())))
+	(let ((none (ks-new-object 'KSEventStream 0 () () () 0)) (off (ks-make-stream () "exprE" "" ())))
 	  (list (ks-stream-curr none) (ks-stream-prev none) (ks-stream-curr off) (ks-stream-prev off)))
 	'(undefined undefined () ()))
 
@@ -122,7 +122,7 @@ for i in [0...10] by 5 total := total + i
   (ks-send s 'collectE (list 't f) () ())
   (ks-set-slot s '__currentValue__ 5)
   (expect "collectE carries a false accumulator on, not its first value" (ks-send s 'collectE (list 't f) () ()) ()))
-(let ((ev (ks-evaluator-new)) (box (box-of "")) (none (new <ks-object> 'KSEventStream 0 () () () 0)))
+(let ((ev (ks-evaluator-new)) (box (box-of "")) (none (ks-new-object 'KSEventStream 0 () () () 0)))
   (ks-set-slot box 'quiet none)
   (ks-evaluator-add-from ev box)
   (ks-sort-and-evaluate-at ev 1)
