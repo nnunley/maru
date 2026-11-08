@@ -56,18 +56,6 @@
 
 (define-function number? (x)		(or (long? x) (double? x)))
 
-(define ks-equal-arrays?)
-(define-function ks-equal? (a b)
-  (cond ((and (number? a) (number? b)) (= (* 1.0 a) (* 1.0 b)))
-	((and (ks-point? a) (ks-point? b))
-	 (and (= (<ks-point>-x a) (<ks-point>-x b))
-	      (= (<ks-point>-y a) (<ks-point>-y b))))
-	((and (array? a) (array? b)) (ks-equal-arrays? a b))	; arrays by their elements, as Squeak's Array>>=
-	(else (equal a b))))
-(define-function ks-equal-arrays? (a b)
-  (and (= (array-length a) (array-length b))
-       (let ((same 1)) (for (i 0 (array-length a)) (or (ks-equal? (array-at a i) (array-at b i)) (set same ()))) same)))
-
 (define-function ks-num (x)
   (cond ((number? x) x)
 	((string? x) (ks-parse-num x))
@@ -676,13 +664,13 @@
 		(b (ks-stream-curr (ks-eval (caddr exp) env this))))
 	    (if (or (= a 'undefined) (= b 'undefined))
 		'undefined
-	      (ks-bool (ks-equal? a b)))))
+	      (ks-bool (equal a b)))))
 	 ((= op '!=)
 	  (let ((a (ks-stream-curr (ks-eval (cadr exp) env this)))
 		(b (ks-stream-curr (ks-eval (caddr exp) env this))))
 	    (if (or (= a 'undefined) (= b 'undefined))
 		'undefined
-	      (ks-bool (not (ks-equal? a b))))))
+	      (ks-bool (not (equal a b))))))
 	 ((= op 'and)
 	  (let ((a (ks-stream-curr (ks-eval (cadr exp) env this))))
 	    (if (ks-truthy? a)

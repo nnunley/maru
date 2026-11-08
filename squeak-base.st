@@ -186,7 +186,7 @@ String copyWithout: c                   { (let ((s (if (symbol? self) (symbol->s
 Array class new: n                      { (let ((a (array n))) (for (i 0 n) (set-array-at a i ())) a) }
 Array size                              { (array-length self) }
 Array at: i                             { (if (and (long? i) (< 0 i) (<= i (array-length self))) (array-at self (- i 1)) (error "Smalltalk: index " i " out of bounds for an Array of " (array-length self))) }
-Array = other                           { (ks-bool (ks-equal? self other)) }
+Array = other                           { (ks-bool (equal self other)) }
 Array , other                           { (list->array (concat-list (array->list self) (ks-elements-of other))) }
 Array at: i put: v                      { (if (and (long? i) (< 0 i) (<= i (array-length self))) (set-array-at self (- i 1) v) (error "Smalltalk: index " i " out of bounds for an Array of " (array-length self))) }
 ArrayedCollection replaceFrom: start to: stop with: source startingAt: from

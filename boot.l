@@ -552,6 +552,40 @@
   (or (defined? selector) (eval (list 'define-selector selector)))
   `(add-method ,selector ,type ',(cons 'self args) ',body))
 
+;;; equality: each type says what its own is (equal), and equal values hash alike (equal-hash), so a table finds a key by
+;;; an equal one.  Numbers are equal by value (2 is 2.0), strings by their text, pairs and arrays by their elements, and
+;;; anything else is itself unless its type defines equal and equal-hash (a type that defines one defines both).
+(define-selector equal (a b) (= a b))
+(define-method equal <pair> (b)	; along the spine in a loop, so a long list takes no frame per element
+  (let ((a self) (same 't))
+    (while (and same (pair? a) (pair? b))
+      (or (equal (car a) (car b)) (set same ()))
+      (set a (cdr a))
+      (set b (cdr b)))
+    (and same (not (pair? a)) (not (pair? b)) (equal a b))))
+(define-method equal <array> (b)
+  (and (= <array> (type-of b)) (= (array-length self) (array-length b))
+       (let ((i 0) (n (array-length self)) (same 't))
+	 (while (and same (< i n)) (or (equal (array-at self i) (array-at b i)) (set same ())) (set i (+ i 1)))
+	 same)))
+(define-selector equal-hash (x) (>> (address-of x) 4))	; itself: where it lives
+(define-function %equal-hash-number (x)	; by its double, as = compares a long with a double; 0 past what a long holds
+  (let ((d (* 1.0 x))) (if (and (< -4.0e18 d) (< d 4.0e18)) (double->long d) 0)))
+(define-method equal-hash <long> () (%equal-hash-number self))
+(define-method equal-hash <double> () (%equal-hash-number self))
+(define-method equal-hash <string> ()
+  (let ((h 7) (i 0) (n (string-length self)))
+    (while (< i n) (set h (% (+ (* h 31) (string-at self i)) 16777213)) (set i (+ i 1)))
+    h))
+(define-method equal-hash <pair> ()	; its first 32 elements, along the spine
+  (let ((h 17) (l self) (k 0))
+    (while (and (pair? l) (< k 32)) (set h (% (+ (* h 31) (equal-hash (car l))) 16777213)) (set l (cdr l)) (set k (+ k 1)))
+    (if (pair? l) h (% (+ (* h 31) (equal-hash l)) 16777213))))
+(define-method equal-hash <array> ()	; its length and first 32 elements
+  (let ((h (array-length self)) (i 0) (n (array-length self)))
+    (while (and (< i n) (< i 32)) (set h (% (+ (* h 31) (equal-hash (array-at self i))) 16777213)) (set i (+ i 1)))
+    h))
+
 ;;; print
 
 (define-selector do-print (arg) (%print arg))
@@ -942,17 +976,6 @@
 
 ;;; structural equality
 
-(define equal ()) ;; forward
-
-(define-function equal-lists (a b)
-  (and (equal (car a) (car b))
-       (equal (cdr a) (cdr b))))
-
-(set equal (lambda (a b)
-  (or (= a b)
-      (and (pair? a)
-	   (pair? b)
-	   (equal-lists a b)))))
 
 ;;; unit testing
 

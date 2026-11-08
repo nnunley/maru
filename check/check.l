@@ -359,6 +359,10 @@
     (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law")))
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (law-file-holds "gc_every" evaluator "check/laws/gc-reference.l" "check/laws/gc-every.law"))))
+;; Maru's equal and equal-hash as selectors, each type's equality defined with the type, on every evaluator
+(check "equal_selector"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "equal_selector" (concat-strings evaluator " check/equal.l"))) "equal ok"))))
 ;; hash.l's tables against an association list, on every evaluator, and an identity table across a saved image (only eval
 ;; saves images), where every object has moved: it rehashes itself before answering
 (check "hash_table"

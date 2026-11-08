@@ -121,6 +121,10 @@
 	(list (st-body "d := Dictionary new. d at: 2 put: 1. d at: 2.0 put: 2. ^ d at: 2")
 	      (st-body "d := IdentityDictionary new. d at: 2 put: 1. d at: 2.0 put: 2. ^ d at: 2"))
 	'(2 1))
+(expect "a Dictionary finds a key by an equal one, as Squeak's = has it: an array by its elements, a point by x and y"
+	(list (st-body "d := Dictionary new. d at: #(1 2) put: 5. ^ d at: #(1 2) ifAbsent: [0]")
+	      (st-body "d := Dictionary new. d at: 3 @ 4 put: 6. ^ d at: 3 @ 4 ifAbsent: [0]"))
+	'(5 6))
 (expect "removeKey:, includesKey: and at:ifAbsent: on a Dictionary"
 	(list (st-body "d := Dictionary new. d at: #a put: 1. d removeKey: #a ifAbsent: [0]. ^ d includesKey: #a")
 	      (st-body "d := Dictionary new. ^ d at: #b ifAbsent: [7]"))

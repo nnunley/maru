@@ -38,8 +38,8 @@
 (define-function name_symbol (n) (string->symbol (concat-string "s" (long->string n))))
 (define *kept* (list->array (list "kept" 'kept (cons 1 2) (array 2) (cons (cons 1 2) 3) "k2" 'k2 (cons 4 5))))
 (define-function kept_key (n) (array-at *kept* (% n 8)))
-(define-function nested (n)	; a list of n + 6 nested pairs, past hash-equal's depth
-  (let ((x n)) (for (i 0 (+ n 6)) (set x (cons i x))) x))
+(define-function nested (n)	; a list of n + 40 elements, past the 32 equal-hash reads
+  (let ((x n)) (for (i 0 (+ n 40)) (set x (cons i x))) x))
 
 (define-function new-table (kind)
   (set *model-same* (if (= kind 'Identity) model-identical? equal))

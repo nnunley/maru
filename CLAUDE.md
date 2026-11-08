@@ -343,7 +343,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   quiet nil. Under KSWorld's classes is `squeak-base.st`, the platform in `test-pepsi.l`'s form (its hierarchy, `{ }`
   primitives, methods answering their last value), with Squeak's meanings where pepsi's differ (Arrays count from 1), Maru's
   booleans (`t`, and `()` for false and nil alike: false answers as nil does), and a KSWorld object an IdentityDictionary of its slots:
-  every object's slots are a `hash.l` table, by identity, or by equality for a Dictionary (and its subclasses), so one set of
+  every object's slots are a `hash.l` table, by identity, or by Maru's `equal` for a Dictionary (and its subclasses: an array key
+  by its elements, a point by x and y, as Squeak's `=` has them), so one set of
   Dictionary methods serves both, and a Set or IdentitySet keeps its members as a table's keys, in the order added. Every KScript method of KSTextLayout and
   every Smalltalk method of KSContentsCollection and KSBox reads, and a KSContentsCollection is made, grown and edited by its
   own Smalltalk. A text box's letters are letter boxes, as KSWorld read the spans it wrote (`ksworld-pp.l`), checked in
@@ -549,6 +550,10 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   them by contention; each run keeps its own output, and a failure prints its
   last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
   forked question inherits from the law runner.
+- `equal_selector` (`check/equal.l`): on every evaluator, Maru's `equal` and `equal-hash` are selectors (`boot.l`, `boot2.l`),
+  each type's equality defined with the type: numbers by value (2 is 2.0), strings by their text, pairs and arrays by their
+  elements (a list along its spine in a loop, 100,000 long without a frame each), anything else itself unless its type defines
+  both (as `<ks-point>` does, by x and y), and equal values hash alike, so a table finds a key by an equal one.
 - `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`): `hash.l`, a hash table in Maru on every
   evaluator, keyed by identity (Smalltalk's `==`: a number by its value and kind, anything else by its address, as `=` compares
   strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. A number hashes by its

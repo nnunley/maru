@@ -14,36 +14,17 @@
 	((and (double? a) (double? b))	(= a b))
 	(else				(= (address-of a) (address-of b)))))
 (define-function hash-address (x) (>> (address-of x) 4))
-;; a number by its double's whole part, as = compares a long with a double (2^53 + 1 is 2^53.0); one with no whole part a
-;; long can hold (NaN, infinite, past 2^62) hashes as 0
-(define-function hash-number (x)
-  (let ((d (* 1.0 x)))
-    (if (and (< -4.0e18 d) (< d 4.0e18)) (double->long d) 0)))
+;; a number by its value (boot.l's equal-hash), anything else by where it lives
 (define-function hash-identity (x)
-  (if (or (long? x) (double? x)) (hash-number x) (hash-address x)))
+  (if (or (long? x) (double? x)) (equal-hash x) (hash-address x)))
 
-;; equality is Maru's equal: 2 and 2.0 are equal, so a number hashes by its double; a string by its text, a pair by
-;; its first few elements (equal walks them all), anything else by where it lives, as equal compares it
-(define-function hash-text (s)
-  (let ((h 7))
-    (for (i 0 (string-length s)) (set h (% (+ (* h 31) (string-at s i)) 16777213)))
-    h))
-(define hash-equal-depth)
-(define-function hash-equal (x) (hash-equal-depth x 4))
-(set hash-equal-depth
-     (lambda (x depth)
-       (cond ((or (long? x) (double? x))	(hash-number x))
-	     ((string? x)	(hash-text x))
-	     ((pair? x)		(if (< 0 depth)
-				    (% (+ (* 31 (hash-equal-depth (car x) (- depth 1))) (hash-equal-depth (cdr x) (- depth 1))) 16777213)
-				  17))
-	     (else		(hash-address x)))))
-
+;; equality is Maru's equal, each type's own (boot.l): equal-hash agrees with it, numbers by value, strings by text, pairs
+;; and arrays by their elements, and a type that defines equal defines equal-hash beside it
 (define-function make-hash-table (hash same)
   (let ((anchor (cons () ())))
     (new <hash-table> hash same (array 8) (array 0) 0 0 anchor (address-of anchor))))
 (define-function identity-hash-table () (make-hash-table hash-identity hash-identical?))
-(define-function equal-hash-table () (make-hash-table hash-equal equal))
+(define-function equal-hash-table () (make-hash-table equal-hash equal))
 (define-function hash-table-same? (table a b) ((<hash-table>-same table) a b))
 
 (define-function hash-bucket-of (table key)

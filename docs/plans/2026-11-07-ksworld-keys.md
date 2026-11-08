@@ -101,9 +101,9 @@ Steps, each a check first:
      Done: hash.l, with laws; every object's slots are a table (identity, or equality for a Dictionary), so Dictionary,
      IdentityDictionary and KSWorld objects share one store and one set of methods; Set and IdentitySet keep their members
      as a table's keys. JOHN's seen states and rules.l's buckets are still their own.
-     Open: a Dictionary compares keys with Maru's equal, as the association list did, where Squeak's compares with =
-     (ks-equal?: arrays by their elements, points by x and y), so #(1 2) as a key is found only by itself. An equality
-     table on ks-equal?, with a hash that agrees (arrays by length and elements, points by x and y), closes it.
+     Closed: Maru's equal and equal-hash are selectors in boot.l, each type's equality defined with the type (arrays by
+     their elements; <ks-point> defines its own by x and y), so a Dictionary finds #(1 2) or 3@4 by an equal key, as
+     Squeak's = has it, and ks-equal? is gone.
    Order and tests (the user, 2026-11-07: "make sure there's solid testing that the change in semantics is accounted for,
    and fixed at the KScript level if it causes breakages"): in Maru false, nil and the empty list are one value, (), so
    arrays become Maru arrays first, and only then KScript's truth becomes Maru's; an empty collection is then an empty

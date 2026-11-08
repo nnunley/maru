@@ -25,6 +25,8 @@
 (define-function ks-slot-entry (obj key)	; (key . value), or () for a slot obj hasn't
   (and (ks-object? obj) (hash-entry (<ks-object>-slots obj) key)))
 (define-function ks-point? (x)	(= <ks-point>  (type-of x)))
+(define-method equal <ks-point> (b) (and (ks-point? b) (equal self.x (<ks-point>-x b)) (equal self.y (<ks-point>-y b))))	; by x and y
+(define-method equal-hash <ks-point> () (+ (* 31 (equal-hash self.x)) (equal-hash self.y)))
 (define-function ks-rect? (x)	(= <ks-rect>   (type-of x)))
 (define-function ks-matrix? (x)	(= <ks-matrix> (type-of x)))
 (define-function ks-color? (x)	(= <ks-color>  (type-of x)))
