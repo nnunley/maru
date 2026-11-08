@@ -224,13 +224,11 @@ It is positional and checks nothing. Its behaviour is set by `allocate` and `set
 - An unregistered type number gives nil, because the size is nil and `allocate` returns nil (eval.c:2636). Probe: `(new 99)` printed `()`.
 - `(new <expr>)` makes an `Expr` with all slots nil. Probe: printed `Expr=()`.
 
-`make type inits...` (boot.l:389-394) takes pairs. Probe: `(make <pt> (x 3) (y 4))` gave fields `(3 4)` in `eval`. It builds `(set (T-x self) v)` forms with `%make-make-inits` (boot.l:384-388) inside `with-instance-accessors`.
-
-In `eval2` and `eval3`, `make` (boot2.l:407-411) takes keyword pairs: `(make <pt> x: 3 y: 4)`. `%make-field-name` (boot2.l:397-400) removes the last character of the keyword to get the field name. Probes:
-
-- `eval`, `(make <pt> x: 3 y: 4)`: `string-length: non-String argument: ()`, raised in `concat-string` from `concat-symbol` (boot.l:95).
-- `eval2`, `(make <pt> (x 3) (y 4))`: `error: string-length: non-String argument: ()`, from boot2.l:399.
-- `eval2` and `eval3`, `(make <pt> x: 3 y: 4)`: fields `(3 4)`.
+`make type inits...` takes keyword pairs in every boot (boot.l, boot2.l): `(make <pt> x: 3 y: 4)` gives fields `(3 4)` on
+`eval`, `eval2` and `eval3` (check/boot-forms.l). `%make-field-name` removes the keyword's colon to name the field, and
+`%make-make-inits` builds `(set (T-x self) v)` forms inside `with-instance-accessors`. Until 2026-11-07 boot.l kept the
+older association form, `(make <pt> (x 3) (y 4))`; Piumarta moved boot2.l to keywords in 2013 (608d514), and boot.l
+now follows it.
 
 ### 3.8 Fields inside methods: self.field
 
@@ -460,7 +458,7 @@ The shared forms (`new`, `make`, `define-structure`, `define-class`, `define-sel
 - Classes with extra fields: `<ir-pointer-type>` adds `referent` (ir2.k:70), `<ir-function-type>` adds `ret-type` and `arg-types` (ir2.k:85), `<ir-struct-type>` adds `members` and `defined` (ir2.k:98).
 - Predicates via `inherits-from`: `ir-type?` (ir2.k:23), `ir-pointer-type?` (ir2.k:70).
 - Positional construction with `new`: `(new <ir-pointer-type> (list name '*) sizeof-pointer alignof-pointer () () type)` (ir2.k:75-78). The values are in field order: name, size, alignment, pointer, function, referent.
-- Keyword construction with `make`: `(make <ir-struct-type> name: name members: members defined: defined)` (ir2.k:110). This is the boot2.l form. Probe: under `eval`, `(make <pt> x: 3 y: 4)` fails inside `concat-symbol` (3.7).
+- Keyword construction with `make`: `(make <ir-struct-type> name: name members: members defined: defined)` (ir2.k:110), the form every boot takes (3.7).
 - Printing: `(define-method do-print <ir-struct-type> () (print "{struct "self.name"}"))` (ir2.k:100).
 - Selectors with methods per class: `ir-check-type` (ir2.k:311) is dispatched on `<ir-nop>`, `<ir-lit>` and others (ir2.k:356 and following). `(define-selector ir-nop? args ())` (ir2.k:359) gives an explicit empty default, and `(define-method ir-nop? <ir-nop> () 1)` (ir2.k:361) gives the real method.
 
@@ -512,7 +510,7 @@ With `-O`, accessors skip `%typecheck` (boot.l:358-361; `(optimised)` at eval.c:
 
 ### 9.5 `make` takes different syntax in each evaluator, and the wrong one gives an unrelated error
 
-See 3.7. `(make <pt> (x 3) (y 4))` works in `eval` only. `(make <pt> x: 3 y: 4)` works in `eval2` and `eval3` only. The other syntax fails inside `string-length`, called from `concat-symbol` or `%make-field-name`, not in `make`.
+See 3.7. Every boot takes `(make <pt> x: 3 y: 4)`; the association form is gone.
 
 ### 9.6 An empty explicit default returns nil silently
 
