@@ -142,7 +142,7 @@
 	(while (and k (not under)) (if (= k name) (set under 1) (set k (let ((c (ks-class-named k))) (and c (<ks-class>-super c))))))
 	(and under (push out (cdr e)))))
     out))
-(define-function ks-elements-of (c) (cond ((pair? c) c) ((array? c) (array->list c)) ((ks-object? c) (ks-slot c 'items)) (else ())))	; a collection's elements
+(define-function ks-elements-of (c) (cond ((pair? c) c) ((array? c) (array->list c)) ((ks-object? c) (let ((items (ks-slot c 'items))) (if (hash-table? items) (array->list (hash-keys items)) items))) (else ())))	; a collection's elements
 (define-function ks-last (l) (if (cdr l) (ks-last (cdr l)) (car l)))
 (define-function ks-but-last (l) (if (cdr l) (cons (car l) (ks-but-last (cdr l))) ()))
 (define-function ks-dict-key (k) (cond ((symbol? k) k) ((string? k) (string->symbol k)) (else k)))

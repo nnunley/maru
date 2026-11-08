@@ -130,6 +130,10 @@
 	      (st-body "s := IdentitySet new. s add: 'ab'. s add: 'ab'. s add: 3. ^ s size")
 	      (array->list (st-body "s := Set new. s add: 3. s add: 1. s add: 3. s add: 2. ^ s asArray")))
 	'(2 3 (3 1 2)))
+(expect "a Set's members reach what takes any collection: addAll:, , and the like"
+	(list (st-body "d := OrderedCollection new. s := Set new. s add: 1. s add: 2. d addAll: s. ^ d size")
+	      (array->list (st-body "s := Set new. s add: 3. ^ #(1 2) , s")))
+	'(2 (1 2 3)))
 (expect "a KSWorld object's slots are a table, read and written by KScript and Smalltalk alike"
 	(let ((o (ks-basic-new (ks-class-named 'KSObject))))
 	  (ks-set-slot o 'colour 'red)
