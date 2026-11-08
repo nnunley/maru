@@ -1,0 +1,8 @@
+-- a list is a domain, named once and shared by laws and a schema
+under test: scaled, few
+let keys = [1, 2, 5 .. 7]
+let scaled = (x) -> x * 10
+for k in keys: fact few(k)
+law listed: all a in keys, b in [10, 20]. scaled(a) + 20 > b by exhaustion
+law named:  all k: few(k). scaled(k) >= 10 by exhaustion
+law drawn:  all a in keys. scaled(a) >= 10

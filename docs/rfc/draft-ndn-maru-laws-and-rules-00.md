@@ -411,6 +411,42 @@ A field in a rule or domain is `E_FIELD` when the file is read. Postfix indexing
 (`r[0]`) is not in `cexpr.g`, whose only postfix form is a call, so it is left
 out; a list is read by a support function instead, and there is no index error.
 
+### Functions and list domains
+
+A law file MAY define functions, so that what a generated term means is written
+beside the rules that make it. Rules stay first-order: a function is evaluated
+where claims are, never in a rule. [R-law-functions]
+
+```maru-check @R-law-functions
+law_rules
+```
+
+- `(x, y) -> expression` is a function of claim values, KScript's form. It MAY
+  appear wherever a claim's expression can, and `let f = (x) -> ...` names it. In a
+  law file `->` is always a function; cexpr.g's member access is not read.
+- A function by cases is a `let` whose cases are joined by `|`, each a pattern and
+  a result: `let value = num(n) -> n | pair(a, b) -> value(a) + value(b) | Zero -> 0`.
+  The same function MAY be written one equation per line,
+  `let size(num(n)) = 1`, the equations of one name joining in the order written.
+- A pattern is a term as rules write one: a lower-case name binds, anything else
+  matches itself. The first case whose patterns unify with the arguments gives
+  its result, with the patterns' names bound. A function MUST NOT answer a quiet
+  nil for arguments no case matches: that is `E_NO_CASE`, naming the function and
+  the term.
+- Every function is a name the whole file can call, from claims, from other
+  functions and from itself.
+
+A law's variable MAY range over a list: `all a in [1, 2, 5 .. 7]`, or
+`all a in keys` after `let keys = [...]`. A list domain is exhausted element by
+element, drawn uniformly by test, and shrunk to earlier elements. A schema over
+one list, written out or named, has one item per element: `for k in keys: fact
+few(k)`. So a named list is one set of values, shared by laws and schemas alike.
+[R-list-domains]
+
+```maru-check @R-list-domains
+law_rules
+```
+
 ### Classes and cover
 
 A law MAY classify its cases after its method: `classify NAME when EXPR, ...`.
@@ -553,6 +589,8 @@ the file, so adding a law does not change the values another draws.
 | `E_FIELD` | `r.c` where `r` is a record with no field `c`, or a value that is not a record; a field in a rule or domain | The run stops with the message, naming the field and the record's fields; a field in a rule or domain stops the file when it is read |
 | `E_COVER` | `cover 20% big` with no class `big`, `cover 120% big`, or `classify a when ..., a when ...` | Reject the law, naming the class or the share; the next law runs |
 | `E_RANGE` | a range `A .. B` whose ends are not whole-number constants | The file stops when it is read, naming the ends |
+| `E_NO_CASE` | `value(other(0))` where no case of `value` matches `other(0)` | The run stops with the message, naming the function and the term |
+| `E_DOMAIN` | `all a in n` where `n` is not a list, nor a let naming one | The file stops when it is read, naming the domain |
 | `E_NO_RULE_APPLIES` | asking for `expr(env, Boolean, e)` with no Boolean rule | `STARVED` |
 
 ## Formal Grammar

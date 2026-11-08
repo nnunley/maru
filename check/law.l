@@ -74,6 +74,7 @@
   (cond ((symbol? x)		(if (or (law-upper? x) (law-relation? x)) (list 'quote x) x))
 	((not (pair? x))	x)
 	((= 'quote (car x))	x)
+	((= 'lambda (car x))	(list 'lambda (cadr x) (law-form (caddr x))))	; a function's parameters are names, not a call
 	((= 'template (car x))	(list 'law-template (list 'quote (cadr x)) (caddr x)
 				      (cons 'list (map (lambda (n) (list 'cons (list 'quote n) n)) *lnames*))))
 	(else			(cons (cond ((= '= (car x)) 'law-equal) ((= '!= (car x)) 'law-ne) (else (car x)))
@@ -118,6 +119,7 @@
 (define-function law-binding (b)
   (let ((v (car b)) (d (cadr b)))
     (cond ((and (pair? d) (= 'let (car d)))	(list v 'let (cdr d)))
+	  ((and (pair? d) (= 'in (car d)))	(list v 'set (cdr d)))	; a list's elements, as a set's members
 	  ((and (pair? d) (= 'grammar (car d)))	(law-grammar v (cadr d) (caddr d)))
 	  ((and (symbol? d) (assq d *law-sets*))	(list v 'set (cdr (assq d *law-sets*))))
 	  ((symbol? d)					(list v 'goal (list d v)))
@@ -584,15 +586,48 @@
 	(println "")
 	(set *law-failed* 1))))))
 
+;; a function the law file defines, by cases: the first case whose patterns unify with the arguments gives its result, the
+;; patterns' variables bound; none is E_NO_CASE.  Its name is a global, so claims, references and itself can call it
+(define-function law-term-text (x)	; a term as a law file writes it, f(a, b)
+  (cond ((symbol? x)	(symbol->string x))
+	((long? x)	(long->string x))
+	((string? x)	(concat-strings "\"" x "\""))
+	((and (pair? x) (symbol? (car x)))
+	 (let ((s (concat-string (symbol->string (car x)) "(")) (first 1))
+	   (list-do a (cdr x) (set s (concat-strings s (if first "" ", ") (law-term-text a))) (set first ()))
+	   (concat-string s ")")))
+	(else		"?")))
+(define-function law-case-result (vars result) (eval (list 'lambda (map law-plain vars) (law-form result))))
+(define-function law-apply-cases (name cases args)
+  (let ((r ()) (done ()))
+    (while (and cases (not done))
+      (let* ((c (car cases)) (env (list ())))
+	(and (= (list-length (car c)) (list-length args))
+	     (let ((s (unify (rules-rename (car c) env) args *rules-empty*)))
+	       (when s
+		 (set done 1)
+		 (set r (apply (caddr c) (map (lambda (v) (walk* (rules-rename v env) s)) (cadr c))))))))
+      (set cases (cdr cases)))
+    (or done (error "E_NO_CASE: " name " has no case for " (if (cdr args) (law-term-text (cons 'args args)) (law-term-text (car args)))))
+    r))
+(define-function law-function (name clauses)
+  (let ((cases (map (lambda (c) (list (car c) (cadr c) (law-case-result (cadr c) (caddr c)))) clauses)))
+    (lambda args (law-apply-cases name cases args))))
+
+(define-function law-function-item? (it)	; a function by cases, or a let whose value is (x) -> e
+  (or (= 'fn (car it)) (and (= 'let (car it)) (pair? (caddr it)) (= 'lambda (car (caddr it))))))
 (define-function law-file (path)
   (let ((items (law-file-read path)) (saved *rules-numbers*) (pos 0))
     (set *law-config* ()) (set *law-sets* ()) (set *law-under* ()) (set *law-drawn-from* ())
+    (list-do it items (and (law-function-item? it) (eval (list 'define (cadr it) ()))))	; every function named first, so any can call any
     (list-do it items
       (let ((k (car it)))
 	(cond ((= k 'defaults)		(set *law-config* (cdr it)))
 	      ((= k 'set)		(push *law-sets* (cons (cadr it) (caddr it))))
 	      ((= k 'under-test)	(set *law-under* (concat-list *law-under* (cdr it))))
-	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (cadr it) (eval (cadr it))))))))
+	      ((= k 'reference)		(law-set-global (cadr it) (law-wrap (cadr it) (eval (cadr it)))))
+	      ((= k 'fn)		(law-set-global (cadr it) (law-function (cadr it) (caddr it))))
+	      ((law-function-item? it)	(law-set-global (cadr it) (eval (law-form (caddr it))))))))
     (let ((ns ()))	; let numerals = [...] replaces the number builtin's numerals; else the file's numbers join them
       (list-do it items (and (= 'let (car it)) (= 'numerals (cadr it)) (set ns (list (caddr it)))))
       (if ns (set *rules-numbers* (car ns))

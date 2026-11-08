@@ -76,6 +76,7 @@
     ((= 'law-list (car x))	(let ((elems (law-ranges (cadr x))))
 				  (if (= var 'claim) (law-list-form elems (cddr x)) (law-list-from elems (cddr x) var))))
     ((= 'template (car x))	(if (= var 1) (law-template-term x) x))
+    ((= 'law-fn (car x))	(list 'lambda (cadr x) (law-conv (caddr x) 'claim)))	; (x, y) -> e, a function of claim values
     (else			(cons (if (member? (car x) *law-schema-vars*) (law-var (car x)) (car x))	; a schema's function name
 				      (map (lambda (a) (law-conv a var)) (cdr x))))))
 (define-function law-goal (g scope)	; a goal's relation is a variable only if a parameter or schema variable
@@ -85,13 +86,20 @@
   (cond ((symbol? d)		(law-conv d ()))
 	((= 'law-grammar (car d))	(cons 'grammar (cdr d)))
 	(else			(law-goal d ()))))
+(define-function law-list-domain (d)	; a list's elements, inline or named by a let; E_DOMAIN for anything else
+  (let ((v (law-conv d ())))
+    (and v (not (pair? v)) (error "E_DOMAIN: a domain after in is a list, or a let's name for one: " v))
+    v))
 (define-function law-bindings (raw)	; (law-bind (names) domain) -> (name domain)...; (law-let n v) -> (name (let . form))
   (let ((out ()))
     (list-do b raw
       (if (= 'law-let (car b))
 	  (set out (concat-list out (list (list (law-var (cadr b)) (cons 'let (law-conv (caddr b) 'claim))))))
+	(if (= 'law-bind-in (car b))
+	    (let ((values (law-list-domain (caddr b))))	; a list's elements: a set of values
+	      (list-do n (cadr b) (set out (concat-list out (list (list (law-var n) (cons 'in values)))))))
 	(list-do n (cadr b)
-	  (set out (concat-list out (list (list (law-var n) (law-domain (caddr b)))))))))
+	  (set out (concat-list out (list (list (law-var n) (law-domain (caddr b))))))))))
     out))
 (define-function law-conditions (raw)
   (let ((out ()))
@@ -105,14 +113,28 @@
     (list 'law (cadr it) (law-bindings (select-binds raw)) (law-conditions raw)
 	  (law-conv (cadddr it) 'claim) (car more) (cadr more)
 	  (map (lambda (k) (list (car k) (law-conv (cadr k) 'claim))) (caddr more)) (cadddr more))))
+;; a function's case: its patterns as rules' terms (a lower-case name binds), the variables they bind, and its result
+(define-function law-pattern-vars (x out)
+  (cond ((and (symbol? x) (= ?$ (string-at (symbol->string x) 0)))	(if (member? x out) out (concat-list out (list x))))
+	((pair? x)	(law-pattern-vars (cdr x) (law-pattern-vars (car x) out)))
+	(else		out)))
+(define-function law-case (c)
+  (let ((pats (map (lambda (p) (law-conv p 1)) (car c))))
+    (list pats (law-pattern-vars pats ()) (law-conv (cadr c) 'claim))))
+(define-function law-schema-values (raw)	; a sole list, written out or a let's name, is its elements
+  (let ((a (car raw)))
+    (if (and (not (cdr raw)) (or (and (symbol? a) (assq a *law-lets*)) (and (pair? a) (= 'law-list (car a)))))
+	(law-conv a ())
+      (map (lambda (v) (law-conv v ())) raw))))
 (define-function law-item (it scope)
   (let ((k (car it)))
     (cond
       ((= k 'let)	(let ((v (law-conv (caddr it) ()))) (set *law-lets* (cons (cons (cadr it) v) *law-lets*)) (list 'let (cadr it) v)))
+      ((= k 'let-cases)	(list 'fn (cadr it) (map law-case (caddr it))))	; a function, by cases or one equation
       ((= k 'rule)	(cons 'rule (cons (cadr it) (cons (map law-var (caddr it))
 			    (map (lambda (g) (law-goal g (concat-list scope (caddr it)))) (cdddr it))))))
       ((= k 'fact)	(list 'fact (law-goal (cadr it) ())))
-      ((= k 'schema)	(let ((outer *law-schema-vars*) (values (map (lambda (a) (law-conv a ())) (caddr it))))
+      ((= k 'schema)	(let ((outer *law-schema-vars*) (values (law-schema-values (caddr it))))
 			  (set *law-schema-vars* (cons (cadr it) outer))	; within its item, the variable names functions too
 			  (let ((inner (law-item (cadddr it) (cons (cadr it) scope))))
 			    (set *law-schema-vars* outer)
@@ -120,12 +142,19 @@
       ((= k 'law)	(law-conv-law it))
       (else		it))))
 
+(define-function law-fn-named (name items)
+  (let ((f ())) (list-do i items (and (= 'fn (car i)) (= name (cadr i)) (set f i))) f))
 (define-function law-text-read (text)
   (let ((parser (text-parser-for-on <law> text)))
     (or ($program parser) (error "syntax error"))
     (set *law-lets* ())
     (set *law-schema-vars* ())
-    (let ((out ())) (list-do it (<law>-result parser) (set out (concat-list out (list (law-item it ()))))) out)))
+    (let ((out ()))
+      (list-do it (<law>-result parser)
+	(let* ((i (law-item it ())) (same (and (= 'fn (car i)) (law-fn-named (cadr i) out))))
+	  (if same (set-car (cddr same) (concat-list (caddr same) (caddr i)))	; equations of one name are one function, in order
+	    (set out (concat-list out (list i))))))
+      out)))
 
 ;;; The items rules-expand takes: rules, facts, schemas and facts-from-function.
 (define-function law-rules (items)

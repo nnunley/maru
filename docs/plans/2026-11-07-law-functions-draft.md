@@ -1,6 +1,8 @@
 # Functions in law files (draft for review)
 
-**Status:** a design in brief, for review before it becomes an RFC (an update to `draft-ndn-maru-laws-and-rules-00`).
+**Status:** accepted 2026-11-07 with both case forms (`|`, preferred, and one equation per line), list domains, and named
+lists shared by laws and schemas; specified in `draft-ndn-maru-laws-and-rules-00` ("Functions and list domains").
+gc-model.g's and gc-real.g's meanings move into gc-model.law next, and hash-ops.g's into hash.law.
 
 ## The problem
 

@@ -37,8 +37,10 @@ primary		= template						# a claim compares templates
 		| identifier
 		| number
 		| string
+		| function						# (x, y) -> expression
 		| "("_ xexpression:e ")"_					-> e
 		;
+function	= "("_ ( xidentifier:a (","_ xidentifier)*:b -> `(,a ,@b) )?:p ")"_ "->"_ xexpression:e	-> `(law-fn ,(car p) ,e) ;
 field		= idpart:a "." idpart:f _				-> `(law-field ,a ,(symbol->string f)) ;
 
 goal		= identifier:n "("_ args?:a ")"_				-> `(,n ,@(car a))
@@ -48,7 +50,9 @@ goals		= goal:g (","_ goal)*:h						-> `(,g ,@h) ;
 names		= xidentifier:a (","_ xidentifier)*:b				-> `(,a ,@b) ;
 setting		= xidentifier:k "="_ number:n					-> (cons k n) ;
 
-item		= "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
+item		= "let"       keyword xidentifier:n "="_ case:a ("|"_ case)*:b	-> `(let-cases ,n (,a ,@b))	# by cases
+		| "let"       keyword xidentifier:n "("_ args:p ")"_ "="_ xexpression:e	-> `(let-cases ,n ((,p ,e)))	# one equation
+		| "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		| "set"       keyword xidentifier:n "="_ xidentifier:a ("|"_ xidentifier)*:b	-> `(set ,n (,a ,@b))
 		| "under"     keyword "test" keyword ":"_ names:n		-> `(under-test ,@n)
 		| "reference" keyword xidentifier:n "("_ names:p ")"_		-> `(reference ,n ,@p)
@@ -64,8 +68,11 @@ item		= "let"       keyword xidentifier:n "="_ xarg:v			-> `(let ,n ,v)
 		  ( "size" keyword number )?:s "."_ names:l			-> `(adequacy ,n ,r ,(car s) ,@l)
 		;
 
+case		= pattern:p "->"_ xexpression:e					-> `((,p) ,e) ;
+pattern		= goal | identifier | number ;
 bindings	= binding:a (","_ binding)*:b					-> `(,a ,@b) ;
 binding		= "let" keyword xidentifier:n "="_ xarg:v			-> `(law-let ,n ,v)
+		| names:n "in" keyword arg0:d					-> `(law-bind-in ,n ,d)	# a list's elements
 		| names:n ":"_ domain:d						-> `(law-bind ,n ,d)
 		| expression:e							-> `(law-bind () ,e)
 		;

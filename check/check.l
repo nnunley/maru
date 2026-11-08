@@ -518,6 +518,9 @@
 		 ("adequacy" "check/laws/fixtures/holds.l" 256 "law listed: TESTED 100" "law painted_listed: TESTED 100" "law adequate: PROVED 7"
 		  "law weak: REFUTED 6 of 7 survive: color(Red:=Green) color(Red:=Blue) -color(Red) color(Green:=Red) color(Green:=Blue) -color(Green)"
 		  "law typo: E_ADEQUATE no rule concludes paintd, so it has no mutants")
+		 ;; functions in a law file, by cases too, and a list as a domain, named and shared with a schema
+		 ("functions" "" 0 "law doubles: PROVED 3" "law applied: PROVED 3" "law valued: PROVED 6" "law twofold: PROVED 3" "law sized: PROVED 6")
+		 ("list-domain" "" 0 "law listed: PROVED 10" "law named: PROVED 5" "law drawn: TESTED 100")
 		 ("numerals" "" 0 "law few: PROVED 2") ("refs" "check/laws/fixtures/refs.l" 0 "law differ: TESTED 100")
 		 ("reach" "check/laws/fixtures/holds.l" 256 "law sound: PROVED 9" "law sound_uv: PROVED 9" "law direct: PROVED 2"
 		  "law adequate: REFUTED 4 of 13 survive: edge(A,B:=C) -edge(A,B) edge(B:=A,C) -edge(B,C)"
@@ -556,6 +559,8 @@
 		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 32 of 300 < 10%"))
       (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
+  (let ((r (law-fixture "no-case" "")))	; a term no case of a function matches stops the run, naming both
+    (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/no-case.out")) "E_NO_CASE: value has no case for other(0)"))))
   (list-do c '(("field-error" "no field c in the record, which has a, b") ("field-plain" "a is read from a value that is not a record"))
     (let ((r (law-fixture (car c) "check/laws/fixtures/fields.l")))
       (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/" (car c) ".out")) (concat-strings "E_FIELD: " (cadr c)))))))

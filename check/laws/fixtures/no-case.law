@@ -1,0 +1,6 @@
+-- a term no case matches is an error naming the function and the term
+under test: value
+let numerals = [0]
+let value = num(n) -> n
+rule k_other: number(n) => key(other(n))
+law missing: all k: key(k). value(k) = 0
