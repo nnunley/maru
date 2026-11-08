@@ -566,7 +566,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   equal; sizes around each doubling hold, compacting at three quarters removed; and tables saved in an image (`check/hash-image-
   save.l`, where loading moves every object) answer as before, keep their order and grow, since each notes where an anchor of its
   own lived and rehashes once it has moved. Planted bugs (an entry not emptied on removal, 2.0 hashed apart from 2, a table that
-  never rehashes) are each caught. NaN is no key: `=` doesn't find it equal to itself.
+  never rehashes) are each caught. NaN is no key: `=` doesn't find it equal to itself. JOHN's seen states (`merge-worlds`),
+  `rules.l`'s seen solutions and `check/law.l`'s cache of reference answers are its tables, by `equal`.
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
 - `boot2_strings` (`check/boot2-strings.l`): `boot2.l`'s Maru definitions of

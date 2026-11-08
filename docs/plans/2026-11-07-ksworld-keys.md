@@ -100,7 +100,8 @@ Steps, each a check first:
      IdentitySet, KSObject's slots, and JOHN's and rules.l's buckets, each moved onto it with its checks.
      Done: hash.l, with laws; every object's slots are a table (identity, or equality for a Dictionary), so Dictionary,
      IdentityDictionary and KSWorld objects share one store and one set of methods; Set and IdentitySet keep their members
-     as a table's keys. JOHN's seen states and rules.l's buckets are still their own.
+     as a table's keys. JOHN's seen states (merge-worlds), rules.l's seen solutions (enumerate, focus) and the law
+     runner's cache of reference answers are tables too: no bucket scheme of its own is left in the tree.
      Closed: Maru's equal and equal-hash are selectors in boot.l, each type's equality defined with the type (arrays by
      their elements; <ks-point> defines its own by x and y), so a Dictionary finds #(1 2) or 3@4 by an equal key, as
      Squeak's = has it, and ks-equal? is gone.

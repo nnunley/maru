@@ -3,6 +3,7 @@
 ;;; hold) and enumerate (every solution).  A rule is (name conclusion premise...),
 ;;; a rule set a list of rules, and $x a logic variable.  Rule sets are passed
 ;;; in, never global, so mutants can swap them.  See docs/rfc/draft-ndn-maru-laws-and-rules-00.md.
+(require "hash.l")	; seen solutions, by equal
 
 ;; seeded, replayable.  rules-fired names the rules used in successful generate and check derivations, rules-used lists them.
 (define *rules-seed* 42)
@@ -138,18 +139,13 @@
   (set *rules-random* ())
   (rules-solve rules (rules-rename goal (list ())) *rules-empty* size (lambda (s) 1)))
 (define-function rules-has? (v l) (let ((y ())) (list-do e l (and (equal e v) (set y 1))) y))
-(define-function rules-hash (x)	; equal terms hash alike (every number alike, as = compares 2 and 2.0)
-  (cond ((pair? x)	(% (+ (* 31 (rules-hash (car x))) (rules-hash (cdr x))) 4093))
-	((symbol? x)	(rules-hash (symbol->string x)))
-	((string? x)	(let ((h 7)) (for (i 0 (string-length x)) (set h (% (+ (* h 31) (string-at x i)) 4093))) h))
-	(else		1)))
-;; enumerate: every distinct solution for the goal's last argument, those seen kept in buckets by hash
+;; enumerate: every distinct solution for the goal's last argument, those seen kept in a table (hash.l, by equal)
 (define-function rules-enumerate (rules goal size)
   (set *rules-random* ())
-  (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)) (all ()) (seen (array 4093)))
+  (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)) (all ()) (seen (equal-hash-table)))
     (rules-solve rules g *rules-empty* size
-		 (lambda (s) (let* ((v (walk* out s)) (h (rules-hash v)))
-			       (or (rules-has? v (array-at seen h)) (let () (push (array-at seen h) v) (push all v)))) ()))
+		 (lambda (s) (let ((v (walk* out s)))
+			       (or (hash-includes? seen v) (let () (hash-at-put seen v 't) (push all v)))) ()))
     (list-reverse! all)))
 
 ;; focus: the distinct instances of goal whose derivation uses rule rl, at the least depth (rules on the
@@ -188,15 +184,15 @@
     (and (> depth 0) (list-do r rules (and (not y) (= (car goal) (car (cadr r))) (set y (rules-focus-try rules r rl goal s depth k)))))
     y))
 (define-function rules-focus (rules goal rl visit)	; true if visit stopped it
-  (let ((d 1) (found ()) (stop ()) (seen (array 4093)))
+  (let ((d 1) (found ()) (stop ()) (seen (equal-hash-table)))
     (set *rules-random* ())
     (rules-mins rules)
     (while (and (not found) (not stop) (<= d (list-length rules)))
       (let ((g (rules-rename goal (list ()))))
 	(set stop (rules-focus-solve rules g *rules-empty* rl d
-				     (lambda (s n) (let* ((v (walk* g s)) (h (rules-hash v)))
-						     (and (not (rules-has? v (array-at seen h)))
-							  (let () (push (array-at seen h) v) (set found 1) (visit v n)))))))
+				     (lambda (s n) (let ((v (walk* g s)))
+						     (and (not (hash-includes? seen v))
+							  (let () (hash-at-put seen v 't) (set found 1) (visit v n)))))))
 	(set d (+ d 1))))
     stop))
 
