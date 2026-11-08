@@ -553,7 +553,8 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 - `equal_selector` (`check/equal.l`): on every evaluator, Maru's `equal` and `equal-hash` are selectors (`boot.l`, `boot2.l`),
   each type's equality defined with the type: numbers by value (2 is 2.0), strings by their text, pairs and arrays by their
   elements (a list along its spine in a loop, 100,000 long without a frame each), anything else itself unless its type defines
-  both (as `<ks-point>` does, by x and y), and equal values hash alike, so a table finds a key by an equal one.
+  both (as `<ks-point>` does, by x and y), and equal values hash alike, so a table finds a key by an equal one. A type
+  that defines `equal` but not `equal-hash` can't be hashed: an error names it, where an equal copy would quietly be missed.
 - `hash_table` (`check/laws/hash.law`, `check/laws/hash.l`): `hash.l`, a hash table in Maru on every
   evaluator, keyed by identity (Smalltalk's `==`: a number by its value and kind, anything else by its address, as `=` compares
   strings by their text) or by Maru's `equal` (2 and 2.0 alike), kept in the order keys were first put. A number hashes by its

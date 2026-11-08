@@ -30,4 +30,21 @@
   (hash-at-put t (new <check-point> 3 4) 'found)
   (expect "a type's own equality, in a table" (list (equal (new <check-point> 3 4) (new <check-point> 3 4)) (hash-at t (new <check-point> 3 4)))
 	  '(t found)))
+;; a type that defines equal but no equal-hash can't be hashed: an equal copy would hash elsewhere and quietly not be found
+(require "recover.l")
+(define-structure <check-half> (x))
+(define-method equal <check-half> (b) (and (= <check-half> (type-of b)) (= self.x (<check-half>-x b))))
+(expect "equal without equal-hash is an error naming the type"
+	(try (equal-hash (new <check-half> 1)) (lambda (c) (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (symbol? p) (symbol->string p) p)))) s)))
+	"equal-hash: <check-half> defines equal but not equal-hash")
+;; the same object is equal to itself at once, as the old equal had it: a cyclic list or an array that holds itself too
+(let ((c (list 1 2)) (v (array 1)))
+  (set-cdr (cdr c) c)
+  (set-array-at v 0 v)
+  (expect "a cyclic list and a self-holding array, each equal to itself" (list (equal c c) (equal v v)) '(t t)))
+;; and a subtype inherits its base's equal, so it needs the base's equal-hash too
+(define-class <check-sub> <check-half> ())
+(expect "a subtype of a type with equal but no equal-hash is refused, by its name"
+	(try (equal-hash (new <check-sub> 1)) (lambda (c) (let ((s "")) (list-do p (cdr c) (set s (concat-string s (if (symbol? p) (symbol->string p) p)))) s)))
+	"equal-hash: <check-sub> defines equal but not equal-hash")
 (println (if ok "equal ok" "equal FAILED"))

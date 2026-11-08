@@ -576,17 +576,21 @@
 (define-selector equal (a b) (= a b))
 (define-method equal <pair> (b)	; along the spine in a loop, so a long list takes no frame per element
   (let ((a self) (same 't))
-    (while (and same (pair? a) (pair? b))
+    (while (and same (pair? a) (pair? b) (not (= a b)))	; the same pair is equal at once (a cycle ends here)
       (or (equal (car a) (car b)) (set same ()))
       (set a (cdr a))
       (set b (cdr b)))
-    (and same (not (pair? a)) (not (pair? b)) (equal a b))))
+    (and same (or (= a b) (and (not (pair? a)) (not (pair? b)) (equal a b))))))
 (define-method equal <array> (b)
-  (and (= <array> (type-of b)) (= (array-length self) (array-length b))
+  (or (= self b)	; the same array is equal at once, even one that holds itself
+   (and (= <array> (type-of b)) (= (array-length self) (array-length b))
        (let ((i 0) (n (array-length self)) (same 't))
 	 (while (and same (< i n)) (or (equal (array-at self i) (array-at b i)) (set same ())) (set i (+ i 1)))
-	 same)))
-(define-selector equal-hash (x) (>> (address-of x) 4))	; itself: where it lives
+	 same))))
+(define-selector equal-hash (x)	; itself: where it lives, unless its type has an equality of its own and no hash to match
+  (if (let ((ms (<selector>-methods equal)) (type (type-of x))) (or (array-at ms type) (<selector>-inherit ms type)))	; its base's too
+      (error "equal-hash: " (array-at %type-names (type-of x)) " defines equal but not equal-hash")
+    (>> (address-of x) 4)))
 (define-function %equal-hash-number (x)	; by its double, as = compares a long with a double; 0 past what a long holds
   (let ((d (* 1.0 x))) (if (and (< -4.0e18 d) (< d 4.0e18)) (double->long d) 0)))
 (define-method equal-hash <long> () (%equal-hash-number self))
