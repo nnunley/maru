@@ -386,17 +386,12 @@
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 
-;; (define-function %make-make-inits (prefix inits)
-;;   (and inits
-;;        (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-;; 	     (%make-make-inits prefix (cdr inits)))))
-
-(define-function %make-field-name (key)
+(define-function %make-field-name (key)	; x: names the field x
   (let* ((str (symbol->string key))
 	 (len (string-length str)))
     (string->symbol (string-copy str 0 (- len 1)))))
 
-(define-function %make-make-inits (prefix inits)
+(define-function %make-make-inits (prefix inits)	; keyword pairs, x: 1 y: 2 (Piumarta, 2013)
   (and inits
        (cons (list 'set (list (concat-symbol prefix (%make-field-name (car inits))) 'self) (cadr inits))
 	     (%make-make-inits prefix (cddr inits)))))
@@ -510,7 +505,6 @@
 	     (make-instance-accessors name (cdr fields) (+ i 1)))))
 
 (define-form with-instance-accessors (type . body)
-  ;;(println "\n\nWITH-INST-ACC env = "(current-environment))
   `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
     (let () ,@body)))
 
@@ -548,12 +542,13 @@
 		(concat-symbol (array-at %type-names type) (concat-symbol '. (<selector>-name self))))))
   (set-array-at (<selector>-methods self) type method))
 
+(define-function %binding-value (b) (cdr b))	; eval2 and eval3 keep a binding as a pair
 (define-form define-selector (name . default)
   (let ((def (defined? name)))
     (if def
-	(if (selector? (cdr def))
-	    (list 'quote (cdr def))
-	  (error name" already defined as non-selector: " def))
+	(if (selector? (%binding-value def))
+	    (list 'quote (%binding-value def))
+	  (error name" already defined as non-selector: " (%binding-value def)))
       (let ()
 	(or default (set default `(args (error "selector "',name
 					       " has no method for "(array-at %type-names (type-of (car args)))

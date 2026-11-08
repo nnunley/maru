@@ -58,22 +58,7 @@
 (define-form send (selector receiver . args)
   `(,(concat-symbol '# selector) ,receiver ,@args))
 
-(define-form define-class (name basis fields)
-  (let ((base (eval basis)))
-    (set fields (concat-list (array-at %structure-fields base) fields))
-    (sanity-check-structure-fields name fields)
-    (let ((type   (%allocate-type name))
-          (size   (list-length fields)))
-      (set-array-at %structure-sizes  type size)
-      (set-array-at %structure-fields type fields)
-      (set-array-at %structure-bases  type base)
-      (let ((derived (or (array-at %structure-derivatives base)
-                         (set-array-at %structure-derivatives base (array)))))
-        (array-append derived type))
-      `(let ()
-         (define ,name ,type)
-         ,@(%make-accessors name fields)
-         ,type))))
+;; define-class is boot.l's and boot2.l's own
 
 (define-function define-topclass (name fields)		;; the root of a hierarchy
   (println "topclass "name" "fields)

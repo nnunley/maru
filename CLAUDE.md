@@ -550,6 +550,11 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   them by contention; each run keeps its own output, and a failure prints its
   last lines. Alone, each `gc_model` file takes 45 to 83 s; nearly all of it is the collector marking the heap the
   forked question inherits from the law runner.
+- `boot_forms` (`check/boot-forms.l`): on every evaluator, the class and dispatch forms `boot.l` and `boot2.l` share, with the
+  same text: `define-structure`, `define-class` (a class extends its base's fields), `make` with keyword pairs (Piumarta's 2013
+  form; `boot.l` had kept the older association form), methods reading fields as `self.x`, and selectors inheriting through
+  the bases. `define-selector` reads a binding through `%binding-value`, a `<variable>` on `eval` and a pair on `eval2` and
+  `eval3`, and `test-pepsi.l` uses the boots' `define-class` rather than a copy.
 - `equal_selector` (`check/equal.l`): on every evaluator, Maru's `equal` and `equal-hash` are selectors (`boot.l`, `boot2.l`),
   each type's equality defined with the type: numbers by value (2 is 2.0), strings by their text, pairs and arrays by their
   elements (a list along its spine in a loop, 100,000 long without a frame each), anything else itself unless its type defines

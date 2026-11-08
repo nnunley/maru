@@ -378,10 +378,15 @@
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 
-(define-function %make-make-inits (prefix inits)
+(define-function %make-field-name (key)	; x: names the field x
+  (let* ((str (symbol->string key))
+	 (len (string-length str)))
+    (string->symbol (string-copy str 0 (- len 1)))))
+
+(define-function %make-make-inits (prefix inits)	; keyword pairs, x: 1 y: 2 (Piumarta, 2013)
   (and inits
-       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-	     (%make-make-inits prefix (cdr inits)))))
+       (cons (list 'set (list (concat-symbol prefix (%make-field-name (car inits))) 'self) (cadr inits))
+	     (%make-make-inits prefix (cddr inits)))))
 
 (define-form make (type . inits)
   `(let ((self (new ,type)))
@@ -530,12 +535,13 @@
 		(concat-symbol (array-at %type-names type) (concat-symbol '. (<selector>-name self))))))
   (set-array-at (<selector>-methods self) type method))
 
+(define-function %binding-value (b) (<variable>-value b))	; eval keeps a binding as a <variable>
 (define-form define-selector (name . default)
   (let ((def (defined? name)))
     (if def
-	(if (selector? (<variable>-value def))
-	    (list 'quote <variable>-value def)
-	  (error name" already defined as non-selector: " (<variable>-value def)))
+	(if (selector? (%binding-value def))
+	    (list 'quote (%binding-value def))
+	  (error name" already defined as non-selector: " (%binding-value def)))
       (let ()
 	(or default (set default `(args (error "selector "',name
 					       " has no method for "(array-at %type-names (type-of (car args)))

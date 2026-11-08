@@ -359,6 +359,10 @@
     (unit-assert (law-file-holds "gc_laws" evaluator "check/laws/gc-reference.l" "check/laws/gc.law")))
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (law-file-holds "gc_every" evaluator "check/laws/gc-reference.l" "check/laws/gc-every.law"))))
+;; boot.l's and boot2.l's class and dispatch forms agree on every evaluator, make with keyword pairs among them
+(check "boot_forms"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "boot_forms" (concat-strings evaluator " check/boot-forms.l"))) "boot forms ok"))))
 ;; Maru's equal and equal-hash as selectors, each type's equality defined with the type, on every evaluator
 (check "equal_selector"
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
