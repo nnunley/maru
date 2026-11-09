@@ -1,5 +1,6 @@
 (require "ansiterm.l")
 
+(require "grammar.l")	; each grammar keeps its definition (compile-tpeg.l registers it)
 (define-structure <text-parser> (string limit position memos refill result foreign))	; foreign: ((type . parser)...)
 
 (define-function text-parser-refill-default (self len) ())

@@ -329,7 +329,8 @@
     `(,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
       ,@(map (lambda (name) (list 'define-selector (concat-symbol '$$ name))) names)
       ,@(map-with compile-value  rules class)
-      ,@(map-with compile-effect rules class))))
+      ,@(map-with compile-effect rules class)
+      (grammar-register ',class ,class ',rules))))	; its definition, to be reflected on (grammar.l)
 
 (define-function parse-and-compile-grammar (path)
   (let* ((spec   (tpeg-parse-whole-file path))

@@ -19,7 +19,7 @@ exponent	= "e" "-"? [0-9]* ;
 number		= "0x" (hex*) @$#16
 		| ("-"? digits ("." [0-9]* exponent? | exponent)) @$:s	-> (string->double s)
 		| ("-"? digits) @$:s				-> (string->long s) ;
-delimiter	= [ \t\r\n] | "(" | ")" | "[" | "]" | "{" | "}" | "\"" | "'" | "`" | "," | ";" ;
+delimiter	= [ \t\r\n()[\]{}"'`,;] ;	# one class, not a dozen alternatives: every character of every symbol meets it
 symbol		= (!delimiter .)+ @$:s				-> (string->symbol s) ;
 items		= (form:f _ -> f)* ;
 list		= at:s "(" _ items:fs ")" at:e			-> (maru-lines-list fs s e self.path self.starts)

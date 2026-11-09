@@ -12,7 +12,7 @@
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
 
-(define *irl-grammars* ())	; (G fields rules) for each block so far
+(define *irl-scope* (grammar-scope *grammar-root*))	; this compilation's grammar blocks, registered as any grammar is (grammar.l)
 (define *irl-g* ())		; the grammar and rule being lowered, for errors
 (define *irl-r* ())
 (define *irl-runtime* ())	; text-parser.k is loaded once
@@ -152,16 +152,11 @@
   (let* ((g (irl-grammar-name (cadr record)))
 	 (parent (caddr record))
 	 (own (cddddr record))
-	 (base (if (= parent '<text-parser>)
-		   (list () ())
-		   (or (cdr (assq (irl-grammar-name parent) *irl-grammars*))
-		       (error "irl grammar: " g ": no grammar block " parent))))
-	 (fields (concat-list (car base) (cadddr record)))
-	 (rules ())
+	 (gr (grammar-define-in *irl-scope* g (and (not (= parent '<text-parser>)) (irl-grammar-name parent)) (cadddr record) own))
+	 (fields (grammar-all-fields gr))	; the base's, then its own
+	 (rules (map (lambda (r) (list (<grammar-rule>-name r) (<grammar-rule>-body r) (<grammar-rule>-parameters r)))
+		     (grammar-rules-base-first gr)))	; the base's not overridden, then its own
 	 (runtime (and (not *irl-runtime*) (set *irl-runtime* 1) '((load "text-parser.k")))))
-    (list-do r (cadr base) (or (assq (car r) own) (push rules r)))
-    (set rules (concat-list (list-reverse! rules) own))
-    (push *irl-grammars* (list g fields rules))
     (set *irl-g* g)
     (concat-list runtime
 		 (cons `(define-struct ,g

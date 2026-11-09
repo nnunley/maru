@@ -171,4 +171,5 @@
     (and decl (println "(define-class "(car decl)" "(cadr decl)" "(caddr decl)")"))
     (list-do name names (println "(define-selector $" name")"))
     (list-do name names (println "(define-selector $$"name")"))
-    (map-with compile-rule rules class)))
+    (map-with compile-rule rules class)
+    (dumpln `(grammar-register ',class ,class ',rules))))	; its definition, as compile-tpeg.l registers it (grammar.l)

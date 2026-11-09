@@ -9,8 +9,7 @@
 (define *erosion-decisions* '(if when unless while until for list-do lists-do array-do alist-do string-do namespace-do hash-do))
 (define-function erosion-decision? (op) (and (symbol? op) (memq op *erosion-decisions*) 't))
 (define-function erosion-sum (ns) (let ((s 0)) (list-do n ns (set s (+ s n))) s))
-(define-function erosion-flat (lists) (let ((out ())) (list-do l lists (list-do x l (push out x))) out))
-(define-function erosion-join (vs lists) (concat-list vs (erosion-flat lists)))
+(define-function erosion-bind-all (vars names) (list-do v names (and v (symbol? v) (hash-at-put vars v 't))) vars)
 (define-function erosion-params (ps)	; a parameter list's names, its dotted rest among them (a tree pattern reads past it)
   (let ((out ()))
     (while (pair? ps) (and (symbol? (car ps)) (push out (car ps))) (set ps (cdr ps)))
@@ -110,10 +109,11 @@
 	(set atoms (+ atoms 1)))
       (visit x h atoms)
       (cons h atoms))))
-(define-function erosion-bound (form)	; the variables form binds, as a set
-  (let ((vars (identity-hash-table)))
-    (list-do v (parse-source <erosion-binders> $form (list form)) (and v (symbol? v) (hash-at-put vars v 't)))
-    vars))
+(define-function erosion-bound (form)	; the variables form binds, as a set, filled by erosion-binders.g as it walks
+  (let ((p (source-parser-for <erosion-binders> (list form))))
+    (set (<erosion-binders>-vars p) (identity-hash-table))
+    (or ($form p) (error "erosion: can't walk a form for its variables"))
+    (<erosion-binders>-vars p)))
 
 ;; how erosion-of reads a source's forms (erosion-run.l reads them once and holds them to Maru's own reader)
 (define erosion-read maru-lines-read)

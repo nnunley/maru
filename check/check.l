@@ -1075,6 +1075,13 @@
 			 "; add an entry for " (- n sum) " saying why"))
     (println "lines: " n ", tests included; the budget of 20000 is soft")))
 
+;; a grammar keeps its definition, to be reflected on: rules, parameters, bodies, annotations, inherited ones too, in process
+;; and compiled to a file (grammar.l)
+(check "grammar_reflect"
+  (run "grammar-reflect-built" "make -q cexpr.g.l")	; the compiled grammar it loads is current
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "grammar_reflect" (concat-strings evaluator " check/grammar-reflect.l"))) "grammar reflect ok"))))
+
 ;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
 ;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
@@ -1086,8 +1093,12 @@
   (let ((files (run "erosion_files" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k)$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | sed \"s,^[.]/,,\""))
 	(measured ()))
     (list-do f files (or (member? f erosion-unread) (push measured f)))
-    (let ((out (run "erosion" (concat-strings "./eval erosion-run.l --ledger check/erosion --unread " (join-words erosion-unread)
-					     " -- " (join-words (list-reverse! measured))) 300)))
+    ;; a CPU limit, as law files have, not a wall clock: four cases at once mustn't fail it by contention
+    (let* ((path (concat-strings tmp "/erosion.out"))
+	   (status (run-cpu-status 300 (concat-strings "exec </dev/null >" path " 2>&1; exec ./eval erosion-run.l --ledger check/erosion --unread "
+						       (join-words erosion-unread) " -- " (join-words (list-reverse! measured)))))
+	   (out (lines (contents-of-file-named path))))
+      (or (= 0 status) (error "FAIL erosion: exit status " status ": " (last out)))
       (list-do l out (println l))
       (or (equal (last out) "erosion matches its ledger") (error "FAIL erosion: " (car out) " per mille, but " (last out))))))
 

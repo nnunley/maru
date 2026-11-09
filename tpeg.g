@@ -127,8 +127,10 @@ expression	= sequence:s	( (bar sequence)+:t		-> `(match-first ,s ,@t)
 
 parameters	= (colon identifier)* ;
 
-definition	= space identifier:id parameters:p
-		  equals expression:e ";"			-> `(,id ,e ,p) ;
+annotation	= at varname:a					-> a ;	# read as a symbol is, so @left-recursive is one
+
+definition	= space annotation*:as identifier:id parameters:p
+		  equals expression:e ";"			-> `(,id ,e ,p ,@(and as (list as))) ;	# annotations, if any
 
 definitions	= definition* ;
 

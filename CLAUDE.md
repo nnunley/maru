@@ -451,6 +451,17 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   arguments are cells on its input and leaving one unread is an error, memos live on the stream's cells, and a foreign
   rule reads through proxy cells with fresh memos. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
   interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.
+- `grammar_reflect` (`check/grammar-reflect.l`, plan `docs/plans/2026-11-09-grammar-engine.md`): a tpeg grammar keeps its
+  definition (`grammar.l`): `(grammar-of type)` is its `<grammar>` (name, type, own fields, rules), each rule a
+  `<grammar-rule>` (name, parameters, body as the tree tpeg parsed, annotations), registered as the grammar is defined, in
+  process (`tpeg-load`) or loaded from the file `compile-tpeg.l` wrote, on every evaluator. `(grammar-rules g)` answers its
+  rules and its ancestors', nearest first, an overridden one once (a class between two grammars that isn't one doesn't cut
+  the line), and defining a rule again replaces it in its place. Grammars live in scopes: tpeg's in the root, and each
+  irl compilation's grammar blocks in a scope of its own under it (`irl-grammar.l`'s `*irl-scope*`), found by name there and
+  then above, so a block is reflected on like any grammar, inherits through the same rules and fields, and is seen by
+  nothing outside its compilation. A rule may be annotated,
+  `@decision pick = …`, each `@name` (read as a symbol, so `@left-recursive`) kept in order as data the engine gives no meaning; a rule with none
+  stays `(name body parameters)`, so `compile-peg.l` and `compile-tpeg.l` still write the same `tpeg.l`.
 - `law_engine` (`check/rules-test.l`): `rules.l`'s one rule set generates, checks and
   enumerates alike; a recursive rule never applies at size 0; unification has an occurs
   check; the `in`, `number` and `=` builtins work as specified; schemas (whose variable may name a term's function:

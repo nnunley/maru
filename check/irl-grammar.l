@@ -57,4 +57,16 @@
 (expect "make-string is an error naming the rule"
 	(has? (compile-text "irl-grammar-str" "grammar { <st> : <text-parser> () s = [a-z]+ $ ; }")
 	      "st.s: make-string has no typed value"))
+;; a grammar block registers in irl's own scope, under the root: reflected on like any grammar, its parent found there, and
+;; seen by nothing outside the compilation
+(require "irl-grammar.l")
+(irl-grammar-forms '(grammar-define <rbase> <text-parser> (a) (num (match-class "0-9") () (token)) (sum (match-rule num) ())))
+(irl-grammar-forms '(grammar-define <rchild> <rbase> (b) (num (match-class "0-9a-f") () (token hex))))
+(let ((child (grammar-named 'rchild *irl-scope*)))
+  (expect "an irl grammar block registers in irl's scope, with its annotations"
+	  (and child (equal (<grammar-rule>-annotations (grammar-rule child 'num)) '(token hex))))
+  (expect "its parent is the block it names, its rules and fields inherit"
+	  (and child (equal (map (lambda (r) (<grammar-rule>-name r)) (grammar-rules-base-first child)) '(sum num))
+	       (equal (grammar-all-fields child) '(a b))))
+  (expect "and nothing outside irl's scope sees it" (not (grammar-named 'rchild))))
 (and ok (println "irl grammar ok"))
