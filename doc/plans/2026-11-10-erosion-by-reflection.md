@@ -34,6 +34,25 @@ raw forms". Background: `docs/plans/2026-11-08-erosion-metrics.md` (the metrics)
 - **Raw forms, not expanded bodies:** expansion makes every `when` a false `empty-let`, adds 1 to complexity per `assert`
   (115 in the tree), and moves clone sizes through generated names (`_list_`). Complexity alone survives expansion.
 
+## Baseline (Task 0, 2026-11-10, Low Power Mode off)
+
+`./eval erosion-measure.l` over the 293 measured files, CPU milliseconds (`-O`, unchecked accessors, beside each):
+
+| stage | ms | `-O` |
+|---|---|---|
+| read through `maru-lines.g` | 44810 | 42939 |
+| Maru's C reader, the same files (`find-and-read`) | 132 | 134 |
+| code lines (`erosion-lines.g`) | 8087 | 8430 |
+| callables (`erosion-complexity.g`) | 13297 | 8036 |
+| verbose findings (`erosion-verbose.g`, 94,610 lists, a parser each) | 12224 | 7474 |
+| binders (`erosion-binders.g`) | 19523 | 11975 |
+| clone hashes (`erosion-scan`, plain Maru) | 4153 | 3364 |
+| total | 102226 | 82352 |
+
+Reading is 44% of the time and the C reader does it 340 times faster; type checks cost a fifth of the rest. Rule
+invocations aren't counted: a grammar's rules take the invoker in force when they're compiled, so wrapping it after loading
+counts nothing; the lists the verbose rules enter stand in for them.
+
 ## Global Constraints
 
 - Everything in Maru languages; no C change (the weak table, not a field on `eval`'s C `struct Expr`); no shell tools inside
