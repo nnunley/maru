@@ -355,7 +355,7 @@
 		  ((array? obj)
 		   (let ((i 0)) (list-do x data (set-array-at obj i x) (set i (+ i 1))))
 		   (list-do p indexed (set-array-at obj (- (car p) 1) (cdr p))))
-		  ((and data (pair? (car data)) (= 'span (caar data))) (ks-set-attr obj ':__spans__ data))
+		  ((and data (pair? (car data)) (ks-pp-sub data 'span)) (ks-set-attr obj ':__spans__ data))	; text, though a box may come first
 		  ((or data indexed)
 		   (ks-set-items obj (or data (ks-by-index indexed)))))))))
     ;; Pass 3: a text box's letters, which KSWorld wrote as spans, read back into its contents as KSWorld read them

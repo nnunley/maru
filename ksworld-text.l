@@ -106,10 +106,12 @@
 ;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts.  A box in the text
 ;; that isn't a letter keeps its place in the count, so a selection's gaps still count the contents, but isn't laid out:
 ;; it stays where its own transformation puts it, and the letters after it don't make room for it.
+(define-function ks-letter? (box)	; KSBox>>unicode is 0 for a box that isn't a letter, as for one that keeps none
+  (let ((u (ks-slot box 'unicode))) (and (long? u) (< 0 u))))
 (define-function ks-letter-chars (letters)
   (let ((out ()) (index 0) (font-of ()) (fonts ()) (size 0) (paint ()))
     (list-do l letters
-      (if (not (ks-slot l 'unicode))
+      (if (not (ks-letter? l))
 	  (set index (+ index 1))
 	(let ((f (ks-slot l 'font)))
 	  (unless (= f font-of)
@@ -224,7 +226,7 @@
 	      (ks-place-letter (<ks-char>-letter c) g)
 	      (or (ks-space? c) (not (memq c ink)) (push out g)))
 	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
-	(push lines (list y (+ (+ y ascent) descent) next (list-reverse! cells)))
+	(push lines (list y (+ (+ y ascent) descent) (if chars (<ks-char>-index (car chars)) next) (list-reverse! cells)))
 	(and chars (set next (+ 1 (<ks-char>-index (car (last-pair chars))))))
 	(and hard (set next (+ next 1)))	; past the carriage return, which no line holds
 	(set y (+ (+ y ascent) (+ descent 2)))))

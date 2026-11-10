@@ -115,7 +115,12 @@
 	  (map (lambda (l) (or (ks-slot l 'unicode) (ks-slot l 'name))) items) '(116 111 32 "address" 120))
   (expect "the box is the document's" (car (cdddr items)) (array-at table 2))
   (when (ks-font-file 'TimesNewRoman ks-plain)
-    (expect "laid out, the letters keep their places in the count" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(0 1 2 4))))
+    (expect "laid out, the letters keep their places in the count" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(0 1 2 4)))
+  ;; text that starts with a box, one whose unicode is KSBox>>unicode's 0, as a box that isn't a letter answers
+  (let ((items (ks-items (ks-val (array-at table 3) 'contents))))
+    (expect "text starting with a box" (map (lambda (l) (if (ks-letter? l) (ks-slot l 'unicode) (ks-slot l 'name))) items) '("photo" 120))
+    (when (ks-font-file 'TimesNewRoman ks-plain)
+      (expect "a box whose unicode is 0 isn't a letter" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(1)))))
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send (ks-class-named 'Color) 'white () () ())) (try (ks-send (ks-class-named 'Color) 'lighter () () ()) (lambda (c) (ksw-message c))))
 	'(1.0 "Smalltalk: Color class does not understand lighter"))
