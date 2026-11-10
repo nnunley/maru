@@ -94,7 +94,26 @@
     (array-do o (cadr (ksworld-load (concat-string dir "/Front page Onward Full v8.ks/index.pp")))
       (and (ks-object? o) (ks-instance? o 'KSBox) (ks-text-box? o) (laid-out-as-kept o)
 	   (push matched (ks-ref o))))
-    (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 411 479))))
+    (expect "the front page's text boxes laid out as KSWorld did" (list-reverse! matched) '(131 340 411 479)))
+  ;; deviation-demo's text holds 19 boxes, each saved where KSWorld laid it out: moved away, those of its second paragraph
+  ;; are placed there again; its first paragraph's aren't, its lines breaking apart from the first, which opens with a tab
+  ;; that KSWorld sent to the second stop (60), and this layout to the first
+  (let ((placed 0) (boxes 0))
+    (array-do o (cadr (ksworld-load (concat-string dir "/deviation-demo.ks/index.pp")))
+      (when (and (ks-object? o) (ks-text-box? o))
+	(let ((saved ()))
+	  (list-do l (ks-items (ks-val o 'contents))
+	    (unless (ks-letter? l)
+	      (push saved (cons l (ks-val l 'transformation)))
+	      (ks-set-val l 'transformation (ks-matrix 1 0 0 1 0 0))))
+	  (ks-text-layout o)
+	  (list-do p saved
+	    (let ((m (ks-val (car p) 'transformation)))
+	      (set boxes (+ boxes 1))
+	      (and (< (let ((d (- (<ks-matrix>-e m) (<ks-matrix>-e (cdr p))))) (* d d)) 0.0001)
+		   (< (let ((d (- (<ks-matrix>-f m) (<ks-matrix>-f (cdr p))))) (* d d)) 0.0001)
+		   (set placed (+ placed 1))))))))
+    (expect "deviation-demo's boxes in its text, placed where KSWorld saved them" (list placed boxes) '(9 19))))
 
 (require "gezira-library.l")	; the Gezira that's libgezira and libnile loads, though nothing here opens the libraries
 (expect "the library Gezira is one" (type-of (gezira-library 0 0)) <gezira-library>)
@@ -107,6 +126,27 @@
 
 ;; a collection a document saved with nil and false elements keeps them, each in its place
 (expect "nil and false elements are elements, of a Maru array" (array->list (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
+;; a box in the text, written among the spans, is in the contents in its place, the document's own object; laid out, it
+;; is a character as wide as its extent, its pivot on the baseline at its pen, and the letters after it make room for it
+(let* ((table (cadr (ksworld-load "check/ksworld/embedded.pp")))
+       (items (ks-items (ks-val (array-at table 1) 'contents))))
+  (expect "letters and the box, in the document's order"
+	  (map (lambda (l) (or (ks-slot l 'unicode) (ks-slot l 'name))) items) '(116 111 32 "address" 120))
+  (expect "the box is the document's" (car (cdddr items)) (array-at table 2))
+  (when (ks-font-file 'TimesNewRoman ks-plain)
+    (expect "laid out, the box keeps its place in the count" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(0 1 2 3 4))
+    (let* ((layout (ks-text-layout (array-at table 1))) (baseline (<ks-glyph>-y (car (car layout))))
+	   (cells (cadddr (cadr layout))) (box (assq 3 cells)) (after (assq 4 cells))
+	   (m (ks-val (array-at table 2) 'transformation)))
+      (expect "the box's pivot (0@0.6 of 36@15) at its pen, on the baseline"
+	      (list (near (<ks-matrix>-e m) (cadr box)) (near (<ks-matrix>-f m) (- baseline 9))) '(t t))
+      (expect "the letter after it starts where it ends" (near (cadr after) (+ (cadr box) 36)) 't)))
+  ;; text that starts with a box, one whose unicode is KSBox>>unicode's 0, as a box that isn't a letter answers
+  (let ((items (ks-items (ks-val (array-at table 3) 'contents))))
+    (expect "text starting with a box" (map (lambda (l) (if (ks-letter? l) (ks-slot l 'unicode) (ks-slot l 'name))) items) '("photo" 120))
+    (when (ks-font-file 'TimesNewRoman ks-plain)
+      (expect "a box whose unicode is 0 isn't a letter" (map (lambda (c) (if (ks-letter? (<ks-char>-letter c)) (<ks-char>-index c) 'box)) (ks-letter-chars items)) '(box 1))))
+  (expect "text that is only a box, named by :valueId" (ks-items (ks-val (array-at table 5) 'contents)) (list (array-at table 6))))
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send (ks-class-named 'Color) 'white () () ())) (try (ks-send (ks-class-named 'Color) 'lighter () () ()) (lambda (c) (ksw-message c))))
 	'(1.0 "Smalltalk: Color class does not understand lighter"))

@@ -5,3 +5,5 @@ erosion +25 () is no form (a pattern list matched nil as an empty list, so every
 verbosity +8 the same: forms no longer padded by (), so covered forms are a larger share
 erosion -2 tokens on demand and source.l's backfill: small definitions, the token number reading split into its own functions
 erosion +1 review fixes in source.l: source-extent, finding a definition's list among the file's, has CC over 10
+verbosity -1 a box in the text (ksworld-pp.l, ksworld-text.l): fewer of their lines in a clone or a verbose pattern, as erosion in forms measures them
+erosion +1 a box in the text laid out (ksworld-text.l): ks-letter-chars and ks-text-layout, already over CC 10, hold a box's branch
