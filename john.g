@@ -12,7 +12,7 @@ idpart		= (letter (letter | digit | "-" &letter)*) @ $$ ;
 wb		= !(letter | digit | "-") _ ;
 reserved	= ( "if" | "is" | "try" | "using" | "use" | "by" | "do" | "consequence" | "establish"
 		  | "dynamically" | "maximize" | "minimize" | "and" | "or" | "not" | "for" | "every"
-		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" ) !(letter | digit | "-") ;
+		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" | "total" | "choices" ) !(letter | digit | "-") ;
 name		= !reserved idpart:x !":" _					-> x ;
 kw		= idpart:x ":" _						-> (john-kw x) ;
 rel		= name:n &-> (john-relation? n)					-> n ;
@@ -46,6 +46,7 @@ prefix		= "for" wb quant:q "time" wb name:v ("after" wb primary)?:a "up" wb "to"
 		| "at" wb "time" wb primary:t compare:e				-> `(at-time ,t ,e)
 		| "for" wb quant:q chain:l "do" wb compare:p			-> `(,q ,l ,p)
 		| "select" wb "all" wb name:c "by" wb expr:p			-> `(select ,c ,p)
+		| "total" wb chain:s "by" wb expr:e				-> `(total ,s ,e)	# ours
 		| "all" wb pair*:ps name:c					-> `(all ,c ,@ps)
 		| "one-from" wb chain:s						-> `(one-from ,s) ;
 exprs		= expr:a ("," _ expr)*:b					-> `(,a ,@b) ;
@@ -104,6 +105,7 @@ statement	= "set" wb name:c "=" _ member:a ("|" _ member)*:b end		-> `(enumerati
 		| "for" wb !quant expr:l "do" wb (makebody | expr):b end	-> `(for ,l ,b)
 		| "at" wb "time" wb primary:t expr:e end			-> `(at-time ,t ,e)
 		| "is" wb expr:e end						-> `(is ,e)
+		| "choices" wb name:o name:g end				-> `(choices ,o ,g)	# ours: the frontier, ranked
 		| primary:o "satisfy" wb name:g primary*:as ("using" wb name+)?:u ("by" wb primary)?:b end
 										-> `(satisfy ,o ,g ,as ,(car u) ,(car b))
 		| name:r "do" wb name:a primary*:as end				-> `(do ,r ,a ,@as)

@@ -56,6 +56,9 @@ Samimi's planning language: parsing, the possible-worlds evaluator, sessions and
   `a is b` asks whether a is one of a kind, b naming a member, its set, a group holding it or a class, and otherwise whether they're the
   same value; so `its evidence is Good`, after `group Good passed tested proved.`, and a value with fields simply isn't a bare name.
   `qualify C p is E` gives p E's value (the memos have it as `if`, in one use that answers yes or no).
+  Ours: `total S by E` is the sum of E over S's members (a class's instances, a `select`, a list), each read as `which`, as
+  `select` reads them, and 0 over none; a member whose E isn't a number is an error naming it. A heuristic weighs a
+  quantity, and without a sum a plan could only count (`doc/rfc/draft-ndn-maru-john-development-00.md`).
 - `john_session` (`check/john-session.l`, `doc/rfc/draft-ndn-maru-john-session-00.md`): JOHN runs as a session, RN-2008-003's
   model (§15): `john-begin` starts one (an empty knowledge base, world 0), `john-enter` enters one statement and answers its
   lines, and `john-run` is a session fed a program. Declarations (and `make`'s facts) never move time; only `do` and a
@@ -66,6 +69,10 @@ Samimi's planning language: parsing, the possible-worlds evaluator, sessions and
   each new step after its plan, and a failed statement its error, undone by `recover.l`'s `try`. `all` answers a set,
   `{ A1, A2 }`, and `one-from` its one element (§14). The transcripts `check/john/*.session` (§13's `opponent`, §14's grid,
   its `row - 1` written `row + 1` to give the memo's answer, and ours) are replayed through the REPL.
+  Ours: `choices O G.` answers O's frontier for G (`doc/rfc/draft-ndn-maru-john-development-00.md`): every step
+  `john-children` allows from the current world, through G's goal-optimizations, one line each, `STEP  score N`, best
+  first, N `john-score` of the world the step leads to, steps of one score in `john-children`'s order; then `choices: K.`
+  It neither moves time nor searches: one level of what `satisfy` explores, ranked by the goal's heuristics.
 - `call_by_meaning` (`check/meaning.l`): `meaning.l`, call by meaning (Samimi et al., Onward! 2014, TR-2014-003) with a model
   where the paper had Cyc. A model proves nothing, so each answer is held to what John can check: `"…" find-passing: "probe"`
   takes an object whose `spec` the model says means the text only if it passes the probe, a qualification of its class, and

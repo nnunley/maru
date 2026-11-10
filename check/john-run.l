@@ -252,6 +252,15 @@
   (is-says "B f is good(at: \"t\", n: 1)" "yes")
   (is-says "B f is good(at: \"t\", n: 2)" "no")
   (is-says "A latest is ran" "yes")
+  ;; total S by E: the sum of E over S's members, which E reads as which, 0 over none, a member not a number an error
+  (let ((spots "create Spot mass. make Spot P 2. make Spot Q 3. make Spot R 5. "))
+    (expect "a total over a class" (equal (run-text (concat-string spots "total (all Spot) by which mass.")) '("10")))
+    (expect "a total over a select"
+	    (equal (run-text (concat-string spots "total (select all Spot by which mass > 2) by which mass.")) '("8")))
+    (expect "a total over nothing is 0"
+	    (equal (run-text (concat-string spots "total (select all Spot by which mass > 9) by which mass.")) '("0")))
+    (expect "a member whose value isn't a number is named"
+	    (has? (child "create Spot mass. make Spot P 2. make Spot Q heavy. total (all Spot) by which mass.") "total: Q")))
   (and ok (println "john run ok")))
 
 (if (not *arguments*) (suite)

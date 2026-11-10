@@ -108,4 +108,16 @@
   (system (concat-strings "./eval " script " > " out " 2>&1"))
   (expect "recover.l first, then john-eval.l" (file-lines out) '("ok." "john: no property or qualification fly of C")))
 
+;; R-choices: the frontier, each step allowed now with the score of the world it leads to, best first; time doesn't move
+(john-begin)
+(enter "create Box planned big. make Box Big no yes. make Box Small no no. make Box Odd no no. create Team. make Team T.
+  action Team pick Box consequence Box planned = yes. rule Team pick is Box planned = no.
+  goal Team g try for every all Box do each planned = yes.
+  heuristic Team g 10 maximize (select all Box by which planned = yes and which big = yes) size.")
+(expect "choices: best first, ties as john-children gives them" (enter "choices T g.")
+	'("T pick Big  score 10" "T pick Small  score 0" "T pick Odd  score 0" "choices: 3."))
+(expect "choices moves no time" (enter "time.") '("0"))
+(enter "T do pick Big. T do pick Small. T do pick Odd.")
+(expect "no step allowed" (enter "choices T g.") '("choices: 0."))
+
 (if ok (println "john session ok") (exit 1))

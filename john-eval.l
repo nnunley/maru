@@ -284,6 +284,9 @@
 ;; (a single element on the right is a list of one, G8)
 (define-selector john-number (v) (john-fail "not a number: " (john-text v)))
 (define-method john-number <long> () self)
+(define-selector john-summand (v o) (john-fail "total: " o " gives " (john-text v) ", not a number"))	; a term of total, for member o
+(define-method john-summand <long> (o) self)
+(define-method john-summand <double> (o) self)
 (define-selector john-as-list (v) (list v))
 (define-method john-as-list <pair> () self)
 (define-method john-as-list <undefined> () ())
@@ -332,6 +335,10 @@
 					  (or xs (john-fail "one-from: nothing to choose from"))
 					  (car xs)))
 		      ((= op 'all) (if (cddr x) (john-fail "all with property values is not read yet") (john-instances (cadr x))))
+		      ((= op 'total) (let ((n 0))	; ours: the sum of E over S's members, each read as which
+				       (list-do o (john-elements (john-eval (cadr x) w env))
+					 (set n (+ n (john-summand (john-eval (caddr x) w (cons (cons 'which o) env)) o))))
+				       n))
 		      ((= op 'select) (let ((out ()))
 					(list-do o (john-instances (cadr x))
 					  (and (john-true? (john-eval (caddr x) w (cons (cons 'which o) env))) (push out o)))
@@ -393,6 +400,15 @@
     (list-do w ws (let ((v (john-score w o g))) (and (or (not top) (> v top)) (set top v))))
     (list-do w ws (and (= top (john-score w o g)) (push out w)))
     (list-reverse! out)))
+;; ours: the frontier, every step o may take now toward g, each with the score of the world it leads to; best first, and
+;; steps of one score in the order john-children gives them
+(define-function john-choices (o g)
+  (let ((out ()))
+    (list-do w (john-children *john-world* (list o) (john-using *john-world* o g ()))
+      (let ((c (cons w (john-score w o g))) (before ()) (after out))
+	(while (and after (>= (cdar after) (cdr c))) (push before (car after)) (set after (cdr after)))
+	(set out (concat-list (list-reverse! before) (cons c after)))))
+    out))
 (define-function john-opponent (o)	; o's opponent in a two-player-game, or ()
   (let ((ps (cdr (assq 'two-player-game *john-options*))))
     (and ps (member? o ps) (if (= o (car ps)) (cadr ps) (car ps)))))
@@ -549,6 +565,9 @@
 					  (john-set-text (john-eval (cadr s) *john-world* ())))
 					 (else (john-text (john-eval (cadr s) *john-world* ()))))))
 	  ((= op 'is) (john-say (john-text (john-eval (cadr s) *john-world* ()))))	; the memos' is ... ?
+	  ((= op 'choices) (let ((cs (john-choices (cadr s) (caddr s))))
+			     (list-do c cs (john-say (concat-strings (john-step-text (<john-world>-action (car c))) "  score " (john-text (cdr c)))))
+			     (john-say (concat-strings "choices: " (long->string (list-length cs)) "."))))
 	  ((= op 'at-time) (john-at-time-query (john-eval (cadr s) *john-world* ()) (caddr s)))
 	  ((= op 'do) (john-do (cadr s) (caddr s) (map (lambda (a) (john-eval a *john-world* ())) (cdddr s))))
 	  (else (john-fail "statement not read yet: " op)))))
