@@ -103,8 +103,7 @@ Timed each stage of today's check; the numbers are the Baseline above.
 
 - [ ] **Step 1: Write the failing tests** in `check/erosion.l`, every fixture by forms: CC 1, 2, 4 and 3 for a line, an if, a
   cond and an `and`; forms 3 for `(define-function f (x) (g x))` (the definition, its parameter list, the call) and 1 for
-  `(define x '(a (b c)))` (the quote's lists aren't forms; the quote form itself is one: `(quote ...)` is read as a list, so
-  2 with it; state which and assert it); erosion 0 at CC 10 and all of it at 11; each verbose rule's example flagged and its
+  `(define x '(a (b c)))` (a quoted datum, its `(quote ...)` included, is data, not a form); erosion 0 at CC 10 and all of it at 11; each verbose rule's example flagged and its
   plain form not; a clone at exactly 12 atoms and none at 11; a finding inside a clone covering its forms once; the ledger's
   sums; rest parameters and quasiquote as before.
 - [ ] **Step 2:** Run `make check CHECKS=erosion`; expected: fails on `<callable>-forms`.
