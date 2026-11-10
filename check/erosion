@@ -1,3 +1,2 @@
-erosion 406 the tree as first measured, 2026-11-08: Maru's .l and .k files in the lines check's set, eight that don't read whole aside
-verbosity 75 the tree as first measured, 2026-11-08, the same files
-erosion -8 a quasiquoted template's decisions belong to the code it makes, not to the callable (review), so forms that write code erode less
+erosion 396 the tree measured in forms, not lines (2026-11-10): a callable's mass is CC x sqrt(forms), forms read by Maru's own reader; eight files that don't read whole aside
+verbosity 77 the tree measured in forms (2026-11-10): the share of forms a verbose pattern flags or a clone covers, each counted once
