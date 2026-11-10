@@ -103,20 +103,24 @@
 (define-structure <ks-glyph> (font glyph scale x y paint))
 
 ;; a text box's letter boxes (its contents, ksworld-pp.l's ks-letter-contents) as characters, each knowing its font,
-;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts
+;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts.  A box in the text
+;; that isn't a letter keeps its place in the count, so a selection's gaps still count the contents, but isn't laid out:
+;; it stays where its own transformation puts it, and the letters after it don't make room for it.
 (define-function ks-letter-chars (letters)
   (let ((out ()) (index 0) (font-of ()) (fonts ()) (size 0) (paint ()))
     (list-do l letters
-      (let ((f (ks-slot l 'font)))
-	(unless (= f font-of)
-	  (let ()	; a span's font keeps what the document wrote as entries under its keywords
-	    (set font-of f)
-	    (set fonts (ks-fonts (string->symbol (ks-attr f ':family)) (string->long (ks-attr f ':style))))
-	    (set size (string->double (ks-attr f ':size)))
-	    (set paint (ks-span-paint (ks-attr f ':fill)))))
-	(let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
-	  (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
-	  (set index (+ index 1)))))
+      (if (not (ks-slot l 'unicode))
+	  (set index (+ index 1))
+	(let ((f (ks-slot l 'font)))
+	  (unless (= f font-of)
+	    (let ()	; a span's font keeps what the document wrote as entries under its keywords
+	      (set font-of f)
+	      (set fonts (ks-fonts (string->symbol (ks-attr f ':family)) (string->long (ks-attr f ':style))))
+	      (set size (string->double (ks-attr f ':size)))
+	      (set paint (ks-span-paint (ks-attr f ':fill)))))
+	  (let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
+	    (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
+	    (set index (+ index 1))))))
     (list-reverse! out)))
 
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
