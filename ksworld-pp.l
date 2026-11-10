@@ -272,17 +272,35 @@
 ;; ... :style ... :fill ...)); reading them gives each character a letter box, as KSBox>>beCharacter made one: its unicode,
 ;; its font (the span's, shared by its letters) and its container.  Layout places them (ksworld-text.l).
 (define-function ks-spans? (box) (and (ks-attr box ':__spans__) 't))	; the spans a document kept, until letters are made
+(define-function ks-letter (box code font)	; a letter box in box, as KSBox>>beCharacter makes one
+  (ks-new-object 'KSBox 0 ()
+		 (list (cons 'container box) (cons 'unicode code) (cons 'font font)
+		       (cons 'transformation ()) (cons 'extent ()) (cons 'bounds ()))
+		 () 0))
 (define-function ks-letter-contents (box)
   (let ((letters ()))
     (list-do s (ks-attr box ':__spans__)
       (let ((font (ks-new-object 'KSFont 0 (cdr s) () () 0)) (text (ks-plist-get (cdr s) ':data)))
-	(for (i 0 (string-length text))
-	  (push letters (ks-new-object 'KSBox 0 ()
-			     (list (cons 'container box) (cons 'unicode (string-at text i)) (cons 'font font)
-				   (cons 'transformation ()) (cons 'extent ()) (cons 'bounds ()))
-			     () 0)))))
+	(for (i 0 (string-length text)) (push letters (ks-letter box (string-at text i) font)))))
     (ks-set-attr box ':__spans__ ())
     (ks-set-slot box 'contents (ks-new-object 'KSContentsCollection 0 () () (list-reverse! letters) 0))))
+
+;; a text box's text, its letters' characters; and set, as KSBox>>textContentsOpt sets it, the Smalltalk textContents:
+;; ksworld/ doesn't keep: its contents replaced by a letter for each character, in its first letter's font (a box with no
+;; letters has no font to set text in)
+(define-function ks-text-letters (box)
+  (let ((out ()))
+    (list-do l (ks-items (ks-val box 'contents))
+      (let ((u (ks-slot l 'unicode))) (and (long? u) (< 0 u) (push out l))))
+    (list-reverse! out)))
+(define-function ks-text-contents (box)
+  (list->string (map (lambda (l) (ks-slot l 'unicode)) (ks-text-letters box))))
+(define-function ks-set-text-contents (box text)
+  (let ((first (car (ks-text-letters box))) (letters ()))
+    (or first (error "KSWorld: textContents: a box with no letters has no font to set its text in"))
+    (for (i 0 (string-length text)) (push letters (ks-letter box (string-at text i) (ks-slot first 'font))))
+    (ks-set-val box 'contents (ks-new-object 'KSContentsCollection 0 () () (list-reverse! letters) 0))
+    text))
 
 (define-function ks-pp-sub (rest tag)	; an entry's (tag ...) part
   (let ((f ())) (list-do sub rest (and (pair? sub) (= tag (car sub)) (not f) (set f sub))) f))
