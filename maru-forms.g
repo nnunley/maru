@@ -1,11 +1,13 @@
 # maru-forms.g -- one walk over a form as Maru's reader made it (erosion.l), each list entered once and decided by its head.
 # A list answers (cc forms flag): its cyclomatic complexity (McCabe: one for each decision, each cond clause but an else,
-# each and or or operand past the first), how many forms it holds (lists outside quoted data, itself among them), and the
-# verbose pattern it matches, if any (forms-list records that in the parser's flags, by the list).  A pattern ends with !.,
-# the list's end, so a longer list goes on to the general alternatives.  Quoted data is no form
-# and no code; a quasiquote, unquote or unquote-splicing is the reader's syntax, so it's no form either, though the lists
-# under it are.  A template's decisions belong to the code it makes, an unquoted part's to the callable.  The variables the
-# form binds (parameters, lets, loop variables) are added to binders as they're met, for erosion.l's clone renaming.
+# each and or or operand past the first), how many forms it holds (pairs outside quoted data, itself among them), and the
+# verbose pattern it matches, if any (forms-list records that in the parser's flags, by the list).  () is NIL, an atom
+# (McCarthy's atom[NIL], Maru's pair?), so a form is a pair; input.l lets a list pattern enter () as an empty list, hence
+# each pair? test.  A pattern ends with !., the list's end, so a longer list goes on to the general alternatives.  Quoted
+# data is no form and no code; a quasiquote, unquote or unquote-splicing is the reader's syntax, so it's no form either,
+# though the lists under it are.  A template's decisions belong to the code it makes, an unquoted part's to the callable.
+# The variables the form binds (parameters, lets, loop variables) are added to binders as they're met, for erosion.l's
+# clone renaming.
 <maru-forms> : <source-parser> (binders flags)
 form		= &.:x &-> (pair? x) `( inner:r )		-> (forms-list self x r)
 		| .						-> *forms-none* ;

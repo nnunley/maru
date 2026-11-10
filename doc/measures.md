@@ -17,7 +17,8 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   verbosity (Orlanski et al., NeurIPS 2026), per mille, counted in forms, over Maru's `.l` and `.k` files in the `lines` check's set,
   held to `check/erosion`'s ledger as `lines` is to `check/lines`: each metric equals the sum of its entries (`erosion-ledger.g`), so
   a rise or a fall is written down with its reason. A form is a list outside quoted data (a quoted datum, its `(quote ...)` too, is
-  none, and so is `()`; a backquote or comma is the reader's syntax, though the lists under it are forms). Erosion is the share of
+  none; `()` is NIL, an atom, as in McCarthy's paper and Maru's `pair?`, though a tpeg list pattern enters it as an empty
+  list, so a form is a pair; a backquote or comma is the reader's syntax, though the lists under it are forms). Erosion is the share of
   complexity mass, CC x sqrt(forms), held by callables of CC over 10, each a definition `source.l` reads from the file
   (`source-lift.g`, [Sources](source.md)), one inside a `(let () ...)` on its own, nested lambdas counted in it; verbosity the share
   of forms a verbose pattern flags or a clone covers, each counted once, a clone being a list of at least 12 atoms met twice once

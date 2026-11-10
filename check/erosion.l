@@ -42,7 +42,7 @@
 	  (list (<callable>-forms c) (<callable>-line c)))
 	'(3 2))
 
-(expect "() is no form" (forms-of "(define-function f () (g () 1))") 2)
+(expect "() is NIL, an atom, not a form" (forms-of "(define-function f () (g () 1))") 2)
 (expect "a let with no bindings and two body forms is three forms, not the empty-let pattern"
 	(list (forms-of "(define-function f () (let () (g) (h)))") (flagged "(let () (g) (h))")) '(4 ()))
 (expect "an if longer than a pattern is no pattern" (flagged "(if c 't () x)") ())
