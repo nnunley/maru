@@ -125,15 +125,17 @@ After `make check` writes a results file, and unless `MARU_RECORD` is `0`, every
 run passed or failed, and none for any other case. A run with `complete` true and every outcome passed MUST also add
 `WholeSuite do observed passed(tree: "T").` to every plan that declares the measure `WholeSuite`. [R-run-records]
 Measures, grammars and laws are not cases of `check/check.l`; `notes/plan/record` still asks them, and MUST NOT run a
-`Case` whose current answer the ledger already holds.
+`Case` whose current answer the ledger already holds. A `make check` that a probe runs sets `MARU_RECORD=0`, since
+`record` writes that probe's answer itself.
 
 ```maru-check @R-run-records
 plan_record
 ```
 
 Each ledger MUST be marked `merge=union` in `.gitattributes`. [R-ledger-union]
-Lanes append to the same ledgers on different branches; a union merge keeps every lane's events, and an event's order
-only matters within one run, which one branch holds.
+Lanes append to the same ledgers on different branches; a union merge keeps every lane's events, in an order no branch
+chose. So no quality a plan defines MAY depend on which of two answers comes later in a ledger: each reads the set of
+answers recorded (through `at time`, over the worlds the ledger replays to), never the latest one.
 
 ```maru-check @R-ledger-union
 plan_evidence
@@ -141,9 +143,20 @@ plan_evidence
 
 ### Done, ready and stale
 
-A plan MUST qualify `Check holds` only for an answer that is good and current, and `Capability proven` only when the
-capability shows at least one check and every one holds; `ready` is every `builds-on` done, as `tree-matching.john`
-has them today. [R-done-current]
+A plan MUST qualify a check's states from the set of its answers, as this table gives them, and `Capability proven`
+only when the capability shows at least one check and every one holds; `ready` is every `builds-on` done, as
+`tree-matching.john` has it today. [R-done-current]
+
+| State | The check's answers |
+|---|---|
+| `holds` | some answer for the current tree is good, and none for the current tree isn't |
+| `failing` | some answer for the current tree is neither good nor untested |
+| `regressed` | `failing`, and some answer for another tree is good |
+| `stale` | no answer for the current tree, and some answer for another tree is good |
+| `untested` | no answers |
+
+Answers for one tree are about the same code wherever they were recorded, so a check both good and not good on one tree
+is flaky: it is `failing`, never `holds`.
 
 ```maru-check @R-done-current
 plan_frontier
@@ -182,10 +195,10 @@ size`, and weighs it. Every plan MUST define these four, and MAY add others: [R-
 
 | Quality | Holds when one of the capability's checks… | Weight |
 |---|---|---|
-| `regressing` | is `regressed` (an earlier answer was good, the latest isn't) | 10000 |
-| `failing` | has a latest answer that is neither good nor untested | 1000 |
-| `aging` | holds only about older code (`stale`) | 100 |
-| `untried` | has never answered (`untested`) | 10 |
+| `regressing` | is `regressed` | 10000 |
+| `failing` | is `failing` and not `regressed` | 1000 |
+| `aging` | is `stale` | 100 |
+| `untried` | is `untested` | 10 |
 
 Regressions come first because they break what was done; then what is known to fail, whose cause is closest at hand;
 then what passed once and only needs confirming; then what nobody has tried. A plan changes the order by changing a
@@ -197,12 +210,15 @@ plan_frontier
 
 ### Erosion
 
-Every plan MUST minimize erosion. The plan's `Measure` `Erosion` runs `erosion-run.l` over the `lines` check's files,
-and its answer, recorded like any other, names the code it measured and every hotspot in it; replaying the ledger
-makes each hotspot of the current code an object of class `Hotspot` (`callable`, `file`, `cc`, `mass`). A plan MUST
-declare `action Team simplify Hotspot consequence Hotspot planned = yes.`, allowed only for a hotspot not yet planned,
-and MUST carry
-`heuristic Team deliver W minimize total (select all Hotspot by which planned = no) by which mass.`
+Every plan MUST minimize erosion. Recording the plan's `Measure` `Erosion` runs `erosion-run.l --hotspots` over the
+`lines` check's files, which prints every callable over CC 10, not only the ten heaviest, since a partial total would
+understate erosion. For each, the ledger gains a declaration
+`make Hotspot H_FILE_LINE "callable" "file" LINE CC MASS "tree" no.`, with FILE's non-alphanumerics as `_` and MASS
+CC x sqrt(SLOC) rounded to a whole number, after the measure's own event. A `make` doesn't move time, so the
+hotspots are facts of the world the ledger replays to. A plan qualifies `Hotspot current` as its tree being the
+current tree's, MUST declare `action Team simplify Hotspot consequence Hotspot planned = yes.`, allowed only for a
+current hotspot not yet planned, and MUST carry
+`heuristic Team deliver W minimize total (select all Hotspot by which planned = no and which current = yes) by which mass.`
 with W its erosion weight. [R-erosion-minimized]
 So `simplify` competes with `build` on the frontier: a step that simplifies a hotspot of mass M scores W x M more than
 one that doesn't. With the default weights a hotspot of mass 1000 weighs as a failing check, and the largest in the
@@ -240,7 +256,7 @@ plan_frontier
 ```
 FUNCTION next(lane) -> List of Choice:
     -- Step 1: the plans are notes/plan/*.john, less the ledgers
-    plans = sort(names of notes/plan/*.john not ending in "-evidence")
+    plans = sort(names of notes/plan/*.john, less "evidence" and any ending in "-evidence")
     IF lane NOT IN plans: FAIL E_UNKNOWN_LANE
     -- Step 2: the lane first, then the others by name
     out = []
