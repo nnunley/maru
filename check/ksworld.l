@@ -105,6 +105,15 @@
 	  (cadddr path)
 	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
 
+;; a box whose clipping is on draws what it holds only inside its bounds, as KSBox>>drawOn: clips by drawingBounds: here
+;; a 30@20 box at 100@50 holding a square scaled past its bottom edge, and one inside it
+(let* ((paths (drawn "check/ksworld/clip.pp" 200 150)) (cut (car paths)) (xs ()) (ys ()) (fs (cadddr cut)))
+  (while fs (push xs (car fs)) (push ys (cadr fs)) (set fs (cddr fs)))
+  (expect "what crosses the clip is given clipped, as placed in the image" (car cut) '(1.0 0.0 0.0 1.0 0.0 0.0))
+  (expect "and lies inside the box: x from 105 to 125, y from 57 to the box's bottom at 70"
+	  (list (apply min xs) (apply max xs) (apply min ys) (apply max ys)) '(105.0 125.0 57.0 70.0))
+  (expect "what lies inside the clip is given as the shape holds it" (car (cadr paths)) '(1.0 0.0 0.0 1.0 105.0 50.0)))
+
 ;; a collection a document saved with nil and false elements keeps them, each in its place
 (expect "nil and false elements are elements, of a Maru array" (array->list (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
 (expect "Color's class and its colours answer apart"

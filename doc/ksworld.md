@@ -37,6 +37,13 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
   a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
+  A box whose `clipping` is true draws its shape, text and children only inside its extent, as `KSBox>>drawOn:` clips its
+  canvas by `drawingBounds` (the rectangle around the extent's corners as placed in the image, met with any clip above
+  it). Gezira clips only to the image, so a path that crosses the clip is placed in the image and clipped in Maru by
+  Gezira's own `ClipBeziers` (`gezira/nile/gezira.nl`): a curve inside passes, one wholly to one side is clamped onto the
+  edge, any other is split at its middle. That path goes to Gezira with the identity matrix; a path inside the clip goes
+  as before. The check's fixture `check/ksworld/clip.pp` is a 30@20 clipping box at 100@50 holding a square scaled past
+  its bottom edge, given clipped to x 105 to 125 and y 57 to 70, and a square inside it, given as the shape holds it.
   `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
   quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
   KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,
