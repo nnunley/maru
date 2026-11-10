@@ -52,7 +52,10 @@ raw forms". Background: `docs/plans/2026-11-08-erosion-metrics.md` (the metrics)
    answers its sources, the rest is one opaque `<source>` that counts its lines and defines nothing.
 3. A data form of tens of thousands of atoms (`fonts.k`): tokenizing and the walk loop along spines, never a frame per
    element.
-4. A definition made by an action or by `eval` of a built form: no source, and asking for one answers `()`, not an error.
+4. What erosion measures is the `lines` set's files, never what loading touched: a derived file (`*.g.l`) or one outside the set
+   that a load reads defines things with sources, and none of it is counted; and a form that defines several things (a
+   form expanding to several `define`s, a grammar whose rules become methods) has its lines counted once, not once per
+   definition.
 5. Symbols as `eval.c` reads them (`<pair>`, `*globals*`, `%eax`, `$rule`, `.long`, `a,b`): the tokens rebuild the same forms.
 
 ---
@@ -121,7 +124,7 @@ raw forms". Background: `docs/plans/2026-11-08-erosion-metrics.md` (the metrics)
   `(source-form f)` is `equal` to the fixture's raw `(define-function f …)`; `(line-count <foo>)` and `(source-text <foo>)`;
   `(map line-count (sources s))` has three entries (the selector, two methods); re-reading `(source-text x)` through
   `tokens-forms` gives `(source-form x)` for each; `(parse-source <tok-kinds> $all (source-of f))` walks its tokens;
-  `(source-of (eval '(lambda (x) x)))` is `()`; defining `f` again makes `(source-form f)` the second definition.
+  defining `f` again makes `(source-form f)` the second definition.
 - [ ] **Step 2:** Run `./eval check/source.l`; expected: fails, `source.l` not found.
 - [ ] **Step 3:** Add `*load-hook*` to `load` in both boots (`(define *load-hook* ())`; after `(pval expr)`,
   `(and *load-hook* (*load-hook* name expr value))`); write `source.l`: the hook records a `<source>` for a top-level form
@@ -143,12 +146,15 @@ raw forms". Background: `docs/plans/2026-11-08-erosion-metrics.md` (the metrics)
 - Consumes: Task 1 (`tokens-forms`), Task 2 (`<source>`, the selectors).
 - Produces: `(define-structure <definition> (kind name type params source))`; `(source-file path)` → `<source-file>`, read
   without evaluating; `(file-definitions path)` → the `<definition>`s its forms define (head-dispatched: one rule per definer,
-  nested `(let () …)` bodies entered), each answering Task 2's selectors; a file whose reading stops partway answers its read
+  nested `(let () …)` bodies entered), each answering Task 2's selectors (this, not loading, is erosion's route: the files it measures run programs, conflict
+  and need particular evaluators, so it reads them; loading answers the same selectors, which the tests hold equal); a
+  file whose reading stops partway answers its read
   definitions and one opaque `<source>` for the rest (lines counted, no definition).
 
 - [ ] **Step 1: Write the failing tests:** for `check/source/defs.l`, `(file-definitions …)` names `f g s <foo>` and the
   grammar, with the same line counts Task 2's loaded objects answer; for `test-pepsi.l`, the definitions before its grammar
-  block and an opaque remainder whose line count is the rest's; for `compile.l`, a refusal naming the line it can't read
+  block and an opaque remainder whose line count is the rest's; a form defining two functions is counted once in the
+  file's lines; for `compile.l`, a refusal naming the line it can't read
   past.
 - [ ] **Step 2:** Run; expected: fails, `file-definitions` undefined.
 - [ ] **Step 3:** Implement `source-lift.g` and `file-definitions` in `source.l`.
