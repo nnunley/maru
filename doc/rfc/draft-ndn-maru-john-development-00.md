@@ -406,7 +406,8 @@ SAT encoding; the frontier gives several agents work without changing that. Exte
 **CBOR serialization.** A second encoding of the same chain, CBOR (RFC 8949), whose definite-length items let a
 reader skip a world without reading it, and which is smaller. Extension point: `john-serialize` writes forms whose
 shapes (lists, names, numbers, strings, a tagged value with fields) map one to one onto CBOR arrays, text and tags; a
-`.answers.cbor` made from the text ledger, untracked, would serve as a cache, the text staying what git merges.
+`.answers.cbor` made from the text ledger, untracked, would serve as a cache. Tracking the CBOR instead takes a
+`textconv` diff and a merge driver in `.gitattributes`, configured in every clone (by `make`, say).
 
 **Cross-plan dependencies.** A capability in one plan building on one in another. Extension point: a `builds-on` naming
 `PLAN:Capability`, read by `next.l`.
@@ -429,8 +430,11 @@ than Maru's reader, and a ledger is data, which needs none of JOHN's syntax. A f
 own sake.
 
 **Why not a binary format such as CBOR, or a LevelDB-like store, as the ledger?** The cost was parsing JOHN, not
-text: Maru's reader reads a ledger in milliseconds. A binary ledger can't be merged line by line by git
-(`merge=union`), and a person can't read its diff. What LevelDB offers, an append-only log with one entry per key, is
+text: Maru's reader reads a ledger in milliseconds. Git can diff and merge a binary ledger through `.gitattributes`
+(`diff=` with a `textconv` command that decodes it, `merge=` with a driver that decodes both sides, takes their union,
+dedupes and encodes), but those drivers are set in each clone's own git configuration, not in the repository, and run
+Maru; a clone without them, or a merge made on a forge's server, sees conflicting binary files. `merge=union` is built
+into git and needs nothing. What LevelDB offers, an append-only log with one entry per key, is
 what appending and deduplicating give. A CBOR encoding beside the text remains open (see Out of Scope).
 
 **Why not drop answers no state reads?** Keeping per check only the current tree's answers and one good answer about
