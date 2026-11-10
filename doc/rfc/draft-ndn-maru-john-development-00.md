@@ -41,8 +41,9 @@ when, and only when, they appear in all capitals, as shown here.
 
 - **plan** — a JOHN program `notes/plan/NAME.john` with a `Team` object `T`, a class `Capability`, an action
   `build Capability` and a goal `deliver`, as `tree-matching.john` has today.
-- **ledger** — a plan's evidence file, `notes/plan/NAME.answers`: one Maru form per line, each an answer a check gave
-  about some code, or a hotspot of some code.
+- **ledger** — a plan's evidence file, `notes/plan/NAME.answers`: a serialized JOHN chain of worlds, one Maru form per
+  line, each a world (the action that made it and what it wrote) or a declaration.
+- **history** — what a property of an object was at each time of the chain: its writes, in order of time.
 - **check** — an instance of the plan's `Check` group: a `Case` (a case in `check/check.l`), a `Measure`, a `Grammar`
   or a `Law`.
 - **current** — said of an answer whose `tree` is the hash `notes/plan/tree-hash` gives for the code as it stands.
@@ -57,9 +58,10 @@ when, and only when, they appear in all capitals, as shown here.
 ## Specification
 
 This document defines: the results file and how `make check` writes it; how a run's results become evidence in every
-ledger; what "done" and "ready" require of evidence; the `choices` statement and the frontier it answers; how a plan
+ledger; how a JOHN chain of worlds is written and read back, with each property's history; what "done" and "ready"
+require of evidence; the `choices` statement and the frontier it answers; how a plan
 scores steps from its evidence; how a plan minimizes erosion; `total`; lanes and overflow in `next.l`; and the rule that keeps plans naming real cases. It
-does NOT define JOHN's semantics beyond `choices` (owned by `draft-ndn-maru-john-session-00` and `doc/john.md`), the
+does NOT define JOHN's semantics beyond `choices`, `over time` and serialization (owned by `draft-ndn-maru-john-session-00` and `doc/john.md`), the
 evidence values a law can answer (owned by `check/law.l` and `plan_evidence`), or coordination between agents beyond
 what the frontier's order gives (see Out of Scope).
 
@@ -84,18 +86,19 @@ RECORD Outcome:
     case     : String               -- the case's name in check/check.l
     passed   : Boolean
 
-RECORD Answer:                      -- a ledger line: (CHECK KIND (FIELD VALUE) ...)
-    check    : Symbol               -- the check's name in the plan
-    kind     : Symbol               -- a member of the plan's Evidence set: passed, failed, tested ...
-    fields   : List of (Symbol, Value)  -- the member's fields, tree first: (tree "504c17079996") (trials 100)
+RECORD WorldLine:                   -- a ledger line: (world (ACTOR ACTION ARG...) ((OBJECT PROPERTY VALUE) ...))
+    action   : List                 -- the step that made the world: tree_lists observed (value passed (tree "T"))
+    writes   : List of (Symbol, Symbol, Value)   -- every write the action made, in the order it made them
 
-RECORD HotspotLine:                 -- a ledger line: (hotspot "callable" "file" LINE CC MASS (tree "T"))
-    callable : String
-    file     : String
-    line     : Integer
-    cc       : Integer
-    mass     : Integer              -- CC x sqrt(SLOC), rounded
-    tree     : String
+RECORD MakeLine:                    -- a ledger line: (make CLASS NAME VALUE ...), a declaration; it moves no time
+    class    : Symbol
+    name     : Symbol
+    values   : List of Value        -- the class's properties, in order
+
+ENUM ValueForm:                     -- how a JOHN value is written in a ledger
+    atom                            -- a name, a number or a string, as Maru's reader reads it
+    list                            -- (list V ...)
+    fields                          -- (value KIND (FIELD V) ...): passed(tree: "T") is (value passed (tree "T"))
 
 RECORD Choice:                      -- one entry of a frontier
     plan     : String               -- the plan's NAME
@@ -133,10 +136,12 @@ A result is evidence about the code it ran against, so a run whose code changed 
 check_results
 ```
 
-After `make check` writes a results file, and unless `MARU_RECORD` is `0`, every plan's ledger MUST gain one answer
-`(C passed (tree "T"))` or `(C failed (tree "T"))` for each `Case` C the plan declares that the run passed or failed,
-and none for any other case. A run with `complete` true and every outcome passed MUST also add
-`(WholeSuite passed (tree "T"))` to every plan that declares the measure `WholeSuite`. [R-run-records]
+After `make check` writes a results file, and unless `MARU_RECORD` is `0`, every plan's ledger MUST gain one world
+for each `Case` C the plan declares that the run passed or failed, and none for any other case: the world the step
+`C observed passed(tree: "T")` (or `failed`) makes, with the writes the plan's `observed` action gives it, so
+`(world (C observed (value passed (tree "T"))) ((C evidence (value passed (tree "T")))))`. A run with `complete` true
+and every outcome passed MUST also add the world of `WholeSuite observed passed(tree: "T")` to every plan that declares
+the measure `WholeSuite`. Worlds are appended in the order the run's outcomes finished. [R-run-records]
 Measures, grammars and laws are not cases of `check/check.l`; `notes/plan/record` still asks them, and MUST NOT run a
 `Case` whose current answer the ledger already holds. A `make check` that a probe runs sets `MARU_RECORD=0`, since
 `record` writes that probe's answer itself.
@@ -146,45 +151,60 @@ plan_record
 ```
 
 Each ledger MUST be marked `merge=union` in `.gitattributes`. [R-ledger-union]
-Lanes append to the same ledgers on different branches; a union merge keeps every lane's answers, in an order no branch
-chose. So no quality a plan defines MAY depend on which of two answers comes later in a ledger: each reads the set of
-answers recorded, never the latest one.
+Lanes append to the same ledgers on different branches. A branch is a world sprouted from main's, and a merge is its
+commit (Warth's worlds, 2011, §2.2), which is safe when nothing the branch wrote depended on what it read: recording an
+answer reads no earlier answer, so lanes' worlds commute. A union merge keeps each side's lines in their order, so
+times relative to others of the same lane stay right; between lanes, which ran at once, no order was ever defined. So
+no quality a plan defines MAY depend on the order of two answers recorded by different lanes; the states below read the
+set of answers.
 
 ```maru-check @R-ledger-union
 plan_evidence
 ```
 
-A ledger MUST be read by Maru's reader (`read`), never by `john.g`. Reading a plan MUST give each check a property
-`answers`, the list of its answers as the plan's `Evidence` values (`(C tested (tree "T") (trials 100))` is
-`tested(tree: "T", trials: 100)`), and each hotspot line a `Hotspot` object, all in world 0: answers are facts, not
-actions, so reading them moves no time. A line that isn't an answer or a hotspot, an answer naming a check or a kind the
-plan doesn't declare, or one missing a field its kind declares, MUST fail naming the ledger and the line.
-[R-ledger-forms]
-A ledger grows with every run, and it is read whenever anyone asks what's next. At the time of writing `john.g` reads
-about 13 ms a line, twice (a relation can be used before its `rel-qualify`), so a ledger of 1380 answers took 41 s to
-read; Maru's reader reads 19,800 such lines in 0.08 s. And since no state reads the order of answers, a step per answer
-would build a chain of worlds that nothing walks.
+A session MUST be able to write its chain of worlds, from world 1 to the current world, as ledger lines
+(`john-serialize`), and to read such lines back (`john-deserialize`) into worlds whose writes are the lines' own,
+evaluating nothing: an action's consequence is what it wrote then, and a plan edited since doesn't rewrite its past.
+A ledger MUST be read by Maru's reader (`read`), never by `john.g`. A world's time is its position in the chain read
+back, never a number stored in it, so a merge can't make two worlds claim one time. `make` lines are declarations,
+entered in world 0 before the worlds, as a session enters them. The possible worlds past the current one are not
+written: search makes them again, as RN-2008-003 has it. A line that is neither form, or that names an object, action,
+property or kind the plan doesn't declare, MUST fail naming the ledger and the line. [R-ledger-forms]
+A ledger grows with every run and is read whenever anyone asks what's next. At the time of writing `john.g` reads about
+13 ms a line, twice (a relation can be used before its `rel-qualify`), so a ledger of 1380 events took 41 s to read;
+Maru's reader reads 19,800 lines of the same events in 0.08 s.
 
 ```maru-check @R-ledger-forms
+john_session
 plan_evidence
 ```
 
-Recording MUST compact the ledger it writes: for each check it keeps every distinct answer about the current tree and,
-of its good answers about other trees, only the last in the ledger; of hotspots, only the current tree's. Two lines
-that read as the same form are one answer. Every state in the table below MUST be the same for the current tree, and
-for any tree no ledger line names, read from the compacted ledger as from the whole one. [R-ledger-compact]
-So a ledger holds about two lines a check, whatever the number of runs. Which good answer about older code is kept
-doesn't change any state, since a state asks only whether there is one. What compaction loses is answers about a tree
-other than the current one: if the code returns to exactly such a tree, a check that held there reads as `stale` and
-is asked again.
+Reading a chain back MUST also give each object's property its history, so that reading a property at any time of the
+chain finds the write in force then without walking the worlds between (a search of the history, logarithmic in its
+length), and so that `E over time`, with E a property read `X p`, answers the distinct values X's p has held from world
+0 to the current time, in the order each first appeared, from the history alone. [R-history-index]
+A world holds only its own writes and finds the rest through its parent (RN-2008-003 §4), which is right for search,
+where chains are short, and slow for a ledger thousands of worlds long: each read of a property written early walks
+them all. A history per property is Reed's object history (1978, §3.3), a function from time to version; the chain
+keeps its single time, and each property its own points of change.
 
-```maru-check @R-ledger-compact
+```maru-check @R-history-index
+john_session
+plan_evidence
+```
+
+Recording MUST drop a world whose action and writes equal those of a world earlier in the ledger, and a `make` line
+equal to an earlier one, keeping the first; nothing else is dropped. [R-ledger-dedupe]
+The same answer about the same code, recorded on two branches, is one event, and Elephant's journal is "virtual": what
+is never referred to need not be kept. A later world moves to an earlier time, and the order of the rest stays.
+
+```maru-check @R-ledger-dedupe
 plan_record
 ```
 
 ### Done, ready and stale
 
-A plan MUST qualify a check's states from the set of its answers, as this table gives them, and `Capability proven`
+A plan MUST qualify a check's states from the set of its answers, `its evidence over time`, as this table gives them, and `Capability proven`
 only when the capability shows at least one check and every one holds; `ready` is every `builds-on` done, as
 `tree-matching.john` has it today. [R-done-current]
 
@@ -254,9 +274,9 @@ plan_frontier
 Every plan MUST minimize erosion. Recording the plan's `Measure` `Erosion` runs `erosion-run.l --hotspots` over the
 `lines` check's files, which prints every callable over CC 10, not only the ten heaviest, since a partial total would
 understate erosion. For each, the ledger gains a line
-`(hotspot "callable" "file" LINE CC MASS (tree "T"))`, with MASS CC x sqrt(SLOC) rounded to a whole number, after the
-measure's own answer. Reading the plan makes each a `Hotspot` named `H_FILE_LINE` (FILE's non-alphanumerics as `_`),
-with `planned` no, in world 0. A plan qualifies `Hotspot current` as its tree being the
+`(make Hotspot H_TREE_FILE_LINE "callable" "file" LINE CC MASS "T" no)`, with FILE's non-alphanumerics as `_` and MASS
+CC x sqrt(SLOC) rounded to a whole number, after the measure's own world. A `make` moves no time, so each hotspot is a
+fact of world 0, `planned` no. A plan qualifies `Hotspot current` as its tree being the
 current tree's, MUST declare `action Team simplify Hotspot consequence Hotspot planned = yes.`, allowed only for a
 current hotspot not yet planned, and MUST carry
 `heuristic Team deliver W minimize total (select all Hotspot by which planned = no and which current = yes) by which mass.`
@@ -302,7 +322,7 @@ FUNCTION next(lane) -> List of Choice:
     -- Step 2: the lane first, then the others by name
     out = []
     FOR p IN [lane] + (plans - [lane]):
-        world = read(p.john, with p.answers as world 0's facts, Now = tree-hash)
+        world = john-deserialize(p.answers) after p.john, Now = tree-hash
         out += [Choice(p, step, score) FOR (step, score) IN choices(world, T, deliver)]
     RETURN out    -- empty: "nothing left to build"
 
@@ -339,7 +359,7 @@ plan_evidence
 | `E_UNKNOWN_LANE` | `next.l --lane kworld` | Exit 1 naming the lane and the plans there are |
 | unknown case in a plan | `make Case ksworld_render untested.` | `plan_evidence` fails naming plan and case; fix the plan |
 | `choices` for an unknown object or goal | `choices T delivr.` | The session's error for an unknown name; nothing changes |
-| bad ledger line | `(tree_lists passd (tree "504c17079996"))` | Reading the plan fails naming the ledger and line; fix or drop the line |
+| bad ledger line | `(world (tree_lists observd (value passed (tree "504c17079996"))) ())` | Reading the plan fails naming the ledger and line; fix or drop the line |
 | ledger not writable | a read-only checkout | `make check` reports it and still exits by its cases' outcome |
 
 ## Formal Grammar
@@ -351,17 +371,20 @@ complete-line  = %s"complete " ( %s"yes" / %s"no" ) LF
 outcome-line   = case-name SP ( %s"passed" / %s"failed" ) LF
 case-name      = 1*( %x61-7A / DIGIT / "_" )
 
-ledger-line    = ( answer-line / hotspot-line ) LF
-answer-line    = "(" name SP name *( SP field ) ")"
+ledger-line    = ( world-line / make-line ) LF
+world-line     = %s"(world (" name SP name *( SP value ) ") (" [ write *( SP write ) ] "))"
+write          = "(" name SP name SP value ")"
+make-line      = %s"(make " name SP name *( SP value ) ")"
+value          = string / number / name / list-value / fields-value
+list-value     = %s"(list" *( SP value ) ")"
+fields-value   = %s"(value " name *( SP field ) ")"
 field          = "(" name SP value ")"
-hotspot-line   = %s"(hotspot " string SP string SP 1*DIGIT SP 1*DIGIT SP 1*DIGIT SP tree-field ")"
-tree-field     = %s"(tree " DQUOTE 12HEXDIG DQUOTE ")"
-value          = string / number / name
 string         = DQUOTE *( %x20-21 / %x23-5B / %x5D-7E / "\" ( DQUOTE / "\" / "n" ) ) DQUOTE
 
 total-expr     = %s"total" 1*SP set-expr 1*SP %s"by" 1*SP expr
 set-expr       = %s"all" 1*SP name / "(" expr ")" / name
 expr           = 1*( %x20-7E )   ; a JOHN expression, as john.g reads it
+over-time      = expr 1*SP %s"over" 1*SP %s"time"
 choices-stmt   = %s"choices" 1*SP name 1*SP name "."
 choice-line    = step 2SP %s"score " number LF
 choices-end    = %s"choices: " 1*DIGIT "." LF
@@ -379,6 +402,11 @@ into laneq, and a claim would be a line in the ledger, as `check/john/airline.jo
 
 **Parallel planning.** JOHN planning several steps in one world. JOHN takes one action a step, in its search and in its
 SAT encoding; the frontier gives several agents work without changing that. Extension point: `choices`.
+
+**CBOR serialization.** A second encoding of the same chain, CBOR (RFC 8949), whose definite-length items let a
+reader skip a world without reading it, and which is smaller. Extension point: `john-serialize` writes forms whose
+shapes (lists, names, numbers, strings, a tagged value with fields) map one to one onto CBOR arrays, text and tags; a
+`.answers.cbor` made from the text ledger, untracked, would serve as a cache, the text staying what git merges.
 
 **Cross-plan dependencies.** A capability in one plan building on one in another. Extension point: a `builds-on` naming
 `PLAN:Capability`, read by `next.l`.
@@ -400,13 +428,17 @@ after parsing, would halve the cost and help every JOHN program, but even one pa
 than Maru's reader, and a ledger is data, which needs none of JOHN's syntax. A faster `john.g` is worth doing for its
 own sake.
 
-**Why not a binary format such as CBOR, or a LevelDB-like store?** The cost was parsing JOHN, not text: Maru's reader
-already reads a ledger in milliseconds. A binary ledger can't be merged line by line by git (`merge=union`), and a
-person can't read its diff. What LevelDB offers, an append-only log merged into one entry per key, is what appending
-and compacting already give.
+**Why not a binary format such as CBOR, or a LevelDB-like store, as the ledger?** The cost was parsing JOHN, not
+text: Maru's reader reads a ledger in milliseconds. A binary ledger can't be merged line by line by git
+(`merge=union`), and a person can't read its diff. What LevelDB offers, an append-only log with one entry per key, is
+what appending and deduplicating give. A CBOR encoding beside the text remains open (see Out of Scope).
 
-**Why not keep every answer?** Nothing would be lost, but the ledger would grow by every run of every lane, and no
-state reads what compaction drops.
+**Why not drop answers no state reads?** Keeping per check only the current tree's answers and one good answer about
+older code would hold a ledger to about two lines a check, but would cut the history `at time` and `did` read. Reading
+is cheap enough that every event is kept until size is shown to matter.
+
+**Why not facts in world 0, with no time?** The states read only the set of answers, but history queries (`regressed`
+through `at time`, `observed-within`) need the order a lane recorded them in, which only worlds keep.
 
 **Why not have `make check` run `notes/plan/record`?** `record` asks every check, measures and grammars included, so
 the suite's cases would run twice. Recording from the results file runs nothing.
@@ -423,10 +455,9 @@ steps of the plan, never commands.
 ## Compatibility
 
 `next.l` stops answering `next: notes/plan/record full` and answers the frontier instead; scripts that grep for that
-line change. The ledgers move from `evidence.john` and `NAME-evidence.john` to `NAME.answers`, each existing event
-rewritten once as an answer (`tree_lists do observed passed(tree: "T").` becomes `(tree_lists passed (tree "T"))`)
-and the result compacted. The plans lose their `observed` action and the `at time` readings of history (`regressed`,
-`observed-within`), which read the `answers` list instead. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
+line change. The ledgers move from `evidence.john` and `NAME-evidence.john` to `NAME.answers`: each plan's existing evidence is
+replayed once and its chain written by `john-serialize`. The plans keep their `observed` action and their history
+readings, and their states read `its evidence over time`. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
 committed with the code they're about (`notes/plan/LOOP.md`'s rule). `MARU_RECORD=0` restores the old behavior for a
 run. The existing plans gain the four qualities and their heuristics, and `render.john` its case names corrected.
 `MARU_PLAN` keeps its meaning.
@@ -438,4 +469,8 @@ run. The existing plans gain the four qualities and their heuristics, and `rende
 - `doc/john.md`, `doc/evidence-plan.md`: JOHN and the evidence plan as they stand.
 - `notes/plan/LOOP.md`: the loop's rules.
 - Samimi, H. et al., RN-2008-003, the JOHN memo (`~/pkm`).
+- Warth, A. et al., Worlds: Controlling the Scope of Side Effects, 2011 (`~/pkm/raw/vpri/warth-2011-worlds.txt`).
+- Reed, D. P., Naming and Synchronization in a Decentralized Computer System, 1978 (`~/pkm/raw/vpri/`).
+- McCarthy, J., Elephant 2000, 1990 draft (`~/pkm/raw/mccarthy/`).
+- RFC 8949: CBOR, for the extension in Out of Scope.
 - BCP 14 (RFC 2119, RFC 8174); ABNF (RFC 5234, RFC 7405).
