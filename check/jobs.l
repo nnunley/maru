@@ -1,5 +1,6 @@
 ;;; (run-jobs JOBS DIR ENTRIES): runs each entry, (name . shell command), a few at a time, its output in DIR/name.log, and
-;;; prints that output whole as each ends.  Answers the names of those that failed, and prints the six slowest.
+;;; prints that output whole as each ends.  Answers the names of those that failed, and prints the six slowest; each
+;;; outcome is kept in *jobs-outcomes*.
 (define jobs-fork	(subr "fork" ">i"))
 (define jobs-execl	(subr "execl" "ss.>i"))
 (define jobs-wait4	(subr "wait4" "ipip>i"))
@@ -47,6 +48,8 @@
   (let ((best (car times)))
     (list-do e times (and (> (car e) (car best)) (set best e)))
     best))
+;; each entry's (name . passed?), most recent first, as they ended
+(define *jobs-outcomes* ())
 (define-function run-jobs (limit dir entries)
   (let ((waiting entries) (running ()) (failed ()) (times ()) (lines ()))
     (or (< 0 limit) (set limit 1))
@@ -65,6 +68,7 @@
 	  (push times (cons (+ (jobs-ms rusage_utime) (jobs-ms rusage_stime)) name))
 	  (push lines (jobs-times-line name (- (jobs-time) (cddr found))))
 	  (print (contents-of-file-named (concat-strings dir "/" name ".log")))
+	  (push *jobs-outcomes* (cons name (and (= 0 status) 't)))
 	  (or (= 0 status) (let () (push failed name) (println "FAILED " name " (" dir "/" name ".log)"))))))
     ;; the slowest, in CPU time, as less depends on what else is running than wall time does, though it does: DIR/times has the rest
     (print "slowest (CPU):")

@@ -3,6 +3,7 @@
 ;;; shares this machine).  The run fails if any case does, and each failure is named.
 (require "check/temp.l")
 (require "check/jobs.l")
+(require "check/results.l")
 (define jobs (let ((j (env-var "MARU_CHECK_JOBS"))) (if j (string->long j) 4)))
 
 ;; the names of the cases, read from where they're written, in order
@@ -39,6 +40,7 @@
       (or *requested* known))))
 
 ((subr "system" "s>i") (concat-strings "rm -rf " check-tmp " && mkdir -p " check-tmp))
+(define tree-before (tree-hash-now))
 (define failed
   (run-jobs jobs check-tmp
 	    (map (lambda (name)
@@ -46,6 +48,8 @@
 		   (cons name (concat-strings "unset MARU_LAW_SEED MARU_LAW_TRIALS; MARU_CHECK_TMP=" check-tmp "/" name
 					      " exec ./eval check/check.l " name)))
 		 names)))
+;; what the evidence is made from: complete only when every case was asked for
+(results-write check-tmp tree-before (tree-hash-now) (not *requested*) (list-reverse! *jobs-outcomes*))
 (if failed
     (let ()
       (println "failed: " failed)

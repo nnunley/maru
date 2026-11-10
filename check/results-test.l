@@ -1,0 +1,22 @@
+;;; check/results.l: what a run of check/parallel.l leaves for the evidence, and nothing when its code changed under it.
+(require "check/results.l")
+(require "recover.l")
+(define-function expect (what ok) (or ok (let () (println "FAIL " what) (exit 1))))
+(define dir (concat-string check-tmp "/results-test"))
+(define file (concat-string dir "/results"))
+(define system (subr "system" "s>i"))
+(system (concat-strings "rm -rf " dir " && mkdir -p " dir))
+(define outcomes '(("unmatched" . t) ("pepsi")))
+(results-write dir "abc123def456" "abc123def456" () outcomes)
+(expect "a run on one tree is written"
+	(= "tree abc123def456\ncomplete no\nunmatched passed\npepsi failed\n" (contents-of-file-named file)))
+(expect "and read back" (equal (results-read file) '("abc123def456" () (("unmatched" . t) ("pepsi")))))
+(results-write dir "abc123def456" "abc123def456" 't outcomes)
+(expect "a complete run says so" (cadr (results-read file)))
+(results-write dir "abc123def456" "fff000fff000" () outcomes)
+(expect "a run whose code changed leaves no results" (not (results-read file)))
+(system (concat-strings "printf 'tree abc123def456\\n' > " file))
+(expect "a file with no complete line is refused"
+	(= "results: no complete line" (try (let () (results-read file) "read") (lambda (c) (cadr c)))))
+(expect "the tree is what tree-hash prints" (= 12 (string-length (tree-hash-now))))
+(println "results ok")

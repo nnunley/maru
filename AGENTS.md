@@ -87,7 +87,7 @@ where it departs from VPRI's original, and its limits. This file holds only a li
 
 ## Functional units
 
-- [The check runner](doc/checks.md): `check/check.l` and `check/parallel.l`: selecting cases, running them in parallel, and their scratch directories. Checks: `check_tmp`, `unmatched`.
+- [The check runner](doc/checks.md): `check/check.l` and `check/parallel.l`: selecting cases, running them in parallel, and their scratch directories, and the results file a run leaves. Checks: `check_results`, `check_tmp`, `unmatched`.
 - [Evaluators and boot files](doc/evaluators.md): The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l` and `boot2.l`, and their primitives. Checks: `eval3`, `eval2_subr`, `data_length`, `byte_bounds`, `boot_forms`, `equal_selector`, `boot2_strings`, `cross_eval`, `run_limit`.
 - [Garbage collector](doc/gc.md): The collector in C and the one written in Maru, held to laws over generated graphs and programs. Checks: `maru_gc`, `maru_gc_coalesce`, `gc_laws`, `gc_model`, `gc_image`.
 - [Hash tables](doc/hash.md): `hash.l`'s tables by identity or `equal`, and weak-key tables over the collector's ephemerons. Checks: `hash_table`, `weak_table`.
