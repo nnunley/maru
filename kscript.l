@@ -458,9 +458,9 @@
 	 (let ((cur obj) (k (if (double? idx) (double->long idx) idx)))
 	   (while (and cur (< 0 k)) (set cur (cdr cur)) (decr k))
 	   (if cur (car cur) ())))
-	((ks-object? obj)
+	((ks-object? obj)	; its field, as obj.key answers it: a stream as itself
 	 (let ((key (if (symbol? idx) idx (string->symbol (ks-to-string idx)))))
-	   (ks-val obj key)))
+	   (or (ks-slot obj key) (ks-field obj key ()))))
 	(else ())))
 
 (define-function ks-apply (fn args env caller-this)
@@ -806,6 +806,20 @@
 	    (ks-set-attr s ':__ast__ ast)
 	    ast)))))
 
+;; recv's field fname, recv a name the home holds: its stream, if it is one, is a dependency
+(define-function ks-collect-slot-dep (recv fname home acc)
+  (when (and (ks-object? home) fname (or (symbol? recv) (and (pair? recv) (= (car recv) 'stream-ref))))
+    (let ((robj (ks-val home (if (symbol? recv) recv (cadr recv)))))
+      (when (ks-object? robj)
+	(let ((fs (ks-slot robj fname)))
+	  (and (ks-stream? fs) (not (memq fs (car acc))) (set-car acc (cons fs (car acc)))))))))
+;; an index's key as a field name: a string, or a name the home holds a string or symbol in; () if neither
+(define-function ks-index-key (idx home)
+  (let ((k (cond ((string? idx) idx)
+		 ((and (ks-object? home) (symbol? idx)) (ks-val home idx))
+		 ((and (ks-object? home) (pair? idx) (= (car idx) 'stream-ref)) (ks-val home (cadr idx))))))
+    (cond ((symbol? k) k) ((string? k) (string->symbol k)))))
+
 ;; Collect synchronous stream dependencies of AST; lag (') and delayE break cycles (section 3.2).
 (define-function ks-collect-deps (ast home acc triggers?)
   (cond
@@ -823,15 +837,12 @@
 	    (let ((s (ks-slot home (cadr ast))))
 	      (and (ks-stream? s) (not (memq s (car acc))) (set-car acc (cons s (car acc)))))))
 	 ((= op 'field)
-	  (let ((recv (cadr ast)) (fname (caddr ast)))
-	    (ks-collect-deps recv home acc triggers?)
-	    (when (and (ks-object? home)
-		       (or (symbol? recv) (and (pair? recv) (= (car recv) 'stream-ref))))
-	      (let* ((rname (if (symbol? recv) recv (cadr recv)))
-		     (robj (ks-val home rname)))
-		(when (ks-object? robj)
-		  (let ((fs (ks-slot robj fname)))
-		    (and (ks-stream? fs) (not (memq fs (car acc))) (set-car acc (cons fs (car acc))))))))))
+	  (ks-collect-deps (cadr ast) home acc triggers?)
+	  (ks-collect-slot-dep (cadr ast) (caddr ast) home acc))
+	 ((= op 'index)	; recv[key] is recv's field key, a key the home holds (deviation-demo's @cellName) as well
+	  (ks-collect-deps (cadr ast) home acc triggers?)
+	  (ks-collect-deps (caddr ast) home acc triggers?)
+	  (ks-collect-slot-dep (cadr ast) (ks-index-key (caddr ast) home) home acc))
 	 ((and (= op 'call) (or (= (cadr ast) 'anyE) (= (cadr ast) 'switchColE)))
 	  (let ((col-exp (caddr ast)) (sname-exp (cadddr ast)))
 	    (ks-collect-deps col-exp home acc triggers?)

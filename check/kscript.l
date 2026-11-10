@@ -110,6 +110,13 @@ for i in [0...10] by 5 total := total + i
 	'(3 1 (3 1 2) (1 2 3)))
 
 (expect "a long range, made without recursion" (array-length (ks-run "[1...20000]")) 20000)
+;; an object's [k] is its field k, as a.k is (JavaScript's property access, which KScript compiles to): a stream
+;; answers as itself, not its value (check/ksworld.l maps one named by its key)
+(let ((box (box-of "n <- 5\n")))
+  (expect "an object's [k], its field k: the stream itself"
+	  (let ((at (ks-eval (car (kscript-parse "this[\"n\"]")) () box)))
+	    (list (and (ks-stream? at) 't) (= at (ks-eval (car (kscript-parse "this.n")) () box))))
+	  '(t t)))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 
