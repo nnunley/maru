@@ -1,22 +1,71 @@
-;;; source-tokens.l -- (source-text-tokens text) divides Maru source text as eval.c's reader does into an array of <token>s
-;;; (maru-tokens.g): kind (open, open-bracket, open-brace, close, symbol, number, string, char, quote, quasiquote, unquote,
-;;; unquote-splicing, comment), text, start and end positions, and the line it starts on, from 1.
-(require "text-parser.l")
+;;; source-tokens.l -- (source-text-tokens text) divides Maru source text as eval.c's reader does (maru-tokens.g) into an array
+;;; of <token>s: kind (open, open-bracket, open-brace, close, symbol, number, string, char, quote, quasiquote, unquote,
+;;; unquote-splicing, comment), text, start and end positions, and the line it starts on, from 1, counted afterwards from the
+;;; positions.  (tokens-forms tokens) reads them back to the forms Maru's reader makes (maru-token-forms.g).  Tokens are made
+;;; for what's asked, a definition's text, not a tree: a text grammar costs some microseconds a character.
+(require "source-parser.l")
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
 (define-structure <token> (kind text start end line))
 (define-method do-print <token> () (print "<" self.kind " " self.line ":" self.text ">"))
-(define maru-token ())	; the grammar's action, defined once the grammar's type is
+(define-function maru-token (parser kind start end)	; not self: make binds self to what it makes
+  (let ((text (string-copy (<text-parser>-string parser) start (- end start))))
+    (make <token> kind: kind text: text start: start end: end line: 0)))
 (tpeg-load "maru-tokens.g")
-(set maru-token
-     (lambda (parser kind start)	; not self: make binds self to what it makes
-       (let* ((end (<text-parser>-position parser))
-	      (text (string-copy (<text-parser>-string parser) start (- end start)))
-	      (line (<maru-tokens>-line parser)))
-	 (array-append (<maru-tokens>-tokens parser) (make <token> kind: kind text: text start: start end: end line: line)))))
+
+;; each token's line: eval.c's reader moves on at a newline and its carriage returns, or a carriage return and its newlines
+(define-function source-token-lines (text tokens)
+  (let ((line 1) (i 0) (n (string-length text)))
+    (array-do t tokens
+      (while (< i (<token>-start t))
+	(let ((c (string-at text i)))
+	  (set i (+ i 1))
+	  (when (or (= c 10) (= c 13))
+	    (set line (+ line 1))
+	    (while (and (< i n) (= (string-at text i) (if (= c 10) 13 10))) (set i (+ i 1))))))
+      (set (<token>-line t) line))
+    tokens))
 (define-function source-text-tokens (text)
   (let ((p (text-parser-for-on <maru-tokens> text)))
-    (set (<maru-tokens>-tokens p) (array))
-    (set (<maru-tokens>-line p) 1)
     (or ($tokens p) (error "source-tokens: can't divide the text past " (<text-parser>-position p)))
-    (<maru-tokens>-tokens p)))
+    (source-token-lines text (list->array (<text-parser>-result p)))))
+
+;; tokens to forms
+(define-function token-kind? (t kind) (and (= <token> (type-of t)) (= kind (<token>-kind t))))
+(define-function token-forms-list (xs)	; xs, dotted if a . comes before its last form, as eval.c's reader has it
+  (let ((p xs))
+    (while (and (pair? p) (pair? (cdr p)) (pair? (cddr p)) (not (= '. (cadr p)))) (set p (cdr p)))
+    (and (pair? p) (pair? (cdr p)) (pair? (cddr p)) (= '. (cadr p)) (not (cdddr p)) (set-cdr p (caddr p))))
+  xs)
+(define-function token-value (rule text)
+  (let ((p (text-parser-for-on <maru-tokens> text)))
+    (or (rule p) (error "source-tokens: can't read " text))
+    (<text-parser>-result p)))
+(define-function token-digits (text from base)	; the whole number text's digits from from make, in base
+  (let ((n 0))
+    (for (i from (string-length text))
+      (let ((c (string-at text i)))
+	(set n (+ (* n base) (cond ((and (<= ?0 c) (<= c ?9)) (- c ?0)) ((<= ?a c) (+ 10 (- c ?a))) (else (+ 10 (- c ?A))))))))
+    n))
+(define-function token-has? (text c)	; whether text holds c (string-search halves a sorted string)
+  (let ((i 0) (n (string-length text)))
+    (while (and (< i n) (!= c (string-at text i))) (set i (+ i 1)))
+    (< i n)))
+(define-function token-number (text)	; as eval.c: a double with . or e, else wcstoul's base 0 (0x hex, a leading 0 octal)
+  (let* ((negative (= ?- (string-at text 0))) (digits (if negative (string-copy text 1 (- (string-length text) 1)) text)))
+    (cond ((or (token-has? digits ?.) (and (token-has? digits ?e) (not (token-has? digits ?x)))) (string->double text))
+	  (else (let ((n (cond ((and (< 1 (string-length digits)) (= ?x (string-at digits 1))) (token-digits digits 2 16))
+			       ((and (< 1 (string-length digits)) (= ?0 (string-at digits 0))) (token-digits digits 1 8))
+			       (else (token-digits digits 0 10)))))
+		  (if negative (- 0 n) n))))))
+(define-function token-forms-atom (t)
+  (let ((kind (<token>-kind t)) (text (<token>-text t)))
+    (cond ((= kind 'symbol)	(string->symbol text))
+	  ((= kind 'number)	(token-number text))
+	  ((= kind 'string)	(token-value $string_value text))
+	  (else			(token-value $char_value text)))))
+(tpeg-load "maru-token-forms.g")
+(define-function tokens-forms (tokens)
+  (let ((p (source-parser-for <maru-token-forms> tokens)))
+    (or ($forms p) (error "source-tokens: can't read the tokens to forms"))
+    (<source-parser>-result p)))

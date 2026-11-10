@@ -4,14 +4,16 @@
 ;;; source with it; a type, being a number, is kept by its number.  A definition made again keeps only its latest source.
 ;;; Each answers the selectors source-of, source-form, form-count (maru-forms.l's forms: lists outside quoted data),
 ;;; line-count (the lines from first to last holding more than a comment), source-text and sources (a selector's: its own and
-;;; each method's, in the order defined).  What loading didn't define, a lambda made at run time, has no source: ().
+;;; each method's, in the order defined) and source-tokens (its text as Maru's reader divides it, source-tokens.l, each
+;;; token's line the file's); a <source> is an input of its tokens (input.l), so a tree grammar walks them.  What loading didn't define, a lambda made at run time, has no source: ().
 ;;; A file that only runs is read without running it: (file-definitions path) answers the <definition>s its forms make (kind
 ;;; function, form, selector, method, apply or type; its name; its <source>), read by source-lift.g, each answering the same
 ;;; selectors; erosion.l measures through them.
 (require "hash.l")
 (require "maru-forms.l")
+(require "source-tokens.l")
 
-(define-structure <source> (path first last form serial))	; serial: the order sources were kept in
+(define-structure <source> (path first last form serial tokens))	; serial: the order kept in; tokens: made when asked
 (define-method do-print <source> () (print "<source " self.path ":" self.first "-" self.last ">"))
 (define-structure <source-file> (text starts))			; starts: where each line begins, line 1 at index 0
 
@@ -97,6 +99,17 @@
 	(while (and after (< (<source>-serial (car after)) (<source>-serial s))) (push before (car after)) (set after (cdr after)))
 	(set out (concat-list (list-reverse! before) (cons s after)))))
     out))
+(define-selector source-tokens (self) (let ((s (source-of self))) (and s (source-tokens s))))
+(define-method source-tokens <source> ()
+  (or self.tokens
+      (let ((tokens (source-text-tokens (source-text self))))
+	(array-do t tokens (set (<token>-line t) (+ (<token>-line t) (- self.first 1))))
+	(set self.tokens tokens))))
+(define-method in-enter <source> ()		1)
+(define-method in-start <source> ()		0)
+(define-method in-at-end <source> (pos)		(>= pos (array-length (source-tokens self))))
+(define-method in-head <source> (pos)		(array-at (source-tokens self) pos))
+(define-method in-tail <source> (pos)		(+ pos 1))
 (define-selector sources (self) (let ((s (source-of self))) (and s (list s))))
 (define-method sources <selector> ()	; its own and each method's, in the order kept
   (let ((out ()))

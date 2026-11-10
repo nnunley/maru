@@ -1093,6 +1093,13 @@
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (equal (last (run "source_lift" (concat-strings evaluator " check/source-lift.l"))) "source lift ok"))))
 
+;; a definition's tokens (source-tokens.l), as eval.c's reader divides its text, read back to its form and walked by a tree
+;; grammar; whole files' tokens read back to what Maru's reader makes of them
+(check "source_tokens"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "source_tokens" (concat-strings evaluator " check/source-tokens.l boot.l boot2.l hash.l check/source/defs.l")))
+			"source tokens ok"))))
+
 ;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
 ;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
