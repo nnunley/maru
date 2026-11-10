@@ -116,6 +116,7 @@ RECORD Choice:                      -- one entry of a frontier
 | `MARU_PLAN` | plan NAME | `tree-matching` | the plan `record`, `observe.l` and `next.l` read when no lane is given |
 | `--lane NAME` (`next.l`) | plan NAME | `MARU_PLAN` | the plan whose frontier `next.l` answers first |
 | `MARU_RECORD` | `0` or `1` | `1` | whether `make check` records its results in the ledgers; `0` leaves the ledgers untouched |
+| `MARU_RETIRE_AFTER` | whole number | `20` | commits a `retired NAME.` stays in its plan before recording drops the name's lines |
 | heuristic weights | whole numbers in each plan | 10000, 1000, 100, 10 (see below) | how much a regression, a failure, an older pass and an untested check weigh |
 | erosion weight | whole number in each plan | 1 | how much a unit of hotspot mass left unsimplified costs |
 
@@ -169,7 +170,8 @@ A ledger MUST be read by Maru's reader (`read`), never by `john.g`. A world's ti
 back, never a number stored in it, so a merge can't make two worlds claim one time. `make` lines are declarations,
 entered in world 0 before the worlds, as a session enters them. The possible worlds past the current one are not
 written: search makes them again, as RN-2008-003 has it. A line that is neither form, or that names an object, action,
-property or kind the plan doesn't declare, MUST fail naming the ledger and the line. [R-ledger-forms]
+property or kind the plan doesn't declare and hasn't retired (below), MUST fail naming the ledger and the line.
+[R-ledger-forms]
 A ledger grows with every run and is read whenever anyone asks what's next. At the time of writing `john.g` reads about
 13 ms a line, twice (a relation can be used before its `rel-qualify`), so a ledger of 1380 events took 41 s to read;
 Maru's reader reads 19,800 lines of the same events in 0.08 s.
@@ -194,11 +196,27 @@ plan_evidence
 ```
 
 Recording MUST drop a world whose action and writes equal those of a world earlier in the ledger, and a `make` line
-equal to an earlier one, keeping the first; nothing else is dropped. [R-ledger-dedupe]
+equal to an earlier one, keeping the first; nothing else is dropped but what retirement drops. [R-ledger-dedupe]
 The same answer about the same code, recorded on two branches, is one event, and Elephant's journal is "virtual": what
 is never referred to need not be kept. A later world moves to an earlier time, and the order of the rest stays.
 
 ```maru-check @R-ledger-dedupe
+plan_record
+```
+
+A plan MAY declare `retired NAME.` for an object it no longer has, a check dropped or renamed. Reading a ledger MUST
+skip, and keep in the file, every world whose action or writes name a retired object and every `make` line making one;
+`next.l` MUST say how many it skipped and for which names (`skipped 3 events about retired: tree_old`). Recording MUST
+drop those lines from the ledger once the plan has declared `retired NAME.` for at least `MARU_RETIRE_AFTER` commits:
+the commits on the current branch since the first that holds the declaration in the plan file (`git rev-list --count
+C..HEAD`); a retirement not yet committed has none. Once they are dropped the declaration MAY go too. [R-retired]
+Feedback edits plans, and dropping or renaming a check is such an edit; its old answers are history about a check that
+no longer exists, which shouldn't stop the plan from loading, nor be deleted by hand from a file only recording writes.
+Naming the retired objects keeps a misspelled name failing, and the delay lets branches that still record the old name
+merge before its lines go. Commits, not pushes, because a checkout can count only its own history.
+
+```maru-check @R-retired
+plan_evidence
 plan_record
 ```
 
@@ -359,6 +377,7 @@ plan_evidence
 | `E_UNKNOWN_LANE` | `next.l --lane kworld` | Exit 1 naming the lane and the plans there are |
 | unknown case in a plan | `make Case ksworld_render untested.` | `plan_evidence` fails naming plan and case; fix the plan |
 | `choices` for an unknown object or goal | `choices T delivr.` | The session's error for an unknown name; nothing changes |
+| ledger line naming a dropped check | `(world (tree_old observed …) …)` after `tree_old` left the plan | Reading fails naming the line; declare `retired tree_old.` in the plan |
 | bad ledger line | `(world (tree_lists observd (value passed (tree "504c17079996"))) ())` | Reading the plan fails naming the ledger and line; fix or drop the line |
 | ledger not writable | a read-only checkout | `make check` reports it and still exits by its cases' outcome |
 
@@ -385,6 +404,7 @@ total-expr     = %s"total" 1*SP set-expr 1*SP %s"by" 1*SP expr
 set-expr       = %s"all" 1*SP name / "(" expr ")" / name
 expr           = 1*( %x20-7E )   ; a JOHN expression, as john.g reads it
 over-time      = expr 1*SP %s"over" 1*SP %s"time"
+retired-stmt   = %s"retired" 1*SP name "."
 choices-stmt   = %s"choices" 1*SP name 1*SP name "."
 choice-line    = step 2SP %s"score " number LF
 choices-end    = %s"choices: " 1*DIGIT "." LF

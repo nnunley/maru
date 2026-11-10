@@ -36,8 +36,8 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
 
 ## Review Focus
 
-1. A ledger line naming a check, action or kind a plan no longer declares (a plan edited after recording): reading
-   fails naming the ledger and line, never answers as if the line weren't there. Test in Task 4.
+1. A ledger line naming a check a plan dropped: with `retired NAME.` it is skipped and reported; without, reading fails
+   naming the ledger and line (a misspelling stays an error). Tests in Tasks 3 and 4.
 2. A `make check` interrupted, or whose tree changed: no results file, or none complete, and nothing recorded; a
    results file without its `complete` line is refused. Tests in Tasks 1 and 5.
 3. A plan with no ledger yet: every check reads `untested`, and the first recording creates the file. Test in Task 5.
@@ -104,7 +104,7 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
 - [ ] **Step 4:** `make check CHECKS="john_forms john_run john_session sat_john"` passes.
 - [ ] **Step 5:** Document both in `doc/john.md` (as ours); `check/lines`; commit.
 
-### Task 3: Serializing a chain, and each property's history [R-ledger-forms, R-history-index]
+### Task 3: Serializing a chain, and each property's history [R-ledger-forms, R-history-index, R-retired]
 
 **Files:**
 - Create: `john-serialize.l` (requires `john-eval.l`)
@@ -121,7 +121,10 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
   - `(john-deserialize forms)`: enters `make` forms as declarations, then appends one world per `world` form to the
     current chain with exactly its writes (`john-write`, nothing evaluated), its action as `<john-world>-action`;
     then builds the history. Errors: `ledger LINE: unknown object|action|property|kind NAME` and
-    `ledger LINE: not a world or a make`, LINE the form's position from 1 (the caller adds the file).
+    `ledger LINE: not a world or a make`, LINE the form's position from 1 (the caller adds the file). A world whose
+    action or writes name a retired object, or a `make` of one, is skipped; `(john-skipped)` → list of
+    `(name . count)` skipped by the last `john-deserialize` [R-retired].
+  - statement `(retired NAME)` from `retired NAME.`, kept in `*john-retired*`; `john-begin` empties it.
   - `<john-world>-history`: a `hash.l` table by `equal`, key `(object . property)`, value an array of
     `(time . value)` in time order, shared by every world of the chain read back. `john-lookup` on a world with a
     history and time ≤ the chain's end answers by binary search; a world past the chain (a possible world) walks its
@@ -135,7 +138,8 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
   forms; a fresh session with the same program, `john-deserialize`d from them, answers `time.` 3, `at time 1 X p` as
   the original, `X did act` as the original; a string with `"`, `\` and a newline, and `(value refuted (tree "a")
   (counterexample "x=\"p\" y=3"))`, round-trip; a ledger text starting with `; comment` and ending without a newline
-  reads; a form naming an undeclared object fails `ledger 2: unknown object Ghost`; after deserializing 2000 worlds,
+  reads; a form naming an undeclared object fails `ledger 2: unknown object Ghost`; after `retired Ghost.` the same
+  forms read, the Ghost world skipped, and `(john-skipped)` is `((Ghost . 1))`; after deserializing 2000 worlds,
   cutting the parent of world 2 (`(set (<john-world>-parent w2) ())`) leaves `X p` at the current time and at time 1500
   answering as before (the history, not the chain, answered); `X p over time` gives each distinct value once, oldest
   first, including world 0's.
@@ -176,7 +180,8 @@ qualify Check untested if for every its evidence over time do each is untested.
   answered good on tree `aaa`, one good on `bbb` and failed on `aaa`) loaded with `plan-load` at tree `aaa` give
   `holds`, `regressed`; at tree `ccc`, both `stale`; a case good and failed on `aaa` is `failing`, not `holds`;
   the same two lanes' lines interleaved in either order give the same states; a ledger line naming a removed check
-  fails `…check/plan/x.answers: ledger 3: unknown object gone`; every `make Case NAME` in `notes/plan/*.john` is in
+  fails `…check/plan/x.answers: ledger 3: unknown object gone`, and with `retired gone.` in the plan loads, its
+  states unchanged by the skipped line; every `make Case NAME` in `notes/plan/*.john` is in
   `(case-names)`, else `FAIL plan PLAN names no case NAME`.
 - [ ] **Step 2:** `make check CHECKS=plan_evidence` fails.
 - [ ] **Step 3: Implement** `plan-load`, `plan-names`, `check/case-names.l`; convert each evidence file by replaying it
@@ -187,7 +192,7 @@ qualify Check untested if for every its evidence over time do each is untested.
   it printed before the conversion for each `MARU_PLAN` (done and not done lines unchanged).
 - [ ] **Step 5:** Document ledgers, `merge=union`, and the states table in `doc/evidence-plan.md`; `check/lines`; commit.
 
-### Task 5: Recording from `make check`, deduplicated [R-run-records, R-ledger-dedupe]
+### Task 5: Recording from `make check`, deduplicated [R-run-records, R-ledger-dedupe, R-retired]
 
 **Files:**
 - Create: `notes/plan/record-run.l`, `check/plan-record.l`
@@ -197,7 +202,10 @@ qualify Check untested if for every its evidence over time do each is untested.
 
 **Interfaces:**
 - Produces: `./eval notes/plan/record-run.l RESULTS [DIR]` (DIR defaults to `notes/plan`): does nothing when
-  `MARU_RECORD` is `0`; says `no results: nothing recorded` for a missing file; for each plan in `DIR`, loads it at the
+  `MARU_RECORD` is `0`; says `no results: nothing recorded` for a missing file; before deduping, drops every line
+  naming a name the plan has retired for at least `MARU_RETIRE_AFTER` commits (default 20; `(retired-commits dir
+  plan name)` → `git rev-list --count C..HEAD`, C the first commit whose plan file holds `retired NAME.`, from
+  `git log --reverse --format=%H -S 'retired NAME.' -- FILE`; 0 when uncommitted) [R-retired]; for each plan in `DIR`, loads it at the
   results' tree, `john-do`es `C observed passed(tree: T)` / `failed` for each declared `Case` in the results, then
   `WholeSuite observed passed(tree: T)` if complete and all passed and the plan declares it, appends the new worlds'
   lines, and dedupes the file. `(ledger-dedupe path)`: rewrites the file keeping the first of each `equal` form, in
@@ -211,7 +219,8 @@ qualify Check untested if for every its evidence over time do each is untested.
   (`tree aaa`, `complete no`, `one passed`, `other failed`, `stranger passed`) adds exactly two worlds to `x.answers`
   (none for `stranger`, which the plan doesn't declare) and none to a plan declaring neither; `complete yes` with all
   passed adds `WholeSuite`; with one failed it doesn't; recording the same results twice leaves the file as after
-  once; two ledgers concatenated (a union merge) dedupe to the first of each; a plan with no `.answers` gets one;
+  once; two ledgers concatenated (a union merge) dedupe to the first of each; with `MARU_RETIRE_AFTER=0` a retired
+  name's lines are dropped and with the default (and the retirement uncommitted) kept; a plan with no `.answers` gets one;
   `MARU_RECORD=0` changes nothing; prints `plan record ok`. Case `plan_record`.
 - [ ] **Step 2:** `make check CHECKS=plan_record` fails.
 - [ ] **Step 3: Implement** `record-run.l`, `ledger-dedupe`, the Makefile hook; change `observe.l` to `john-do` each
@@ -251,7 +260,8 @@ heuristic Team deliver 10 maximize (select all Capability by which planned = yes
   regressing, failing, aging, untried with scores 10000, 1000, 100, 10, then beta's; lane beta puts beta first; with
   every answer about an older tree, a frontier is still answered (no `record full` line); a plan all done contributes
   nothing; all done everywhere prints `nothing left to build`; `--lane nope` exits 1 with
-  `E_UNKNOWN_LANE: nope (plans: alpha, beta)`; the printed lines match `next: alpha: T build R  score 10000` and
+  `E_UNKNOWN_LANE: nope (plans: alpha, beta)`; a plan with a skipped retired line prints
+  `skipped 1 events about retired: gone` before its frontier; the printed lines match `next: alpha: T build R  score 10000` and
   `then: …`. Prints `plan frontier ok`. Case `plan_frontier`.
 - [ ] **Step 2:** `make check CHECKS=plan_frontier` fails.
 - [ ] **Step 3: Implement** `frontier.l`, the new `next.l` tail (the `record full` branch goes), the plans' qualities and
