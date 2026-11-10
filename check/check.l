@@ -1082,6 +1082,11 @@
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (equal (last (run "grammar_reflect" (concat-strings evaluator " check/grammar-reflect.l"))) "grammar reflect ok"))))
 
+;; what loading defined answers its own source (source.l): its form as read, its form and line counts, its text
+(check "source"
+  (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "source" (concat-strings evaluator " check/source.l"))) "source ok"))))
+
 ;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
 ;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must

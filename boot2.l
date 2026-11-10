@@ -1150,10 +1150,14 @@
 (define-function find-and-read (name)
   (find-and-read-in name *load-paths*))
 
+;; called after load evaluates each top-level form, (*load-hook* name form value), when set (source.l keeps sources)
+(define *load-hook* ())
 (define-function load (name)
   (let ((exps (find-and-read name)))
     (or exps (error "file not found or empty: "name))
-    (list-do expr exps (pval expr))))
+    (list-do expr exps
+      (let ((value (pval expr)))
+	(and *load-hook* (*load-hook* name expr value))))))
 
 (define *loaded*)
 
