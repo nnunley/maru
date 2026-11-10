@@ -31,6 +31,11 @@
 	  (and (pair? (car x)) (push todo (car x)))
 	  (set x (cdr x)))))
     last))
+(define-function source-put (object source)
+  (set (<source>-serial source) (set *source-serial* (+ *source-serial* 1)))
+  (if (long? object)
+      (set-array-at *type-sources* object source)
+    (and object (hash-at-put *sources* object source))))
 (define-function source-keep (object path form)
   (let* ((s (<pair>-source form))
 	 (first (if (and (pair? s) (long? (cdr s))) (cdr s) 0))
@@ -40,16 +45,17 @@
 	(set-array-at *type-sources* object source)
       (and object (hash-at-put *sources* object source)))))
 
-;; what a top-level form defined, by its head, or ()
+;; what a top-level form defined, by its head, or (): the object its name is bound to now
+(define-function source-value (name) (let ((b (and (symbol? name) (defined? name)))) (and b (%binding-value b))))
 (define-function source-defined (form)
   (let ((op (car form)) (rest (cdr form)))
     (and (pair? rest) (symbol? (car rest))
-	 (cond ((memq op '(define-function define-form define-selector define-structure define-class)) (eval (car rest)))
+	 (cond ((memq op '(define-function define-form define-selector define-structure define-class)) (source-value (car rest)))
 	       ((= op 'define-method)
-		(let ((sel (eval (car rest))) (type (eval (cadr rest))))
+		(let ((sel (source-value (car rest))) (type (and (pair? (cdr rest)) (source-value (cadr rest)))))
 		  (and (selector? sel) (long? type) (array-at (<selector>-methods sel) type))))
 	       ((= op 'define)
-		(and (pair? (cdr rest)) (pair? (cadr rest)) (= 'lambda (car (cadr rest))) (eval (car rest))))))))
+		(and (pair? (cdr rest)) (pair? (cadr rest)) (= 'lambda (car (cadr rest))) (source-value (car rest))))))))
 (set *load-hook* (lambda (path form value) (and (pair? form) (source-keep (source-defined form) path form))))
 
 (define-function source-file (path)
@@ -118,3 +124,14 @@
     (or ($forms p) (error "source: can't read the definitions of " path))
     (<source-parser>-result p)))
 (define-function file-definitions (path) (forms-definitions path (find-and-read path)))
+;; what was read before this file: the boot file, which the evaluator read itself before load or its hook existed, and each
+;; file required before; read again, each definition is kept for what its name is bound to now
+(define-function source-backfill (path)
+  (let ((forms (find-and-read path)))
+    (and forms
+	 (list-do d (forms-definitions path forms)
+	   (let ((object (source-defined (source-form d))))
+	     (and object (source-put object (<definition>-source d))))))))
+(let ((paths ()))	; *loaded* is newest first
+  (list-do path *loaded* (push paths path))
+  (list-do path (cons (if (defined? 'find-and-read-in) "boot2.l" "boot.l") paths) (source-backfill path)))

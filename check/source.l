@@ -21,4 +21,11 @@
 (let ((m (array-at (<selector>-methods source-fixture-s) <pair>)))
   (expect "a method knows its file and lines" (list (<source>-path (source-of m)) (<source>-first (source-of m)) (<source>-last (source-of m)))
 	  '("check/source/defs.l" 8 8)))
+;; what was read before source.l: the boot file, which the evaluator read itself, and each file required before
+(define boot-file (if (defined? 'find-and-read-in) "boot2.l" "boot.l"))
+(expect "a boot definition answers its source in the boot file" (<source>-path (source-of load)) boot-file)
+(expect "and its form as read" (car (source-form load)) 'define-function)
+(expect "a selector the boot defined has sources" (not (not (sources equal))) 't)
+(expect "a file required before source.l answers its sources" (<source>-path (source-of hash-at)) "hash.l")
+(expect "a structure the boot defined" (car (source-form <selector>)) 'define-structure)
 (println (if ok "source ok" "source FAILED"))

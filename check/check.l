@@ -1085,7 +1085,8 @@
 ;; what loading defined answers its own source (source.l): its form as read, its form and line counts, its text
 (check "source"
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
-    (unit-assert (equal (last (run "source" (concat-strings evaluator " check/source.l"))) "source ok"))))
+    (unit-assert (equal (last (run "source" (concat-strings evaluator " check/source.l"))) "source ok"))
+    (unit-assert (equal (last (run "source_main" (concat-strings evaluator " source-run.l check/source/main.l"))) "check/source/main.l 2 2"))))
 
 ;; definitions read from a file without running it answer what they answer loaded (source.l's file-definitions)
 (check "source_lift"
