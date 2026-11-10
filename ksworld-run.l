@@ -31,12 +31,11 @@
 ;; A dbjr copy keeps the fonts its documents name in fonts/ beside the documents' directories (notes/plan/fetch-dbjr), so
 ;; a document run from one finds them without its caller setting *ks-font-path*.
 (define-function ksworld-fonts-beside (path)
-  (let* ((dir (ksworld-directory path))
-	 (fonts (concat-string (ksworld-directory (string-copy dir 0 (max 0 (- (string-length dir) 1)))) "fonts"))
-	 (known ()))
-    (list-do d *ks-font-path* (and (equal d fonts) (set known 1)))
-    (or known (not (= 0 ((subr "access" "si>i") fonts 4)))
-	(set *ks-font-path* (cons fonts *ks-font-path*)))))
+  (let* ((dir (ksworld-directory path))	; "" for a document named from inside its own directory
+	 (fonts (if (= dir "") "../fonts"
+		  (concat-string (ksworld-directory (string-copy dir 0 (- (string-length dir) 1))) "fonts"))))
+    (or (member? fonts *ks-font-path*) (not (ks-readable? fonts))
+	(push *ks-font-path* fonts))))
 
 (define-function ksworld-run (path ticks)
   (ksworld-fonts-beside path)
