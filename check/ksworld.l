@@ -18,6 +18,11 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("Smalltalk: KSBox does not understand blink" . 1))))
 
+;; a stream whose code doesn't read is reported, and one depending on it runs: the sort doesn't read it again
+(let ((r (ksworld-run "check/ksworld/unreadable.pp" 2)))
+  (expect "code, read, unreadable" (list (at r 'code) (at r 'unreadable)) '(2 1))
+  (expect "the unreadable stream, reported once" (list-length (at r 'failures)) 1))
+
 ;; what a document draws, asked of a Gezira: here one that records each path it's asked to fill, so the walk is checked
 ;; with no Gezira built
 (define-structure <gezira-recording> (paths))

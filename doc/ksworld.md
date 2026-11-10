@@ -20,7 +20,8 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
-  tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
+  tick, each stream on its own, then reports what ran, fired and failed, and why. A stream whose code doesn't read is reported and
+  passed over, even where another depends on it (`check/ksworld/unreadable.pp`). Our fixture `check/ksworld/tiny.pp`
   counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
