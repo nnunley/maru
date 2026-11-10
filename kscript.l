@@ -385,9 +385,16 @@
 		   recv)))
   (asGeziraFill recv))
 
+;; a stream fires when it takes a defined value: it holds the value, and what depends on it is due this tick;
+;; undefined stops the change, so the stream keeps its value and doesn't fire
+(define-function ks-fire (s val)
+  (when (ks-defined? val)
+    (ks-set-slot s '__currentValue__ val)
+    (ks-set-slot s '__firedAt__ *ks-logical-time*)))
+
 ;; the stream combinators: each answers undefined, which stops the change, until its stream has a value
 (ks-methods KSEventStream
-  (set (ks-set-slot recv '__currentValue__ (car args)))
+  (set (ks-fire recv (car args)) (car args))	; as KSNewEventStream>>set: stamps its last time
   (currentValue (ks-stream-curr recv))
   (dormant (ks-set-attr recv ':__dormant__ (if (ks-truthy? (car args)) "true" "false"))
 	   (car args))
@@ -898,10 +905,7 @@
 ;; one stream's new value, if it has one this tick; a driver may wrap this to see what each stream does (ksworld-run.l)
 (define ks-evaluate-stream
   (lambda (s ast home)
-    (let ((val (ks-stream-curr (ks-eval ast (list (cons '__this__ home)) home))))
-      (when (ks-defined? val)
-	(ks-set-slot s '__currentValue__ val)
-	(ks-set-slot s '__firedAt__ *ks-logical-time*)))))
+    (ks-fire s (ks-stream-curr (ks-eval ast (list (cons '__this__ home)) home)))))
 
 (define-function ks-sort-and-evaluate-at (ev logical-time)
   (or (> logical-time (<ks-evaluator>-previous ev))	; a stream fired if it fired at this time, so a time can't recur

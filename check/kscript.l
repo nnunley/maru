@@ -122,6 +122,37 @@ for i in [0...10] by 5 total := total + i
   (ks-send s 'collectE (list 't f) () ())
   (ks-set-slot s '__currentValue__ 5)
   (expect "collectE carries a false accumulator on, not its first value" (ks-send s 'collectE (list 't f) () ()) ()))
+;; set fires the stream, so what depends on it updates (scroll bars and halos set a stream from a method, TR-2013-002 §3.1)
+(expect "set from a stream"
+	(ticks "x <- 1
+y <- x * 2
+d <- when timerE(2) then this.x.set(5)
+" 'y 4)
+	'(2 2 10 10))
+(expect "set from a method"
+	(ticks "x <- 1
+y <- x * 2
+poke = () -> this.x.set(5)
+d <- when timerE(2) then poke()
+" 'y 4)
+	'(2 2 10 10))
+(let ((box (box-of "x <- 1
+y <- x * 2
+")) (ev (ks-evaluator-new)) (out ()))
+  (ks-evaluator-add-from ev box)
+  (for (t 0 4)
+    (when (= t 2) (set *ks-logical-time* t) (ks-send (ks-slot box 'x) 'set (list 5) () ()))
+    (ks-sort-and-evaluate-at ev t)
+    (push out (ks-val box 'y)))
+  (expect "set between ticks" (list-reverse! out) '(2 2 10 10)))
+;; set to undefined stops the change, as any undefined does: the stream keeps its value and doesn't fire
+(expect "set to undefined"
+	(ticks "x <- 1
+y <- x * 2
+d <- when timerE(2) then this.x.set(undefined)
+" 'y 4)
+	'(2 2 2 2))
+
 (let ((ev (ks-evaluator-new)) (box (box-of "")) (none (ks-new-object 'KSEventStream 0 () () () 0)))
   (ks-set-slot box 'quiet none)
   (ks-evaluator-add-from ev box)
