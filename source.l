@@ -5,6 +5,9 @@
 ;;; Each answers the selectors source-of, source-form, form-count (maru-forms.l's forms: lists outside quoted data),
 ;;; line-count (the lines from first to last holding more than a comment), source-text and sources (a selector's: its own and
 ;;; each method's, in the order defined).  What loading didn't define, a lambda made at run time, has no source: ().
+;;; A file that only runs is read without running it: (file-definitions path) answers the <definition>s its forms make (kind
+;;; function, form, selector, method, apply or type; its name; its <source>), read by source-lift.g, each answering the same
+;;; selectors; erosion.l measures through them.
 (require "hash.l")
 (require "maru-forms.l")
 
@@ -94,3 +97,24 @@
     (and (source-of self) (push out (source-of self)))
     (array-do m (<selector>-methods self) (let ((s (and m (source-of m)))) (and s (push out s))))
     (source-by-serial out)))
+
+;; definitions read, not run
+(define-structure <definition> (kind name source))
+(define-method do-print <definition> () (print "<" self.kind " " self.name ">"))
+(define-method source-of <definition> () self.source)
+(define-function source-lift-concat (ds) (let ((out ())) (list-do d ds (list-do e d (push out e))) (list-reverse! out)))
+(define source-lift ())	; the grammar's action, set once its type exists
+(tpeg-load "source-lift.g")
+(set source-lift
+     (lambda (parser d form)
+       (let* ((path (<source-lift>-path parser))
+	      (s (<pair>-source form))
+	      (first (if (and (pair? s) (long? (cdr s))) (cdr s) 0))
+	      (source (make <source> path: path first: first last: (source-last-line form first) form: form serial: 0)))
+	 (list (make <definition> kind: (car d) name: (cdr d) source: source)))))
+(define-function forms-definitions (path forms)	; the definitions forms, read from path, make
+  (let ((p (source-parser-for <source-lift> forms)))
+    (set (<source-lift>-path p) path)
+    (or ($forms p) (error "source: can't read the definitions of " path))
+    (<source-parser>-result p)))
+(define-function file-definitions (path) (forms-definitions path (find-and-read path)))

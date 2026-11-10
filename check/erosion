@@ -1,3 +1,5 @@
 erosion 396 the tree measured in forms, not lines (2026-11-10): a callable's mass is CC x sqrt(forms), forms read by Maru's own reader; eight files that don't read whole aside
 verbosity 77 the tree measured in forms (2026-11-10): the share of forms a verbose pattern flags or a clone covers, each counted once
 erosion -1 source.l and its check: small definitions, the forms walk shared with erosion.l in maru-forms.l
+erosion +25 () is no form (a pattern list matched nil as an empty list, so every () counted, 6,500 in the tree), and a verbose pattern must end its list, so (let () a b) is a let and counted; source-lift.g and its check
+verbosity +8 the same: forms no longer padded by (), so covered forms are a larger share

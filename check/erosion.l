@@ -17,6 +17,7 @@
 (define-function metrics-of (texts) (erosion-of (map (lambda (t) (source-of-text "fixture.l" t)) texts)))
 (define-function callables-of (text) (<erosion-metrics>-callables (metrics-of (list text))))
 (define-function cc-of (text) (<callable>-cc (car (callables-of text))))
+(define-function flagged (text) (map (lambda (f) (<verbose-finding>-rule f)) (<erosion-metrics>-findings (metrics-of (list text)))))
 (define-function forms-of (text) (<callable>-forms (car (callables-of text))))
 
 ;; complexity: 1, and one for each decision
@@ -41,6 +42,11 @@
 	  (list (<callable>-forms c) (<callable>-line c)))
 	'(3 2))
 
+(expect "() is no form" (forms-of "(define-function f () (g () 1))") 2)
+(expect "a let with no bindings and two body forms is three forms, not the empty-let pattern"
+	(list (forms-of "(define-function f () (let () (g) (h)))") (flagged "(let () (g) (h))")) '(4 ()))
+(expect "an if longer than a pattern is no pattern" (flagged "(if c 't () x)") ())
+
 ;; erosion: the share of mass, CC x sqrt(forms), in callables of CC over 10
 (define-function ifs (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "(if a b) "))) s))
 (define-function eroded (text) (<erosion-metrics>-erosion (metrics-of (list text))))
@@ -51,7 +57,6 @@
 	(double->long (/ (* 1000.0 (* 11 (sqrt 11.0))) (+ (* 11 (sqrt 11.0)) 1.0))))
 
 ;; verbosity: forms a rule flags or a clone covers, over all forms
-(define-function flagged (text) (map (lambda (f) (<verbose-finding>-rule f)) (<erosion-metrics>-findings (metrics-of (list text)))))
 (expect "each rule flags its example"
 	(flagged "(if c 't ())\n(if c () 't)\n(let () x)\n(not (not x))\n(cond (c x) (else y))\n(= x ())")
 	'(if-t-nil if-nil-t empty-let not-not one-cond eq-nil))

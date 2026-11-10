@@ -5,6 +5,7 @@
 ;;; rounded down.  A form is a list outside quoted data; maru-forms.l walks each top-level form once for its complexity, its
 ;;; forms, the verbose patterns in it and the variables it binds.
 (require "maru-forms.l")
+(require "source.l")
 
 (define-structure <ledger-entry> (metric change reason))	; a line of check/erosion
 (define-function erosion-parse-text (grammar rule text what)	; what rule reads of all of text, or an error naming what
@@ -20,12 +21,7 @@
 (define sqrt (subr "sqrt" "d>d"))
 (define-function erosion-mass (c) (* (<callable>-cc c) (sqrt (* 1.0 (<callable>-forms c)))))
 
-;; callables: the top-level definitions, and a define or set of a lambda
-(define-function erosion-definition-name (form)
-  (and (pair? form) (pair? (cdr form))
-       (let ((op (car form)) (name (cadr form)))
-	 (cond ((memq op '(define-function define-method define-form define-selector define-apply)) name)
-	       ((and (memq op '(define set)) (pair? (cddr form)) (pair? (caddr form)) (= 'lambda (car (caddr form)))) name)))))
+;; callables: the definitions source.l reads from a file's forms (source-lift.g), all but types
 (define-function erosion-line (form)	; the line Maru's reader noted on form's first pair
   (let ((s (and (pair? form) (<pair>-source form)))) (and (pair? s) (cdr s))))
 
@@ -86,17 +82,23 @@
 (define-function erosion-of (sources)
   (let ((callables ()) (forms 0) (flags (identity-hash-table)) (seen (identity-hash-table)) (occurrences ()) (tops ()))
     (list-do src sources
-      (list-do form (cdr src)
-	(let* ((binders (identity-hash-table)) (r (maru-forms-walk form binders flags)) (name (erosion-definition-name form)))
-	  (set forms (+ forms (cadr r)))
-	  (push tops form)
-	  (and name (push callables (make <callable> name: name path: (car src) line: (erosion-line form)
-					  cc: (+ 1 (car r)) forms: (cadr r))))
-	  (erosion-scan form binders
+      (let ((walked (identity-hash-table)))	; each top-level form's walk, which a definition that is one reuses
+	(list-do form (cdr src)
+	  (let* ((binders (identity-hash-table)) (r (maru-forms-walk form binders flags)))
+	    (and (pair? form) (hash-at-put walked form r))
+	    (set forms (+ forms (cadr r)))
+	    (push tops form)
+	    (erosion-scan form binders
 			(lambda (x key atoms)
 			  (when (<= 12 atoms)
 			    (hash-at-put seen key (+ 1 (hash-at seen key 0)))
-			    (push occurrences (cons key x))))))))
+			    (push occurrences (cons key x)))))))
+	(list-do d (forms-definitions (car src) (cdr src))	; a definition inside a let is walked on its own
+	  (unless (= 'type (<definition>-kind d))
+	    (let* ((form (source-form d))
+		   (r (or (hash-at walked form) (maru-forms-walk form (identity-hash-table) (identity-hash-table)))))
+	      (push callables (make <callable> name: (<definition>-name d) path: (car src) line: (erosion-line form)
+				    cc: (+ 1 (car r)) forms: (cadr r))))))))
     (let ((covered (identity-hash-table)) (flagged 0) (findings ()))
       (hash-do flags (lambda (x rule) (hash-at-put covered x 't) (push findings (make <verbose-finding> rule: rule form: x))))
       (list-do o occurrences (and (< 1 (hash-at seen (car o))) (hash-at-put covered (cdr o) 't)))
