@@ -175,6 +175,7 @@
 (define ks-eval)
 (define ks-apply)
 (define ks-stream-deps)
+(define ks-fired?)
 (define ks-any-fired?)
 
 ;; a trigger with streams behind it counts only if one fired this tick, not for a value it holds
@@ -588,9 +589,12 @@
 		      (items (ks-elements col))
 		      (sname (string->symbol (ks-to-string (ks-stream-curr (ks-eval (cadr raw-args) env this)))))
 		      (res 'undefined))
+		 ;; the first item whose stream fired this tick, as KSWorld's switchColE takes the first updated since it last
+		 ;; looked; a box without the stream, or whose stream holds an older value, is passed
 		 (while (and (pair? items) (= res 'undefined))
-		   (let ((p (ks-slot-entry (car items) sname)))	; a box without it is passed
-		     (when p (let ((v (ks-stream-curr (cdr p)))) (when (ks-defined? v) (set res v)))))
+		   (let* ((p (ks-slot-entry (car items) sname))
+			  (s (and p (cdr p))))
+		     (when (and (ks-stream? s) (ks-fired? s)) (set res (ks-stream-curr s))))
 		   (set items (cdr items)))
 		 res))
 	      ((= fn 'timerE)	; fires when a multiple of its step was reached since the last evaluation

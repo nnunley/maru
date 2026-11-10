@@ -261,8 +261,9 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
   transcribed from TR-2012-001, and `kscript.l` runs streams tick by tick, as the report says: a
   stream recomputes when a stream it depends on fires, a primed name isn't a dependency (so
   `nat <- 0 fby nat' + 1` never updates), and undefined keeps the value and stops the change. `timerE`
-  is the only source. Untyped, so it runs on `eval`, not through ir2; `anyE` and `switchColE` still
-  read held values, and layout and rendering don't exist yet.
+  is the only source. Untyped, so it runs on `eval`, not through ir2. `anyE` and `switchColE` take the
+  first item whose stream fired that tick, as KSWorld's do, so a menu reports the button just pressed;
+  layout and rendering don't exist yet.
   Methods are defined per class (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), each a method of
   the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
   field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
