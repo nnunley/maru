@@ -45,9 +45,6 @@
     (list-do bm (ks-boxes-in root) (and (= box (car bm)) (set found (ks-apply-matrix (ks-invert (cdr bm)) point))))
     found))
 
-(define-function ks-fire (stream value)
-  (ks-set-slot stream '__currentValue__ value)
-  (ks-set-slot stream '__firedAt__ *ks-logical-time*))
 (define-function ks-awake? (stream) (and (ks-stream? stream) (not (= (ks-attr stream ':__dormant__) "true"))))
 
 (define-structure <ksworld-session> (root evaluator time hand))
