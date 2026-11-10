@@ -104,15 +104,31 @@
 
 ;; a text box's letter boxes (its contents, ksworld-pp.l's ks-letter-contents) as characters, each knowing its font,
 ;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts.  A box in the text
-;; that isn't a letter keeps its place in the count, so a selection's gaps still count the contents, but isn't laid out:
-;; it stays where its own transformation puts it, and the letters after it don't make room for it.
+;; that isn't a letter is a character with no font, as wide as its extent, laid out as KSTextLayout lays out any box: its
+;; pivot (KSBox>>pivotOffset, its pivotRatio of its extent) on the line's baseline, its ascent above the pivot and its
+;; descent below it.
 (define-function ks-letter? (box)	; KSBox>>unicode is 0 for a box that isn't a letter, as for one that keeps none
   (let ((u (ks-slot box 'unicode))) (and (long? u) (< 0 u))))
+(define-function ks-box-char? (c) (not (<ks-char>-font c)))
+(define-function ks-box-extent (box)	; a box without one, as a document might write it, has none
+  (let ((e (ks-val box 'extent))) (if (ks-point? e) e (ks-point 0 0))))
+(define-function ks-box-pivot (box)	; KSBox's pivotRatio, 0.5@0.5 unless the document gave another
+  (let ((r (ks-val box 'pivotRatio))) (if (ks-point? r) r (ks-point 0.5 0.5))))
+(define-function ks-char-ascent (c)
+  (if (ks-box-char? c)
+      (let ((l (<ks-char>-letter c))) (* (<ks-point>-y (ks-box-pivot l)) (<ks-point>-y (ks-box-extent l))))
+    (* (<ks-char>-scale c) (<ttf>-ascent (<ks-char>-font c)))))
+(define-function ks-char-descent (c)
+  (if (ks-box-char? c)
+      (let ((l (<ks-char>-letter c))) (* (- 1 (<ks-point>-y (ks-box-pivot l))) (<ks-point>-y (ks-box-extent l))))
+    (* (<ks-char>-scale c) (- (<ttf>-descent (<ks-char>-font c))))))
 (define-function ks-letter-chars (letters)
   (let ((out ()) (index 0) (font-of ()) (fonts ()) (size 0) (paint ()))
     (list-do l letters
       (if (not (ks-letter? l))
-	  (set index (+ index 1))
+	  (let ()
+	    (push out (new <ks-char> 0 () 1 () (<ks-point>-x (ks-box-extent l)) 0 index l))
+	    (set index (+ index 1)))
 	(let ((f (ks-slot l 'font)))
 	  (unless (= f font-of)
 	    (let ()	; a span's font keeps what the document wrote as entries under its keywords
@@ -128,8 +144,9 @@
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
 
 ;; how far a glyph's ink starts from its pen
-(define-function ks-left-bearing (c)
-  (* (<ks-char>-scale c) (car (ttf-bounds (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c))))))
+(define-function ks-left-bearing (c)	; a box's ink is its extent: none
+  (if (ks-box-char? c) 0
+    (* (<ks-char>-scale c) (car (ttf-bounds (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)))))))
 
 ;; how far a character moves the pen from x: a tab to the next stop.  The stops (start, stop, step) are from the box's
 ;; edge, and KSWorld's pen starts at the line's first glyph's left bearing, so origin, where x is 0, is the left margin
@@ -191,6 +208,23 @@
     (ks-set-slot letter 'bounds (ks-rect (<ks-point>-x p) (<ks-point>-y p)
 					 (+ (<ks-point>-x p) (<ks-point>-x e)) (+ (<ks-point>-y p) (<ks-point>-y e))))))
 
+;; a box in the text placed as KSBox>>pivotPosition: moved, keeping its scale and rotation, so its pivot's x is the pen's
+;; and its pivot's y the baseline's
+(define-function ks-place-box (box x baseline)
+  (let ((e (ks-box-extent box)) (r (ks-box-pivot box))
+	(m (let ((m (ks-val box 'transformation))) (if (ks-matrix? m) m (ks-matrix 1 0 0 1 0 0)))))
+    (ks-set-val box 'transformation
+		(ks-matrix (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m)
+			   (- x (* (<ks-point>-x r) (<ks-point>-x e))) (- baseline (* (<ks-point>-y r) (<ks-point>-y e)))))))
+
+(define-function ks-place-char (c x baseline)	; a letter's glyph, its letter placed there; a box placed, and no glyph
+  (if (ks-box-char? c)
+      (let () (ks-place-box (<ks-char>-letter c) x baseline) ())
+    (let ((g (new <ks-glyph> (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)) (<ks-char>-scale c)
+		  x baseline (<ks-char>-paint c))))
+      (ks-place-letter (<ks-char>-letter c) g)
+      g)))
+
 (define-function ks-text-box? (box)	; a KSTextLayout's box whose contents are letters
   (let ((c (ks-val box 'contents)) (layout (ks-slot box 'handler)))
     (and (ks-object? c) (ks-instance? c 'KSContentsCollection)
@@ -217,15 +251,13 @@
 	     (spread (if (and (= justification 'full) (not hard) (< 0 spaces)) (/ (- width (ks-line-width ink tabs origin)) spaces) 0))
 	     (ascent 0) (descent 0) (extra 0) (cells ()))
 	(list-do c chars
-	  (set ascent (max ascent (* (<ks-char>-scale c) (<ttf>-ascent (<ks-char>-font c)))))
-	  (set descent (max descent (* (<ks-char>-scale c) (- (<ttf>-descent (<ks-char>-font c)))))))
+	  (set ascent (max ascent (ks-char-ascent c)))
+	  (set descent (max descent (ks-char-descent c))))
 	(list-do c chars
 	  (let ((x (+ (+ left offset) (+ (<ks-char>-x c) extra))))
 	    (push cells (list (<ks-char>-index c) x (+ x (ks-char-width c (<ks-char>-x c) tabs origin))))
-	    (let ((g (new <ks-glyph> (<ks-char>-font c) (ttf-glyph (<ks-char>-font c) (<ks-char>-code c)) (<ks-char>-scale c)
-			  x (+ y ascent) (<ks-char>-paint c))))
-	      (ks-place-letter (<ks-char>-letter c) g)
-	      (or (ks-space? c) (not (memq c ink)) (push out g)))
+	    (let ((g (ks-place-char c x (+ y ascent))))
+	      (or (not g) (ks-space? c) (not (memq c ink)) (push out g)))
 	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
 	(push lines (list y (+ (+ y ascent) descent) (if chars (<ks-char>-index (car chars)) next) (list-reverse! cells)))
 	(set next (cond ((and hard (not (= 1 hard))) (+ 1 (<ks-char>-index hard)))	; past the carriage return, which no line holds
