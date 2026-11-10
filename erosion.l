@@ -1,5 +1,5 @@
 ;;; erosion.l -- SlopCodeBench's erosion and verbosity (Orlanski et al., NeurIPS 2026) over Maru source, counted in forms, as
-;;; docs/plans/2026-11-10-erosion-by-reflection.md has them.  (erosion-of sources), sources ((path . forms) ...), the forms as
+;;; doc/plans/2026-11-10-erosion-by-reflection.md has them.  (erosion-of sources), sources ((path . forms) ...), the forms as
 ;;; Maru's own reader made them, answers an <erosion-metrics>: erosion, the share of complexity mass (CC x sqrt(forms)) held
 ;;; by callables of CC over 10, and verbosity, the share of forms a verbose pattern flags or a clone covers, each per mille,
 ;;; rounded down.  A form is a list outside quoted data; maru-forms.l walks each top-level form once for its complexity, its

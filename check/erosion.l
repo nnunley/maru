@@ -1,4 +1,4 @@
-;;; erosion.l's metrics (SlopCodeBench's erosion and verbosity, counted in forms: docs/plans/2026-11-10-erosion-by-reflection.md)
+;;; erosion.l's metrics (SlopCodeBench's erosion and verbosity, counted in forms: doc/plans/2026-11-10-erosion-by-reflection.md)
 ;;; on small sources whose answers are worked out by hand, each read by Maru's own reader from a file in the check's directory.
 (require "erosion.l")
 (require "recover.l")
