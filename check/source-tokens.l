@@ -1,0 +1,23 @@
+;;; check/source-tokens.l -- ./eval check/source-tokens.l FILE...: source-tokens.l reads Maru text to tokens, each with its
+;;; kind, text, place and line, and the tokens read back to the forms Maru's own reader makes, for each file named.
+(require "source-tokens.l")
+(define ok 1)
+(define-function expect (what got want)
+  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(define-function kinds (text) (map (lambda (t) (<token>-kind t)) (array->list (source-text-tokens text))))
+(define-function texts (text) (map (lambda (t) (<token>-text t)) (array->list (source-text-tokens text))))
+(expect "kinds" (kinds "(f 'x) ; c\n") '(open symbol quote symbol close comment))
+(expect "texts" (texts "(f 'x) ; c\n") '("(" "f" "'" "x" ")" "; c"))
+(expect "quasiquote" (kinds "`(a ,b ,@c)") '(quasiquote open symbol unquote symbol unquote-splicing symbol close))
+(expect "atoms" (kinds "\"a\\\"b\" ?c 12 -3.5 0x1f 3e -x") '(string char number number number number symbol))
+(expect "1+ is a number and a symbol, as eval.c reads it" (texts "1+") '("1" "+"))
+(list-do s '("<pair>" "*g*" "%eax" "$rule" ".long" "a,b" "x->y" "a?")
+  (expect s (texts s) (list s)))
+(let ((ts (source-text-tokens "a\n\n  (b\n c)")))
+  (expect "lines" (map (lambda (t) (<token>-line t)) (array->list ts)) '(1 3 3 4 4))
+  (expect "starts" (map (lambda (t) (<token>-start t)) (array->list ts)) (quote (0 5 6 9 10))))
+(while *arguments*
+  (let* ((path (next-argument)) (text (contents-of-file-named path)))
+    (or (equal (tokens-forms (source-text-tokens text) path) (find-and-read path))
+	(error "source-tokens: " path " reads otherwise than Maru's reader"))))
+(println (if ok "source tokens ok" "source tokens FAILED"))
