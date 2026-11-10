@@ -43,7 +43,10 @@
 	    (else (push code s))))
     (let ((ev (ks-evaluator-new)) (read ()))
       (list-do s code
-	(if (try (let () (ks-stream-ast s) 1) (lambda (c) (ksw-count failed (concat-string "unreadable: " (ksw-message c))) ()))
+	(if (try (let () (ks-stream-ast s) 1)
+		 (lambda (c)
+		   (ks-set-attr s ':__unreadable__ 't)	; so a stream depending on it doesn't read it again, outside this try
+		   (ksw-count failed (concat-string "unreadable: " (ksw-message c))) ()))
 	    (push read s)
 	  (set unreadable (+ unreadable 1))
 	  (push failed-streams s)))

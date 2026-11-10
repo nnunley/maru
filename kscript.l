@@ -797,11 +797,13 @@
 (define-function ks-evaluator-new ()
   (new <ks-evaluator> () -1))
 
+;; a stream's code, read once; one whose code didn't read (a driver marks it :__unreadable__) has none, as a setter has
+;; none, so the sort reaching it as another's dependency neither reads it again nor evaluates it
 (define-function ks-stream-ast (s)
   (or (ks-attr s ':__ast__)
       (let ((code (ks-attr s ':__code__))
 	    (type (ks-attr s ':__type__)))
-	(when (and code (not (= type "setter")))
+	(when (and code (not (= type "setter")) (not (ks-attr s ':__unreadable__)))
 	  (let ((ast (car (kscript-parse code))))
 	    (ks-set-attr s ':__ast__ ast)
 	    ast)))))
