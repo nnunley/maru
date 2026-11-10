@@ -73,6 +73,17 @@ Samimi's planning language: parsing, the possible-worlds evaluator, sessions and
   `john-children` allows from the current world, through G's goal-optimizations, one line each, `STEP  score N`, best
   first, N `john-score` of the world the step leads to, steps of one score in `john-children`'s order; then `choices: K.`
   It neither moves time nor searches: one level of what `satisfy` explores, ranked by the goal's heuristics.
+  Ours: a session's chain of worlds is written as Maru forms (`john-serialize.l`), one line a world,
+  `(world (ACTOR ACTION ARG…) ((OBJECT PROPERTY VALUE) …))`, a value a name, a number, a string, `(list V…)` or
+  `(value KIND (FIELD V)…)`, and `(make CLASS NAME VALUE…)` a declaration. `john-deserialize` reads such forms (Maru's
+  `read`, never `john.g`) into a session: makes into world 0, then each world appended to the chain with exactly its own
+  writes, nothing evaluated, so a plan edited since doesn't rewrite its past. A line that is neither, or names an object,
+  action, property or kind the program doesn't declare, fails naming its position (`ledger 2: unknown object Ghost`),
+  unless the program declared the object `retired NAME.`: then the line is skipped and counted (`john-skipped`). Reading
+  a chain back also gives each property its history, its writes in time order, shared by the chain's worlds: a read at
+  any time searches that history, and `at time` finds its world by index, so neither walks the chain (the case cuts a
+  parent pointer in a chain of 2000 to show it). `E over time`, E a property read `X p`, is the distinct values X's p has
+  held from world 0 to now, each where it first appeared (`doc/rfc/draft-ndn-maru-john-development-00.md`).
 - `call_by_meaning` (`check/meaning.l`): `meaning.l`, call by meaning (Samimi et al., Onward! 2014, TR-2014-003) with a model
   where the paper had Cyc. A model proves nothing, so each answer is held to what John can check: `"…" find-passing: "probe"`
   takes an object whose `spec` the model says means the text only if it passes the probe, a qualification of its class, and

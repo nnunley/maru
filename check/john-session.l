@@ -120,4 +120,76 @@
 (enter "T do pick Big. T do pick Small. T do pick Odd.")
 (expect "no step allowed" (enter "choices T g.") '("choices: 0."))
 
+;; a condition's parts as text, joined outside the world that failed
+(define-selector part-text (x) (symbol->string x))
+(define-method part-text <string> () self)
+(define-method part-text <long> () (long->string self))
+(define-function condition-text (c) (apply concat-strings (map part-text (cdr c))))
+;; R-ledger-forms: a chain of worlds written as Maru forms (john-serialize.l) and read back by read, evaluating nothing
+(require "recover.l")
+(require "john-serialize.l")
+(define pair-program "set Mark = plain | noted(text).
+  create Pair a b note. make Pair X 0 0 plain.
+  action Pair both consequence its a = its a + 1 and its b = its b + 2.
+  action Pair mark Mark consequence its note = Mark.")
+(define-function ledger-text (forms)	; the lines a ledger would hold
+  (let ((s "")) (list-do f forms (set s (concat-strings s (john-ledger-line f) "\n"))) s))
+(define-function write-file (path text)
+  (let ((f ((subr "fopen" "ss>p") path "w"))) ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f)))
+(john-begin)
+(enter pair-program)
+(enter "X do both. X do both. X do mark noted(text: \"q\\\"b\\\\c\nd\").")
+(define forms (john-serialize-worlds 0 *john-world*))
+(expect "one form a world, oldest first, its action and every write it made"
+	(list-length forms) 3)
+(expect "a world's form" (car forms) '(world (X both) ((X a 1) (X b 2))))
+(expect "a value with fields" (caddr (caddr forms)) '((X note (value noted (text "q\"b\\c\nd")))))
+(define ledger (concat-string check-tmp "/pair.answers"))
+(write-file ledger (concat-string "; a ledger\n" (ledger-text forms)))
+(expect "read gives the forms back" (read ledger) forms)
+(write-file ledger (let ((t (ledger-text forms))) (string-copy t 0 (- (string-length t) 1))))
+(expect "a last line with no newline reads" (read ledger) forms)
+(john-begin)
+(enter pair-program)
+(john-deserialize (read ledger))
+(expect "time is the chain's length" (enter "time.") '("3"))
+(expect "a property as the original has it" (enter "X a. at time 1 X b.") '("2" "2"))
+(expect "which action made a world" (enter "at time 3 X did mark.") '("yes"))
+(expect "a string with quotes, a backslash and a newline" (john-eval '(send (send X note) text) *john-world* ()) "q\"b\\c\nd")
+(expect "nothing was evaluated: the writes are the lines'"
+	(let () (john-begin) (enter pair-program) (john-deserialize '((world (X both) ((X a 40))))) (enter "X a. X b.")) '("40" "0"))
+(expect "a line naming an object the program doesn't declare"
+	(let () (john-begin) (enter pair-program)
+	  (try (let () (john-deserialize '((world (X both) ()) (world (Ghost both) ()))) "read") condition-text))
+	"ledger 2: unknown object Ghost")
+(expect "a line that is neither a world nor a make"
+	(let () (john-begin) (enter pair-program) (try (let () (john-deserialize '((wrld))) "read") condition-text))
+	"ledger 1: not a world or a make")
+(expect "a make line is a declaration, in world 0"
+	(let () (john-begin) (enter pair-program) (john-deserialize '((make Pair Y 5 6 plain) (world (Y both) ())))
+	  (enter "at time 0 Y a. time."))
+	'("5" "1"))
+;; R-retired: a retired object's lines are skipped, and counted
+(expect "a retired object's world is skipped"
+	(let () (john-begin) (enter pair-program) (enter "retired Ghost.")
+	  (john-deserialize '((world (X both) ()) (world (Ghost both) ()) (make Pair Ghost 1 1 plain)))
+	  (list (enter "time.") (john-skipped)))
+	'(("1") ((Ghost . 2))))
+;; R-history-index: each property's history answers a read at any time without walking the chain
+(john-begin)
+(enter pair-program)
+(define long-chain ())
+(for (i 1 2001) (push long-chain (list 'world '(X both) (list (list 'X 'a i)))))
+(john-deserialize (list-reverse! long-chain))
+(let ((w2 (john-at-time *john-world* 2)))
+  (set (<john-world>-parent w2) ()))
+(expect "the history, not the chain, answers now and at 1500" (enter "X a. at time 1500 X a. at time 1 X a. X b.") '("2000" "1500" "1" "0"))
+(john-begin)
+(enter pair-program)
+(enter "X do mark noted(text: \"one\"). X do both. X do mark noted(text: \"two\"). X do mark noted(text: \"one\").")
+(expect "over time: each value once, oldest first, world 0's too"
+	(enter "X note over time.") '("[ plain, noted(text: one), noted(text: two) ]"))
+(john-deserialize ())
+(expect "and the same from a history" (enter "X note over time.") '("[ plain, noted(text: one), noted(text: two) ]"))
+
 (if ok (println "john session ok") (exit 1))

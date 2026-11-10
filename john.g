@@ -12,7 +12,7 @@ idpart		= (letter (letter | digit | "-" &letter)*) @ $$ ;
 wb		= !(letter | digit | "-") _ ;
 reserved	= ( "if" | "is" | "try" | "using" | "use" | "by" | "do" | "consequence" | "establish"
 		  | "dynamically" | "maximize" | "minimize" | "and" | "or" | "not" | "for" | "every"
-		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" | "total" | "choices" ) !(letter | digit | "-") ;
+		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" | "total" | "choices" | "over" | "retired" ) !(letter | digit | "-") ;
 name		= !reserved idpart:x !":" _					-> x ;
 kw		= idpart:x ":" _						-> (john-kw x) ;
 rel		= name:n &-> (john-relation? n)					-> n ;
@@ -34,7 +34,8 @@ arop		= "+" -> '+ | "-" -> '- | "*" -> '* | "/" -> '/ ;
 arith		= arith:a arop:o _ chain:b					-> `(,o ,a ,b)
 		| chain ;
 kwpart		= kw:k primary:a						-> (cons k a) ;
-chain		= chain:r kwpart+:ps						-> `(send ,r ,(john-selector ps) ,@(map cdr ps))
+chain		= chain:r "over" wb "time" wb					-> `(over-time ,r)	# ours: the values it has held
+		| chain:r kwpart+:ps						-> `(send ,r ,(john-selector ps) ,@(map cdr ps))
 		| chain:r !rel name:n						-> `(send ,r ,n)
 		| prefix
 		| primary ;
@@ -105,6 +106,7 @@ statement	= "set" wb name:c "=" _ member:a ("|" _ member)*:b end		-> `(enumerati
 		| "for" wb !quant expr:l "do" wb (makebody | expr):b end	-> `(for ,l ,b)
 		| "at" wb "time" wb primary:t expr:e end			-> `(at-time ,t ,e)
 		| "is" wb expr:e end						-> `(is ,e)
+		| "retired" wb name:n end					-> `(retired ,n)	# ours: its ledger lines are skipped
 		| "choices" wb name:o name:g end				-> `(choices ,o ,g)	# ours: the frontier, ranked
 		| primary:o "satisfy" wb name:g primary*:as ("using" wb name+)?:u ("by" wb primary)?:b end
 										-> `(satisfy ,o ,g ,as ,(car u) ,(car b))
