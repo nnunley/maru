@@ -13,7 +13,9 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   reports the button just pressed; layout and rendering don't exist yet.
   Methods are defined per class (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), each a method of
   the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
-  field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
+  field or entry it already has, but never makes one, which would hide a missing method. A stream answers its own
+  class's methods (`set`, `mapE` …) and any other send as its value does: KSObject's are a box's (`center`, `width`), and
+  a box's bounds, a stream of a rectangle, answers its rectangle's. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
   collection, true as a test, never nil. KScript compiles to Smalltalk, and a chain reads as KSWorld's compiler reads it.
   `a[k]` and `a.k` are `KSCompiler>>get`'s `ksAt:`, the slot itself, so a stream answers as itself. A chain down to

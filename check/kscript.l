@@ -134,6 +134,12 @@ for i in [0...10] by 5 total := total + i
 	  (= (ks-chain-end (car (kscript-parse "@a.b")) box) (ks-slot x 'b)) 't)
   (expect "a three-step chain ends at the last key on the object holding the one before it"
 	  (= (ks-chain-end (car (kscript-parse "@a.b.c")) box) (ks-slot x 'c)) 't))
+;; a stream answers its own class's methods, and any other send as its value does, even one KSObject has for a box:
+;; a box's bounds, a stream of a rectangle, answers its rectangle's center (deviation-demo's slider1.bounds.center())
+(let ((box (box-of "b <- P(10, 20).extent(P(30, 40))\n")))
+  (expect "a stream of a rectangle, its center and width"
+	  (map (lambda (text) (ks-stream-curr (ks-eval (car (kscript-parse text)) () box))) '("this.b.center().y()" "this.b.width()"))
+	  '(40 30)))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 

@@ -282,11 +282,17 @@
 	(else (ks-no-method recv sel))))
 ;; a send: the receiver's kind's method, up its superclasses; else, as in Smalltalk, doesNotUnderstand: with a Message (its
 ;; selector in Squeak's form and ours, its arguments), which KSObject answers from its slots and Object at the root natively
+;; a stream answers its own class's methods, not those it inherits from KSObject, which are a box's (center, width ...):
+;; any other send goes to its value
+(define-function ks-stream-method (sel args)
+  (or (ks-own-method 'KSEventStream sel) (and args (ks-own-method 'KSEventStream (ks-squeak-selector sel (list-length args))))))
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
     (let* ((type (type-of recv))	; a class object's type is its metaclass
-	   (m (or (ks-method-for-type type sel) (and args (ks-method-for-type type (ks-squeak-selector sel (list-length args))))))
-	   (dnu (and (not m) (ks-method-for-type type '_doesNotUnderstand))))
+	   (stream (ks-stream? recv))
+	   (m (if stream (ks-stream-method sel args)
+		(or (ks-method-for-type type sel) (and args (ks-method-for-type type (ks-squeak-selector sel (list-length args)))))))
+	   (dnu (and (not m) (not stream) (ks-method-for-type type '_doesNotUnderstand))))
       (cond (m (m recv args env this))
 	    (dnu (dnu recv (list (ks-new-object 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
 		      env this))
