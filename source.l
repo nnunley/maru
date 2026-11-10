@@ -13,9 +13,10 @@
 (require "maru-forms.l")
 (require "source-tokens.l")
 
-(define-structure <source> (path first last form serial tokens))	; serial: the order kept in; tokens: made when asked
+(define-structure <source> (path first last form serial span))	; first, last: the lines the reader noted; serial: the order kept
+(define-structure <source-extent> (start end first last tokens))	; where its text is: positions, its true lines, its tokens
 (define-method do-print <source> () (print "<source " self.path ":" self.first "-" self.last ">"))
-(define-structure <source-file> (text starts))			; starts: where each line begins, line 1 at index 0
+(define-structure <source-file> (text starts tokens forms ranges))	; starts: where each line begins; the rest read when asked
 
 (define *sources* (weak-identity-hash-table))	; object -> <source>
 (define *type-sources* (array))			; type -> <source>
@@ -79,19 +80,48 @@
 (define-selector form-count (self) (let ((s (source-of self))) (and s (form-count s))))
 (define-method form-count <source> () (maru-forms-count self.form))
 (define-selector line-count (self) (let ((s (source-of self))) (and s (line-count s))))
-(define-method line-count <source> ()
-  (let* ((f (source-file self.path)) (text (<source-file>-text f)) (starts (<source-file>-starts f)) (n 0))
-    (for (l self.first (+ self.last 1))
-      (let ((from (array-at starts (- l 1)))
-	    (to (if (< l (array-length starts)) (array-at starts l) (string-length text))))
-	(and from (source-line-holds-code? text from to) (set n (+ n 1)))))
-    n))
+;; Where a definition's text is: the reader notes a line on each pair, which misses a closing paren on a line of its own and
+;; drifts after a string holding newlines, and a line may hold more than one definition.  So the file is divided into tokens
+;; once (source-tokens.l), read back to forms keeping each list's opening and closing token, and a definition's extent is the
+;; list equal to its form nearest the line its reader noted.
+(define-function source-file-read (f)	; its tokens, the forms they read back to, and each list's range
+  (or (<source-file>-tokens f)
+      (let* ((tokens (source-text-tokens (<source-file>-text f))) (fr (tokens-forms-ranges tokens)))
+	(set (<source-file>-forms f) (car fr))
+	(set (<source-file>-ranges f) (cdr fr))
+	(set (<source-file>-tokens f) tokens)))
+  f)
+(define-function source-extent (s)
+  (or (<source>-span s)
+      (let* ((f (source-file-read (source-file (<source>-path s)))) (form (<source>-form s)) (ranges (<source-file>-ranges f))
+	     (best ()) (distance 0) (todo (list (<source-file>-forms f))))
+	(while todo	; every list in the file, along spines in a loop
+	  (let ((x (car todo)))
+	    (set todo (cdr todo))
+	    (and (pair? x) (= (car x) (car form)) (equal x form)
+		 (let* ((r (hash-at ranges x)) (d (and r (- (<token>-line (car r)) (<source>-first s)))))
+		   (and r (< d 0) (set d (- 0 d)))
+		   (and r (or (not best) (< d distance)) (let () (set best r) (set distance d)))))
+	    (while (pair? x) (and (pair? (car x)) (push todo (car x))) (set x (cdr x)))))
+	(and best
+	     (let ((start (<token>-start (car best))) (end (<token>-end (cdr best))) (tokens ()))
+	       (array-do t (<source-file>-tokens f) (and (<= start (<token>-start t)) (<= (<token>-end t) end) (push tokens t)))
+	       (set (<source>-span s) (make <source-extent> start: start end: end first: (<token>-line (car best))
+					    last: (<token>-line (cdr best)) tokens: (list->array (list-reverse! tokens)))))))))
+(define-method line-count <source> ()	; its lines, from its first token's to its last's, that hold more than a comment
+  (let ((e (source-extent self)))
+    (and e
+	 (let* ((f (source-file self.path)) (text (<source-file>-text f)) (starts (<source-file>-starts f)) (n 0))
+	   (for (l (<source-extent>-first e) (+ (<source-extent>-last e) 1))
+	     (let ((from (array-at starts (- l 1)))
+		   (to (if (< l (array-length starts)) (array-at starts l) (string-length text))))
+	       (and from (source-line-holds-code? text from to) (set n (+ n 1)))))
+	   n))))
 (define-selector source-text (self) (let ((s (source-of self))) (and s (source-text s))))
-(define-method source-text <source> ()	; its lines, the last without its newline
-  (let* ((f (source-file self.path)) (text (<source-file>-text f)) (starts (<source-file>-starts f))
-	 (from (array-at starts (- self.first 1)))
-	 (to (if (< self.last (array-length starts)) (- (array-at starts self.last) 1) (string-length text))))
-    (string-copy text from (- to from))))
+(define-method source-text <source> ()	; its own text, from its opening paren to its closing one
+  (let ((e (source-extent self)))
+    (and e (string-copy (<source-file>-text (source-file self.path)) (<source-extent>-start e)
+			(- (<source-extent>-end e) (<source-extent>-start e))))))
 (define-function source-by-serial (ss)	; an insertion sort: a selector has a handful of methods
   (let ((out ()))
     (list-do s ss
@@ -100,11 +130,7 @@
 	(set out (concat-list (list-reverse! before) (cons s after)))))
     out))
 (define-selector source-tokens (self) (let ((s (source-of self))) (and s (source-tokens s))))
-(define-method source-tokens <source> ()
-  (or self.tokens
-      (let ((tokens (source-text-tokens (source-text self))))
-	(array-do t tokens (set (<token>-line t) (+ (<token>-line t) (- self.first 1))))
-	(set self.tokens tokens))))
+(define-method source-tokens <source> () (let ((e (source-extent self))) (and e (<source-extent>-tokens e))))
 (define-method in-enter <source> ()		1)
 (define-method in-start <source> ()		0)
 (define-method in-at-end <source> (pos)		(>= pos (array-length (source-tokens self))))
@@ -138,13 +164,17 @@
     (<source-parser>-result p)))
 (define-function file-definitions (path) (forms-definitions path (find-and-read path)))
 ;; what was read before this file: the boot file, which the evaluator read itself before load or its hook existed, and each
-;; file required before; read again, each definition is kept for what its name is bound to now
-(define-function source-backfill (path)
-  (let ((forms (find-and-read path)))
-    (and forms
-	 (list-do d (forms-definitions path forms)
-	   (let ((object (source-defined (source-form d))))
-	     (and object (source-put object (<definition>-source d))))))))
-(let ((paths ()))	; *loaded* is newest first
+;; file required before, read again in the order they were evaluated (a file's forms in turn, a require read where it stands,
+;; once), so the definition kept for a name is the one the program ran last
+(define-function source-replay (path seen)
+  (unless (hash-at seen path)
+    (hash-at-put seen path 't)
+    (list-do form (find-and-read path)
+      (if (and (pair? form) (= 'require (car form)) (pair? (cdr form)) (string? (cadr form)) (member? (cadr form) *loaded*))
+	  (source-replay (cadr form) seen)
+	(list-do d (forms-definitions path (list form))
+	  (let ((object (source-defined (source-form d))))
+	    (and object (source-put object (<definition>-source d)))))))))
+(let ((paths ()) (seen (equal-hash-table)))	; *loaded* is newest first
   (list-do path *loaded* (push paths path))
-  (list-do path (cons (if (defined? 'find-and-read-in) "boot2.l" "boot.l") paths) (source-backfill path)))
+  (list-do path (cons (if (defined? 'find-and-read-in) "boot2.l" "boot.l") paths) (source-replay path seen)))

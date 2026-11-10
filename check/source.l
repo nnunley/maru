@@ -21,6 +21,18 @@
 (let ((m (array-at (<selector>-methods source-fixture-s) <pair>)))
   (expect "a method knows its file and lines" (list (<source>-path (source-of m)) (<source>-first (source-of m)) (<source>-last (source-of m)))
 	  '("check/source/defs.l" 8 8)))
+;; a definition's text is its own, however it shares lines or holds strings
+(load "check/source/spans.l")
+(expect "a definition sharing its line with another has only its own text"
+	(source-text span-b) "(define-function span-b () 'b)")
+(expect "and its tokens read back to it alone" (tokens-forms (source-tokens span-b)) (list (source-form span-b)))
+(expect "a closing paren on its own line ends the text, and counts as a line"
+	(list (source-text span-hang) (line-count span-hang)) '("(define-function span-hang (x)\n  (+ x 1)\n  )" 3))
+(expect "a definition after a string of three lines is where it is" (source-text span-after) "(define-function span-after () 'after)")
+(expect "a definition ending in a string of two lines has all of it, and tokens"
+	(list (source-text span-tail) (tokens-forms (source-tokens span-tail)))
+	(list "(define-function span-tail () (list \"x\ny\"))" (list (source-form span-tail))))
+
 ;; what was read before source.l: the boot file, which the evaluator read itself, and each file required before
 (define boot-file (if (defined? 'find-and-read-in) "boot2.l" "boot.l"))
 (expect "a boot definition answers its source in the boot file" (<source>-path (source-of load)) boot-file)

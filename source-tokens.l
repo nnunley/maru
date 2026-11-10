@@ -6,6 +6,7 @@
 (require "source-parser.l")
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
+(require "hash.l")
 (define-structure <token> (kind text start end line))
 (define-method do-print <token> () (print "<" self.kind " " self.line ":" self.text ">"))
 (define-function maru-token (parser kind start end)	; not self: make binds self to what it makes
@@ -64,8 +65,12 @@
 	  ((= kind 'number)	(token-number text))
 	  ((= kind 'string)	(token-value $string_value text))
 	  (else			(token-value $char_value text)))))
+(define token-forms-range ())	; the grammar's action, set once its type exists
 (tpeg-load "maru-token-forms.g")
-(define-function tokens-forms (tokens)
+(set token-forms-range (lambda (parser open close list) (and (pair? list) (hash-at-put (<maru-token-forms>-ranges parser) list (cons open close))) list))
+(define-function tokens-forms-ranges (tokens)	; (forms . ranges): ranges, by each list, its (opening . closing) tokens
   (let ((p (source-parser-for <maru-token-forms> tokens)))
+    (set (<maru-token-forms>-ranges p) (identity-hash-table))
     (or ($forms p) (error "source-tokens: can't read the tokens to forms"))
-    (<source-parser>-result p)))
+    (cons (<source-parser>-result p) (<maru-token-forms>-ranges p))))
+(define-function tokens-forms (tokens) (car (tokens-forms-ranges tokens)))
