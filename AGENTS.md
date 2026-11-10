@@ -55,7 +55,7 @@ sizes by definition.
 
 ## Verify
 
-make check
+    make check
 
 `make check` runs the cases four at a time (`check/parallel.l`, `MARU_CHECK_JOBS` to change it), and says which were slowest, in CPU time; `times` in its directory has each case's wall and CPU time in milliseconds, peak memory (bytes on macOS, kilobytes on Linux), disk blocks, minor and major faults, and switches;
 `make check-quick` leaves out the slowest, for everyday edits. Everything runs before a merge. `make check-sweep` looks for new

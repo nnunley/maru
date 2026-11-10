@@ -16,8 +16,8 @@ Nile's compiler on Maru, its runtime in typed Maru, Gezira, and the runtime's la
   rest white, on 1 and 4 workers (`nile/runtimes/maru/test/gezira-image.k`).
 - `gezira_maru` (`check/check.l`, `check/gezira-maru.l`): the Gezira library `build/gezira.dylib` (make builds it from
   `gezira/nile/gezira.nl` and the runtime) through `gezira-maru.l`'s `<gezira-maru>` selectors renders the `gezira_image`
-  rectangle with a matrix, on 1 and 4 workers. `check/gezira-scene.l` draws `check/ksworld/scene.pp` the same way; it is
-  verified in a scratch copy with main's KSWorld stack and is not registered on this branch.
+  rectangle with a matrix, on 1 and 4 workers. `gezira_scene` (`check/gezira-scene.l`) draws `check/ksworld/scene.pp`
+  the same way.
 - `nile_laws` (`check/laws/runtime.law`, `check/laws/runtime.l`): through the batch driver `nile/runtimes/maru/test/law-runtime.k`,
   built with text-layout.nl's module, every law by exhaustion over lengths 0, 1, 2, 3, 5, 60 to 62, 121 to 123, 244 and 245
   (a buffer holds 122 floats: one and two buffers crossed for streams of floats and of pairs) and seeds 1 and 7. The
@@ -55,4 +55,4 @@ Nile's compiler on Maru, its runtime in typed Maru, Gezira, and the runtime's la
   nothing, so only `nile_Process_claim_locked`'s test holds it. Enumerating every schedule within two preemptions, or two
   delays of a round robin, found none of the races.
 
-Not yet described here (each has a comment above it in `check/check.l`): `nile_dupcat`, `nile_interface`, `nile_leaks`, `nile_limits`, `nile_oom`, `nile_osdefs`, `nile_prefix`, `nile_recip`, `nile_reroute`, `nile_reverse`, `nile_sort`, `nile_startup`, `nile_zip_stream`, `gezira_many`, `gezira_oom`, `gezira_scene`.
+Not yet described here (each has a comment above it in `check/check.l`): `nile_dupcat`, `nile_interface`, `nile_leaks`, `nile_limits`, `nile_oom`, `nile_osdefs`, `nile_prefix`, `nile_recip`, `nile_reroute`, `nile_reverse`, `nile_sort`, `nile_startup`, `nile_zip_stream`, `gezira_many`, `gezira_oom`.
