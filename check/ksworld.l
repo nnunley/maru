@@ -120,7 +120,8 @@
   (let ((items (ks-items (ks-val (array-at table 3) 'contents))))
     (expect "text starting with a box" (map (lambda (l) (if (ks-letter? l) (ks-slot l 'unicode) (ks-slot l 'name))) items) '("photo" 120))
     (when (ks-font-file 'TimesNewRoman ks-plain)
-      (expect "a box whose unicode is 0 isn't a letter" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(1)))))
+      (expect "a box whose unicode is 0 isn't a letter" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(1))))
+  (expect "text that is only a box, named by :valueId" (ks-items (ks-val (array-at table 5) 'contents)) (list (array-at table 6))))
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send (ks-class-named 'Color) 'white () () ())) (try (ks-send (ks-class-named 'Color) 'lighter () () ()) (lambda (c) (ksw-message c))))
 	'(1.0 "Smalltalk: Color class does not understand lighter"))
