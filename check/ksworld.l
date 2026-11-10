@@ -18,6 +18,15 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("Smalltalk: KSBox does not understand blink" . 1))))
 
+;; a text box's text set by a stream, as deviation-demo's numbers set theirs: its letters replaced, in the font they had
+(let* ((r (ksworld-run "check/ksworld/text.pp" 4))
+       (box (array-at (at r 'table) 1)) (letters (ks-items (ks-val box 'contents))))
+  (expect "a box's text, set by its stream"
+	  (list (list->string (map (lambda (l) (ks-slot l 'unicode)) letters)) (at r 'failures)) '("30" ()))
+  (expect "its letters, in the box, in the font the span gave"
+	  (map (lambda (l) (list (= box (ks-slot l 'container)) (ks-attr (ks-slot l 'font) ':family))) letters)
+	  '((t "TimesNewRoman") (t "TimesNewRoman"))))
+
 ;; what a document draws, asked of a Gezira: here one that records each path it's asked to fill, so the walk is checked
 ;; with no Gezira built
 (define-structure <gezira-recording> (paths))

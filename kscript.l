@@ -419,6 +419,7 @@
   (first (car (ks-items recv)))
   (size (list-length (ks-items recv)))
   (copy recv)
+  (textContents (if args (ks-set-text-contents recv (ks-to-string (car args))) (ks-text-contents recv)))
   (width (<ks-point>-x (or (ks-val recv 'extent) (ks-point 0 0))))
   (height (<ks-point>-y (or (ks-val recv 'extent) (ks-point 0 0))))
   (topLeft (if args (ks-box-set-topleft recv (car args)) (ks-send (ks-box-rect recv) 'topLeft () env this)))
