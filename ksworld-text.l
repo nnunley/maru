@@ -142,7 +142,8 @@
     (<ks-char>-advance c)))
 
 ;; characters into lines, each (hard origin chars...) with chars in order and their pen x set: a carriage return ends a
-;; line hard, and a word that runs past width (unless wrapping is off) starts the next one, the space before it ending this
+;; line hard (hard is that character, or 1 for the text's end), and a word that runs past width (unless wrapping is off)
+;; starts the next one, the space before it ending this
 (define-function ks-break-lines (chars width tabs wrap left)
   (let ((lines ()) (line ()) (pen 0) (origin left))
     (let ((finish (lambda (hard) (push lines (cons hard (cons origin (list-reverse! line)))) (set line ()) (set pen 0)))
@@ -152,7 +153,7 @@
 		   (set pen (+ pen (ks-char-width c pen tabs origin)))
 		   (push line c))))
       (list-do c chars
-	(cond ((= 13 (<ks-char>-code c)) (finish 1))
+	(cond ((= 13 (<ks-char>-code c)) (finish c))
 	      (else
 	       (when (and wrap (not (ks-space? c)) (> (+ pen (ks-char-width c pen tabs origin)) width))
 		 (let ((tail ()) (rest line))
@@ -227,8 +228,9 @@
 	      (or (ks-space? c) (not (memq c ink)) (push out g)))
 	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
 	(push lines (list y (+ (+ y ascent) descent) (if chars (<ks-char>-index (car chars)) next) (list-reverse! cells)))
-	(and chars (set next (+ 1 (<ks-char>-index (car (last-pair chars))))))
-	(and hard (set next (+ next 1)))	; past the carriage return, which no line holds
+	(set next (cond ((and hard (not (= 1 hard))) (+ 1 (<ks-char>-index hard)))	; past the carriage return, which no line holds
+			(chars (+ 1 (<ks-char>-index (car (last-pair chars)))))
+			(else next)))
 	(set y (+ (+ y ascent) (+ descent 2)))))
     (cons (list-reverse! out) (list-reverse! lines))))
 (define-function ks-text-glyphs (box) (car (ks-text-layout box)))
