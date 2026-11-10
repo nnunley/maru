@@ -8,7 +8,7 @@
 
 **Tech Stack:** untyped Maru (`boot.l`, `boot2.l`), `tpeg.g`, `compile-tpeg.l`, `text-parser.l`, `check/check.l`.
 
-**Spec:** `docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`, stage 1 of its order of work.
+**Spec:** `doc/rfc/draft-ndn-maru-typed-tree-matching-00.md`, stage 1 of its order of work.
 
 ## Global Constraints
 

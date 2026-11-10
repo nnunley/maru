@@ -240,7 +240,7 @@ the native path; the Nile runtime and Gezira move to it when `[R-nile-native]` p
 ## References
 
 - RFC 2119, RFC 8174: BCP 14 key words.
-- RFC 0001 (`docs/rfc/0001-table-assemblers.md`): the encoders, placeholders and the code region.
+- RFC 0001 (`doc/rfc/0001-table-assemblers.md`): the encoders, placeholders and the code region.
 - `asm-coverage.spec`, `abi.spec`, `stub.l`, `stub-arm64.g`, `stub-x64.g`, `exe.l`, `code-region.l`.
 - `ir-gen-x86.k` (Piumarta): the frame-slot model this follows; `ir-gen-c.k`: what this replaces, not the reference.
 - Arm, "Procedure Call Standard for the Arm 64-bit Architecture" (AAPCS64); Apple, "Writing ARM64 code for Apple

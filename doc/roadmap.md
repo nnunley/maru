@@ -15,13 +15,13 @@
 4. Bare metal: Maru as a bootable live image. The qemu raw-boot
    environments (i386, x86-64 long mode, A64 `virt`: boot, console, memory
    map, exit) are the first step, specified after the encoders
-   (RFC 0001, `docs/rfc/0001-table-assemblers.md`) as part C of the 2026-10-14
+   (RFC 0001, `doc/rfc/0001-table-assemblers.md`) as part C of the 2026-10-14
    assembler design.
 5. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
    POSIX mutexes, arm64 and x86-64), then Gezira, then its demos in an SDL3
    window on macOS and Linux.
    Nile and Gezira come in as submodules of forks, and count toward the 20k.
-   Spec: `docs/rfc/draft-ndn-nile-runtime-in-maru-02.md`.
+   Spec: `doc/rfc/draft-ndn-nile-runtime-in-maru-02.md`.
    - Array types in `maru.k`/`ir2`, replacing the runtime's `long` field runs.
    - Blocks sized to a stream's element size, so kernels over large tensors
      can run (one 512-byte block size caps an element at about 118 floats).

@@ -1,5 +1,5 @@
 ;;; erosion.l -- SlopCodeBench's erosion and verbosity (Orlanski et al., NeurIPS 2026) over Maru source, as
-;;; docs/plans/2026-11-08-erosion-metrics.md has them.  (erosion-of sources), sources ((path . text) ...), answers an
+;;; doc/plans/2026-11-08-erosion-metrics.md has them.  (erosion-of sources), sources ((path . text) ...), answers an
 ;;; <erosion-metrics>: erosion, the share of complexity mass (CC x sqrt(SLOC)) held by callables of CC over 10, and
 ;;; verbosity, the share of source lines a verbose pattern flags or a clone covers, each per mille, rounded down.
 (require "maru-lines.l")

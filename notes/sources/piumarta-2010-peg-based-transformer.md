@@ -132,7 +132,7 @@ Artifacts named:
   encoding tables.
 - **§6 anticipates the table-driven assembler.** Its JIT note (output expressions that build
   instruction words from bit fields) is exactly what the A64 encoding table provides. The spec
-  (`docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`) is the "syntax to
+  (`doc/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`) is the "syntax to
   construct integer instructions from bit fields", made reversible.
 - **The architecture already exists in our tree.** The middle end's accumulator/stack abstract
   machine is essentially `emit.l`'s model. The PEG engine (`peg.l`, `parser.l`, `peg-compile.l`)

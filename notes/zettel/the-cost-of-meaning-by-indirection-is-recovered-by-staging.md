@@ -22,4 +22,4 @@ The data stays the only source either way; staging changes only when the interpr
 
 The general rule: keep meaning in data for openness and size, and buy back speed by compiling the data, rather than by hand-writing the specialised code.
 
-Source: Piumarta 2011, *Open, extensible composition models* (VPRI TR-2011-002), §5.4 and §6 (primary; the recovery claim is unproven there); Maru rebuild table-driven assembler spike, 2026-10-14 (measured instance; see `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`).
+Source: Piumarta 2011, *Open, extensible composition models* (VPRI TR-2011-002), §5.4 and §6 (primary; the recovery claim is unproven there); Maru rebuild table-driven assembler spike, 2026-10-14 (measured instance; see `doc/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`).

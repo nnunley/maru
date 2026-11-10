@@ -9,7 +9,7 @@
 ;;; the *john-...* lists below) and a working memory (the current world and its parents).  Declarations add to the first,
 ;;; and a make's facts to the current world; only a step (do, or a satisfied goal) moves time.  With *john-echo* on, as at
 ;;; john-repl.l's prompt, a declaration answers ok., a step its mutations, and a failed statement its error, undone.
-;;; docs/rfc/draft-ndn-maru-john-session-00.md.
+;;; doc/rfc/draft-ndn-maru-john-session-00.md.
 ;;;
 ;;; An object is its name, a symbol; a class is its instances wherever a collection is
 ;;; expected.  A world holds the property values set in it and finds the rest in its

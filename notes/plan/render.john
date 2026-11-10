@@ -1,7 +1,7 @@
 ; Gezira renders KSWorld documents in an SDL3 window, with the mouse: what's being built, what each piece builds on, and what
 ; would show it works.  MARU_PLAN=render notes/plan/record asks the checks; MARU_PLAN=render ./eval notes/plan/next.l says
-; what's next.  The Nile runtime's pieces follow docs/plans/2026-10-15-nile-runtime-in-maru.md (RFC
-; docs/rfc/draft-ndn-nile-runtime-in-maru-02.md); the document's side builds on notes/plan/ksworld.john.
+; what's next.  The Nile runtime's pieces follow doc/plans/2026-10-15-nile-runtime-in-maru.md (RFC
+; doc/rfc/draft-ndn-nile-runtime-in-maru-02.md); the document's side builds on notes/plan/ksworld.john.
 
 start-world plan.
 load "notes/plan/probes.l".

@@ -1,4 +1,4 @@
-; Stage 1 of docs/rfc/draft-ndn-maru-typed-tree-matching-00.md: what we're building, how each piece relates to
+; Stage 1 of doc/rfc/draft-ndn-maru-typed-tree-matching-00.md: what we're building, how each piece relates to
 ; the others, and what would show it works.
 ;
 ; A Check is something the system can be asked.  notes/plan/observe.l asks every one with `observe`, whose answer is an

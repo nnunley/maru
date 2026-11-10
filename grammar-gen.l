@@ -12,7 +12,7 @@
 ;;; The sentinel is text the language never absorbs after a sentence (cexpr: ")"),
 ;;; so a sentence ending in a // comment, which would swallow what a template
 ;;; puts after it, is refused.
-;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Generating from a grammar".
+;;; See doc/rfc/draft-ndn-maru-laws-and-rules-00.md, "Generating from a grammar".
 
 (require "tpeg.l")
 (require "text-parser.l")

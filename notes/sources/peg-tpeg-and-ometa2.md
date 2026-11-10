@@ -64,5 +64,5 @@ overridden, and add factoring. The thesis (§2.3.2) reports left factoring and j
 
 ## What of it
 
-`docs/rfc/draft-ndn-maru-typed-tree-matching-00.md` builds on this. Thesis §2.5 suggests list patterns over
+`doc/rfc/draft-ndn-maru-typed-tree-matching-00.md` builds on this. Thesis §2.5 suggests list patterns over
 "objects that are not actually lists", after Wadler's views, which is the uniform stream interface.

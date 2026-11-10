@@ -646,7 +646,7 @@ not reach the build unreviewed.
 - Nile's runtime TODO, `runtimes/c/TODO`: the two-argument pipe.
 - `CLAUDE.md` roadmap items 1 and 4, and the 20k line budget.
 - Table-driven assemblers and disassemblers (x86, A64):
-  `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
+  `doc/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
 - SDL3: https://wiki.libsdl.org/SDL3/
 - Tracking issues: nnunley/maru #17 (Nile and Gezira running natively on
   Linux and macOS), with this runtime as #11 and the SDL3 window as #15.

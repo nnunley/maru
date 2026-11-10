@@ -1,4 +1,4 @@
-; KSWorld documents, headless (docs/superpowers/specs/2026-11-06-ksworld-headless-design.md): what's being built, what it
+; KSWorld documents, headless (doc/superpowers/specs/2026-11-06-ksworld-headless-design.md): what's being built, what it
 ; builds on, and what would show it works.  MARU_PLAN=ksworld notes/plan/record asks the checks; ./eval notes/plan/next.l
 ; with MARU_PLAN=ksworld says what's next.  The documents are third-party, so make check fetches them into a temporary
 ; directory (mktemp -d) before the checks that read them: a KSWorld objective never stands on documents we didn't fetch.

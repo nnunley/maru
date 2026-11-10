@@ -13,7 +13,7 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   STEPS target ("a modest 400-page book" one programmer can hold); it is
   soft, so the check reports the total but doesn't fail over it. Prefer a DSL or grammar (as `gen-asm-x86.k` generates
   the x86 assembler) over writing code out, tests included.
-- `erosion` (`check/erosion.l`, `erosion-run.l`, `docs/plans/2026-11-08-erosion-metrics.md`): SlopCodeBench's erosion and verbosity
+- `erosion` (`check/erosion.l`, `erosion-run.l`, `doc/plans/2026-11-08-erosion-metrics.md`): SlopCodeBench's erosion and verbosity
   (Orlanski et al., NeurIPS 2026), per mille, over Maru's `.l` and `.k` files in the `lines` check's set, held to `check/erosion`'s
   ledger as `lines` is to `check/lines`: each metric equals the sum of its entries (`erosion-ledger.g`), so a rise or a fall is
   written down with its reason. Erosion is the share of complexity mass, CC x sqrt(SLOC), held by callables (each top-level

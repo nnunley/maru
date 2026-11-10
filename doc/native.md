@@ -5,7 +5,7 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
 ## Checks
 
 - `native_ir2` (`check/native.l`): typed Maru compiled to native code in this process
-  (`docs/rfc/draft-ndn-maru-native-ir2-00.md`, plan `docs/plans/2026-11-06-native-ir2.md`): `native.l` (on `eval2`, which
+  (`doc/rfc/draft-ndn-maru-native-ir2-00.md`, plan `doc/plans/2026-11-06-native-ir2.md`): `native.l` (on `eval2`, which
   runs `maru.k`) compiles a unit through `native-gen.k`, the generator `maru.k` drives in place of `ir-gen-c.k`, to
   architecture-neutral intents on ir2's frame slots; `native-arm64.g` lowers them by tree matching to arm64 forms, with
   `abi.spec`'s registers; `native-link.l` encodes them into a code region; and each function is called by address

@@ -1,4 +1,4 @@
-;;; JOHN runs as a session (docs/rfc/draft-ndn-maru-john-session-00.md): statements entered one at a time into a
+;;; JOHN runs as a session (doc/rfc/draft-ndn-maru-john-session-00.md): statements entered one at a time into a
 ;;; knowledge base and a working memory, time moved only by steps, echo at the prompt (ok. and each step's
 ;;; mutations), a failed statement leaving the session as it was; and the REPL replaying RN-2008-003's transcripts.
 (require "john-eval.l")

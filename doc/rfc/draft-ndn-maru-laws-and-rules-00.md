@@ -778,7 +778,7 @@ setup on all 64 cases compared.
 ## References
 
 - draft-ndn-maru-forms-as-neutral-tree-00: the forms laws compile to.
-- RFC 0001 (`docs/rfc/0001-table-assemblers.md`): the in-process code
+- RFC 0001 (`doc/rfc/0001-table-assemblers.md`): the in-process code
   region typed laws would use.
 - Lampropoulos, Paraskevopoulou, Pierce, "Generating Good Generators for
   Inductive Relations", POPL 2018:

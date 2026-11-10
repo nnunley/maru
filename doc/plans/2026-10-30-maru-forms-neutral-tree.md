@@ -8,7 +8,7 @@
 
 **Tech Stack:** Maru (`eval`, `eval2`), tpeg grammars on `text-parser.l`, `maru.k` → ir2 → C, `check/check.l`.
 
-**Spec:** `docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md` (markers `[R-front-end-forms]`, `[R-core-forms]`, `[R-extension-forms]`, `[R-handoff-file]`, `[R-cexpr-forms]`, `[R-irl-via-maru]`, `[R-ir-retired]`, and `[R-zero-global]`).
+**Spec:** `doc/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md` (markers `[R-front-end-forms]`, `[R-core-forms]`, `[R-extension-forms]`, `[R-handoff-file]`, `[R-cexpr-forms]`, `[R-irl-via-maru]`, `[R-ir-retired]`, and `[R-zero-global]`).
 
 ## Global Constraints
 
@@ -128,5 +128,5 @@ Each level is left-recursive like `term`, and `conditional = logor:c "?"_ expres
 
 - [ ] **Step 1: Failing test.** Case `ir_retired` asserts that `git grep -l 'require "ir.k"'` prints nothing, that `grep -c 'ir-' irl.g compile-irl.l` is 0 for both files, and that none of the five deleted files exists. It fails while they exist.
 - [ ] **Step 2:** Delete the files and the rules. Make `test-compile-irl` run the Task 5 pipeline.
-- [ ] **Step 3:** `make check` passes. The RFC corpus result for this draft, from `rfc-run docs/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md`, is 0 failing blocks.
+- [ ] **Step 3:** `make check` passes. The RFC corpus result for this draft, from `rfc-run doc/rfc/draft-ndn-maru-forms-as-neutral-tree-00.md`, is 0 failing blocks.
 - [ ] **Step 4:** Remove the RFC's `**Corpus:**` line, run `rfc-lint` to exit 0, add a ledger entry for the removal (a large negative), and commit. Publishing is a separate decision for the user.

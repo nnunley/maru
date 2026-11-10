@@ -52,7 +52,7 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error.
-- `ksworld_sources` (`check/ksworld-sources.l`, plan `docs/plans/2026-11-07-ksworld-keys.md`): KSWorld's own code runs from its
+- `ksworld_sources` (`check/ksworld-sources.l`, plan `doc/plans/2026-11-07-ksworld-keys.md`): KSWorld's own code runs from its
   sources (`ksworld/*.st`): `st-fileout.g` reads Squeak's file-out (each class's definition, its instance and class sides),
   `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
   grammar) its Smalltalk ones to the same trees, so neither is transliterated by hand; `ksworld-source.l` makes each a method

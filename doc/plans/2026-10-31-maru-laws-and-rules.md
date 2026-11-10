@@ -8,7 +8,7 @@
 
 **Tech Stack:** untyped Maru (`eval`), tpeg grammars on `text-parser.l`, `check/check.l`.
 
-**Spec:** `docs/rfc/draft-ndn-maru-laws-and-rules-00.md`. The spike that measured it is `notes/spikes/laws/` (README there); port from it, don't copy it blind.
+**Spec:** `doc/rfc/draft-ndn-maru-laws-and-rules-00.md`. The spike that measured it is `notes/spikes/laws/` (README there); port from it, don't copy it blind.
 
 ## Global Constraints
 
@@ -32,11 +32,11 @@
 
 ### Task 0: Nile's compiler on this tree's Maru (prerequisite)
 
-Execute Task 3 of `docs/plans/2026-10-15-nile-runtime-in-maru.md` as written (its Task 2 is done: `boot2_strings` exists). It restores `print-structure.l`, runs Nile's compiler on `eval2`/`boot2.l`, deletes `nile/compilers/maru/maru/` and adds case `nile_compile`. The vendored copy is marked `unused`, so the `lines` total doesn't drop; the repository loses 34,840 lines and the Boehm GC dependency (`gceval`), whose arm64 build failure was only Homebrew's `/opt/homebrew` prefix.
+Execute Task 3 of `doc/plans/2026-10-15-nile-runtime-in-maru.md` as written (its Task 2 is done: `boot2_strings` exists). It restores `print-structure.l`, runs Nile's compiler on `eval2`/`boot2.l`, deletes `nile/compilers/maru/maru/` and adds case `nile_compile`. The vendored copy is marked `unused`, so the `lines` total doesn't drop; the repository loses 34,840 lines and the Boehm GC dependency (`gceval`), whose arm64 build failure was only Homebrew's `/opt/homebrew` prefix.
 
 ### Task 1: Amend the RFC [R-reference-verdicts] [R-template-holes]
 
-**Files:** `docs/rfc/draft-ndn-maru-laws-and-rules-00.md`.
+**Files:** `doc/rfc/draft-ndn-maru-laws-and-rules-00.md`.
 
 - [ ] **Step 1:** Replace "moving Nile onto this tree's Maru is also when its fatal errors become values, so the Nile laws run in-process" with: Maru has no non-local exit, so a reference that exits on error runs forked until one exists; the extension point is a non-local exit in `eval.c` and `eval2`, listed under Out of Scope.
 - [ ] **Step 2:** Under Templates, add that a filler is inserted as text and grouping is the template author's (Review Focus 3).
@@ -137,7 +137,7 @@ Execute Task 3 of `docs/plans/2026-10-15-nile-runtime-in-maru.md` as written (it
 ### Task 11: Close out
 
 - [ ] **Step 1:** `CLAUDE.md` Verify list: `law_engine`, `law_cexpr`, `law_nile`, `law_rules`, each in one sentence.
-- [ ] **Step 2:** `make check` green; `rfc-run docs/rfc/draft-ndn-maru-laws-and-rules-00.md` 0 failing blocks.
+- [ ] **Step 2:** `make check` green; `rfc-run doc/rfc/draft-ndn-maru-laws-and-rules-00.md` 0 failing blocks.
 - [ ] **Step 3:** Remove the RFC's `**Corpus:**` line; `rfc-lint` exits 0; two-key commit. Publishing is the user's decision.
 
 ## Requirement coverage

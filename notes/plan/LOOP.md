@@ -1,8 +1,8 @@
 # The stage 1 evidence loop
 
 Goal: `notes/plan/tree-matching.john`'s goal is reached, which is stage 1 of
-`docs/rfc/draft-ndn-maru-typed-tree-matching-00.md`. Background on approach and pitfalls, not a task list:
-`docs/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC wins.
+`doc/rfc/draft-ndn-maru-typed-tree-matching-00.md`. Background on approach and pitfalls, not a task list:
+`doc/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC wins.
 
 The plan says what each `Capability` is (`what`, `where`), what it builds on (`builds-on`) and what would show it works (`shown-by`). A `Check` is anything the system can be asked: a `Case` in `check/check.l`, a `Measure` (a program's exit status), or a `Grammar` (compiled live on each evaluator, reading its language). John objects ask through messages `notes/plan/probes.l` defines.
 

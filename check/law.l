@@ -9,7 +9,7 @@
 ;;; A file with no under test: line prints E_NO_UNDER_TEST and runs none of its
 ;;; laws, as does one with two laws of one name (E_DUPLICATE).  A claim or condition valued a
 ;;; reference's verdict is E_CLAIM.  The run exits 1 if any law is neither TESTED nor PROVED.
-;;; See docs/rfc/draft-ndn-maru-laws-and-rules-00.md, "Laws" and "References".
+;;; See doc/rfc/draft-ndn-maru-laws-and-rules-00.md, "Laws" and "References".
 (require "rules.l")
 (require "law-compile.l")
 (require "grammar-gen.l")

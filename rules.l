@@ -2,7 +2,7 @@
 ;;; (rules in random order, one solution), check (rules in order, does the goal
 ;;; hold) and enumerate (every solution).  A rule is (name conclusion premise...),
 ;;; a rule set a list of rules, and $x a logic variable.  Rule sets are passed
-;;; in, never global, so mutants can swap them.  See docs/rfc/draft-ndn-maru-laws-and-rules-00.md.
+;;; in, never global, so mutants can swap them.  See doc/rfc/draft-ndn-maru-laws-and-rules-00.md.
 (require "hash.l")	; seen solutions, by equal
 
 ;; seeded, replayable.  rules-fired names the rules used in successful generate and check derivations, rules-used lists them.

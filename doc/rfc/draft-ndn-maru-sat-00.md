@@ -639,7 +639,7 @@ MAY be added. ir2 needs nothing new.
 
 ## References
 
-- RFC 0001 (`docs/rfc/0001-table-assemblers.md`): the in-process code region [R-native] will
+- RFC 0001 (`doc/rfc/0001-table-assemblers.md`): the in-process code region [R-native] will
   use once ir2 has an arm64 backend.
 - draft-ndn-maru-forms-as-neutral-tree-00: the shared tree irl and Nothing compile to.
 - draft-ndn-maru-laws-and-rules-00: the laws search, the solver's second client.

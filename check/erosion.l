@@ -1,4 +1,4 @@
-;;; erosion.l's metrics (SlopCodeBench's erosion and verbosity, docs/plans/2026-11-08-erosion-metrics.md) on small sources
+;;; erosion.l's metrics (SlopCodeBench's erosion and verbosity, doc/plans/2026-11-08-erosion-metrics.md) on small sources
 ;;; whose answers are worked out by hand.  (erosion-run.l holds maru-lines.g to Maru's own reader on every file it measures.)
 (require "erosion.l")
 (require "recover.l")

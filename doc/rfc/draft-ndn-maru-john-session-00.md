@@ -158,4 +158,4 @@ anything a file can. The REPL reads only standard input and the files named on i
 
 - Samimi, H., "JOHN – A Knowledge Representation Language", VPRI RN-2008-003, `~/pkm/raw/vpri/rn2008003_john.txt`.
 - `~/pkm/wiki/synthesis/john-language-reconstruction.md` (G-numbered decisions).
-- `docs/rfc/draft-ndn-maru-laws-and-rules-00.md` (the evidence plan reads JOHN through a session).
+- `doc/rfc/draft-ndn-maru-laws-and-rules-00.md` (the evidence plan reads JOHN through a session).

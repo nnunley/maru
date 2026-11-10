@@ -473,7 +473,7 @@ opcode-map length decoder (with VEX/EVEX), the bytes-to-bytes identity on
 foreign code, and the `asm_x86_eval`/`asm_x86_foreign`/`asm_arm64_eval`
 checks. Extension point: `asm-decode`, which returns `()` today where that
 specification will return a `(data ...)` fragment. Source text:
-`docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
+`doc/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`.
 
 **Running code outside the evaluator.** `exe.l` (static ELF, self-signed
 Mach-O), the i386, x86-64 and A64 qemu environments, and `ASM_RUN`.
@@ -582,11 +582,11 @@ no entitlement; signing them with the hardened runtime would require the
   (instruction set reference; 3.1.1.3 operand notation; 2.3 VEX).
 - Arm Architecture Reference Manual for A-profile (A64 encoding diagrams;
   Advanced SIMD; logical and FP immediates).
-- `docs/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`:
+- `doc/superpowers/specs/2026-10-14-table-driven-assemblers-design.md`:
   the earlier design, source for the disassembler, running-code and
   migration specifications.
 - The spike, committed on branch `table-asm` with a README of its measured
   state and removed as it was promoted (see the branch history).
-- `docs/rfc/draft-ndn-nile-runtime-in-maru-01.md`: the first user of the
+- `doc/rfc/draft-ndn-nile-runtime-in-maru-01.md`: the first user of the
   native back ends.
 - libffi: https://github.com/libffi/libffi

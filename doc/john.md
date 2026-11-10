@@ -56,7 +56,7 @@ Samimi's planning language: parsing, the possible-worlds evaluator, sessions and
   `a is b` asks whether a is one of a kind, b naming a member, its set, a group holding it or a class, and otherwise whether they're the
   same value; so `its evidence is Good`, after `group Good passed tested proved.`, and a value with fields simply isn't a bare name.
   `qualify C p is E` gives p E's value (the memos have it as `if`, in one use that answers yes or no).
-- `john_session` (`check/john-session.l`, `docs/rfc/draft-ndn-maru-john-session-00.md`): JOHN runs as a session, RN-2008-003's
+- `john_session` (`check/john-session.l`, `doc/rfc/draft-ndn-maru-john-session-00.md`): JOHN runs as a session, RN-2008-003's
   model (§15): `john-begin` starts one (an empty knowledge base, world 0), `john-enter` enters one statement and answers its
   lines, and `john-run` is a session fed a program. Declarations (and `make`'s facts) never move time; only `do` and a
   satisfied goal do, so world 0 keeps what was declared before the first step, and `time.` answers the current time. At
