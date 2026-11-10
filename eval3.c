@@ -2856,8 +2856,8 @@ static subr(subr)
     void *addr= 0;
     switch (getType(arg))
     {
-	case String:	name= get(arg, String,bits);  break;
-	case Symbol:	name= get(arg, Symbol,bits);  break;
+	case String:	name= wcsdup(get(arg, String,bits));  break;	/* a copy: the string may be collected */
+	case Symbol:	name= wcsdup(get(arg, Symbol,bits));  break;
 	case Long:	name= L"<address>";  addr= (void *)getLong(arg);  break;
 	default:	fatal("subr: argument must be string, symbol or address");
     }
