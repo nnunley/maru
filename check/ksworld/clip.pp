@@ -4,12 +4,19 @@
 		(slot :keyClass "Symbol" :keyValue "extent" :name "2" :valueClass "Point" :valueValue "30.0@20.0")
 		(slot :keyClass "Symbol" :keyValue "clipping" :name "3" :valueClass "True" :valueValue "true")
 		(slot :keyClass "Symbol" :keyValue "contents" :name "4" :valueId "3"))
-	(KSContentsCollection :ref "3" :size "2"
+	(KSContentsCollection :ref "3" :size "3"
 		(slot :name "1" :ref "4")
-		(slot :name "2" :ref "11"))
-	(KSBox :ref "4" :size "2"
+		(slot :name "2" :ref "11")
+		(slot :name "3" :ref "13"))
+	(KSBox :ref "4" :size "4"
 		(slot :keyClass "Symbol" :keyValue "transformation" :name "1" :valueClass "MatrixTransform2x3" :valueValue "2.0 0.0 5.0 0.0 2.0 7.0")
-		(slot :keyClass "Symbol" :keyValue "shape" :name "2" :valueId "6"))
+		(slot :keyClass "Symbol" :keyValue "shape" :name "2" :valueId "6")
+		(slot :keyClass "Symbol" :keyValue "extent" :name "3" :valueClass "Point" :valueValue "10.0@10.0")
+		(slot :keyClass "Symbol" :keyValue "buttonDown" :name "4" :valueId "12"))
+	(KSEventStream :__code__ "nil" :__dormant__ "false" :__homeObject__ "4" :__type__ "exprE" :ref "12")
+	(KSBox :ref "13" :size "2"
+		(slot :keyClass "Symbol" :keyValue "clipping" :name "1" :valueClass "True" :valueValue "true")
+		(slot :keyClass "Symbol" :keyValue "font" :name "2" :valueClass "Symbol" :valueValue "Times"))
 	(KSShape :ref "6"
 		(slot :name "elements" :ref "7"))
 	(Array :ref "7" :size "1"
