@@ -3,8 +3,8 @@
 ;
 ; A Check is something the system can be asked.  Its answers are worlds of the plan's chain, in notes/plan/tree-matching.answers:
 ; `make check` records each case it ran there, and notes/plan/record what observe.l asks (measures, grammars, laws), each
-; answer an Evidence value naming the code it ran against.  A check's state reads its latest answer, and `was` the one
-; before it.  An answer counts only for the code it ran against: plan-world.l makes `Now`, this tree, so
+; answer an Evidence value naming the code it ran against.  A check's state reads its latest answer and its last good
+; one, both kept by `observed`.  An answer counts only for the code it ran against: plan-world.l makes `Now`, this tree, so
 ; a capability is proven only if its checks hold now.  Plans never run a check: rules read what's recorded.
 
 start-world plan.
@@ -17,10 +17,10 @@ set Evidence = untested | passed(tree) | failed(tree)
 group Good passed tested proved.
 
 group Check Case Measure Grammar Law.
-create Case evidence.                                 ; a case in check/check.l
-create Measure evidence command cadence.              ; a program; its exit status is the answer
-create Grammar evidence file class rule host inherits samples.  ; compiled live, reading its own language
-create Law evidence file support.                     ; one law, by name, of a law file
+create Case evidence last-good.                                 ; a case in check/check.l
+create Measure evidence last-good command cadence.              ; a program; its exit status is the answer
+create Grammar evidence last-good file class rule host inherits samples.  ; compiled live, reading its own language
+create Law evidence last-good file support.                     ; one law, by name, of a law file
 
 qualify Case observe is it case-passes.
 qualify Measure observe is it command-succeeds.
@@ -32,46 +32,46 @@ qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
 ; first, because what a whole run shows counts for the cases below, and they then needn't run again
-make Measure WholeSuite untested "nice make check" "full".
+make Measure WholeSuite untested untested "nice make check" "full".
 
-make Case tree_selectors untested.
-make Case tree_source untested.
-make Case tree_lists untested.
-make Case tree_args untested.
-make Case tree_args_unread untested.
-make Case tree_text_refuses untested.
-make Case tree_interleave untested.
-make Case tree_apply untested.
-make Case tree_memo untested.
-make Case tree_foreign untested.
-make Case tree_literals untested.
-make Case tree_parse_complete untested.
-make Case tree_calc untested.
+make Case tree_selectors untested untested.
+make Case tree_source untested untested.
+make Case tree_lists untested untested.
+make Case tree_args untested untested.
+make Case tree_args_unread untested untested.
+make Case tree_text_refuses untested untested.
+make Case tree_interleave untested untested.
+make Case tree_apply untested untested.
+make Case tree_memo untested untested.
+make Case tree_foreign untested untested.
+make Case tree_literals untested untested.
+make Case tree_parse_complete untested untested.
+make Case tree_calc untested untested.
 
-make Measure TextMatchingSpeed untested "notes/plan/speed" "routine".
+make Measure TextMatchingSpeed untested untested "notes/plan/speed" "routine".
 
-make Grammar CExpressions untested "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
-make Grammar JohnPrograms untested "john.g" "<john>" "program" "john.l" [ CExpressions ]
+make Grammar CExpressions untested untested "cexpr.g" "<cexpr>" "expression" "" [ ] [ "notes/plan/samples/cexpr.txt" ].
+make Grammar JohnPrograms untested untested "john.g" "<john>" "program" "john.l" [ CExpressions ]
   [ "check/john/hanoi2.john", "check/john/x86-allocator.john", "check/john/airline.john" ].
-make Grammar LawFiles untested "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
-make Grammar IrlPrograms untested "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
-make Grammar Arm64Table untested "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
-make Grammar X86Table untested "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
-make Grammar OsDefinitions untested "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
-make Grammar TpegItself untested "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
+make Grammar LawFiles untested untested "law.g" "<law>" "program" "law-compile.l" [ CExpressions ] [ "check/laws/cexpr.law" ].
+make Grammar IrlPrograms untested untested "irl.g" "<irl>" "program" "compile-irl.l" [ CExpressions ] [ "test.irl", "dimacs.irl" ].
+make Grammar Arm64Table untested untested "arm64.g" "<arm64spec>" "file" "" [ ] [ "arm64.spec" ].
+make Grammar X86Table untested untested "x86.g" "<x86spec>" "file" "" [ ] [ "x86.spec" ].
+make Grammar OsDefinitions untested untested "osdefs.g" "<osdefs>" "file" "compile-osdefs.l" [ ] [ "system.osdefs" ].
+make Grammar TpegItself untested untested "tpeg.g" "<tpeg>" "parser_spec" "" [ ] [ "cexpr.g", "john.g" ].
 
-make Law conditional_right untested "check/laws/cexpr.law" "".
-make Law minus_left untested "check/laws/cexpr.law" "".
-make Law comment_blank untested "check/laws/cexpr.law" "".
+make Law conditional_right untested untested "check/laws/cexpr.law" "".
+make Law minus_left untested untested "check/laws/cexpr.law" "".
+make Law comment_blank untested untested "check/laws/cexpr.law" "".
 
 ; an answer says which code gave it, and it's only good for that code
 create Code tree.
-action Check observed Answer consequence its evidence = Answer.
-; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
-; lanes' answers in an order no branch chose, so no state reads which came last
+action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.
+; a check's state is what the world holds (doc/rfc/draft-ndn-maru-john-development-00.md): its latest answer, and the
+; last good one, which observed keeps, so nothing is worked out again from the answers before
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
 qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
-qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check regressed if it failing = yes and its last-good is Good.
 qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
 qualify Check untested if its evidence is untested.
 

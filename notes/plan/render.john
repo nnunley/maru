@@ -12,10 +12,10 @@ set Evidence = untested | passed(tree) | failed(tree)
 group Good passed tested proved.
 
 group Check Case Measure Grammar Law.
-create Case evidence.
-create Measure evidence command cadence.
-create Grammar evidence file class rule host inherits samples.
-create Law evidence file support.
+create Case evidence last-good.
+create Measure evidence last-good command cadence.
+create Grammar evidence last-good file class rule host inherits samples.
+create Law evidence last-good file support.
 qualify Case observe is it case-passes.
 qualify Measure observe is it command-succeeds.
 qualify Grammar observe is it compiles-and-reads.
@@ -23,42 +23,42 @@ qualify Law observe is it law-verdict.
 qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
-make Measure WholeSuite untested "nice make check" "full".
+make Measure WholeSuite untested untested "nice make check" "full".
 
 ; the Nile runtime in typed Maru, task by task
-make Case nile_interface untested.
-make Case nile_osdefs untested.
-make Case nile_startup untested.
-make Case nile_recip untested.
-make Case nile_limits untested.
-make Case nile_oom untested.
-make Case nile_prefix untested.
-make Case nile_reroute untested.
-make Case nile_reverse untested.
-make Case nile_sort untested.
-make Case nile_dupcat untested.
-make Case nile_laws untested.			; the built-ins hold to their definitions, the same on 1, 4 and 8 workers
-make Case nile_schedules untested.		; and keep the runtime's contracts under generated thread schedules
-make Case nile_text_layout untested.
+make Case nile_interface untested untested.
+make Case nile_osdefs untested untested.
+make Case nile_startup untested untested.
+make Case nile_recip untested untested.
+make Case nile_limits untested untested.
+make Case nile_oom untested untested.
+make Case nile_prefix untested untested.
+make Case nile_reroute untested untested.
+make Case nile_reverse untested untested.
+make Case nile_sort untested untested.
+make Case nile_dupcat untested untested.
+make Case nile_laws untested untested.			; the built-ins hold to their definitions, the same on 1, 4 and 8 workers
+make Case nile_schedules untested untested.		; and keep the runtime's contracts under generated thread schedules
+make Case nile_text_layout untested untested.
 ; what draws, and where
-make Case gezira_image untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
-make Case sdl3_window untested.			; a window shows a pixel buffer, and mouse events come back
-make Case ksworld_headless untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
-make Case ksworld_pixels untested.		; KSWorld.ks's pixels in a window: its bar, background, a filled shape, glyphs
+make Case gezira_image untested untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
+make Case sdl3_window untested untested.			; a window shows a pixel buffer, and mouse events come back
+make Case ksworld_headless untested untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
+make Case ksworld_pixels untested untested.		; KSWorld.ks's pixels in a window: its bar, background, a filled shape, glyphs
 ; cases that were planned and never written, or written under other names: their answers stay in the ledger, unread
 retired ksworld_render.				; ksworld_pixels shows a document's pixels
 retired ksworld_text.				; ksworld_headless lays its text out with TrueType glyphs
 retired nile_threads.				; nile_laws runs the built-ins on 1, 4 and 8 workers
 retired nile_tsan.				; nile_schedules finds races by schedule, not a sanitizer
-make Case ksworld_mouse untested.		; a click lands on the box under it, fires its streams, and the redraw shows it
+make Case ksworld_mouse untested untested.		; a click lands on the box under it, fires its streams, and the redraw shows it
 
 create Code tree.
-action Check observed Answer consequence its evidence = Answer.
-; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
-; lanes' answers in an order no branch chose, so no state reads which came last
+action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.
+; a check's state is what the world holds (doc/rfc/draft-ndn-maru-john-development-00.md): its latest answer, and the
+; last good one, which observed keeps, so nothing is worked out again from the answers before
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
 qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
-qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check regressed if it failing = yes and its last-good is Good.
 qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
 qualify Check untested if its evidence is untested.
 

@@ -41,14 +41,14 @@ qualify Law holds if its evidence is Good and its evidence tree = Now tree.
 (require "check/case-names.l")
 (define-function states (dir name tree)
   (plan-load dir name tree)
-  (map (lambda (c) (map (lambda (q) (plan-ask c q)) '(holds failing regressed stale untested))) '(one other fixed bad none)))
+  (map (lambda (c) (map (lambda (q) (plan-ask c q)) '(holds failing regressed stale untested))) '(one other fixed bad none again)))
 ;;                         holds failing regressed stale untested
-(expect "on the tree the answers name: one and fixed hold, other regressed, bad failing, none untested"
+(expect "on the tree the answers name: one and fixed hold, other regressed, bad failing, none untested, again regressed"
 	(equal (states "check/plan" "x" "aaa")
-	       '((yes no no no no) (no yes yes no no) (yes no no no no) (no yes no no no) (no no no no yes))))
+	       '((yes no no no no) (no yes yes no no) (yes no no no no) (no yes no no no) (no no no no yes) (no yes yes no no))))
 (expect "on a tree none names, every answered check is stale"
 	(equal (states "check/plan" "x" "ccc")
-	       '((no no no yes no) (no no no yes no) (no no no yes no) (no no no yes no) (no no no no yes))))
+	       '((no no no yes no) (no no no yes no) (no no no yes no) (no no no yes no) (no no no no yes) (no no no yes no))))
 (define scratch (concat-string check-tmp "/plan-evidence-plans"))
 (system (concat-strings "rm -rf " scratch " && mkdir -p " scratch " && cp check/plan/x.john " scratch "/"))
 (define-function ledger (name lines)
@@ -58,14 +58,14 @@ qualify Law holds if its evidence is Good and its evidence tree = Now tree.
 (define x-lines (plan-file-lines "check/plan/x.answers"))
 (system (concat-strings "cp check/plan/x.john " scratch "/y.john"))
 (ledger "y" (list-reverse! (plan-file-lines "check/plan/x.answers")))
-(expect "the latest answer decides: in the other order, other is stale and fixed regressed"
+(expect "the latest answer decides: in the other order, other and again are stale and fixed regressed"
 	(equal (states scratch "y" "aaa")
-	       '((yes no no no no) (no no no yes no) (no yes yes no no) (no yes no no no) (no no no no yes))))
+	       '((yes no no no no) (no no no yes no) (no yes yes no no) (no yes no no no) (no no no no yes) (no no no yes no))))
 (system (concat-strings "cp check/plan/x.john " scratch "/z.john"))
 (ledger "z" (concat-list x-lines '("(world (gone observed (value passed (tree \"aaa\"))) ((gone evidence (value passed (tree \"aaa\")))))")))
 (expect "a line naming a check the plan no longer has fails, naming the ledger and the line"
 	(equal (try (let () (plan-load scratch "z" "aaa") "loaded") (lambda (c) (plan-condition-text c)))
-	       (concat-string scratch "/z.answers: ledger 7: unknown object gone")))
+	       (concat-string scratch "/z.answers: ledger 10: unknown object gone")))
 (system (concat-strings "echo 'retired gone.' >> " scratch "/z.john"))
 (expect "once the plan retires it, the line is skipped and the states are as before"
 	(equal (states scratch "z" "aaa") (states "check/plan" "x" "aaa")))

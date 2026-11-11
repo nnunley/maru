@@ -223,7 +223,9 @@ plan_record
 
 ### Done, ready and stale
 
-A plan MUST qualify a check's states from its latest answer, `its evidence`, and the answer before it, `its evidence was`, as this table gives them, and `Capability proven`
+A plan MUST qualify a check's states from what its world holds: its latest answer, `its evidence`, and its last good
+answer, `its last-good`, which the `observed` action writes with a good answer
+(`its evidence = Answer and its last-good = Answer if Answer is Good`), as this table gives them, and `Capability proven`
 only when the capability shows at least one check and every one holds; `ready` is every `builds-on` done, as
 `tree-matching.john` has it today. [R-done-current]
 
@@ -231,15 +233,17 @@ only when the capability shows at least one check and every one holds; `ready` i
 |---|---|
 | `holds` | the latest answer is good, for the current tree |
 | `failing` | the latest answer is neither good nor untested, for the current tree |
-| `regressed` | `failing`, and the answer before it was good |
+| `regressed` | `failing`, and some earlier answer was good |
 | `stale` | the latest answer is for another tree |
 | `untested` | no answers |
 
 A state is about the check now, so it reads the current value, not every answer the check has had: a later answer for
 the current tree replaces an earlier one, and a check fixed on this tree holds. Only runs in this checkout answer for its
-tree, and a merge makes a new tree, so union-merged answers from other lanes are stale until a run here answers them.
-`E was V` is KScript's previous value (`x'`, TR-2013-002 §3.2) read per property, as Reed's object history keeps it,
-written as the past of `is`.
+tree, and a merge makes a new tree, so union-merged answers from other lanes are stale until a run here answers them. What a state needs from the
+past is kept in the world by the action that learns it, as JOHN keeps all state (RN-2008-003 §4), not worked out again
+from the history at each ask: `regressed` stays until the check holds again, however many failing runs come between.
+`E was V` (KScript's previous value, `x'`, TR-2013-002 §3.2, read per property) asks the value before the last write,
+and `over time` every value; neither is needed for a state.
 
 ```maru-check @R-done-current
 plan_frontier
@@ -485,7 +489,7 @@ steps of the plan, never commands.
 `next.l` stops answering `next: notes/plan/record full` and answers the frontier instead; scripts that grep for that
 line change. The ledgers move from `evidence.john` and `NAME-evidence.john` to `NAME.answers`: each plan's existing evidence is
 replayed once and its chain written by `john-serialize`. The plans keep their `observed` action and their history
-readings, and their states read `its evidence` and `its evidence was`. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
+readings, and their states read `its evidence` and `its last-good`. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
 committed with the code they're about (`notes/plan/LOOP.md`'s rule). `MARU_RECORD=0` restores the old behavior for a
 run. The existing plans gain the four qualities and their heuristics, and `render.john` its case names corrected.
 `MARU_PLAN` keeps its meaning.

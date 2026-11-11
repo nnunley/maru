@@ -1,15 +1,15 @@
-; A plan for check/plan-evidence.l and check/plan-record.l: five cases, their states read from the answers the ledger recorded.
+; A plan for check/plan-evidence.l and check/plan-record.l: six cases, their states read from the answers the ledger recorded.
 set Evidence = untested | passed(tree) | failed(tree).
 group Good passed.
 group Check Case.
-create Case evidence.
-make Case one untested. make Case other untested. make Case fixed untested. make Case bad untested. make Case none untested.
+create Case evidence last-good.
+make Case one untested untested. make Case other untested untested. make Case fixed untested untested. make Case bad untested untested. make Case none untested untested. make Case again untested untested.
 create Code tree.
-action Check observed Answer consequence its evidence = Answer.
+action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.
 
-; a check's state, from its answer now and the one before it
+; a check's state, from its latest answer and the last good one, which observed keeps
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
 qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
-qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check regressed if it failing = yes and its last-good is Good.
 qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
 qualify Check untested if its evidence is untested.

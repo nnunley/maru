@@ -15,9 +15,10 @@ loop's rules and notes.
 ## Ledgers
 
 A plan's evidence is its ledger, `notes/plan/NAME.answers`: the plan's chain of worlds, one Maru form a line, each
-answer the world its `observed` step made (`john-serialize.l`, `doc/john.md`):
+answer the world its `observed` step made, every write of it (`john-serialize.l`, `doc/john.md`):
 
-    (world (tree_lists observed (value passed (tree "504c17079996"))) ((tree_lists evidence (value passed (tree "504c17079996")))))
+    (world (tree_lists observed (value passed (tree "504c17079996")))
+      ((tree_lists evidence (value passed (tree "504c17079996"))) (tree_lists last-good (value passed (tree "504c17079996")))))
 
 `notes/plan/plan-load.l`'s `(plan-load dir name tree)` reads the plan, makes `Now` the tree, and reads its ledger back
 with Maru's `read`, evaluating nothing; a world's time is its place in the file. Ledgers are `merge=union`
@@ -25,13 +26,14 @@ with Maru's `read`, evaluating nothing; a world's time is its place in the file.
 order, and no state reads which of two lanes' answers came last. `notes/plan/tree-hash` leaves the ledgers out of the
 code an answer is about.
 
-A check's state reads its latest answer, `its evidence`, and for `regressed` the one before it, `its evidence was`:
+A check's state reads what its world holds: its latest answer, `its evidence`, and its last good answer, `its last-good`,
+which `observed` writes with every good answer:
 
 | State | The check's answers |
 |---|---|
 | `holds` | the latest answer is good, for the current tree |
 | `failing` | the latest answer is neither good nor untested, for the current tree |
-| `regressed` | `failing`, and the answer before it was good |
+| `regressed` | `failing`, and some earlier answer was good |
 | `stale` | the latest answer is for another tree |
 | `untested` | no answers |
 
@@ -47,8 +49,8 @@ is declared `retired NAME.` in its plan, and its lines are skipped and kept (`re
 - `plan_evidence` (`check/plan-evidence.l`): what `check/law.l` prints, read by `notes/plan/law-report.g` to events, one
   a law: tested and proved hold if they're about this code, refuted, starved, vacuous, inconclusive and a law that
   stopped its run don't. A fixture plan and ledger (`check/plan/x.john`, `x.answers`) give each state of the table: one
-  holding, one fixed on the tree and holding, one regressed, one failing and one untested on the tree they name, the
-  answered ones stale on another; the same answers in the other order leave the latest deciding (other stale, fixed
-  regressed); a line naming a dropped check fails naming the ledger and line, and loads once the
+  holding, one fixed on the tree and holding, one regressed, one regressed after failing twice, one failing and one
+  untested on the tree they name, the answered ones stale on another; the same answers in the other order leave the
+  latest deciding (other stale, fixed regressed); a line naming a dropped check fails naming the ledger and line, and loads once the
   plan retires it. Every `make Case NAME` in every plan names a case `check/check.l` has. `next.l` runs on the plan as it
   stands.

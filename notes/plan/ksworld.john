@@ -12,10 +12,10 @@ set Evidence = untested | passed(tree) | failed(tree)
 group Good passed tested proved.
 
 group Check Case Measure Grammar Law.
-create Case evidence.
-create Measure evidence command cadence.
-create Grammar evidence file class rule host inherits samples.
-create Law evidence file support.
+create Case evidence last-good.
+create Measure evidence last-good command cadence.
+create Grammar evidence last-good file class rule host inherits samples.
+create Law evidence last-good file support.
 qualify Case observe is it case-passes.
 qualify Measure observe is it command-succeeds.
 qualify Grammar observe is it compiles-and-reads.
@@ -24,18 +24,18 @@ qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
 ; first that the documents can be fetched; make check fetches them itself into a temporary directory before its KSWorld check
-make Measure DbjrDocuments untested
+make Measure DbjrDocuments untested untested
   "d=$(mktemp -d \"${TMPDIR:-/tmp}/maru-dbjr.XXXXXX\") && notes/plan/fetch-dbjr \"$d\"; s=$?; rm -rf \"$d\"; exit $s" "routine".
-make Measure KSWorldHeadless untested "nice make check CHECKS=ksworld_headless" "routine".
-make Measure WholeSuite untested "nice make check" "full".
+make Measure KSWorldHeadless untested untested "nice make check CHECKS=ksworld_headless" "routine".
+make Measure WholeSuite untested untested "nice make check" "full".
 
 create Code tree.
-action Check observed Answer consequence its evidence = Answer.
-; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
-; lanes' answers in an order no branch chose, so no state reads which came last
+action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.
+; a check's state is what the world holds (doc/rfc/draft-ndn-maru-john-development-00.md): its latest answer, and the
+; last good one, which observed keeps, so nothing is worked out again from the answers before
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
 qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
-qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check regressed if it failing = yes and its last-good is Good.
 qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
 qualify Check untested if its evidence is untested.
 

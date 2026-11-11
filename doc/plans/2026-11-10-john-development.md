@@ -8,7 +8,7 @@ the steps each plan allows, ranked by what the evidence and erosion say.
 
 **Architecture:** `check/parallel.l` writes a results file; `notes/plan/record-run.l` turns it into worlds of each plan's
 chain, written by `john-serialize` as Maru forms and read back by `john-deserialize` with `read`, with a history per
-property. Plans qualify each check's state from its latest answer and, with `was`, the one before, weigh steps with heuristics (one using
+property. Plans qualify each check's state from what the world holds, its latest answer and the last good one `observed` keeps, weigh steps with heuristics (one using
 `total` over hotspots), and `choices` answers the ranked frontier, which `next.l` prints lane first.
 
 **Tech Stack:** untyped Maru on `eval` (`john-eval.l`, `john.g`, `check/*.l`), `sh` (`notes/plan/record`,
@@ -149,7 +149,7 @@ property. Plans qualify each check's state from its latest answer and, with `was
 - [ ] **Step 4:** `make check CHECKS="john_forms john_run john_session sat_john call_by_meaning"` passes.
 - [ ] **Step 5:** Document in `doc/john.md`; `check/lines`, `check/erosion` if it moved; commit.
 
-### Task 4: Plans read their ledgers; states from the latest answer and `was` [R-ledger-union, R-ledger-forms, R-done-current, R-plans-name-cases]
+### Task 4: Plans read their ledgers; states from the latest answer and the last good one [R-ledger-union, R-ledger-forms, R-done-current, R-plans-name-cases]
 
 **Files:**
 - Create: `check/case-names.l` (the reader `check/parallel.l` has, moved out), `notes/plan/tree-matching.answers`,
@@ -163,12 +163,15 @@ property. Plans qualify each check's state from its latest answer and, with `was
 - Produces: `(plan-load dir name tree)`: a fresh session (`john-begin`), `DIR/NAME.john` read, `(make Code Now TREE)`,
   `DIR/NAME.answers` (empty if missing) deserialized; leaves `*john-world*` current. `(plan-names dir)` → sorted names
   of `DIR/*.john`. `plan-ask`, `plan-yes?` as now. `(case-names)` from `check/case-names.l`.
+- Each Check class gains `last-good` (each make another `untested`), and `observed` keeps it:
+  `action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.`
+  The converted ledgers are replayed through that action once, so each world holds every write it made.
 - Each plan declares, replacing `holds`, `stale` and the `at time` `regressed`:
 
 ```
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
 qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
-qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check regressed if it failing = yes and its last-good is Good.
 qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
 qualify Check untested if its evidence is untested.
 ```
@@ -178,7 +181,7 @@ qualify Check untested if its evidence is untested.
   `john: was reads a property: X p was V` for `3 was 3`; in `check/plan-evidence.l`, a fixture plan and ledger in
   `check/plan/` (one answered good on tree `aaa`; other good on `bbb` then failed on `aaa`; fixed failed then good on
   `aaa`; bad failed on `aaa`; none unanswered) loaded with `plan-load` at tree `aaa` give holds, regressed, holds,
-  failing, untested; at `ccc` the answered ones are stale; the lines reversed give other stale and fixed regressed; a ledger line naming a removed check
+  failing, untested; again (good on `bbb`, failed on `ccc`, failed on `aaa`) regressed; at `ccc` the answered ones are stale; the lines reversed give other stale and fixed regressed; a ledger line naming a removed check
   fails `…check/plan/x.answers: ledger 7: unknown object gone`, and with `retired gone.` in the plan loads, its
   states unchanged by the skipped line; every `make Case NAME` in `notes/plan/*.john` is in
   `(case-names)`, else `FAIL plan PLAN names no case NAME`.
