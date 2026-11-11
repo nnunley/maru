@@ -186,6 +186,29 @@
 
 ;;; ---- expressions, in world w with env ((name . value) ...)
 
+;; ours: the time of the write of o's p in force in w, 0 if only world 0's
+(define-function john-last-write-time (w o p)
+  (let ((t ()))
+    (while (and w (not t))
+      (let ((h (<john-world>-history w)))
+	(if h
+	    (let ((e (john-history-entry h o p (<john-world>-time w)))) (set t (if e (car e) 0)))
+	  (list-do e (<john-world>-writes w) (and (= (car e) o) (= (cadr e) p) (set t (<john-world>-time w))))
+	  (set w (<john-world>-parent w)))))
+    (or t 0)))
+;; the object and property the expression a reads first, its innermost X p; ev is john-eval
+(define-function john-was-property (a w env ev)
+  (or (and (pair? a) (= 'send (car a)) (= 3 (list-length a))
+	   (let ((r (ev (cadr a) w env)))
+	     (if (and (john-object? r) (member? (caddr a) (john-props (john-object-class r))))
+		 (cons r (caddr a))
+	       (john-was-property (cadr a) w env ev))))
+      (john-fail "was reads a property: X p was V")))
+;; the world just before the last write of the property a reads, or () if only world 0 wrote it
+(define-function john-was-world (a w env ev)
+  (let* ((op (john-was-property a w env ev)) (t (john-last-write-time w (car op) (cdr op))))
+    (and (< 0 t) (john-at-time w (- t 1)))))
+
 ;; ours: the distinct values o's p has held from world 0 to w's time, each where it first appeared
 (define-function john-values-over-time (w o p)
   (or (and (john-object? o) (member? p (john-props (john-object-class o)))) (john-fail "over time reads a property: " o " " p))
@@ -359,11 +382,13 @@
 		      ((= op 'and) (john-bool (and (john-true? (john-eval (cadr x) w env)) (john-true? (john-eval (caddr x) w env)))))
 		      ((= op 'or) (john-bool (or (john-true? (john-eval (cadr x) w env)) (john-true? (john-eval (caddr x) w env)))))
 		      ((= op 'not) (john-bool (not (john-true? (john-eval (cadr x) w env)))))
-		      ((= op 'is)
-		       (let ((v (john-eval (cadr x) w env)))
-			 (john-bool (if (john-kind-name? (caddr x) env)
-					(john-is-a v (caddr x))
-				      (john-equivalent v (john-eval (caddr x) w env))))))
+		      ((member? op '(is was))	; was: is, with the left side read just before its property's last write
+		       (let ((past (if (= op 'was) (john-was-world (cadr x) w env john-eval) w)))
+			 (john-bool (and past
+					 (let ((v (john-eval (cadr x) past env)))
+					   (if (john-kind-name? (caddr x) env)
+					       (john-is-a v (caddr x))
+					     (john-equivalent v (john-eval (caddr x) w env))))))))
 		      ((= op 'rel) (john-holds (cadr x) (john-eval (caddr x) w env)
 					       (if (= 'did (cadr x)) (cadddr x) (john-eval (cadddr x) w env)) w env))
 		      ((and (member? op '(every any)) (= 'time (cadr x)) (cddddr x))

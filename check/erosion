@@ -14,3 +14,4 @@ verbosity 75 the tree as first measured, 2026-11-08, the same files
 erosion -8 a quasiquoted template's decisions belong to the code it makes, not to the callable (review), so forms that write code erode less
 erosion 1 choices adds a statement to john-statement, already over CC 10 (a statement table would take it under; the plans' simplify step will name it)
 verbosity -1 john-serialize.l's lines, none flagged or cloned, dilute the verbose share
+erosion -1 plan-load.l's small readers and was's helpers, each under CC 10, dilute the eroded share

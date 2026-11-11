@@ -21,7 +21,7 @@
 	      (or (plan-yes? b 'proven) (println "           waiting on " b)))))))
 (list-do c (john-instances 'Check)
   (and (plan-yes? c 'regressed) (println "regressed: " c)))
-(println "this code: " plan-tree ", events of evidence: " (list-length plan-evidence))
+(println "this code: " plan-tree ", events of evidence: " (<john-world>-time *john-world*))
 ;; the plan's answer starts with the evidence, the world chain's own history; what's new starts at now
 (if (< 0 stale)
     (println "next: notes/plan/record full (" stale " answers are about older code)")

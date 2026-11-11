@@ -8,7 +8,7 @@ the steps each plan allows, ranked by what the evidence and erosion say.
 
 **Architecture:** `check/parallel.l` writes a results file; `notes/plan/record-run.l` turns it into worlds of each plan's
 chain, written by `john-serialize` as Maru forms and read back by `john-deserialize` with `read`, with a history per
-property. Plans qualify each check's state from `its evidence over time`, weigh steps with heuristics (one using
+property. Plans qualify each check's state from its latest answer and, with `was`, the one before, weigh steps with heuristics (one using
 `total` over hotspots), and `choices` answers the ranked frontier, which `next.l` prints lane first.
 
 **Tech Stack:** untyped Maru on `eval` (`john-eval.l`, `john.g`, `check/*.l`), `sh` (`notes/plan/record`,
@@ -149,13 +149,13 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
 - [ ] **Step 4:** `make check CHECKS="john_forms john_run john_session sat_john call_by_meaning"` passes.
 - [ ] **Step 5:** Document in `doc/john.md`; `check/lines`, `check/erosion` if it moved; commit.
 
-### Task 4: Plans read their ledgers; states from `over time` [R-ledger-union, R-ledger-forms, R-done-current, R-plans-name-cases]
+### Task 4: Plans read their ledgers; states from the latest answer and `was` [R-ledger-union, R-ledger-forms, R-done-current, R-plans-name-cases]
 
 **Files:**
 - Create: `check/case-names.l` (the reader `check/parallel.l` has, moved out), `notes/plan/tree-matching.answers`,
   `notes/plan/ksworld.answers`, `notes/plan/render.answers` (converted once; the converter is not kept)
 - Delete: `notes/plan/evidence.john`, `notes/plan/ksworld-evidence.john`, `notes/plan/render-evidence.john`
-- Modify: `notes/plan/plan-world.l`, `notes/plan/tree-hash` (exclude `notes/plan/*.answers`), `.gitattributes`
+- Modify: `john.g`, `john-eval.l` (`was`), `check/john-session.l`, `doc/john.md`, `notes/plan/plan-world.l`, `notes/plan/tree-hash` (exclude `notes/plan/*.answers`), `.gitattributes`
   (`notes/plan/*.answers merge=union`), `check/parallel.l`, the three plans, `check/plan-evidence.l`,
   `doc/evidence-plan.md`, `check/lines`
 
@@ -166,21 +166,20 @@ property. Plans qualify each check's state from `its evidence over time`, weigh 
 - Each plan declares, replacing `holds`, `stale` and the `at time` `regressed`:
 
 ```
-qualify Check current-good if for some its evidence over time do (each is Good and each tree = Now tree).
-qualify Check current-bad if for some its evidence over time do (not each is Good and not each is untested and each tree = Now tree).
-qualify Check older-good if for some its evidence over time do (each is Good and not each tree = Now tree).
-qualify Check holds if it current-good = yes and it current-bad = no.
-qualify Check failing if it current-bad = yes.
-qualify Check regressed if it failing = yes and it older-good = yes.
-qualify Check stale if it current-good = no and it current-bad = no and it older-good = yes.
-qualify Check untested if for every its evidence over time do each is untested.
+qualify Check holds if its evidence is Good and its evidence tree = Now tree.
+qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
+qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
+qualify Check untested if its evidence is untested.
 ```
 
-- [ ] **Step 1: Write the tests** in `check/plan-evidence.l`: a fixture plan and ledger in `check/plan/` (two cases, one
-  answered good on tree `aaa`, one good on `bbb` and failed on `aaa`) loaded with `plan-load` at tree `aaa` give
-  `holds`, `regressed`; at tree `ccc`, both `stale`; a case good and failed on `aaa` is `failing`, not `holds`;
-  the same two lanes' lines interleaved in either order give the same states; a ledger line naming a removed check
-  fails `…check/plan/x.answers: ledger 3: unknown object gone`, and with `retired gone.` in the plan loads, its
+- [ ] **Step 1: Write the tests**: in `check/john-session.l`, `E was V` is `E is V` on the value before E's property's last
+  write (read on to a field; not the world before's), the same from a history, no for a property only world 0 wrote, and
+  `john: was reads a property: X p was V` for `3 was 3`; in `check/plan-evidence.l`, a fixture plan and ledger in
+  `check/plan/` (one answered good on tree `aaa`; other good on `bbb` then failed on `aaa`; fixed failed then good on
+  `aaa`; bad failed on `aaa`; none unanswered) loaded with `plan-load` at tree `aaa` give holds, regressed, holds,
+  failing, untested; at `ccc` the answered ones are stale; the lines reversed give other stale and fixed regressed; a ledger line naming a removed check
+  fails `…check/plan/x.answers: ledger 7: unknown object gone`, and with `retired gone.` in the plan loads, its
   states unchanged by the skipped line; every `make Case NAME` in `notes/plan/*.john` is in
   `(case-names)`, else `FAIL plan PLAN names no case NAME`.
 - [ ] **Step 2:** `make check CHECKS=plan_evidence` fails.

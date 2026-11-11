@@ -37,21 +37,30 @@ make Case nile_reroute untested.
 make Case nile_reverse untested.
 make Case nile_sort untested.
 make Case nile_dupcat untested.
-make Case nile_threads untested.
-make Case nile_tsan untested.
+make Case nile_laws untested.			; the built-ins hold to their definitions, the same on 1, 4 and 8 workers
+make Case nile_schedules untested.		; and keep the runtime's contracts under generated thread schedules
 make Case nile_text_layout untested.
 ; what draws, and where
 make Case gezira_image untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
 make Case sdl3_window untested.			; a window shows a pixel buffer, and mouse events come back
 make Case ksworld_headless untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
-make Case ksworld_text untested.		; a document's spans laid out as TrueType glyph paths
-make Case ksworld_render untested.		; a document rendered through Gezira to pixels, against its bundle's preview
+make Case ksworld_pixels untested.		; KSWorld.ks's pixels in a window: its bar, background, a filled shape, glyphs
+; cases that were planned and never written, or written under other names: their answers stay in the ledger, unread
+retired ksworld_render.				; ksworld_pixels shows a document's pixels
+retired ksworld_text.				; ksworld_headless lays its text out with TrueType glyphs
+retired nile_threads.				; nile_laws runs the built-ins on 1, 4 and 8 workers
+retired nile_tsan.				; nile_schedules finds races by schedule, not a sanitizer
 make Case ksworld_mouse untested.		; a click lands on the box under it, fires its streams, and the redraw shows it
 
 create Code tree.
 action Check observed Answer consequence its evidence = Answer.
+; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
+; lanes' answers in an order no branch chose, so no state reads which came last
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
-qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
+qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
+qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
+qualify Check untested if its evidence is untested.
 
 create Capability what where shown-by builds-on planned.
 make Capability NileInterface "nile.k is the one interface; the Maru generator passes sizeof_vars"
@@ -61,7 +70,7 @@ make Capability NileThreads "pthread types sized from nile.osdefs; a worker pool
 make Capability NileProcesses "processes and the kernel interface, with the limits and running out of memory"
   "nile/runtimes/maru/nile-process.k, nile-kernel.k" [ nile_recip, nile_limits, nile_oom, nile_prefix, nile_reroute ] [ NileThreads ] no.
 make Capability NileBuiltins "the remaining built-ins, and every thread count giving the same answer, race-free"
-  "nile/runtimes/maru/nile-builtins.k" [ nile_reverse, nile_sort, nile_dupcat, nile_threads, nile_tsan ] [ NileProcesses ] no.
+  "nile/runtimes/maru/nile-builtins.k" [ nile_reverse, nile_sort, nile_dupcat, nile_laws, nile_schedules ] [ NileProcesses ] no.
 make Capability NileEndToEnd "text-layout.nl runs end to end through Maru, as the C runtime ran it"
   "nile/, check/check.l" [ nile_text_layout ] [ NileBuiltins ] no.
 make Capability GeziraImage "Gezira's kernels, compiled through Maru, render a scene to pixels"
@@ -71,9 +80,9 @@ make Capability Sdl3Window "an SDL3 window shows a pixel buffer each frame and h
 make Capability DocumentScene "a document's boxes ask a Gezira to fill their shapes' paths, each placed by its matrix and painted in its fill"
   "ksworld-render.l" [ ksworld_headless ] [ ] no.
 make Capability DocumentText "a document's text spans are laid out with TrueType glyph outlines, quadratic Béziers Gezira draws"
-  "a TrueType byte grammar, ksworld-text.l" [ ksworld_text ] [ DocumentScene ] no.
-make Capability DocumentRendered "a document is rendered through Gezira to pixels, and matches its bundle's preview"
-  "ksworld-render.l" [ ksworld_render ] [ GeziraImage, DocumentText ] no.
+  "a TrueType byte grammar, ksworld-text.l" [ ksworld_headless ] [ DocumentScene ] no.
+make Capability DocumentRendered "a document is rendered through Gezira to pixels: its bar, background, a filled shape and its glyphs where KSWorld put them"
+  "ksworld-render.l" [ ksworld_pixels ] [ GeziraImage, DocumentText ] no.
 make Capability MouseHandled "in an SDL3 window, a click lands on the box under it, fires its streams, and the redraw shows it"
   "ksworld-window.l" [ ksworld_mouse ] [ DocumentRendered, Sdl3Window ] no.
 make Capability NothingElseBroke "every other check in the repository still passes"
@@ -84,8 +93,6 @@ qualify Capability done if it proven = yes or it planned = yes.
 qualify Capability ready if for every its builds-on do each done = yes.
 rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
 rel-qualify Check:C supports Capability:K if C in K shown-by.
-qualify Check regressed if not its evidence is Good and not its evidence is untested
-  and for some time A up to time do (at time A its evidence is Good).
 
 create Team.
 make Team T.

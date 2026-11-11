@@ -31,8 +31,13 @@ make Measure WholeSuite untested "nice make check" "full".
 
 create Code tree.
 action Check observed Answer consequence its evidence = Answer.
+; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
+; lanes' answers in an order no branch chose, so no state reads which came last
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
-qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
+qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
+qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
+qualify Check untested if its evidence is untested.
 
 create Capability what where shown-by builds-on planned.
 make Capability DocumentsAvailable "the dbjr documents the checks read are fetched from tinlizzie.org/dbjr into a temporary directory"
@@ -47,8 +52,6 @@ qualify Capability done if it proven = yes or it planned = yes.
 qualify Capability ready if for every its builds-on do each done = yes.
 rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
 rel-qualify Check:C supports Capability:K if C in K shown-by.
-qualify Check regressed if not its evidence is Good and not its evidence is untested
-  and for some time A up to time do (at time A its evidence is Good).
 
 create Team.
 make Team T.

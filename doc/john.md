@@ -83,7 +83,10 @@ Samimi's planning language: parsing, the possible-worlds evaluator, sessions and
   a chain back also gives each property its history, its writes in time order, shared by the chain's worlds: a read at
   any time searches that history, and `at time` finds its world by index, so neither walks the chain (the case cuts a
   parent pointer in a chain of 2000 to show it). `E over time`, E a property read `X p`, is the distinct values X's p has
-  held from world 0 to now, each where it first appeared (`doc/rfc/draft-ndn-maru-john-development-00.md`).
+  held from world 0 to now, each where it first appeared, and `E was V` is `E is V` with E's property (the innermost `X p`
+  it reads, fields read on from there) as it was just before its last write: KScript's `x'` per property, ours. A property
+  only world 0 wrote answers no, and a left side reading no property fails (`was reads a property: X p was V`); the case
+  asks both in a session and again from a history (`doc/rfc/draft-ndn-maru-john-development-00.md`).
 - `call_by_meaning` (`check/meaning.l`): `meaning.l`, call by meaning (Samimi et al., Onward! 2014, TR-2014-003) with a model
   where the paper had Cyc. A model proves nothing, so each answer is held to what John can check: `"…" find-passing: "probe"`
   takes an object whose `spec` the model says means the text only if it passes the probe, a qualification of its class, and

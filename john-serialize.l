@@ -55,7 +55,9 @@
 (define *john-skipped* ())
 (define-function john-skipped () *john-skipped*)
 ;; the message in parts, none made here: a try that catches it undoes what its body built
-(define-function john-ledger-fail args (apply error (cons "ledger " (cons *john-ledger-line* (cons ": " args)))))
+(define *john-ledger-file* ())	; the ledger's path, if it came from one, in parts (none built here), to name in an error
+(define-function john-ledger-fail args
+  (apply error (concat-list *john-ledger-file* (concat-list (if *john-ledger-file* '(": ") ()) (cons "ledger " (cons *john-ledger-line* (cons ": " args)))))))
 (define-function john-ledger-variant (kind fields)
   (let ((m (john-member kind)) (out ()))
     (or m (john-ledger-fail "unknown kind " kind))

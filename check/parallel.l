@@ -4,25 +4,8 @@
 (require "check/temp.l")
 (require "check/jobs.l")
 (require "check/results.l")
+(require "check/case-names.l")
 (define jobs (let ((j (env-var "MARU_CHECK_JOBS"))) (if j (string->long j) 4)))
-
-;; the names of the cases, read from where they're written, in order
-(define-function case-names ()
-  (let* ((text (contents-of-file-named "check/check.l"))
-	 (marker "(check \"")
-	 (m (string-length marker))
-	 (n (string-length text))
-	 (names ())
-	 (i 0))
-    (while (< i (- n m))
-      (if (and (or (= i 0) (= ?\n (string-at text (- i 1))))
-	       (= marker (string-copy text i m)))
-	  (let ((end (+ i m)))
-	    (while (not (= ?\" (string-at text end))) (set end (+ end 1)))
-	    (push names (string-copy text (+ i m) (- end (+ i m))))
-	    (set i end))
-	(set i (+ i 1))))
-    (list-reverse! names)))
 
 ;; what --quick leaves out: the longest by far, as the slowest line reports them.  Everything runs before a merge.
 (define slow-cases '("gc_laws" "gc_model" "asm_rows_x64" "asm_rows_x86" "asm_rows_arm64" "asm_table" "exe" "sat_john" "sat_proof" "recover" "lines"))

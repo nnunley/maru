@@ -61,7 +61,7 @@ This document defines: the results file and how `make check` writes it; how a ru
 ledger; how a JOHN chain of worlds is written and read back, with each property's history; what "done" and "ready"
 require of evidence; the `choices` statement and the frontier it answers; how a plan
 scores steps from its evidence; how a plan minimizes erosion; `total`; lanes and overflow in `next.l`; and the rule that keeps plans naming real cases. It
-does NOT define JOHN's semantics beyond `choices`, `over time` and serialization (owned by `draft-ndn-maru-john-session-00` and `doc/john.md`), the
+does NOT define JOHN's semantics beyond `choices`, `was`, `over time` and serialization (owned by `draft-ndn-maru-john-session-00` and `doc/john.md`), the
 evidence values a law can answer (owned by `check/law.l` and `plan_evidence`), or coordination between agents beyond
 what the frontier's order gives (see Out of Scope).
 
@@ -184,7 +184,8 @@ plan_evidence
 Reading a chain back MUST also give each object's property its history, so that reading a property at any time of the
 chain finds the write in force then without walking the worlds between (a search of the history, logarithmic in its
 length), and so that `E over time`, with E a property read `X p`, answers the distinct values X's p has held from world
-0 to the current time, in the order each first appeared, from the history alone. [R-history-index]
+0 to the current time, in the order each first appeared, from the history alone, and `E was V` answers `E is V` with E's
+property read as it was just before its last write, with no earlier value answering no. [R-history-index]
 A world holds only its own writes and finds the rest through its parent (RN-2008-003 §4), which is right for search,
 where chains are short, and slow for a ledger thousands of worlds long: each read of a property written early walks
 them all. A history per property is Reed's object history (1978, §3.3), a function from time to version; the chain
@@ -222,20 +223,23 @@ plan_record
 
 ### Done, ready and stale
 
-A plan MUST qualify a check's states from the set of its answers, `its evidence over time`, as this table gives them, and `Capability proven`
+A plan MUST qualify a check's states from its latest answer, `its evidence`, and the answer before it, `its evidence was`, as this table gives them, and `Capability proven`
 only when the capability shows at least one check and every one holds; `ready` is every `builds-on` done, as
 `tree-matching.john` has it today. [R-done-current]
 
 | State | The check's answers |
 |---|---|
-| `holds` | some answer for the current tree is good, and none for the current tree isn't |
-| `failing` | some answer for the current tree is neither good nor untested |
-| `regressed` | `failing`, and some answer for another tree is good |
-| `stale` | no answer for the current tree, and some answer for another tree is good |
+| `holds` | the latest answer is good, for the current tree |
+| `failing` | the latest answer is neither good nor untested, for the current tree |
+| `regressed` | `failing`, and the answer before it was good |
+| `stale` | the latest answer is for another tree |
 | `untested` | no answers |
 
-Answers for one tree are about the same code wherever they were recorded, so a check both good and not good on one tree
-is flaky: it is `failing`, never `holds`.
+A state is about the check now, so it reads the current value, not every answer the check has had: a later answer for
+the current tree replaces an earlier one, and a check fixed on this tree holds. Only runs in this checkout answer for its
+tree, and a merge makes a new tree, so union-merged answers from other lanes are stale until a run here answers them.
+`E was V` is KScript's previous value (`x'`, TR-2013-002 §3.2) read per property, as Reed's object history keeps it,
+written as the past of `is`.
 
 ```maru-check @R-done-current
 plan_frontier
@@ -481,7 +485,7 @@ steps of the plan, never commands.
 `next.l` stops answering `next: notes/plan/record full` and answers the frontier instead; scripts that grep for that
 line change. The ledgers move from `evidence.john` and `NAME-evidence.john` to `NAME.answers`: each plan's existing evidence is
 replayed once and its chain written by `john-serialize`. The plans keep their `observed` action and their history
-readings, and their states read `its evidence over time`. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
+readings, and their states read `its evidence` and `its evidence was`. `make check` writes the results file and appends to the ledgers, so a run leaves tracked files modified,
 committed with the code they're about (`notes/plan/LOOP.md`'s rule). `MARU_RECORD=0` restores the old behavior for a
 run. The existing plans gain the four qualities and their heuristics, and `render.john` its case names corrected.
 `MARU_PLAN` keeps its meaning.

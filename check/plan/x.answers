@@ -1,0 +1,6 @@
+(world (one observed (value passed (tree "aaa"))) ((one evidence (value passed (tree "aaa")))))
+(world (other observed (value passed (tree "bbb"))) ((other evidence (value passed (tree "bbb")))))
+(world (other observed (value failed (tree "aaa"))) ((other evidence (value failed (tree "aaa")))))
+(world (fixed observed (value failed (tree "aaa"))) ((fixed evidence (value failed (tree "aaa")))))
+(world (fixed observed (value passed (tree "aaa"))) ((fixed evidence (value passed (tree "aaa")))))
+(world (bad observed (value failed (tree "aaa"))) ((bad evidence (value failed (tree "aaa")))))

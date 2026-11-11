@@ -1,11 +1,11 @@
 ; Stage 1 of doc/rfc/draft-ndn-maru-typed-tree-matching-00.md: what we're building, how each piece relates to
 ; the others, and what would show it works.
 ;
-; A Check is something the system can be asked.  notes/plan/observe.l asks every one with `observe`, whose answer is an
-; Evidence value naming the code it ran against, and prints it as an event, `tree_lists do observed passed(tree: "1f3a...").`
-; notes/plan/record appends those to evidence.john.  Replaying the events gives the chain of worlds, so `evidence` is the
-; latest answer, and `at time` reads earlier ones.  An answer counts only for the code it ran against: plan-world.l makes
-; `Now`, this tree, so a capability is proven only if its checks hold now.  Plans never run a check: rules read what's recorded.
+; A Check is something the system can be asked.  Its answers are worlds of the plan's chain, in notes/plan/tree-matching.answers:
+; `make check` records each case it ran there, and notes/plan/record what observe.l asks (measures, grammars, laws), each
+; answer an Evidence value naming the code it ran against.  A check's state reads its latest answer, and `was` the one
+; before it.  An answer counts only for the code it ran against: plan-world.l makes `Now`, this tree, so
+; a capability is proven only if its checks hold now.  Plans never run a check: rules read what's recorded.
 
 start-world plan.
 load "notes/plan/probes.l".
@@ -67,8 +67,13 @@ make Law comment_blank untested "check/laws/cexpr.law" "".
 ; an answer says which code gave it, and it's only good for that code
 create Code tree.
 action Check observed Answer consequence its evidence = Answer.
+; a check's state, from every answer it has had (doc/rfc/draft-ndn-maru-john-development-00.md): union merges leave
+; lanes' answers in an order no branch chose, so no state reads which came last
 qualify Check holds if its evidence is Good and its evidence tree = Now tree.
-qualify Check stale if its evidence is Good and not its evidence tree = Now tree.
+qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
+qualify Check regressed if it failing = yes and its evidence was Good.
+qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
+qualify Check untested if its evidence is untested.
 
 ; ---- what we're building
 create Capability what where shown-by builds-on planned.
@@ -107,8 +112,6 @@ rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
 rel-qualify Check:C supports Capability:K if C in K shown-by.
 
 ; ---- what the history says, for reading, never for planning
-qualify Check regressed if not its evidence is Good and not its evidence is untested
-  and for some time A up to time do (at time A its evidence is Good).
 qualify Check observed-within: N if
   for some time A after (time - N) up to time do (at time A it did observed).
 

@@ -189,7 +189,18 @@
 (enter "X do mark noted(text: \"one\"). X do both. X do mark noted(text: \"two\"). X do mark noted(text: \"one\").")
 (expect "over time: each value once, oldest first, world 0's too"
 	(enter "X note over time.") '("[ plain, noted(text: one), noted(text: two) ]"))
+(define was-reads "X note was noted. X note text was \"two\". X note was plain. X a was 0. X a is 0.")
+(define was-answers '("yes" "yes" "no" "yes" "no"))
+(expect "was: the value before the property's last write, read on to a field, not the world before's"
+	(enter was-reads) was-answers)
 (john-deserialize ())
 (expect "and the same from a history" (enter "X note over time.") '("[ plain, noted(text: one), noted(text: two) ]"))
+(expect "was, the same from a history" (enter was-reads) was-answers)
+(john-begin)
+(enter pair-program)
+(expect "was: a property only world 0 wrote has no earlier value" (enter "X a was 0.") '("no"))
+(set *john-echo* 1)
+(expect "was reads a property" (enter "3 was 3.") '("john: was reads a property: X p was V"))
+(set *john-echo* ())
 
 (if ok (println "john session ok") (exit 1))

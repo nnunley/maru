@@ -5,3 +5,6 @@ peg.l            derived
 arm64.g.l        derived
 x86.g.l          derived
 undo-irl.c       derived
+
+# Evidence ledgers: each lane appends; a union merge keeps every lane's worlds (doc/rfc/draft-ndn-maru-john-development-00.md)
+notes/plan/*.answers merge=union

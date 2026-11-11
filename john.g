@@ -12,7 +12,7 @@ idpart		= (letter (letter | digit | "-" &letter)*) @ $$ ;
 wb		= !(letter | digit | "-") _ ;
 reserved	= ( "if" | "is" | "try" | "using" | "use" | "by" | "do" | "consequence" | "establish"
 		  | "dynamically" | "maximize" | "minimize" | "and" | "or" | "not" | "for" | "every"
-		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" | "total" | "choices" | "over" | "retired" ) !(letter | digit | "-") ;
+		  | "any" | "some" | "select" | "all" | "one-from" | "satisfy" | "the" | "total" | "choices" | "over" | "retired" | "was" ) !(letter | digit | "-") ;
 name		= !reserved idpart:x !":" _					-> x ;
 kw		= idpart:x ":" _						-> (john-kw x) ;
 rel		= name:n &-> (john-relation? n)					-> n ;
@@ -28,6 +28,7 @@ neg		= "not" wb neg:a						-> `(not ,a)
 cmpop		= "<=" -> '<= | ">=" -> '>= | "<" -> '< | ">" -> '> | "=" -> '= ;
 compare		= arith:a cmpop:o _ arith:b					-> `(,o ,a ,b)
 		| arith:a "is" wb arith:b					-> `(is ,a ,b)	# ours: the same, or one of
+		| arith:a "was" wb arith:b					-> `(was ,a ,b)	# ours: is, on the value before the property's last write
 		| arith:a rel:r arith:b						-> `(rel ,r ,a ,b)
 		| arith ;
 arop		= "+" -> '+ | "-" -> '- | "*" -> '* | "/" -> '/ ;
