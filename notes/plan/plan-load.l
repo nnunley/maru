@@ -4,6 +4,8 @@
 ;;;   (plan-load dir name tree)   a fresh session: DIR/NAME.john, Now's tree, then DIR/NAME.answers if there is one
 ;;;   (plan-names dir)            the names of DIR/*.john, sorted
 ;;;   (plan-ask object message)   what it answers in the current world; plan-yes? whether that's yes
+;;;   (plan-replay dir name)      ((now . form) ...): each ledger form as the plan's actions write it now, and as it is
+;;;   (plan-ledger-drift dir name) () if the ledger is what the plan's actions write now, else which line isn't
 (require "john-serialize.l")
 (define-function plan-file-lines (path)	; a file's lines, or () if there is no file
   (and (= 0 ((subr "access" "si>i") path 4))
@@ -39,3 +41,24 @@
 (define-selector plan-part-text (x) (john-text x))
 (define-method plan-part-text <string> () self)
 (define-function plan-condition-text (c) (apply concat-strings (map plan-part-text (cdr c))))
+;; a ledger's worlds, each step taken again by the plan's action as it stands; a retired object's line is kept as it is
+(define-function plan-replay (dir name)
+  (john-run (concat-list (john-read (concat-strings dir "/" name ".john")) (list (list 'make 'Code 'Now "replay"))))
+  (let ((out ()) (ledger (plan-ledger-path dir name)))
+    (and (= 0 ((subr "access" "si>i") ledger 4))
+	 (list-do f (read ledger)
+	   (if (or (not (= 'world (john-ledger-shape f))) (john-ledger-retired (concat-list (cadr f) (map car (caddr f)))))
+	       (push out (cons f f))
+	     (let ((t (<john-world>-time *john-world*)) (a (cadr f)))
+	       (john-do (car a) (cadr a) (map john-form->value (cddr a)))
+	       (push out (cons (and (< t (<john-world>-time *john-world*)) (car (john-serialize-worlds t *john-world*))) f))))))
+    (list-reverse! out)))
+(define-function plan-ledger-drift (dir name)
+  (let ((n 0) (bad ()))
+    (list-do e (plan-replay dir name)
+      (set n (+ n 1))
+      (or bad (equal (car e) (cdr e)) (set bad (cons n e))))
+    (and bad (concat-strings (plan-ledger-path dir name) ": ledger " (long->string (car bad)) ": "
+			     (symbol->string (cadr (cadr (cddr bad))))
+			     (if (cadr bad) " writes what the line doesn't hold" " takes no step now")
+			     "; ./eval notes/plan/replay.l write rewrites the ledger"))))

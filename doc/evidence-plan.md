@@ -40,6 +40,12 @@ which `observed` writes with every good answer:
 A later answer for the current tree replaces an earlier one. A capability is proven when it shows at least one check and
 every one holds.
 
+Recording an answer is a step of the plan: `observed` runs, time moves on, and the world it made, every write of it,
+is the line. Reading a ledger evaluates nothing, so when what an action writes changes, the lines already there hold the
+old writes: `./eval notes/plan/replay.l` (`MARU_PLAN` picks the plan) says whether the ledger is what the plan's actions
+write now, naming the first line that isn't, and `./eval notes/plan/replay.l write` takes each recorded step again and
+rewrites it.
+
 A ledger line naming an object the plan doesn't declare fails, naming the ledger and the line. A check dropped or renamed
 is declared `retired NAME.` in its plan, and its lines are skipped and kept (`render.john` retires `ksworld_render`,
 `ksworld_text`, `nile_threads` and `nile_tsan`, planned under names no case has).
@@ -52,5 +58,6 @@ is declared `retired NAME.` in its plan, and its lines are skipped and kept (`re
   holding, one fixed on the tree and holding, one regressed, one regressed after failing twice, one failing and one
   untested on the tree they name, the answered ones stale on another; the same answers in the other order leave the
   latest deciding (other stale, fixed regressed); a line naming a dropped check fails naming the ledger and line, and loads once the
-  plan retires it. Every `make Case NAME` in every plan names a case `check/check.l` has. `next.l` runs on the plan as it
+  plan retires it. The fixture's ledger is what its actions write now, a line missing a write `observed` makes is
+  named, and every plan's ledger replays to itself. Every `make Case NAME` in every plan names a case `check/check.l` has. `next.l` runs on the plan as it
   stands.

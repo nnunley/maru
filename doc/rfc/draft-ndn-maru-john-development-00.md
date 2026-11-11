@@ -166,6 +166,9 @@ plan_evidence
 A session MUST be able to write its chain of worlds, from world 1 to the current world, as ledger lines
 (`john-serialize`), and to read such lines back (`john-deserialize`) into worlds whose writes are the lines' own,
 evaluating nothing: an action's consequence is what it wrote then, and a plan edited since doesn't rewrite its past.
+So a change to what an action writes leaves the worlds already recorded as they were: a plan's check MUST fail naming
+the first ledger line whose writes differ from what the plan's actions write now, and `notes/plan/replay.l write`
+rewrites the ledger by taking each recorded step again, a retired object's lines kept as they are.
 A ledger MUST be read by Maru's reader (`read`), never by `john.g`. A world's time is its position in the chain read
 back, never a number stored in it, so a merge can't make two worlds claim one time. `make` lines are declarations,
 entered in world 0 before the worlds, as a session enters them. The possible worlds past the current one are not

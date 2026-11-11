@@ -165,7 +165,9 @@ property. Plans qualify each check's state from what the world holds, its latest
   of `DIR/*.john`. `plan-ask`, `plan-yes?` as now. `(case-names)` from `check/case-names.l`.
 - Each Check class gains `last-good` (each make another `untested`), and `observed` keeps it:
   `action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.`
-  The converted ledgers are replayed through that action once, so each world holds every write it made.
+  The converted ledgers are replayed through that action (`notes/plan/replay.l write`, `plan-replay` and
+  `plan-ledger-drift` in `plan-load.l`), so each world holds every write it made; `plan_evidence` fails on a ledger that
+  isn't what its plan's actions write now.
 - Each plan declares, replacing `holds`, `stale` and the `at time` `regressed`:
 
 ```

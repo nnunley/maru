@@ -69,6 +69,16 @@ qualify Law holds if its evidence is Good and its evidence tree = Now tree.
 (system (concat-strings "echo 'retired gone.' >> " scratch "/z.john"))
 (expect "once the plan retires it, the line is skipped and the states are as before"
 	(equal (states scratch "z" "aaa") (states "check/plan" "x" "aaa")))
+;; a ledger holds every write its plan's actions make now: a change to what an action writes is replayed into it
+(expect "the fixture's ledger is what its actions write now" (not (plan-ledger-drift "check/plan" "x")))
+(system (concat-strings "cp check/plan/x.john " scratch "/w.john"))
+(ledger "w" (cons "(world (one observed (value passed (tree \"aaa\"))) ((one evidence (value passed (tree \"aaa\")))))" (cdr x-lines)))
+(expect "a line missing a write its action makes now is named"
+	(equal (plan-ledger-drift scratch "w")
+	       (concat-string scratch "/w.answers: ledger 1: observed writes what the line doesn't hold; ./eval notes/plan/replay.l write rewrites the ledger")))
+(list-do plan (plan-names "notes/plan")
+  (or (= 0 (system (concat-strings "MARU_PLAN=" plan " ./eval notes/plan/replay.l >/dev/null 2>&1")))
+      (expect (concat-strings "plan " plan "'s ledger is what its actions write now") ())))
 ;; every case a plan names is a case check/check.l has
 (let ((known (case-names)))
   (list-do plan (plan-names "notes/plan")
