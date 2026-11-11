@@ -4,10 +4,6 @@ KSObject subclass: #KSBox
 	poolDictionaries: 'OpenGLConstants'
 	category: 'KSObjects-Boxes'!
 
-!KSBox methodsFor: '*generated' stamp: 'yo 8/3/2012 15:54'!
-foo = () ->
-	this.foo = $$(this.xyz(mergeE(@x, @y)))! !
-
 !KSBox methodsFor: '*ksobjects-pushpull' stamp: 'yo 2/14/2013 18:26'!
 findPPEmbeddedName = (aString) ->
 	//"self new findPPEmbeddedName ''"
@@ -232,15 +228,6 @@ allContentsDo = (aBlock) ->
 	for e in this.contents
 		e.withAllContentsDo(aBlock)! !
 
-!KSBox methodsFor: 'collection' stamp: 'yo 7/17/2012 13:01'!
-beAPart = (aBoolean) ->
-	this.part = aBoolean
-	this.backgroundPart = !!aBoolean! !
-
-!KSBox methodsFor: 'collection' stamp: 'yo 7/24/2012 19:46'!
-container = (c) ->
-	this.container.set(c)! !
-
 !KSBox methodsFor: 'collection' stamp: 'yo 7/17/2012 13:11'!
 contents = () ->
 	this.contents! !
@@ -361,16 +348,6 @@ remove = (aBox) ->
 	if index > 0 
 		this.removeAt(index)
 		if this.worldState() && !!this.optimizedField() then this.worldState().clearSortedBubbles()! !
-
-!KSBox methodsFor: 'collection' stamp: 'yo 7/17/2012 15:04'!
-remove: aBox
-	"Remove this box.  If the box is on more than one page of a stack, and if the user refuses to delete it, this method will return with the box not deleted.  This method returns before the dialog box appears, so the delete may happen after the return."
-	| index |
-	aBox isPart ifTrue: [^ self removeAsParts: aBox].
-	aBox isBackgroundPart ifTrue: [^ self removeAsBackgroundParts: aBox].
-
-	index := contents indexOf: aBox.
-	index > 0 ifTrue: [self removeAt: index].	"extra tests done here"! !
 
 !KSBox methodsFor: 'collection' stamp: 'yo 7/17/2012 15:05'!
 removeAll = () ->
@@ -1043,12 +1020,6 @@ dropShape: aShape named: aString
 	bb name: aString.
 	self adjustSizeAndDrop: bb! !
 
-!KSBox methodsFor: 'events' stamp: 'tk 2/27/2013 15:26'!
-addEvent = (anEvent) ->
-	var strm = this[anEvent.event]
-	if strm && !!strm.dormant()
-		strm.set(anEvent)! !
-
 !KSBox methodsFor: 'events' stamp: 'ael 3/21/2013 11:56'!
 announce = (anEvent) ->
 	// if this is an as-yet unhandled event of a type the receiver listens for (see senders of listen:), and is currently listening, and the event passes any necessary tests (e.g., contained within box bounds; modifier-key state is allowed by the modifier masks), then register the receiver as its handler
@@ -1190,22 +1161,6 @@ receive = (anEvent) ->
 	if (!!anEvent.handler && (tried && (this.containsPoint(this.localPointFor(anEvent.position)))))
 		this.defaultHandlerWith(anEvent)! !
 
-!KSBox methodsFor: 'events' stamp: 'yo 7/17/2012 16:42'!
-receive: anEvent
-	| tried |
-	anEvent handled ifTrue: [^ self].
-	tried := false.
-
-	(anEvent isMouseEvent and: [
-		self visible and: [self clipping not or: [
-			self containsPoint: (self localPointFor: anEvent position)]]]) ifTrue: [
-				tried := true.
-				self announceInCollections: anEvent].
-	anEvent handled ifTrue: [^ self].
-	self announce: anEvent.
-	(anEvent handled not and: [tried and: [self containsPoint: (self localPointFor: anEvent position)]])  ifTrue: [
-		self defaultHandlerWith: anEvent]! !
-
 !KSBox methodsFor: 'events' stamp: 'yo 7/24/2012 14:17'!
 rejectEventsWithModifiers
 	self at: #modifierMask put: 0.! !
@@ -1213,10 +1168,6 @@ rejectEventsWithModifiers
 !KSBox methodsFor: 'events' stamp: 'yo 8/28/2012 19:29'!
 setDefaultHandlerIfNil = (evt) ->
 	evt.defaultHandler ?= this! !
-
-!KSBox methodsFor: 'events' stamp: 'yo 7/17/2012 19:21'!
-setWantsHaloFromClick = (aBoolean) ->
-	this.wantsHaloFromClick(aBoolean)! !
 
 !KSBox methodsFor: 'events' stamp: 'ael 3/20/2013 22:53'!
 testModifierKey = (anEvent) ->
@@ -1343,12 +1294,6 @@ beCharacter = (unicode, font) ->
 	this.unicode = unicode
 	this.font = this.streamOf(font)
 	this.shape(font.glyphAt(unicode))		// will work for unicode=0 too! !
-
-!KSBox methodsFor: 'font' stamp: 'yo 8/27/2012 10:54'!
-beGlyph = (font, unicode) ->
-	this.font(font)
-	this.unicode = unicode
-	this.shape(font.glyphAt(unicode))! !
 
 !KSBox methodsFor: 'font' stamp: 'ael 3/20/2013 12:19'!
 beItalic = (aBoolean) ->
@@ -1517,15 +1462,6 @@ transformationToMatchWith = (aBox) ->
 	var tr2 = @container.transformationFromGlobal().inverseTransformation()
 	return tr2.composedWithLocal(tr)! !
 
-!KSBox methodsFor: 'geometry access' stamp: 'yo 7/18/2012 09:36'!
-basicTransformation = (aTransformation) ->
-	var elemInOpaque = !!(this.container()) && this.container().opaqueDamageRect()
-	if !!elemInOpaque
-		this.invalidRectInContainer(this.basicFullDrawingBounds())
-	this._ksSet_put("transformation", aTransformation)
-	if !!elemInOpaque
-		this.invalidRect(this.basicFullDrawingBounds)! !
-
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:39'!
 bottom = (aNumber) ->
 	this.translateByInOwner(P(0, aNumber - this.bounds().bottom()))! !
@@ -1666,10 +1602,6 @@ globalPointFor = (aPoint) ->
 	if !!@container
 		return p
 	return @container.globalPointFor(p)! !
-
-!KSBox methodsFor: 'geometry transformation' stamp: 'yo 7/19/2012 18:01'!
-invertPoint = (aPoint) ->
-	@transformation.invertPoint(aPoint)! !
 
 !KSBox methodsFor: 'geometry transformation' stamp: 'yo 8/27/2012 11:13'!
 localTransformBy = (aTransform) ->
@@ -2057,12 +1989,6 @@ beHaloRotationHandler = () ->
 beHaloScaleHandler = () ->
 	this.beScaleHandler(null)
 	this.target = $$(@container.haloTarget)! !
-
-!KSBox methodsFor: 'halo' stamp: 'yo 1/9/2013 19:57'!
-gradMoveStopsRelatively = (r) ->
-	var from = @container.gradFrom
-	var a =@container.direction
-	this.center(from + (r * a))! !
 
 !KSBox methodsFor: 'halo' stamp: 'yo 1/28/2013 18:49'!
 haloLayout = () ->
@@ -2698,34 +2624,6 @@ layoutChangedFrom = (aBox) ->
 lengthIn = (symbol) ->
 	return @glueLength ? this[symbol].currentValue()! !
 
-!KSBox methodsFor: 'layout' stamp: 'yo 7/19/2012 14:37'!
-setBounds = (aRectangle) ->
-	if @bounds == aRectangle
-		return this
-	var tr = @transformation
-	//I think thre is a better way to handle it when it the box is rotated.  (Right now, if you rotate a box and then say (aBox bounds: aRectangle) = aRectangle, the result is false).
-	var oldBox = @bounds
-	if oldBox.extent() == P(0, 0) || tr.isPureTranslation()
-		this.extent.set(aRectangle.extent())
-		this.topLeft.set(aRectangle.origin())
-		return this
-	var extentPoint = aRectangle.extent()
-	var l = P(0, 0).extent(@extent)
-	var o = this.pointInContainer(l.origin())
-	var c = this.pointInContainer(l.corner())
-	try
-		var relOrigin = (o - oldBox.origin()) / oldBox.extent()
-		var relCorner = (c - oldBox.origin()) / oldBox.extent()
-	catch ex
-		ex.resume(ex.dividend())
-	// map origin and corner into the new extent
-	o = oldBox.origin() + (relOrigin * extentPoint)
-	c = oldBox.origin() + (relCorner * extentPoint)
-	o = tr.invertPoint(o)
-	c = tr.invertPoint(c)
-	this.extent.set(c - o)
-	this.topLeft(aRectangle.origin())! !
-
 !KSBox methodsFor: 'layout' stamp: 'yo 1/8/2013 13:44'!
 wholeContentsDo = (aFunction) ->
 	for b in this.parts
@@ -2742,51 +2640,6 @@ wholeContentsSize = () ->
 !KSBox methodsFor: 'menu actions' stamp: 'yo 10/10/2012 10:17'!
 acceptDrops = (evt) ->
 	this.attachDropAcceptor()! !
-
-!KSBox methodsFor: 'menu actions' stamp: 'ael 1/20/2013 23:51'!
-beActionListHandler = (items) ->
-	// like beMenuHandler, but without the assumption that the action list includes selectors.
-	// Instead, each non-empty item is given an index number that the client of this list can use to decide what to do.
-	// Each item is specified as a tuple: { < string or #- >.  <icon> (optional) }
-	this.layout(KSVerticalLayout.new())
-	this.layout().inset(3)
-	this.name("list")
-
-	this.setItems = (actionList) ->
-		var font = KSFamily.withName("DejaVuSans").withStyle(0).withSize(12)
-		var col = []
-		var index = 0
-		this.itemIndices = {}
-		var b
-		this.removeAll()
-		for action in actionList
-			if action[0] == "-".asSymbol()
-				b = KSBox._extent_fill(P(50, 8), Color.transparent())
-				this.itemIndices[b] = -1
-			else
-				b = this.factory()._newLabel_font_fill(action[0], font, Color.black())
-				this.itemIndices[b] = index
-				index = index + 1
-				if action.size() > 1
-					var icon = action[1]
-					icon.scale(12.0/icon.extent().y())
-					b.layout().inset(P(2,0))
-					b.addFirst(icon)
-			col.push(b.beListItemHandler(
-				Color.transparent(), Color.gray(0.8), Color.gray(0.7), Color.gray(0.7)))
-			this.add(b)
-		this.items = col
-
-	this.setItems(items)
-	this.selectedItemIndex = $$(switchColE(@items, "fire").mapE((ev) ->
-		this.itemIndices[ev.item]))
-
-	this.listChangeRequest = this.eventStream()
-	this.listChangeRequested = $$(@listChangeRequest.mapE((col) ->
-		this.setItems(col)))
-
-	this.listen(["buttonUp", "buttonDown"])
-	this.handleControlKey(false)! !
 
 !KSBox methodsFor: 'menu actions' stamp: 'yo 10/10/2012 14:21'!
 beListHandler = (evt) ->
@@ -2939,12 +2792,6 @@ ksInspectInMorphic = (evt) ->
 !KSBox methodsFor: 'menu actions' stamp: 'yo 1/9/2013 10:53'!
 newBox = (ev) ->
 	this.addFirst(KSBox.new())! !
-
-!KSBox methodsFor: 'menu actions' stamp: 'yo 1/9/2013 11:11'!
-newMovableBox = (ev) ->
-	var box = KSBox.new()
-	box.attachGenericMoveHandler()
-	this.addFirst(box)! !
 
 !KSBox methodsFor: 'menu actions' stamp: 'yo 10/10/2012 10:32'!
 pickUp = (evt) ->
@@ -3379,63 +3226,6 @@ beScrollerFor = (box, wantsHScroll, wantsVScroll, wantsWidthTracking) ->
 
 	return this! !
 
-!KSBox methodsFor: 'slider' stamp: 'ael 1/31/2013 17:01'!
-beVScrollerFor = (box) ->
-	this.add(box)
-	this.target = box
-
-	var slider = this.slider = box.factory().newSlider(P(1,10))	// ensure we get a vertical one
-	slider.name("slider")
-	this.addAsParts(slider)
-	this.clipping(true)
-
-	var layout = KSSimpleLayout.new()
-	layout._keep_of_to(#"topRight", "slider", #"topRight")	
-	layout._keep_of_to_offset(#"bottomLeft", "slider", #"bottomRight", P(-10,0))
-	this.layout(layout)
-
-	this.scroller = $$(@slider.sliderValue.mapE((v) ->
-		if v < 0 || v > @slider.sliderMinMax().max
-			this.slider.setSliderCurrentValue(P(0,0))
-		else
-			var top = (v.negated() * (@target.bounds().height() - (this.height()))).min(0)
-			@target.topLeft(P(0, top))))
-
-	this.scrollAdjuster = $$(mergeE(@extent,@target.bounds).doE(() ->
-		var visibleHeight = @extent.y()
-		var ratio = (visibleHeight / (@target.bounds().height())).min(1.0)
-		this.slider.knobFraction.set(ratio)))
-
-	this.scrollIntoView = (item) ->
-		var rect = item.bounds().outsetBy(P(0, 3))
-		var thisHeight = this.height()
-		var targetHeight = @target.bounds().height()	// NB: bounds() to get container's coords
-		if thisHeight >= targetHeight
-			return this						// whole list should already be in view
-		var currentValueY = @slider.sliderValue
-		var scrollRange = targetHeight - thisHeight
-		// minimum satisfactory slider value is when bottom of item is aligned with bottom of view
-		var minSliderY = ((@target.pointInContainer(rect.bottomRight()).y() - thisHeight) / scrollRange).max(0)
-		if currentValueY < minSliderY
-			this.slider.setSliderCurrentValue(P(0, minSliderY))
-		else
-			// max is when top of item is aligned with top of view
-			var maxSliderY = (@target.pointInContainer(rect.topLeft()).y() / scrollRange).min(1.0)
-			if currentValueY > maxSliderY
-				this.slider.setSliderCurrentValue(P(0, maxSliderY))
-
-	return this! !
-
-!KSBox methodsFor: 'slider' stamp: 'yo 2/26/2013 19:20'!
-beVTextScrollerFor = (aTextField) ->
-	this.beVScrollerFor(aTextField)
-	var layout = this.layout()
-	layout._keep_of_to(#"left", aTextField.name(), #"left")	
-	layout._keep_of_to_of(#"right", aTextField.name(), #"left", "slider")
-	this.adjustHeight = $$(@extent.mapE((ext) ->
-		this.target.handler.minimumHeight.set(ext.y())))
-	return this! !
-
 !KSBox methodsFor: 'slider' stamp: 'ael 3/28/2013 12:07'!
 newSliderValue = (knobPos) ->
 	// convert a slider knob position to a ratio
@@ -3489,27 +3279,6 @@ sliderMoveToRatio = (aNumberOrPoint) ->
 	var cmin = minmax.min
 	var cmax = minmax.max
 	this.sliderMoveTo(aNumberOrPoint * (cmax - cmin) + cmin)! !
-
-!KSBox methodsFor: 'slider' stamp: 'yo 8/23/2012 20:48'!
-sliderMoveToWithin = (aPoint, cmin, cmax) ->
-	var newPos = aPoint
-	if cmin
-		newPos = newPos.max(cmin)
-	if cmax
-		newPos = newPos.min(cmax)
-	this.sliderKnob().topLeft(newPos)! !
-
-!KSBox methodsFor: 'slider' stamp: 'yo 7/27/2012 13:43'!
-sliderValue = (newPos) ->
-	var minmax = this.sliderMinMax()
-	var cmin = minmax.min
-	var cmax = minmax.max
-	var total = minmax.max - minmax.min
-	if total.x() == 0.0
-		total = P(1, total.y())
-	if total.y() == 0.0
-		total = P(total.x(), 1)
-	return (newPos - cmin) / total! !
 
 !KSBox methodsFor: 'squeak interface' stamp: 'ael 2/4/2013 21:51'!
 ksAt: key 
@@ -3579,27 +3348,6 @@ insertChar = (char) ->
 	// General way to insert a character.
 	this.addAfterIndex(KSBox._withChar_inFont(char, this.fontNearest(@contents.size())), @contents.size()-1)! !
 
-!KSBox methodsFor: 'text editor' stamp: 'tk 2/27/2013 15:11'!
-reLabel = (label, aFill, aNumber, font, justification) ->
-	//reLabel: label textFill: aFill width: aNumber font: font justification: justification
-	this.removeAll()
-	if !!(@layout.isMemberOf(KSTextLayout))
-		KSTextLayout.new().installTo(this)
-		this.layout().font = font
-		this.layout().inset(P(0, 0))
-		this.layout().horizontalShrink = true
-		this.layout().verticalShrink = true
-		this.layout().noWrap = true
-		this.layout().beReadOnly(true)
-	var f = font.fill(aFill)
-	this.layout().addAll(label)
-//	if aNumber
-//		box.layout().
-	this.layout().justification = justification
-	this.layOut()
-	this.blockHaloForContents()
-	return this! !
-
 !KSBox methodsFor: 'time bubbles' stamp: 'yo 1/8/2013 13:38'!
 isBox = () ->
 	return true! !
@@ -3621,6 +3369,10 @@ timeBubblesInto = (aRecord, top) ->
 		for col in [this.parts, this.contents, this.backgroundParts]
 			for e in col
 				e.timeBubblesInto(aRecord, top)! !
+
+!KSBox methodsFor: 'tree hierarchy' stamp: 'yo 7/24/2012 15:47'!
+container = () ->
+	return @container! !
 
 !KSBox methodsFor: 'tree hierarchy' stamp: 'yo 3/20/2013 12:30'!
 docEditor = () ->
@@ -3711,20 +3463,6 @@ initializeAsWorld = (extentPoint) ->
 	this.name("Window")
 	this.beWindow()
 	this.setTimeBubble(true)! !
-
-!KSBox methodsFor: 'window' stamp: 'yo 7/24/2012 10:20'!
-initializeAsWorld: extentPoint 
-	| worldState |
-	self removeAllParts.
-	worldState := self ksAt: #worldState asKSKey put: KSWorldState new init.
-	worldState ksAt: #window asKSKey put: self.
-	self initializeShape: extentPoint.
-	self
-		addAsParts: (worldState ksAt: #hand asKSKey).
-	self ksAt: #clipping asKSKey put: true.
-	self ksAt: #name asKSKey put: 'KSWindow'.
-	self beWindow.
-	^ self setTimeBubble: true! !
 
 !KSBox methodsFor: 'window' stamp: 'yo 7/26/2012 12:28'!
 initializeShape: extentPoint

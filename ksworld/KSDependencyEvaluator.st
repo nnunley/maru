@@ -4,6 +4,9 @@ KSObject subclass: #KSDependencyEvaluator
 	poolDictionaries: ''
 	category: 'KSObjects'!
 
+!KSDependencyEvaluator commentStamp: 'yo 3/14/2013 10:13' prior: 0!
+A KSDependencyEvaluator provides the topological sort feature for dependency of streams.  Also provides entry points to evaluate the streams at given logical time.!
+
 !KSDependencyEvaluator methodsFor: 'all' stamp: 'yo 3/28/2013 16:59'!
 addStreamsFrom = (object) ->
 	// Add all streams in object.  To support the priority sorting idea, the streams in "direct", rawEvents, layoutDep are put in different bins.

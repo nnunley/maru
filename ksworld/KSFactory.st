@@ -137,10 +137,6 @@ newLabel = (label, fill, font) ->
 	box.layOut()
 	return box! !
 
-!KSFactory methodsFor: 'box creation' stamp: 'yo 1/17/2013 20:37'!
-newLabel: label
-	^ self newLabel: label font: self defaultMenuFont fill: Color black.! !
-
 !KSFactory methodsFor: 'box creation' stamp: 'ael 3/4/2013 16:29'!
 newLineEditor = (width, fill, font) ->
 	// create a one-line editable text field.  If width is non-nil, the field is fixed to that width.
@@ -861,27 +857,6 @@ menulikeDownArrow = () ->
 	down.pivotRatio(P(0.5, 0.8))
 	return down! !
 
-!KSFactory methodsFor: 'bubble-data' stamp: 'yo 1/18/2013 15:02'!
-newBubble = (width) ->
-	var box = KSBox.new()
-	box.extent(P(width, 84))
-	var fill = GeziraFillLinearGradient.new()._from_to(P(0, 0), P(0, 84))
-	fill._addStop_at([0.9716520309448242, 0.8465298414230347,
-		0.5953079462051392, 1.0].asFloatArray(), 0)
-	fill._addStop_at([0.9960899353027344, 0.9765396118164063,
-		0.939393937587738, 1.0].asFloatArray(), 0.8214285714285714)
-	fill._addStop_at([0.9716520309448242, 0.8465298414230347,
-		0.5953079462051392, 1.0].asFloatArray(), 0.8314285714285714)
-	fill._addStop_at([0.9716520309448242, 0.8465298414230347,
-		0.5953079462051392, 1.0].asFloatArray(), 0.8414285714285714)
-	fill._addStop_at([0.9716520309448242, 0.8465298414230347,
-		0.5953079462051392, 1.0].asFloatArray(), 1.0)
-	box.fill(fill)
-	box.cornerRadius(8)
-	box.borderFill(this.theme.iconColor)
-	box.borderWidth(1)
-	return box! !
-
 !KSFactory methodsFor: 'bubble-data' stamp: 'ael 3/14/2013 11:58'!
 overlapBubble = (bubble) ->
 	this.beBubble(bubble, 210)
@@ -1361,13 +1336,13 @@ balloonSVG
         <dc:date>21.2.2007</dc:date>
         <dc:creator>
           <cc:Agent>
-            <dc:title>Martin DvoÅÃ¡k</dc:title>
+            <dc:title>Martin Dvořák</dc:title>
           </cc:Agent>
         </dc:creator>
         <dc:description>Classical Smalltalk Balloon</dc:description>
         <dc:contributor>
           <cc:Agent>
-            <dc:title>Jan VranÃ½</dc:title>
+            <dc:title>Jan Vraný</dc:title>
           </cc:Agent>
         </dc:contributor>
       </cc:Work>

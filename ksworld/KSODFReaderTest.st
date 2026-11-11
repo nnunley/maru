@@ -4,6 +4,9 @@ TestCase subclass: #KSODFReaderTest
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFReaderTest commentStamp: 'tak 3/21/2011 16:55' prior: 0!
+self buildSuite run!
+
 !KSODFReaderTest methodsFor: 'running' stamp: 'bf 1/9/2013 10:26'!
 setUp
 	"Processor activeProcess lWindow ifNil: [Processor activeProcess lWindow: LWindow new]."! !

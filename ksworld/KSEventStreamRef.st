@@ -4,6 +4,9 @@ Object subclass: #KSEventStreamRef
 	poolDictionaries: ''
 	category: 'KSObjects'!
 
+!KSEventStreamRef commentStamp: 'yo 3/14/2013 10:24' prior: 0!
+A KSEventStreamRef is an internal data holding the name of the dependency.  Basically a @-variable in KScript will be translated to this, and @-variable with prime will have an instance of this class with the "last" variable set.!
+
 !KSEventStreamRef methodsFor: 'accessing' stamp: 'yo 7/10/2012 10:40'!
 isSubExpression
 	^ isSubExpression! !
@@ -24,11 +27,6 @@ ref
 ref: anObject
 	ref := anObject.
 	isSubExpression := anObject beginsWith: 'tt'! !
-
-!KSEventStreamRef methodsFor: 'as yet unclassified' stamp: 'yo 3/27/2012 12:06'!
-equal = function(other) {
-	return other.ref == this.ref && other.attr == this.attr
-}! !
 
 !KSEventStreamRef methodsFor: 'printing' stamp: 'yo 3/14/2013 10:24'!
 printOn: aStream

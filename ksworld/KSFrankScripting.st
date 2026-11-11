@@ -65,10 +65,6 @@ getVerb = (tile) ->
 objectUnder = (tile) ->
 	return (x in (tile ? this.whole).contents() when x.handler.scriptingType == "object")! !
 
-!KSFrankScripting methodsFor: 'accessing' stamp: 'yo 7/5/2012 20:56'!
-passive = (aBoolean) ->
-	this.passive = aBoolean! !
-
 !KSFrankScripting methodsFor: 'accessing' stamp: 'yo 1/31/2013 22:57'!
 scriptingArea = () ->
 	return @whole.orContainerSuchThat((box) -> !!(box.handler instanceof KSFrankScripting))! !
@@ -457,27 +453,6 @@ scriptingAreaLayout: aBox
 !KSFrankScripting methodsFor: 'scripting area' stamp: 'yo 2/13/2013 14:31'!
 scriptingTarget = () ->
 	return @scriptingTarget! !
-
-!KSFrankScripting methodsFor: 'scripting area' stamp: 'yo 2/1/2013 09:56'!
-setupScriptingArea = (scriptingTarget) ->
-	var factory = scriptingTarget.factory()
-	var trash = this.trash = factory.newButton("trash")
-	var go = this.go = factory.newButton("go")
-	var clear = this.clear = factory.newButton("clear")
-	var sweep = this.sweep = factory.newButton("sweep")
-	var head = this.makeHead("start")
-
-	this.whole.addAsParts(trash)
-	this.whole.addAsParts(go)
-	this.whole.addAsParts(clear)
-	this.whole.addAsParts(sweep)
-	this.whole.add(head)
-
-	this.scriptingAreaLayout()
-	this.whole.layOut()
-
-	this.scriptingTarget = scriptingTarget
-	this.actionsInScriptingArea()! !
 
 !KSFrankScripting methodsFor: 'scripting area' stamp: 'yo 2/13/2013 14:36'!
 setupScriptingHead = () ->

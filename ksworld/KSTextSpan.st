@@ -4,6 +4,17 @@ KSContentsCollection subclass: #KSTextSpan
 	poolDictionaries: ''
 	category: 'KSObjects-Boxes'!
 
+!KSTextSpan commentStamp: 'tk 4/4/2013 14:39' prior: 0!
+A KSTextSpan is the contents of a field box, that is drawn from a the charBoxes or a KSTextFlow.  Layout is done by  a KSTextFlowLayout.  It wraps the text in this span with very little knowledge of the rest of the flow.
+
+A page in the stack has field boxes that are linked together for text flow.
+A KSTextSpan record tells which range of lines in textLines are in this box.
+	firstInd, lastInd   indexes into textLines, telling which lines are in this box.
+	pageNum	page number in the stack
+	field		the field box
+	flowKey	key in stack where this flow is held.
+	upToDate    flag saying changes from the end of the previous box has been propagated to this box.  The changes could be removing or adding a new first line, or removing or adding letters from my first line.  Also false when lines or letters were added or removed insode my text by editing.!
+
 !KSTextSpan methodsFor: 'accessing' stamp: 'tk 4/3/2013 11:23'!
 field
 

@@ -4,6 +4,9 @@ ObjectExplorerWrapper subclass: #KSODFExplorerWrapper
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFExplorerWrapper commentStamp: 'tak 3/25/2011 09:49' prior: 0!
+See class comment of KSODFExplorer.!
+
 !KSODFExplorerWrapper methodsFor: 'accessing' stamp: 'tak 10/6/2011 16:00'!
 attributeContents
 	"Return explorerContents of the XML attributes. Ignore xmlns "

@@ -323,32 +323,6 @@ newResistor = (resistance) ->
 	handler.beTwoLeadedThing("Resistor", {resistance: resistance ? 1.0}, this.resistorShape, Color.black())
 	return box! !
 
-!KSCircuitEditor methodsFor: 'initialization and creation' stamp: 'yo 6/7/2012 16:15'!
-newTwoLeadedThing = (type, obj, sel, fill) ->
-	var box = JBox._new()
-	box._handlerAs(this._class())
-	box.handler().beConnectorHandler()
-	box.handler().pathFromTo = this[sel]
-	box.handler().fill = fill
-	box.handler().attributes = obj
-	box.handler().readOnly = {}
-	for k, v of obj
-		box.handler().readOnly[k] = true
-	box.handler().thing = type
-	box._name(this.nextId(box.handler().thing))
-
-	box.handler().listen("pointerEnter", "pointerLeave", "motionQuery")
-
-	box.handler().mayBePopUp = $$(extractE(box, "pointerEnter").mapE((ev) ->
-		if this.showProperty.currentValue()
-			this.showPropertyFor(box)))
-
-	box.handler().mayBePopDown = $$(extractE(box, "pointerLeave").delayE(1000).mapE((ev) ->
-		if !!(ev.to && ev.to._hasContainer(box))
-			this.hidePropertyFor(box)))
-
-	return box! !
-
 !KSCircuitEditor methodsFor: 'initialization and creation' stamp: 'yo 11/2/2012 16:28'!
 newTwoLeadedThingFrom = (box, evt) ->
 	if !!this.selection
@@ -487,24 +461,6 @@ showPropertyFor = (box) ->
 	table.topLeft(box.extent()/2.0)
 	box.add(table)
 	return table! !
-
-!KSCircuitEditor methodsFor: 'property sheet' stamp: 'yo 6/6/2012 23:46'!
-togglePropertyFor = (box) ->
-	if box._contents()._size() > 0
-		box._contents()._first()._delete()
-		return this
-
-	var handler = box.handler()
-	var table = JBox._new()
-	table._layout(JVerticalLayout._new())
-	table._fill(Color._transparent())
-
-	for k, v of handler.attributes
-		table._add(this.propertyRow(handler, k))
-
-	table._topLeft(box._extent()/2.0)
-	box._add(table)
-	! !
 
 !KSCircuitEditor methodsFor: 'shapes' stamp: 'yo 6/5/2012 21:12'!
 batteryPathFrom: from0 to: to0

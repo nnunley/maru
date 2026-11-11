@@ -38,9 +38,9 @@ begin :extraDep =
 	anything:src &(anything anything) [OMeta2Fail signal]
 |	anything:src build(extraDep)! !
 
-!KSQuoteTranslator methodsFor: 'rules' stamp: 'yo 8/30/2012 16:03'!
+!KSQuoteTranslator methodsFor: 'rules' stamp: 'yo 8/10/2012 11:01'!
 build :extraDep =
-	&anything:n [attributes at: n ifAbsent: [false halt]]:quoted
+	&anything:n [attributes at: n ifAbsent: [false]]:quoted
 	(?[quoted or: [n first == #call]]
 		{&(anything:sel ?[self respondsTo: sel]) anything:sel [self apply: sel withArgs: {extraDep}]:n} [n]
 	|	trans:n 	-> [{#quoted. #(). n}]

@@ -4,6 +4,17 @@ Object subclass: #KSODFFormulaInterpreter
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFFormulaInterpreter commentStamp: 'tak 4/6/2011 15:50' prior: 0!
+It evaluates an expression built by KSODFFormulaParser
+
+Structure:
+ modifiers	Array -- a list of numbers in draw:modifires
+ functions	IdentityDictionary -- a list of function expressions
+ viewBox		Rectangle -- from draw:viewBox
+ style		KSODFStyle -- from draw:style
+
+Bug: logwidth and logheight are not defined correctly.!
+
 !KSODFFormulaInterpreter methodsFor: 'eval' stamp: 'tak 5/20/2011 13:43'!
 eval: expr 
 	| args |

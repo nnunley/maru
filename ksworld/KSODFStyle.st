@@ -4,6 +4,14 @@ Object subclass: #KSODFStyle
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFStyle commentStamp: 'tak 3/22/2011 11:43' prior: 0!
+KSODFStyle has key value map for the style and parent pointer.
+It has same protocol as Dictionary.
+
+Structure:
+ map		IdentityDictionary -- contents of this style
+ parent	KSODFStyle -- parent style!
+
 !KSODFStyle methodsFor: 'copying' stamp: 'tak 4/22/2011 14:01'!
 withParent: anODFStyle 
 	"Return a new KSODFStyle for the inside scope. If the

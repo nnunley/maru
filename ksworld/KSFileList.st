@@ -4,6 +4,87 @@ KSUserEventHandler subclass: #KSFileList
 	poolDictionaries: ''
 	category: 'KSObjects-Demos'!
 
+!KSFileList commentStamp: 'ael 3/15/2013 15:59' prior: 0!
+Here is a set of do its in KScript to set up a File List:
+
+this.container().add(this.factory().createVScrollerFor(this))
+
+For file name box:
+this.fill(Color.white())
+this.borderWidth(1)
+this.borderFill(this.factory().theme.borderColor)
+
+For directory name box:
+this.fill(Color.white())
+this.borderWidth(0)
+this.beReadOnly(true)
+
+For two buttons:
+	var font =KSFamily.withName("DejaVuSans").withStyle(1).withSize(11).fill(this.factory().theme.iconColor)
+	this.reLabel("Button", Color.transparent(), nil, font, nil)
+	this.layout().inset(2)
+	this.borderWidth(0.5)
+	this.cornerRadius(4)
+	this.defaultFill = Color.transparent()
+	this.enteredFill = this.factory().buttonGradient()
+	this.pressedFill = this.factory().theme.contrastColor
+	this.defaultBorderFill = Color.transparent()
+	this.enteredBorderFill = this.factory().theme.iconColor
+
+For the shortcut and file lists:
+	this.factory = KSFactory.newFrom(this.factory())
+	this.factory.setListFillsFromTheme()
+	this.fill(Color.white())
+	this.container().fill(this.fill())
+	this.borderWidth(0)
+	this.container().borderFill(this.factory.theme.borderColor)
+	this.container().borderWidth(1)
+	
+For the title label:
+	var font =KSFamily.withName("DejaVuSans").withStyle(1).withSize(11).fill(this.factory().theme.iconColor)
+	this.layout().font = font
+	this.layout().inset(P(20, 5))
+	this.layout().beReadOnly(true)
+	this.container().fill(this.factory().theme.themeColor)
+	this.container().cornerRadius(8)
+	this.fill(Color.transparent())
+
+Give names For the file list pane:
+	this.container().name("fileListScroller")
+	this.name("fileList")
+	this.container().container().fileList = this
+
+Give names For the shortcut list pane:
+	this.container().name("shortcutListScroller")
+	this.name("shortcutList")
+	this.container().container().shortcutList = this
+
+Give names For the accept button:
+	this.name("accept")
+	this.container().acceptButton = this
+
+Give names For the cencel button:
+	this.name("cancel")
+	this.container().cancelButton = this
+	this.textContents("Cancel")
+
+Give names For the file name field:
+	this.name("nameField")
+	this.container().nameField = this
+
+Give names For the directory name field:
+	this.name("directoryField")
+	this.container().directoryField = this
+
+Give names For the title field:
+	this.name("label")
+	this.container().container().label = this
+	this.container().name("titleBar")
+	this.container().container().titleBar = this.container()
+
+Give names For the FileList:
+	this.name("FileList")!
+
 !KSFileList methodsFor: 'building' stamp: 'yo 1/30/2013 10:38'!
 beDialogExtent = (box, aPoint) ->
 	box.cornerRadius(8)

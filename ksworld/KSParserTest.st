@@ -191,7 +191,7 @@ testMulExpr
 	 		{str := '!!3'.		#mulExpr.	self build: {#send. str. #!!. {'3'. #postfix}}}.
 	}.! !
 
-!KSParserTest methodsFor: 'tests' stamp: 'yo 4/12/2012 11:13'!
+!KSParserTest methodsFor: 'tests' stamp: 'yo 9/6/2012 14:55'!
 testName
 
 	self triples:
@@ -201,7 +201,7 @@ testName
 			{'$$'.	#name.		#'$$'}.
 	}.
 
-	self should: [KSParser matchAll: 'for' with: #name] raise: Error.! !
+"	self should: [KSParser matchAll: 'for' with: #name] raise: Error."! !
 
 !KSParserTest methodsFor: 'tests' stamp: 'yo 6/12/2012 15:20'!
 testNumber

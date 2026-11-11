@@ -4,6 +4,28 @@ KSUserEventHandler subclass: #KSStack
 	poolDictionaries: ''
 	category: 'KSObjects-Boxes'!
 
+!KSStack commentStamp: 'tk 1/8/2013 16:03' prior: 0!
+A KSStack is a component of a KSBox that makes the box into a stack.  The stack box is a frame and the current background box is inside of it.  The page is the current background box, with some page-specific text and boxes added.
+
+Important properties
+	baseBackground:	<KSBox>
+	pageArray:			<OrderedCollection>
+	pageIndex:			<Integer>
+	showBackground:	<Boolean>
+
+baseBackground
+	- An empty background box that can be copied to make a new background
+	- Later maybe not use this.  Instead make a box of the current size, fill, and border.
+
+pageArray
+	- OrderedCollection of KSPageData objects.  They hold the background Box, and pageBoxes specific to each page.
+
+pageIndex
+	- index in pageArray (1 - based)
+
+showBackground
+	- true if showing a bare background box, so that it can be edited.!
+
 !KSStack methodsFor: 'editor support' stamp: 'tk 3/6/2013 14:30'!
 createThumbnails = (width) ->
 	// hibernate the current page
@@ -280,14 +302,6 @@ pageNAfterOrNil = (delta) ->
 	if @pageIndex + delta > this.pageArray.size()
 		return nil
 	return this.pageArray[@pageIndex - 1 + delta]! !
-
-!KSStack methodsFor: 'stack' stamp: 'yo 2/21/2013 14:31'!
-setupPageData = (pageData) ->
-	// Make a new Box as it it is the background page for the pageData
-	var aBackground = pageData.background.copy()
-	pageData.removePageSpecificFrom(aBackground)
-	pageData.addPageSpecificTo(aBackground)
-	return aBackground! !
 
 !KSStack methodsFor: 'stack' stamp: 'yo 2/21/2013 19:06'!
 showPageAt = (newIndexIn) ->

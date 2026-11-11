@@ -4,6 +4,11 @@ KSObject subclass: #KSEventStream
 	poolDictionaries: ''
 	category: 'KSObjects'!
 
+!KSEventStream commentStamp: 'yo 4/3/2013 14:13' prior: 0!
+This was the old and obsoleted implementation of EventStream.  This was written in KScript but for the performance reason this implementation was dropped in favor of the Squeak implementation called KSNewEventStream with real instance variables.
+
+Up to a point, this class was maintained to provide the exact same behavior to KSNewEventStream, but it is not the case anymore.!
+
 !KSEventStream methodsFor: '*ksobjects-pushpull' stamp: 'yo 3/1/2013 23:55'!
 ppContentsInto: newElem context: dictionary
 	"This should only be called for the top level stream."
@@ -84,13 +89,6 @@ type = () ->
 visited = (aBoolean) ->
 	this.__visited__ = aBoolean! !
 
-!KSEventStream methodsFor: 'as yet unclassified' stamp: 'yo 3/9/2012 19:06'!
-evalAt = function(time, space) {
-	this.lastValue = this.__currentValue__;
-	this.__currentValue__ = this.type == "timerE" ? time : this.ksPerform("updater", space);
-	this.lastTime = time;
-}! !
-
 !KSEventStream methodsFor: 'combinators' stamp: 'yo 1/9/2013 15:45'!
 M = (selector, code, extraDep, arguments) ->
 	this.setup(selector, code, extraDep, arguments)
@@ -130,36 +128,6 @@ collectE = (selector, code, extraDep, arguments) ->
 			else
 				this.__currentValue__)
 	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 6/29/2012 14:11'!
-collectionE = (selector, code, extraDep, collection, streamName) ->
-	this.ksPerform2("setup", arguments)
-	this.__argCollection__ = collection
-	this.__streamName__ = streamName._asSymbol()
-	this.found = nil
-	this.updater = (space) ->
-		if this.found
-			var f = this.found
-			this.found = null
-			return space.frpGet(f)
-		undefined
-	this.__shouldEventEvaluate__ =  (space) ->
-		var col = space.lookup(this.__argCollection__)
-		var attr = space.lookup(this.__streamName__)
-		for arg in col
-			var base = space.lookup(arg)
-			var s = base[attr]
-			if s._isEventStream() && s.lastTime > (this.lastTime ? -1) || s !!== undefined && !!s._isEventStream() && s !!= this.lastValue
-				this.found = s
-				return true
-		this.found = null
-		false
-	return this
-
-//collection:: Ref to Collection|Collection
-// resolved collection: [KSObject | Ref]
-//streamName Stringy | Ref
-// as Ref is involved in the latter, collection of refs should resolve to collection of KsObjects! !
 
 !KSEventStream methodsFor: 'combinators' stamp: 'yo 8/22/2012 16:47'!
 delayE = (selector, code, extraDep, arguments) ->
@@ -211,70 +179,6 @@ exprE = (selector, code, extraDep, arguments) ->
 		space.frpGet(this.__receiver__).ksPerform(this.__selector__, (space.frpGet(x) for x in this.__restArgs__))
 	return this! !
 
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 7/26/2012 15:58'!
-extract = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.__object__				=	arguments[0]
-	this.__eventName__		=	arguments[1]
-	this.__eventTime__			=	0
-	this.__realObject__			=	nil
-	this.updater = (space, evaluator) ->
-		var o = space.frpGet(this.__object__)
-		var ev = o.extract(this.__eventClass__)
-		if !!ev
-			return undefined
-		var kev = KSObject._newLUserEvent_from(ev, o)
-		return kev
-	this.__shouldEventTrigger__ =  (space, time, evaluator) ->
-		var o = space.frpGet(this.object)
-		if !!o
-			return false
-		if o !!== this.__realObject__
-			this.__realObject__ = o
-			this.__eventTime__ = 0
-			return true
-		var ev = o._extract_for(EventNameMap[space.frpGet(this.__eventName__)], this.eventTime)
-		if !!ev
-			return false
-		this.__eventClass__ = ev._class()
-		if !!ev.timeStamp()
-			ev.timeStamp(evaluator.__currentTime__)
-		this.__eventTime__ = ev.timeStamp()
-		this.__currentValue__.newValue !!= ev.newValue()
-
-	this.__lastTime__				=	0
-	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 7/26/2012 15:52'!
-extractE = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.__object__				=	arguments[0]
-	this.__eventName__		=	arguments[1]
-	this.__eventTime__			=	0
-	this.__realObject__			=	nil
-	this.__updater__ = (space, evaluator) ->
-		var o = space.frpGet(this.__object__)
-		var ev = o.extract(EventNameMap[space.frpGet(this.__eventName__)])
-		if !!ev
-			return undefined
-		this.eventTime = evaluator.__currentTime__
-		var kev = KSObject._newLUserEvent_from(ev, o)
-		return kev
-	this.__shouldEventTrigger__ =  (space, time, evaluator) ->
-		var o = space.frpGet(this.__object__)
-		if !!o
-			return false
-		if o !!== this.__realObject__
-			this.__realObject__ = o
-			return true
-		var ev = o.extract(EventNameMap[space.frpGet(this.__eventName__)])
-		if !!ev
-			this.__lastTime__ = -1 // ??? now conflicting with -1 used in ksSet:put:
-			return false
-		evaluator.__currentTime__ > this.__eventTime__
-	this.__lastTime__				=	0
-	return this! !
-
 !KSEventStream methodsFor: 'combinators' stamp: 'yo 7/19/2012 10:02'!
 frpAnd = (selector, code, extraDep, arguments) ->
 	this.setup(selector, code, extraDep, arguments)
@@ -303,14 +207,6 @@ frpOr = (selector, code, extraDep, arguments) ->
 		(space.frpGet(this.__c1__) || space.frpGet(this.__c2__)).asBoolean()
 	return this! !
 
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 7/11/2012 23:50'!
-funcE = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.sources		= arguments[1].slice(0).push(extraDep)
-	this.__body__		= arguments[0]
-	this.updater		= (space, evaluator) -> this.body
-	return this! !
-
 !KSEventStream methodsFor: 'combinators' stamp: 'yo 1/25/2013 10:55'!
 getE = (selector, code, extraDep, arguments) ->
 	this.setup(selector, code, extraDep, arguments)
@@ -324,35 +220,6 @@ getE = (selector, code, extraDep, arguments) ->
 		// okay, getE here has the equality check... why is it good?
 		var v = this.findForGet(space)
 		v.isEventStream() && v.currentValue() !!== undefined && v.currentValue() !!== this.__lastValue__
-	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 5/8/2012 15:41'!
-getOptE = (selector, code, extraDep, base, key) ->
-	this.ksPerform2("setup", arguments)
-	this.base = base
-	this.key = key
-	if base._isEventStreamRef()
-		this.__sources__._push(new KSEventStreamRef({ref: base._ref(), attr: key}))
-	this.updater = (space) ->
-		if space.frpGet(this.base).hasOwnProperty(space.frpGet(this.key))
-			return space.frpGet(this.base)[space.frpGet(this.key)].currentValue()
-		else
-			return undefined
-	this.__shouldEventEvaluate__ = (space) ->
-		space.frpGet(this.base)[space.frpGet(this.key)].currentValue() !!= this.lastValue
-	this.__shouldEventTrigger__ = (space, time) -> false
-	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 7/19/2012 10:06'!
-lift = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.__realSources__ = arguments.slice(1)
-	this.__func__ = arguments[0]
-	this.__updater__ = (space, evaluator) ->
-		var values = (space.frpGet(x) for x in this.__realSources__)
-		if values.contains(undefined)
-			return undefined
-		space.frpGet(this.__func__).valueWithEnoughArguments(values.asArray())
 	return this! !
 
 !KSEventStream methodsFor: 'combinators' stamp: 'yo 7/19/2012 10:06'!
@@ -498,68 +365,12 @@ update = (selector, code, extraDep, arguments) ->
 	this.__updater__			=	(space, evaluator) -> space.frpGet(this.__expr__)
 	return this! !
 
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 7/19/2012 10:11'!
-updateE = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.__expr__				=	arguments[1]
-	this.__updater__			=	(space, evaluator) -> space.frpGet(this.__expr__)
-	this.__initialValue__			=	arguments[0]
-	this.__currentValue__		=	arguments[0]
-	this.__synching__			=	true
-	this.__lastValue__			=	arguments[0]
-	this.__synched__			=	true
-	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 8/22/2012 20:42'!
-virtualE = (selector, code, extraDep, arguments) ->
-	this.setup(selector, code, extraDep, arguments)
-	this.__func__				=	arguments[0]
-	return this! !
-
-!KSEventStream methodsFor: 'combinators' stamp: 'yo 5/8/2012 10:07'!
-zeroE = (selector, code, extraDep) ->
-	this.ksPerform2("setup", arguments)
-	this.type						= "zeroE"
-	this.updater					= (space) -> undefined
-	this.__shouldEventEvaluate__	= (space) -> false
-	this.__shouldEventTrigger__	= (space) -> false
-	return this! !
-
 !KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 7/11/2012 14:43'!
 addSubExpression = (id, expression) ->
 	if !!this.__subExpressions__
 		this.__subExpressions__ = []
 	this.__subExpressions__.push(id)
 	this[id] = expression! !
-
-!KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 8/1/2012 14:52'!
-basicSet = (val) ->
-	this.__currentValue__ = val
-	this.__lastTime__ = -1
-//	this.sync()! !
-
-!KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 7/11/2012 22:47'!
-basicShouldEventEvaluate = (space, evaluator) ->
-	if !!this.__eventSourcesCache__
-		this.__eventSourcesCache__ = []
-	else
-		this.__eventSourcesCache__.reset()
-	var eventSources = this.__eventSourcesCache__
-	for x in this.__sources__
-		var v = space.lookup(x)
-		if v === undefined
-			return false
-		if v.isEventStream()
-			eventSources.push(v)
-
-	if eventSources.length == 0 && this.lastTime == 0
-		return true
-	for src in eventSources
-		if !!src.lastTime
-			return true
-		if (this.type !!= "updateE" && src.synching && src.synched && src.lastTime >= this.lastTime) || src.lastTime > this.lastTime
-			return true
-	return false! !
 
 !KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 1/24/2013 20:25'!
 basicShouldEventTrigger = (space, evaluator) ->
@@ -586,10 +397,6 @@ basicShouldEventTrigger = (space, evaluator) ->
 beBehavior = () ->
 	this.__isBehavior__ = true
 	return this! !
-
-!KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 8/22/2012 14:47'!
-beVirtual = (aFunction) ->
-	this.__getter__ = aFunction! !
 
 !KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 7/18/2012 11:46'!
 ceilTime = (time) ->
@@ -740,14 +547,6 @@ set = (val) ->
 setLastTime = (aNumber) ->
 	this.__lastTime__ = aNumber
 	this.__lastCheckTime__ = aNumber! !
-
-!KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 8/22/2012 15:35'!
-setSetter = (aFunction) ->
-	this! !
-
-!KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 7/11/2012 22:46'!
-shouldEvaluate = (space, evaluator) ->
-	this.__shouldEventEvaluate__._value_value(space, evaluator)! !
 
 !KSEventStream methodsFor: 'evaluatioin' stamp: 'yo 1/7/2013 15:00'!
 shouldTrigger = (space, time, evaluator) ->

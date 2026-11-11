@@ -31,29 +31,6 @@ addFormula = (key, value) ->
 addFormulaString = (key, aString) ->
 	this.addFormula(key, this.eval2(key.concat("<-").concat(aString)))! !
 
-!KSTable methodsFor: 'accessing' stamp: 'ael 3/5/2013 16:13'!
-addFormulae = (aString) ->
-	this.eval(aString)
-	if !!this.columnNames
-		return this
-	var max = 0
-	for i in [0 .. this.columnNames.size()]
-		var e = this.columnNames[i]
-		var column = this.columnAt(i+1)
-		var j = this.findMaxRowFor(e)
-		max = if max > j + 1 then max else j + 1
-		for x in [column.contentsSize() ... j]
-			var cell = this.newCell(e.concat(x.printString()))
-			column.add(cell)
-	var numbers = this.cells().contentsAt(1)
-	numbers.removeAll()
-	for ii in [0 ... max]
-		cell = this.newCell(null)
-		cell.width(20)
-		if ii > 0
-			cell.textContents(ii.printString())
-		numbers.add(cell)! !
-
 !KSTable methodsFor: 'accessing' stamp: 'yo 9/5/2013 21:16'!
 behavior = () ->
 	this.focus = $$(switchColE(@allCells, "buttonDown"))
@@ -190,69 +167,6 @@ newTitlePane = (label) ->
 	titlePane.attachGenericMoveHandler()
 	titlePane.sliderTarget.set(this.whole)
 	return titlePane! !
-
-!KSTable class methodsFor: 'examples' stamp: 'yo 7/13/2012 14:35'!
-citiesExample1
-"
-KSTable citiesExample1
-"
-	| ll table cellName data numCols numRows tableData value weights expr summedData cityData weightsRow columnNames box |
-	ll := JMorph new openInWorld extent: 900@500.
-	ll window add: (table := JBox extent: 850@400 fill: Color white).
-	
-	data := self cityData.
-	columnNames := {'name'. 'stability'. 'healthcare'. 'culture'. 'education'. 'infrastructure'. 'total'. 'foo'}.
-	weights := (data at: 2) copyFrom: 3 to: 7.
-	weightsRow := { '(weights)' }, weights, { weights sum }.
-	cityData := (data allButFirst: 2) collect: [ :t | { t first }, (t copyFrom: 3 to: 7) ].
-	summedData := cityData collect: [ :t | t, { ((t copyFrom: 2 to: 6) with: weights collect: [ :s :w | s * w * 0.01 ]) sum printShowingMaxDecimalPlaces: 2 } ].
-	tableData := { weightsRow }, (summedData sort: [ :x :y | x last >= y last ]).
-
-	numRows := 5.
-	numCols := 7.
-	table handlerAs: KSTable.
-	table handler columnNames: columnNames with: 'Liveability'.
-	1 to: numRows do: [ :dataRow |
-		1 to: numCols do: [ :dataCol |
-			value := (tableData at: dataRow) at: dataCol.
-			value isString ifTrue: [ value := '"', value, '"' ].
-			cellName := (columnNames at: dataCol), dataRow asString.
-			expr := 'this.', cellName, ' = ', value asString.
-"Transcript cr; show: expr."
-			table handler addFormulae: expr.
-			]
-		].
-
-	table handler addFormulae: 'this.foo1 = ""'.
-	numRows + 1 to: numRows + 5 do: [:row |
-		columnNames allButLast do: [:col |
-			table handler addFormulae: 'this.', col, row asString, ' = ""']].
-
-	table contents second contents last height: table contents second contents last height + 1.
-	ActiveWorld doOneCycleNow.
-	table contents second contents last delete.
-	ll extent: 765@245.
-	ActiveWorld doOneCycleNow.
-
-	box := ((table handler columnAt: 3) at: 4).
-	box contentsDo: [:c | c fill: Color blue].
-
-	FileDirectory default deleteFileNamed: 'table1.bmp'.
-	ll imageForm writeBMPfileNamed: 'table1.bmp'.
-	"CommandShell command: 'convert ', (FileDirectory default fullPathFor: 'table1.bmp'), ' ',  (FileDirectory default fullPathFor: 'table1.bmp')"! !
-
-!KSTable class methodsFor: 'examples' stamp: 'yo 7/13/2012 12:46'!
-cityData
-	| csv f results |
-	f := FileDirectory default oldFileNamed: 'liveability.csv'.
-	[ csv := f upToEnd ] ensure: [ f close ].
-	results := ((1 to: 142) collect: [ :x |  Array new: 8 ]) asArray.
-	(CSVReader matchAll: csv with: #start) first withIndexDo: [:rec :recIndex |
-			rec withIndexDo: [:field :fieldIndex |
-				(field notEmpty and: [ field first isDigit ]) ifTrue: [ field := field asNumber ].
-				(results at: fieldIndex) at: recIndex put: field
-			] ].
-	^results! !
 
 !KSTable class methodsFor: 'examples' stamp: 'yo 3/8/2013 19:36'!
 example1

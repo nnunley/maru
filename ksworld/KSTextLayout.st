@@ -4,6 +4,55 @@ KSUserEventHandler subclass: #KSTextLayout
 	poolDictionaries: ''
 	category: 'KSObjects-Boxes'!
 
+!KSTextLayout commentStamp: 'tk 2/12/2013 14:19' prior: 0!
+A KSTextLayout is a handler to lay out and edit word wrapped text.
+(the old class LTextLayoutPre is folded into this class.  No separate 'pre' superclass.)
+
+font		
+selection		an interval (0-order).  start is an index before the selected character, and stop is after the last char.
+selectionAnchor		index of the anchor charater (before or after it?)
+caret		THe vertical bar box.
+tabArray		
+undoStack		
+lastTypeInTransaction		
+autoVerticalResize		true if field shrinks and grows at its bottom.
+valueChanged		
+name		
+flowDir		(1@0)
+overflowDir		(0@1)
+groupMeasureSel		#wordWidth
+groupPrepSel		#measureWords
+breakSel		#isNewline
+isReadOnly
+maxHeight		of a letter on this line
+missingHeight		extra in a letter taller than maxHeight
+maxDescent	in pixels
+lineStart		box of letter at start of the current line
+justification			left, right, center, or full
+extraOnLeft		pixels of space before the first char of the line
+extraEachSpace	amount added to each space character
+spacesInLine		number
+current		box of letter we are processing now
+debug		boolean
+debugState
+
+The actual layout is governed by 'rules'.  These are methods for simple understandable rules.  Each rule works on either an individual character (an element) or on the text field as a whole (the client).
+
+We also handle input events, such as selection and type-in.
+We hold the selection and the insertion point.  
+Later we will put selection and input into one aspect, and layout into another.
+
+selection is an interval that does not include the end indicies.  start is an index before the selected character, and stop is after the last char.  1 to: 2 is an insertion point between chars 1 and 2.  1 to: 3 selects the second char.  0 to: 1 is an insertion point at the beginning.  contents size to: contents size + 1 is an insertion point after the end of the text.
+
+For tall letters and justification, which require the entire line to be moved, remember how much they must be moved. Set current to the start of the line, and proceed from there.  Always just working on a single letter.  Only go back to the start of the line when we reach the end of the line.  Next time the errors will be 0.
+
+maxHeight is the height of the tallest character in this line.  It is the distance from the bottom of the chars in the previous line to baseline of this line.  
+missingHeight is the amount that the baseLine must be moved down to accomodate a new tall character.  When a word ends and missingHeight > 0, we go back and move the line down.
+
+Justification:  If the spacing in not right at the end of a line, set extraOnLeft and extraEachSpace.  Go back to lineStart and layout the line again.
+
+valueChanged is true when the content of the client changed in a way that would cause a spreadsheet cell to re-evaluate.  Changing the selection or emphasis or text size does not set valueChanged.  Deleting or inserting characters does change valueChanged.  User may reset it to false.!
+
 !KSTextLayout methodsFor: '*ksobjects-pushpull' stamp: 'yo 2/7/2013 00:34'!
 ppSerializer = () ->
 	return this! !

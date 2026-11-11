@@ -4,6 +4,28 @@ KSObject subclass: #KSTextLineInfo
 	poolDictionaries: ''
 	category: 'KSObjects-Boxes'!
 
+!KSTextLineInfo commentStamp: 'tk 4/4/2013 15:07' prior: 0!
+A KSTextLineInfo is the text span of one line of text.  I Do not know what field I am in, since that changes often as text moves down.
+
+Instance Variables
+firstInd
+	- index into the charBoxes or a KSTextFlow
+
+lastInd
+	- index into the charBoxes or a KSTextFlow
+
+ascent
+	- pixels above the baseline (pivotOffset) of the tallest letter in this line
+
+descent
+	- pixels below the baseline (pivotOffset) of the largest descending letter in this line
+
+flow
+	- the textFlow I am in.  (so I can get and put glyphs)
+
+upToDate
+	- flag saying changes from the end of the previous box has been propagated to this box.  The changes could be removing or adding letters from my front.!
+
 !KSTextLineInfo methodsFor: 'accessing' stamp: 'tk 4/2/2013 15:07'!
 ascent
 

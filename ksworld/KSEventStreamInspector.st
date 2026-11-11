@@ -4,6 +4,23 @@ StringHolder subclass: #KSEventStreamInspector
 	poolDictionaries: ''
 	category: 'KSObjects-Tools'!
 
+!KSEventStreamInspector commentStamp: 'ael 4/2/2012 16:17' prior: 0!
+Instance Variables
+	object					the main KSObject being inspected
+
+	lastSelectedStream	Symbol - the stream name last explicitly selected by the user
+	lastSelectedTrace		WWorld - the trace entry last explicitly selected by the user 
+
+	selectionIndex			Integer - the index of the currently selected stream
+
+	traceIndex				Integer - the index of the currently selected trace step
+	traces					OrderedCollection - the worlds in which we have trace steps for this object
+
+	lastValue				<Object> - the last value used to derive the string shown in the value pane
+
+	running					Boolean - whether the KSObject should be re-evaluated at each inspector step
+	selectionUpdateTime	Integer - number of ms used in the most recent derivation of selectionValue!
+
 !KSEventStreamInspector methodsFor: 'accessing' stamp: 'yo 9/6/2013 16:30'!
 acceptSource: aText 
 	self selectionKey

@@ -64,10 +64,6 @@ toText: aCollection
 drawOn = (aCanvas) -> 
 	@window.fullDrawOn(aCanvas)! !
 
-!KSWorldState methodsFor: 'drawing' stamp: 'yo 7/26/2012 12:20'!
-drawOn: aCanvas 
-	^ (self ksAt: #window asKSKey) currentValue fullDrawOn: aCanvas! !
-
 !KSWorldState methodsFor: 'drawing' stamp: 'yo 7/26/2012 15:48'!
 needsRedraw = () ->
 	return true! !

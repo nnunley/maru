@@ -4,49 +4,6 @@ KSUserEventHandler subclass: #KSBridge
 	poolDictionaries: ''
 	category: 'KSObjects-Demos'!
 
-!KSBridge methodsFor: 'all' stamp: 'yo 4/25/2012 00:06'!
-isFixed = (index) ->
-	for x in [0, 5, 11, 16]
-		if x == index
-			return true
-	return false! !
-
-!KSBridge methodsFor: 'all' stamp: 'bf 5/4/2012 19:08'!
-setupTimer = () ->
-	var fall = LBox._newButton("fall")
-	fall._fill(Color._white())
-	this.whole._add(fall)
-	fall._topLeft(P(650, 300))
-	fall.handler().rot = 0.2
-	fall.handler().velocity = -20
-	this.fall = fall.handler()
-	this.startFall = $$(@fall.fire.mapE((x) ->
-		this.startFall()))
-
-	var breakUp = LBox._newButton("break")
-	breakUp._fill(Color._white())
-	this.whole._add(breakUp)
-	breakUp._topLeft(fall._topRight() + P(20, 0))
-	breakUp.handler().rot = 0.2
-	breakUp.handler().velocity = -20
-	this.breakUpHandler = breakUp.handler()
-	this.breakUp = $$(@breakUpHandler.fire.mapE((x) ->
-		this.breakUp()))
-
-	var gravity = LBox._newButton("gravity")
-	gravity._fill(Color._white())
-	this.whole._add(gravity)
-	gravity._topLeft(breakUp._topRight() + P(20, 0))
-	gravity.handler().rot = -0.1
-	gravity.handler().velocity = -25
-	this.gravityHandler = gravity.handler()
-	this.startGravity = $$(@gravityHandler.fire.mapE((x) ->
-		this.whole._fill(this.backgroundFill())
-		for box in this.whole._contents()
-			if box.handler().pathFromTo
-				box.handler().pathFromTo = this.steel()
-		this.gravity = true))! !
-
 !KSBridge methodsFor: 'fall' stamp: 'yo 9/4/2013 13:54'!
 addMassAt = (aPoint) ->
 	var box = this.newMassAt(aPoint)
@@ -84,27 +41,6 @@ beButtonToShowBridgeRules = (weight) ->
 		var oldLeft = weight.left()
 		weight.left(oldLeft - 100)
 		weight.borderFill(Color.green())))! !
-
-!KSBridge methodsFor: 'fall' stamp: 'yo 5/15/2012 21:22'!
-beTypeableWeight = (weight) ->
-	weight._shape(LBoxShape._extent_fill(P(12, 12), Color._gray()))
-//	weight.handler().attachShapeStretcher(P(16, 16))
-	weight._borderColor(Color._gray())
-	weight._fill(Color._black())
-	weight._layout(JLineEditor._new())
-	weight._layout()._font(JBox._defaultFont()._fill(Color._white()))
-	weight._textContents("Hello!!")
-	weight.handler().listen("keyStroke", "buttonDown")
-	weight.handler().getFocus = $$(extractE(weight, "buttonDown").mapE((x) ->
-		x.hand._keyboardFocus(weight)))
-	weight.handler().stroke = $$(extractE(weight, "keyStroke").mapE((x) ->
-		if x.keyValue == 8
-			weight._layout()._charTyped08()
-			weight.handler().mass -= 1
-		else
-			if x.keyValue >= 32
-				weight._insertChar(x.keyValue)
-				weight.handler().mass += 1))! !
 
 !KSBridge methodsFor: 'fall' stamp: 'yo 9/3/2013 14:37'!
 bounce = (mass, bnds) ->
@@ -523,41 +459,6 @@ setUpSolver = () ->
 		this.whole.fill(Color.transparent())
 		this.stepper = $$(@timer.mapE((x) ->
 			this.solve()))! !
-
-!KSBridge methodsFor: 'fall' stamp: 'yo 5/15/2012 20:56'!
-setUpWeight = () ->
-	var weight = this.addMassAt(500, 200)
-	weight._borderWidth(1)
-	weight._borderColor(Color._gray())
-	weight._fill(Color._black())
-	weight._layout(JLineEditor._new())
-	weight._layout()._font(JBox._defaultFont()._fill(Color._white()))
-	weight._handlerAs(this._class())
-	weight._textContents("Hello!!")
-	weight.handler().mass = 2
-	weight.handler().listen("keyStroke", "buttonDown")
-	weight.handler().getFocus = $$(extractE(weight, "buttonDown").mapE((x) ->
-		x.hand._keyboardFocus(weight)))
-	weight.handler().stroke = $$(extractE(weight, "keyStroke").mapE((x) ->
-		if x.keyValue == 8
-			weight._layout()._charTyped08()
-			weight.handler().mass -= 1
-		else
-			if x.keyValue >= 32
-				weight._insertChar(x.keyValue)
-				weight.handler().mass += 1))
-
-	var box = JBox._new()
-	box._borderWidth(3)
-	box.handler().naturalLength = 200
-	box.handler().springConstant = 200
-	box.eventHandler().beConnectorHandler(null, weight)
-	box.handler().start._position(P(500, 350))
-	box.handler().end._position(P(500, 550))
-	weight._center(P(489, 550))
-	this.connectors._push(box)
-	box._name("weight-connector")
-	this.whole._add(box)! !
 
 !KSBridge methodsFor: 'fall' stamp: 'yo 9/3/2013 15:24'!
 setupModernLook = () ->

@@ -13,7 +13,7 @@ markEnd =
 										-> [{#methodDef. src. name. {#func. a. b. c. false. n}}]
 |	anything! !
 
-!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 4/17/2013 10:39'!
+!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 7/6/2012 00:37'!
 markFuncReturn =
 	{#begin anything:src
 		((&{#begin anything*} [true] | [false]):isBegin
@@ -29,14 +29,14 @@ markFuncReturn =
 		[self popReturnStack]:hasReturn}		-> [{#func. src. args. temps. hasReturn. n}]
 |	anything! !
 
-!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 4/17/2013 10:40'!
+!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 7/6/2012 00:43'!
 markFuncReturnInner =
 	{#return anything:src (markFuncReturnInner | [{#var. 'this'. #this}]):x} 	-> [true ifTrue: [stack atLast: 1 put: true. {#return. src. x}]]
 |	{#func anything:src anything:args anything:temps anything
 		[self pushReturnStack]
 		markFuncReturn:n
 		[self popReturnStack]:hasReturn}									-> [{#func. src. args. temps. hasReturn. n}]
-|	~(anything:x ?[x isString or: [x isSymbol]]) {(&#if [self halt]) markFuncReturnInner*:xs}	-> [xs asArray]
+|	~(anything:x ?[x isString or: [x isSymbol]]) {markFuncReturnInner*:xs}	-> [xs asArray]
 |	anything! !
 
 !KSReturnVisitor methodsFor: 'rules' stamp: 'yo 4/1/2013 11:53'!
@@ -52,11 +52,11 @@ markMethodReturn =
 																			-> [{#begin. src}, col]
 |	anything! !
 
-!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 4/17/2013 10:26'!
+!KSReturnVisitor methodsFor: 'rules' stamp: 'yo 7/6/2012 10:33'!
 markMethodReturnInner =
 	{#return anything*:xs}
 														-> [{#methodReturn}, xs]
-|	{#func anything:src  [(src includesSubString: 'moveEvt') ifTrue: [self halt]] anything:args anything:temps anything
+|	{#func anything:src anything:args anything:temps anything
 		[self pushReturnStack]
 		markFuncReturn:n
 		[self popReturnStack]:hasReturn

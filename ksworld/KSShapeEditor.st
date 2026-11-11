@@ -161,12 +161,6 @@ makeFillButton = () ->
 	box.attachButtonHandler()
 	return box! !
 
-!KSShapeEditor methodsFor: 'build' stamp: 'yo 2/11/2013 16:06'!
-makeFillColorPicker = (aColor) ->
-	var box = @whole.factory().newColorPicker(aColor)
-	box.name("fillColorPicker")
-	return box! !
-
 !KSShapeEditor methodsFor: 'build' stamp: 'ael 4/8/2013 14:55'!
 makeFilledPathButton = () ->
 	var iconElements = [

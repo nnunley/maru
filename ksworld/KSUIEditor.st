@@ -4,19 +4,6 @@ KSUserEventHandler subclass: #KSUIEditor
 	poolDictionaries: ''
 	category: 'KSObjects-Demos'!
 
-!KSUIEditor methodsFor: 'all' stamp: 'yo 10/10/2012 16:24'!
-handleResult = (result, points) ->
-	if result[0] == "rectangle"
-		var rect = points[0].corner(Rectangle.encompassing(points).corner())
-		var box = KSBox.withShape(this.newRectShape(rect))
-		box.topLeft(rect.topLeft())
-		@playfield.addFirst(box)
-	if result[0] == "circle"
-		var rect = points[0].corner(Rectangle.encompassing(points).corner())
-		var box = KSBox.withShape(this.newCircleShape(rect))
-		box.topLeft(rect.topLeft())
-		@playfield.addFirst(box)! !
-
 !KSUIEditor methodsFor: 'all' stamp: 'yo 1/17/2013 20:25'!
 layout
 	^ KSSimpleLayout new
@@ -25,19 +12,6 @@ layout
 		keep: #topLeft of: 'Name' to: #topRight of: 'Load' offset: 10@0;
 		keep: #center of: 'playfield' to: #center;
 		yourself.! !
-
-!KSUIEditor methodsFor: 'all' stamp: 'yo 1/9/2013 10:23'!
-newRectShape = (rect) ->
-	var stroke = GeziraStrokedPath._rect_radius(P(0, 0).extent(rect.extent()), 0).fill(Color.gray(0.8)).stroke(GeziraStroke.width(2))
-	KSShape.new().elements([
-		stroke,
-		GeziraFilledPath.new().floats(stroke.floats()).fill(@whole.factory().theme.themeColor)].asArray())! !
-
-!KSUIEditor methodsFor: 'all' stamp: 'yo 10/10/2012 13:30'!
-setStroke = (points) ->
-	this.stroke.shape().elements()[0] = (GeziraStrokedPath.polyline(points).fill(Color.black()).stroke(GeziraStroke.width(3)))
-	this.stroke.shape().computeBounds()
-	this.stroke.shape()! !
 
 !KSUIEditor methodsFor: 'all' stamp: 'yo 2/27/2013 23:58'!
 setup = () ->

@@ -151,15 +151,6 @@ makeChild
 		at: #'__proto__' put: self;
 		yourself! !
 
-!KSProtoObject class methodsFor: '*ksobjects-pushpull' stamp: 'yo 9/14/2012 15:07'!
-ppCreateInstanceFromSexp: sexp ref: ref from: from to: to
-	| inst |
-	inst := self ppNewWithSexp: sexp.
-	to at: ref put: inst.
-	sexp elements do: [:each |
-		inst readSlot: each from: from to: to].
-	^ inst! !
-
 !KSProtoObject class methodsFor: '*ksobjects-pushpull' stamp: 'yo 9/20/2012 00:32'!
 ppInstanceIsLiteral
 	^ self == KSProtoObject! !
@@ -210,13 +201,12 @@ compileMethodToString2: aStringOrStream forClass: cls
 compileMethodToString: aStringOrStream
 	^ self compileMethodToString: aStringOrStream forClass: self.! !
 
-!KSProtoObject class methodsFor: 'compilation' stamp: 'yo 4/17/2013 10:00'!
+!KSProtoObject class methodsFor: 'compilation' stamp: 'yo 1/18/2013 11:07'!
 compileMethodToString: aStringOrStream forClass: cls
 	| stream tree attrs |
 	stream := aStringOrStream isString ifTrue: [aStringOrStream readStream] ifFalse: [aStringOrStream].
 	tree := KSParser matchStream: stream with: #method withArgs: #() withPlaybackDebugging: false.
 	attrs := KSQuoteAttributor match: tree with: #start.
-	self halt.
 	^ OMeta2Flattener match: (
 			KSCompiler match: (
 				KSBlockSimplifier match: (

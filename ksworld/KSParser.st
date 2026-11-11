@@ -335,13 +335,13 @@ unary =
 |	< "!!"	unary:p >:src			-> [{#send. src withBlanksTrimmed. #'!!'. p}]
 |			postfix! !
 
-!KSParser class methodsFor: 'initialization' stamp: 'yo 7/17/2012 09:39'!
+!KSParser class methodsFor: 'initialization' stamp: 'yo 9/5/2012 19:12'!
 initialize
 "
 KSParser initialize
 "
 
-	Keywords := IdentitySet newFrom: #(break case catch default do else for finally if in instanceof of return switch throw try var while when).
+	Keywords := IdentitySet newFrom: #().
 	CharEscapes := IdentityDictionary new.
 	0 to: 255 do: [:a |
 		| c |

@@ -4,6 +4,16 @@ OMeta2 subclass: #KSODFFormulaParser
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFFormulaParser commentStamp: 'tak 4/7/2011 10:17' prior: 0!
+A parser for draw:formula attribute used in draw:custom-shape.
+See KSODFReaderTest >> testFormulaParser
+
+http://docs.oasis-open.org/office/v1.1/OS/OpenDocument-v1.1-html/OpenDocument-v1.1.html#outline:9.5.5.Enhanced_Geometry___Equation
+
+Note: This BNF has a bug in atan2, function_reference, modifier_reference, and unary_expression, so I fixed them.
+
+KSODFFormulaParser parse: '3+4'!
+
 !KSODFFormulaParser methodsFor: 'non terminals' stamp: 'tak 4/8/2011 13:26'!
 additiveExpression =
 	  additiveExpression:x ``+'' spaces multiplicativeExpression:y -> [{#'+'. x. y}]

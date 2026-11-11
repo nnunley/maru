@@ -28,22 +28,6 @@ checkBubbleVisibility = () ->
 				if bubble.globalPointFor(bubble.extent()).x() >= maxRight
 					break! !
 
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/5/2013 17:22'!
-chooseFont = (event) ->
-	Transcript.show("choose font").cr()! !
-
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/5/2013 17:22'!
-chooseFontBackground = (event) ->
-	Transcript.show("choose font background").cr()! !
-
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/5/2013 17:22'!
-chooseFontColor = (event) ->
-	Transcript.show("choose font colour").cr()! !
-
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/5/2013 17:22'!
-chooseFontSize = (event) ->
-	Transcript.show("choose font size").cr()! !
-
 !KSDocEditor methodsFor: 'events' stamp: 'yo 3/15/2013 18:35'!
 docFontChosen = (event) ->
 	var fontName = event.handler.textContents()
@@ -410,16 +394,6 @@ provisionalSendToAddress = () ->
 	// placeholder for testing bubble behaviour
 	Transcript.show("send to address '".concat(@sendTarget).concat("'")).cr()! !
 
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/13/2013 18:59'!
-provisionalStackAction = (action) ->
-	if @doc && @doc.stackHandler() then @doc.stackHandler().stackAction(action)! !
-
-!KSDocEditor methodsFor: 'events' stamp: 'ael 2/13/2013 19:34'!
-provisionalTextAction = (action) ->
-	if @textSelection
-		@focusLayout.textAction(action)
-		this.editSignal.set(true)! !
-
 !KSDocEditor methodsFor: 'events' stamp: 'yo 2/28/2013 14:01'!
 saveDocument = () ->
 	if !!@doc
@@ -442,17 +416,6 @@ saveDocument = () ->
 		if ev.file !!= default
 			@titleHolder.textContents(ev.file)
 			@titleHolder.handler.textAction("accept")))! !
-
-!KSDocEditor methodsFor: 'events' stamp: 'ael 1/21/2013 00:23'!
-setTheme = (tname) ->
-	var factory = @factory
-	factory.themeNamed(tname)
-	this.themeColor.set(factory.theme.themeColor)	// main inside
-	this.contrastColor.set(factory.theme.contrastColor)
-	this.edgeColor.set(factory.theme.edgeColor)		// darker border
-	this.lightColor.set(factory.theme.lightColor)		// white for main gradient
-	this.itemTextColor.set(factory.theme.itemTextColor)
-	this.iconColor.set(factory.theme.iconColor)! !
 
 !KSDocEditor methodsFor: 'events' stamp: 'ael 3/13/2013 23:53'!
 triggerMenuCommand = (target, action, args) ->
@@ -1292,16 +1255,6 @@ scriptGroupBubbleCommands = () ->
 		// gezira compositions
 		// (ditto)! !
 
-!KSDocEditor methodsFor: 'initialization' stamp: 'ael 1/24/2013 15:06'!
-setInitialTheme = (themeName) ->
-	this.themeColor = this.streamOf(undefined)
-	this.contrastColor = this.streamOf(undefined)
-	this.edgeColor = this.streamOf(undefined)
-	this.lightColor = this.streamOf(undefined)
-	this.itemTextColor = this.streamOf(undefined)
-	this.iconColor = this.streamOf(undefined)
-	this.setTheme(themeName)! !
-
 !KSDocEditor methodsFor: 'initialization' stamp: 'yo 8/19/2013 14:09'!
 setupOn = (initialDoc) ->
 	this.factory = @whole.factory()
@@ -1343,16 +1296,6 @@ setupOn = (initialDoc) ->
 		anObject))
 
 	this.fullScreenAll = this.streamOf(false)! !
-
-!KSDocEditor methodsFor: 'initialize-release' stamp: 'ael 1/29/2013 02:06'!
-oldloadBubble = (bName) ->
-	if !!this.loadedBubbles[bName]
-		var dir = KSDocEditor._ensureBubbleDirectory_refetching(bName, false)
-		if dir
-			this.loadedBubbles[bName] = KSBox.loadBoxFromDirectory(dir)
-		else
-			return undefined
-	return this.loadedBubbles[bName]! !
 
 !KSDocEditor methodsFor: 'odf' stamp: 'yo 8/17/2013 10:35'!
 openODF = (urlString) ->
@@ -1440,13 +1383,13 @@ setupThumbnailsBehavior = () ->
 paperFrontPageCol1: text
 	"Divide the text  into paragraphs and insert in column 1 of the current document (Front Page.ks).  For the front page of the paper Making Applications in KS World.  Store into property:  Column1Texts of the KSMorph.
 	 KSDocEditor paperFrontPageCol1: 'Abstract
-We report on a language called KScript and a GUI frame- work called KSWorld. The goal of KScript and KSWorld is to try to reduce the accidental complexity in GUI framework writing and application building. We aim for an understand- able, concise way to specify an applicationâs behavior and appearance, minimizing extra details that arise only because of the medium being used.
+We report on a language called KScript and a GUI frame- work called KSWorld. The goal of KScript and KSWorld is to try to reduce the accidental complexity in GUI framework writing and application building. We aim for an understand- able, concise way to specify an application’s behavior and appearance, minimizing extra details that arise only because of the medium being used.
 KScript is a dynamic language based on the declara- tive and time-aware dataflow-style execution model of Func- tional Reactive Programming (FRP), extended with support for loose coupling among program elements and a high de- gree of program reconfigurability.
 KSWorld is built using KScript. The fields, or slots, of graphical widgets in KSWorld are reactive variables. Defini- tions of such variables can be added or modified in a local- ized manner, allowing on-the-fly customization of the visual and behavioral aspects of widgets and entire applications. Thus the KSWorld environment supports highly exploratory application building: a user constructs the appearance inter- actively with direct manipulation, then attaches and refines reactive variable definitions to achieve the desired overall behavior.
 We illustrate our use of KSWorld to build an editor for general graphical documents, including dynamic documents that serve as active essays. The graphical building blocks for documents are the same as those used for building the editor itself, enabling a bootstrapping process in which the earliest working version of the editor can be used to create further components for its own interface.
 As one way of measuring progress on our complexity goal, we provide an overview of the number of lines of code in KSWorld. The total for the KScript compiler, the FRP evaluator, the framework, document model and document editor is currently around 10,000 lines.
 1. Introduction
-The software for todayâs personal computing environments has become so complex that no single person can understand'
+The software for today’s personal computing environments has become so complex that no single person can understand'
 	"
 	"Take a column of text, divide it into paragraphs, and create text boxes for them.  "
 	| ksm docEd pageBox col1A col2A paras model fld prev extra bodyFont bodyFont1 bfa cnt indent |
@@ -1505,7 +1448,7 @@ The software for todayâs personal computing environments has become so comp
 !KSDocEditor class methodsFor: 'demo' stamp: 'tk 4/5/2013 12:29'!
 paperFrontPageCol2: text
 	"Divide the text  into paragraphs and insert in column 1 of the current document (Front Page.ks).  For the front page of the paper Making Applications in KS World.  Store into property:  Column1Texts of the KSMorph.
-	 KSDocEditor paperFrontPageCol2: 'an entire system: a typical desktop OS and commonly used application suite amount to over 100 million lines of code. Our groupâs early experiences with personal computing led us to understand that much of this complexity is âacciden- talâ, rather than inherent. In the STEPS project we therefore explored how to reduce such accidental complexity in soft- ware, setting as our domain of interest the entire personal computing environment [1].
+	 KSDocEditor paperFrontPageCol2: 'an entire system: a typical desktop OS and commonly used application suite amount to over 100 million lines of code. Our group’s early experiences with personal computing led us to understand that much of this complexity is “acciden- tal”, rather than inherent. In the STEPS project we therefore explored how to reduce such accidental complexity in soft- ware, setting as our domain of interest the entire personal computing environment [1].
 In this paper we focus on the end-user authoring envi- ronment. We feel that end-users should be able to make ap- plications of the same kind as those they are using. Toward'
 	#### remember to change the font of    buttonDown:, buttonUp, pointerMotion,
 	"
@@ -1528,10 +1471,10 @@ In this paper we focus on the end-user authoring envi- ronment. We feel that end
 	bodyFont := col2A layout ksAt: #font.
 	col2A removeAll.
 	fst := paras removeFirst.
-	fst := fst copyReplaceAll: 'â¢' with: '
-   â¢'.		"bullets"
+	fst := fst copyReplaceAll: '•' with: '
+   •'.		"bullets"
 	fst first isSeparator ifTrue: [fst := fst allButFirst].	"remove cr"
-	jj := (fst includes: 'â¢' first) ifTrue: ['left'] ifFalse: ['full'].
+	jj := (fst includes: '•' first) ifTrue: ['left'] ifFalse: ['full'].
 	col2A layout ksAt: #justification put: jj.
 	col2A layout addAll: fst.
 	prev := col2A.

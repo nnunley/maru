@@ -4,38 +4,6 @@ KSUserEventHandler subclass: #KSWanderingLetters
 	poolDictionaries: ''
 	category: 'KSObjects-Demos'!
 
-!KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 5/3/2012 00:14'!
-addChar = (code) ->
-	this.index ?= 0
-	this.index += 1
-	this.origPos = {x: 0, y: 0}
-	this.currentCode = code
-	this._eval(
-'var box = LBox._withShape(LBox._defaultFont()._glyphAt(this.currentCode))
-box._handlerAs(this._class())
-this.whole._add(box)
-
-this.box{1}				= box
-this.char{1}				= box.handler()
-this.pred{1}			= $$(@this.char{2})
-this.next{1}				= $$(@this.char{3})
-this.alerted{1}			= $$(false fby ((@crossedRight{1} && @settled{2}) || (!!@isSpace{1} && @alerted{3})) at mergeE(@crossedRight{1}, @settled{2}, @isSpace{1}))
-this.settled{1}			= $$(false fby @settled{2} && !!@crossedRight{1} at mergeE(@settled{2}, @crossedRight{1}))
-this.crossedRight{1}	= $$(false fby @position{1}.x + @width{1} > @wholeWidth at @position{1})
-this.beginning{1}		= $$(false fby @alerted{1} && @isSpace{2} at mergeE(@alerted{1}, @isSpace{2}))
-'._format([this.index._printString(), (this.index-1)._printString(), (this.index+1)._printString()]))
-
-	this._eval(
-'this.position{1}			= $$(this.origPos fby this.place(@position{2}, @width{2}, @lineSkip{1}, @beginning{1}))
-this.setPosition{1}		= $$(@position{1}.mapE((pos) ->
-	this.box{1}._pivotPosition(P(pos.x, pos.y))
-))
-this.wholeWidth 		= this.whole._width()
-this.width{1}			= this.box{1}._width()
-this.isSpace{1}			= this.box{1}._shape()._isWhiteSpace()
-this.lineSkip{1}			= @box{1}._shape()._lineSkip()
-'._format([this.index._printString(), (this.index-1)._printString(), (this.index+1)._printString()]))! !
-
 !KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 7/5/2012 20:02'!
 adoptLayout = (world) ->
 	// only used in example1
@@ -49,21 +17,6 @@ adoptLayout = (world) ->
 		)
 	this.whole.layoutChanged()! !
 
-!KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'ael 6/7/2012 22:56'!
-applyBestLayout = () ->
-	var layoutWorld	= this.layoutWithRank(1)
-
-	var topWorld		= WTopLevelWorld._default()
-	var charHandlers	= this.charHandlers
-	var lboxes			= this.lboxes
-	layoutWorld._eval(() ->
-		for charIndex in [ 0 .. lboxes.length ]
-			var pos = charHandlers[charIndex].position.currentValue()
-			topWorld._eval(() ->
-				lboxes[charIndex]._pivotPosition(P(pos.x, pos.y))
-				)
-		)! !
-
 !KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 7/17/2012 10:24'!
 applyLayout = (layoutWorld) ->
 	var topWorld		= WTopLevelWorld._default()
@@ -76,25 +29,6 @@ applyLayout = (layoutWorld) ->
 				lboxes[charIndex].pivotPosition(P(pos.x, pos.y))
 				)
 		)! !
-
-!KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 4/30/2012 11:23'!
-char = () ->
-	this.pred			= undefined
-	this.next			= undefined
-	this.alerted			= $$(false fby @alerted || ((@crossedRight && @pred.settled) || (!!@isSpace && @next.alerted)))
-	this.settled			= $$(false fby @pred.settled && !!@crossedRight)
-	this.crossedRight	= $$(false fby @position.x + @width > this.whole._container()._width())
-	this.width			= this.whole._width()
-	this.height			= this.whole._height()
-	this.isSpace		= this.whole._shape()._isWhiteSpace()
-	this.beginning		= $$(false fby @alerted && @pred.isSpace)
-	this.position		= $$({x: 0, y: 0} fby this.place(@pred.position, @pred.width, @pred.height, @beginning))
-
-	this.place			= (predPos, predWidth, predHeight, beginning) ->
-		{x: if beginning then 0 else predPos.x + predWidth,
-			y: if beginning then predPos.y + this.whole._shape()._lineSkip() else predPos.y}
-
-	this.setPosition		= $$(@position.mapE((x) -> this.whole._pivotPosition(P(x.x, x.y))))! !
 
 !KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 7/17/2012 10:24'!
 field = () ->
@@ -296,38 +230,6 @@ recordLineEnd = (lastChar) ->
 		posObj = field.firstCharPosition
 		endPoint = P(posObj.x, posObj.y)
 	field.lineEnds.add(endPoint)! !
-
-!KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'ael 6/7/2012 00:33'!
-scoreLBoxLayout = (world,leftX) ->
-	var prevX = undefined
-	var ends = []
-	var score = 0
-	world._eval(() ->
-		for char in this.charHandlers
-			var posX = char.position.__currentValue__.x
-			if prevX && (posX == leftX) then ends._push(prevX)
-			prevX = posX
-		)
-	ends._push(prevX)
-	for n in [1...(ends._size()-1)]
-		score += (ends._at(n+1) - ends._at(n))._squared()
-	score! !
-
-!KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'ael 6/4/2012 15:23'!
-scoreLayout = (world) ->
-	var prevX = undefined
-	var ends = []
-	var score = 0
-	world._eval(() ->
-		for charBox in this.whole._contents()
-			var posX = charBox.handler().position.__currentValue__.x
-			if prevX && (posX == 0) then ends._push(prevX)
-			prevX = posX
-		)
-	if prevX !!== 0 then ends._push(prevX)
-	for n in [1...(ends._size()-1)]
-		score += (ends._at(n+1) - ends._at(n))._squared()
-	score! !
 
 !KSWanderingLetters methodsFor: 'as yet unclassified' stamp: 'yo 7/17/2012 10:24'!
 scoreLayouts = () ->

@@ -4,6 +4,21 @@ Object subclass: #KSODFAnimation
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFAnimation commentStamp: 'tak 3/31/2011 13:59' prior: 0!
+KSODFAnimation represents a simple animation sequence.
+It doesn't support pararel animations yet.
+
+Structure:
+ sequence		Collection -- a list of lists of {name. command}
+
+The sequence is a nested structure. The first level is a sequential executed elements, and the second level is a pararel executed elements. For example:
+
+{{script1. script2}.
+ {script3}}
+
+script1 and script2 is executed in same time, and script3 is executed after that.
+Each sequential element assumes a mouse down event to continue.!
+
 !KSODFAnimation methodsFor: 'accessing' stamp: 'tak 3/30/2011 16:20'!
 arrayedSequence
 	"for test cases"

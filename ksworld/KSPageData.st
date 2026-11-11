@@ -4,6 +4,19 @@ KSObject subclass: #KSPageData
 	poolDictionaries: ''
 	category: 'KSObjects-Boxes'!
 
+!KSPageData commentStamp: 'tk 3/20/2013 09:47' prior: 0!
+A KSPageData is a datastructure for a page of a KSStack.
+
+Instance Variables (held as Javascript like properties)
+
+background = box that is this page.  Shared by all pages of this background.
+
+pageBoxes = array of boxes that go on this page only.  They know their positions.  Each has pageSpecific = true.
+
+If background box has textBox.dbjrDataGetter, then call it textContentsX
+textContentsX = a copy of the contents of the textBox as it appears on this page.
+	Stored as the contents of a dummy box.!
+
 !KSPageData methodsFor: 'all' stamp: 'yo 2/21/2013 12:15'!
 addPageSpecific = () ->
 	return this.addPageSpecificTo(this.background)! !

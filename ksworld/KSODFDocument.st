@@ -4,6 +4,18 @@ Object subclass: #KSODFDocument
 	poolDictionaries: ''
 	category: 'KSObjects-ODFReader'!
 
+!KSODFDocument commentStamp: 'tak 7/15/2011 21:29' prior: 0!
+KSODFDocument represents an ODF file.
+
+Structure:
+ meta		XMLDocument -- meta.xml
+ content	XMLDocument -- content.xml
+ styles		XMLDocument -- styles.xml
+ styleMap	IdentityDictionary -- map from style name to properties (also IdentityDictionary).
+ archive	ZipArchive -- ODF zip file itself
+ stream		FileStream -- A file stream which is included in the archive. It is only used to close the zip archive once importing is finished.
+ addedForms	IdentityDictionary -- file name -> {form. byteArray} : is used as a cache of the archive.!
+
 !KSODFDocument methodsFor: 'accessing' stamp: 'tak 3/28/2011 14:15'!
 archive
 	^ archive! !
