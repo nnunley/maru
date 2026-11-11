@@ -55,7 +55,7 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   glyph's left bearing). An emphasis other than bold and italic is an error.
 - `ksworld_sources` (`check/ksworld-sources.l`, plan `doc/plans/2026-11-07-ksworld-keys.md`): KSWorld's own code runs from its
   sources (`ksworld/*.st`): `st-fileout.g` reads Squeak's file-out (each class's definition, its instance and class sides),
-  `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` or `#"symbols"` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
+  `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` or `#"symbols"`, `instanceof` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
   grammar) its Smalltalk ones to the same trees, so neither is transliterated by hand; `ksworld-source.l` makes each a method
   of its class. A selector is named as KSCompiler named it (`at:put:` is `_at_put`; a KScript method with parameters is its
   keyword selector, and KScript's `rec.abc(a, b)` reaches `abc:with:`), `self` is `this`, an instance variable a field of it,

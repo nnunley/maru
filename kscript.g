@@ -70,6 +70,11 @@ unary		= "not" wb unary:a						-> `(not ,a)
 		| suffix
 		;
 
+relation	= relation:a "instanceof" !(letter | digit) _ shift:b		-> `(send ,b __hasInstance__ ,a)	# KSParser: y.__hasInstance__(x)
+		| relation:a relop:o _ shift:b					-> `(,o ,a ,b)
+		| shift
+		;
+
 equalop		= "===" -> '= | "!==" -> '!= | "==" -> '= | "!=" -> '!= | "~=" -> '!= ;
 
 coalesce	= logor:a ("?" !"="_ coalesce:b -> `(coalesce ,a ,b) :a)*	-> a ;
