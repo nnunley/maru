@@ -25,6 +25,8 @@
   (expect "a symbol literal" (kscript-parse "x = #'wordWidth'") '((assign x (symbol wordWidth))))
   ;; KSParser's symbol is $# string, so either quote: lettersBubble.ks's textSelection.mapE asks respondsTo(#"firstInSelection")
   (expect "a symbol literal in double quotes" (kscript-parse "x = #\"firstInSelection\"") '((assign x (symbol firstInSelection))))
+  ;; KSParser's relExpr reads x instanceof y as y.__hasInstance__(x): overlapBubble.ks asks b...handler instanceof KSStack
+  (expect "instanceof" (kscript-parse "a.handler instanceof KSStack") '((send KSStack __hasInstance__ (field a handler))))
   (expect "a stream made from an expression" (kscript-parse "x = $$(@s.doE(() -> 1))")
 	  '((assign x (stream-expr (send (stream-ref s) doE (fn () 1)))))))
 
