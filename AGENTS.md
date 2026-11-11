@@ -112,4 +112,5 @@ where it departs from VPRI's original, and its limits. This file holds only a li
 
 - [The evidence plan](doc/evidence-plan.md): `notes/plan/`'s JOHN plans, how their evidence is observed and recorded, and `MARU_PLAN`.
 - [Known not to work (verified on arm64 macOS)](doc/known-issues.md): Read before relying on 32-bit x86, tail calls, closures made in a loop on `eval`, or cross-compiling.
+- [VPRI's Frank](doc/vpri/index.md): one-page walkthroughs of Frank's parts (OMeta2, KScript and its streams, LObjects, KSWorld, Worlds, Cassowary, Cooperating Languages, Nile, Gezira, ForAll, SISS, Silt, J), sorted by the families of expression STEPS aimed for.
 - [Roadmap](doc/roadmap.md): What comes next: the arm64 back end, `refactor-main`'s pieces, the STEPS grammars, bare metal, Nile.
