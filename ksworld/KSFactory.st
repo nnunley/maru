@@ -123,6 +123,10 @@ newFillInTheBlank = (title, initialAnswer) ->
 	inst.beFillInTheBlank()
 	return inst! !
 
+!KSFactory methodsFor: 'box creation' stamp: 'ael 3/4/2013 15:01'!
+newLabel = (label) ->
+	return this.newLabel(label, Color.transparent(), this.defaultMenuFont())! !
+
 !KSFactory methodsFor: 'box creation' stamp: 'yo 9/9/2013 14:18'!
 newLabel = (label, fill, font) ->
 	var box = KSBox._extent_fill(P(0, 0), fill ? Color.transparent())
@@ -206,6 +210,10 @@ newTextField = () ->
 	textBox.name('text')
 	textBox.layout().font = KSFactory.default().defaultFont()
 	return textBox! !
+
+!KSFactory methodsFor: 'box creation' stamp: 'yo 2/2/2013 15:15'!
+newToolButton = (label) ->
+	return this.newToolButton(label, nil)! !
 
 !KSFactory methodsFor: 'box creation' stamp: 'ael 3/5/2013 16:13'!
 newToolButton = (label, fontOrNil) ->

@@ -175,6 +175,11 @@ addFirst = (aBox) ->
 addLast = (aBox) ->
 	this.addAfterIndex(aBox, this.contents.size()-1)! !
 
+!KSBox methodsFor: 'collection' stamp: 'yo 7/16/2012 18:32'!
+addTextContents = (aStringOrArray) ->
+	// Convert an ascii string to be in my contents as LBoxes with letter glyphs.  Append them to at the end of contents.
+	this.ensureTextLayout().addAll(aStringOrArray)! !
+
 !KSBox methodsFor: 'collection' stamp: 'yo 9/3/2013 20:01'!
 addTextContents = (aStringOrArray, font) ->
 	// Convert an ascii string to be in my contents as LBoxes with letter glyphs.  Append them to at the end of contents.
@@ -401,6 +406,14 @@ successor = () ->
 !KSBox methodsFor: 'collection' stamp: 'ael 3/14/2013 15:34'!
 textContents = () ->
 	return String.newFrom((Character.value(e.unicode()) for e in this.contents when e.unicode() > 0))! !
+
+!KSBox methodsFor: 'collection' stamp: 'ael 3/4/2013 16:35'!
+textContents = (aString) ->
+	// Convert an ascii string to be in my contents as KSBoxes with letter glyphs.  Replace entire contents.
+	this.removeAll()
+	this.ensureTextLayout()
+	this.layout().selection.set(0.to(1))
+	this.layout().addAll(aString)! !
 
 !KSBox methodsFor: 'collection' stamp: 'yo 8/28/2013 14:40'!
 textContentsOpt = (aString) ->
@@ -861,6 +874,86 @@ glDrawOn = (gl) ->
 		gl.glMultMatrixf(@transformation.glTransform())
 		this.glDrawOn(gl, @transformation, 0)! !
 
+!KSBox methodsFor: 'drawing-opengl' stamp: 'yo 1/24/2013 13:17'!
+glDrawOn = (gl, scaleMatrix, depth) ->
+	if !!@visible
+		return
+
+	var tex
+	var fill = @shape.fill()
+
+	// set own color or texture
+	if !!@shape.needsToBeDrawn()
+		if this.isLeaf()
+			// no children, bail out
+			return
+		gl.glColorMask(false, false, false, false)
+	else
+		gl.glColorMask(true, true, true, true)
+		if fill.isKindOf(GeziraFillContrastiveOver)
+			gl.glColor4f(0, 0.1, 0.1, 0.2)
+		else
+			if @shape.isRectangular() && fill.isUniform() && !!@shape.hasBorder()
+				gl.glColor4f(fill.red() * fill.alpha(), fill.green() * fill.alpha(), fill.blue() * fill.alpha(), fill.alpha())
+			else
+				tex = this.glCacheTexture(#'glTexture', @shape, #'drawOn:', #'drawingBounds', scaleMatrix, 1.5)
+				gl.installTexture(tex)
+				gl.enableTexture(tex)
+				gl.glTexCoordPointer(2, GLFloat, 0, this.glQuadCoords())
+				gl.glEnableClientState(GLTextureCoordArray)
+				gl.glColor4f(1.0, 1.0, 1.0,  1.0)
+	// clip to at least current depth, and increment stencil so our kids are only visible in our bounds
+	gl.glStencilFunc(GLLequal, depth, 0xFF)
+	if @clipping
+		gl.glStencilOp(GLKeep, GLKeep, GLIncr)
+	else
+		gl.glStencilOp(GLKeep, GLKeep, GLKeep)
+
+	// draw own shape
+	var vertices = this.glVertices()
+	gl.glVertexPointer(2, GLFloat, 0, vertices)
+	gl.glEnableClientState(GLVertexArray)
+	gl.glDrawArrays(GLTriangleStrip, 0, vertices.size() / 2)
+	gl.glDisableClientState(GLVertexArray)
+
+	if tex
+		gl.disableTexture(tex)
+		gl.glDisableClientState(GLTextureCoordArray)
+
+	// draw children
+	var mat = Matrix4x4.identity()
+	[@backgroundParts, @contents, @parts]._do((boxes) ->
+		boxes.reverseDo((box) ->
+			box.glDrawShadowOn(gl, scaleMatrix)
+			var scale
+			var boxTrans = box.transformation.currentValue()
+			gl.glPushMatrix()
+			if boxTrans.isPureTranslation()
+				scale = scaleMatrix
+				gl.glTranslatef(boxTrans.a13(), boxTrans.a23(), 0)
+			else
+				scale = scaleMatrix.composedWithLocal(boxTrans)
+				boxTrans.glTransformInto(mat)
+				gl.glMultMatrixf(mat)
+			box.glDrawOn(gl, scale, (if @clipping then depth + 1 else depth))
+			gl.glPopMatrix()
+		)
+	)
+
+	// clear stencil by drawing own shape again
+	if @clipping
+		gl.glColorMask(false, false, false, false)
+		gl.glStencilFunc(GLLequal, depth, 0xFF)
+		gl.glStencilOp(GLKeep, GLKeep, GLReplace)
+		vertices = this.glVertices()
+		gl.glVertexPointer(2, GLFloat, 0, vertices)
+		gl.glEnableClientState(GLVertexArray)
+   		gl.glDrawArrays(GLTriangleStrip, 0, vertices.size() / 2)
+		gl.glDisableClientState(GLVertexArray)
+
+	// clear flag for next frame
+	delete this.glScaleInvalid! !
+
 !KSBox methodsFor: 'drawing-opengl' stamp: 'yo 1/24/2013 13:21'!
 glDrawShadowOn = (gl, scaleMatrix) ->
 	if !!@shadowFill
@@ -905,6 +998,10 @@ glReleaseCaches = () ->
 !KSBox methodsFor: 'drawing-opengl' stamp: 'bf 7/27/2012 16:13'!
 glShadowVertices = () ->
 	this.glShadowVertices ?= this.shadowBounds().glVertices()! !
+
+!KSBox methodsFor: 'drawing-opengl' stamp: 'bf 1/31/2013 19:03'!
+glUpdateList = (gl) ->
+	this.glUpdateList(gl, MatrixTransform2x3.identity(), 0)! !
 
 !KSBox methodsFor: 'drawing-opengl' stamp: 'bf 1/31/2013 18:54'!
 glUpdateList = (gl, scaleMatrix, depth) ->
@@ -1055,6 +1152,10 @@ basicHandlesEvent = (anEvent) ->
 	else
 		false! !
 
+!KSBox methodsFor: 'events' stamp: 'yo 7/17/2012 15:51'!
+blockHaloForContents = () ->
+	this.allContentsAndPartsDo((e) -> e.wantsHaloFromClick(false))! !
+
 !KSBox methodsFor: 'events' stamp: 'tk 2/27/2013 13:17'!
 blockHaloForContents = (doBlock) ->
 	this.allContentsAndPartsDo((e) -> e.wantsHaloFromClick(!!doBlock))! !
@@ -1186,6 +1287,10 @@ unblockHaloForContents = () ->
 !KSBox methodsFor: 'events' stamp: 'yo 1/7/2013 19:06'!
 wantsHaloFromClick = () ->
 	return this.wantsHaloFromClick ? true! !
+
+!KSBox methodsFor: 'factories' stamp: 'yo 1/22/2013 00:28'!
+factory = () ->
+	return this.factory ? KSFactory.default()! !
 
 !KSBox methodsFor: 'factories' stamp: 'ael 3/14/2013 15:05'!
 factory = (f) ->
@@ -1412,6 +1517,34 @@ unicode = () ->
 bounds = () ->
 	return @bounds! !
 
+!KSBox methodsFor: 'geometry' stamp: 'yo 10/5/2012 15:23'!
+bounds = (aRectangle) ->
+	if @bounds == aRectangle
+		return this
+	var tr = @transformation
+	//I think thre is a better way to handle it when it the box is rotated.  (Right now, if you rotate a box and then say (aBox bounds: aRectangle) = aRectangle, the result is false).
+	var oldBox = @bounds
+	if oldBox.extent() == P(0, 0) || tr.isPureTranslation()
+		this.extent(aRectangle.extent())
+		this.topLeft(aRectangle.origin())
+		return this
+	var extentPoint = aRectangle.extent()
+	var l = P(0, 0).extent(@extent)
+	var o = this.pointInContainer(l.origin())
+	var c = this.pointInContainer(l.corner())
+	try
+		var relOrigin = (o - oldBox.origin()) / oldBox.extent()
+		var relCorner = (c - oldBox.origin()) / oldBox.extent()
+	catch ex
+		ex.resume(ex.dividend())
+	// map origin and corner into the new extent
+	o = oldBox.origin() + (relOrigin * extentPoint)
+	c = oldBox.origin() + (relCorner * extentPoint)
+	o = tr.invertPoint(o)
+	c = tr.invertPoint(c)
+	this.extent(c - o)
+	this.topLeft(aRectangle.origin())! !
+
 !KSBox methodsFor: 'geometry' stamp: 'yo 1/31/2013 10:32'!
 computeBounds = () ->
 	return @transformation.localBoundsToGlobalNoRound(P(0, 0).extent(@extent))! !
@@ -1462,9 +1595,17 @@ transformationToMatchWith = (aBox) ->
 	var tr2 = @container.transformationFromGlobal().inverseTransformation()
 	return tr2.composedWithLocal(tr)! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:23'!
+bottom = () ->
+	return this.bounds().bottom()! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:39'!
 bottom = (aNumber) ->
 	this.translateByInOwner(P(0, aNumber - this.bounds().bottom()))! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:24'!
+bottomCenter = () ->
+	return this.bounds().bottomCenter()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:39'!
 bottomCenter = (aPoint) ->
@@ -1474,13 +1615,29 @@ bottomCenter = (aPoint) ->
 bottomLeft = () ->
 	return this.bounds().bottomLeft()! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'bf 8/30/2012 18:23'!
+bottomLeft = (aPoint) ->
+	this.translateByInOwner(aPoint - this.bounds().bottomLeft())! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:51'!
 bottomRight = () ->
 	return this.bounds().bottomRight()! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'bf 8/30/2012 18:23'!
+bottomRight = (aPoint) ->
+	this.translateByInOwner(aPoint - this.bounds().bottomRight())! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:51'!
 center = () ->
 	return (this.bounds().topLeft() + this.bounds().bottomRight()) / 2.0! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 9/4/2012 14:50'!
+center = (aPoint) ->
+	this.translateByInOwner(aPoint - (this.bounds().origin() + this.bounds().corner())/2.0)! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:25'!
+height = () ->
+	return @extent.y()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'ael 3/5/2013 16:11'!
 height = (aNumber) ->
@@ -1490,14 +1647,27 @@ height = (aNumber) ->
 left = () ->
 	return this.bounds().left()! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
+left = (aNumber) ->
+	this.translateByInOwner(P(aNumber - this.bounds().left(), 0))! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/31/2013 10:30'!
 leftCenter = () ->
 	return this.bounds().leftCenter()! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
+leftCenter = (aPoint) ->
+	this.translateByInOwner(aPoint - this.bounds().leftCenter())! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:25'!
 pivotOffset = () ->
 	//The pivot is the center of rotation of a box and the baseline for a letter.  Return the pivot offset as a displacement from the top left of this box at a scale of 1.0.  pivotOffset does not change when the box is scaled.  (pivotPosition does change with scale and is in the container's coords)
 	return @pivotRatio * @extent! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'ael 3/5/2013 16:11'!
+pivotPosition = () ->
+	//The pivot point is the center of rotation of a box and the baseline for a letter.  Return the pivot point in the coordinates of the container (owner).
+	return @transformation.transformPointNoRound(this.pivotOffset())! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'ael 3/5/2013 16:11'!
 pivotPosition = (aPoint) ->
@@ -1507,21 +1677,46 @@ pivotPosition = (aPoint) ->
 	if (!!n.x().closeTo(0.0) || !!n.y().closeTo(0.0))
 		this.translateBy(n.negated())! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
+pivotRatio = () ->
+	@pivotRatio! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'tk 1/11/2013 11:33'!
 pivotRatio = (fractionalPoint) ->
 	this.pivotRatio.set(fractionalPoint)! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:26'!
+right = () ->
+	return this.bounds().right()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
 right = (aNumber) ->
 	this.translateByInOwner(P(aNumber - this.bounds().right(), 0))! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:27'!
+rightCenter = () ->
+	return this.bounds().rightCenter()! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
 rightCenter = (aPoint) ->
 	this.translateByInOwner(aPoint - this.bounds().rightCenter())! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:27'!
+rotation = () ->
+	return @transformation.rotation()! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:40'!
 rotation = (aNumber) ->
 	this.rotateBy(aNumber - this.rotation())! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:27'!
+scale = () ->
+	var tr = @transformation
+	return P(tr.a11(), tr.a12()).r()! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:27'!
+scale2D = () ->
+	return @transformation.scale2D()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'bf 10/17/2012 14:16'!
 scale = (aNumberOrPoint) ->
@@ -1531,17 +1726,25 @@ scale = (aNumberOrPoint) ->
 	var m = MatrixTransform2x3
 	this.transformation(m.withRadRotation(rot).composedWithLocal(m.withScale(aNumberOrPoint)).composedWithGlobal(m.withOffset(off)))! !
 
-!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:27'!
-scale2D = () ->
-	return @transformation.scale2D()! !
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:28'!
+top = () ->
+	return this.bounds().top()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:41'!
 top = (aNumber) ->
 	this.translateByInOwner(P(0, aNumber - this.bounds().top()))! !
 
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:28'!
+topCenter = () ->
+	return this.bounds().topCenter()! !
+
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:41'!
 topCenter = (aPoint) ->
 	this.translateByInOwner(aPoint - this.bounds().topCenter())! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:28'!
+topLeft = () ->
+	return this.bounds().topLeft()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/31/2013 10:32'!
 topLeft = (aPoint) ->
@@ -1550,6 +1753,14 @@ topLeft = (aPoint) ->
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:29'!
 topRight = () ->
 	return this.bounds().topRight()! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'bf 8/30/2012 18:24'!
+topRight = (aPoint) ->
+	this.translateByInOwner(aPoint - this.bounds().topRight())! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:29'!
+transformation = () ->
+	return @transformation! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 8/14/2013 20:16'!
 transformation = (aTransformation) ->
@@ -1572,6 +1783,10 @@ translateByInOwner = (aPoint) ->
 !KSBox methodsFor: 'geometry access' stamp: 'yo 8/27/2012 12:03'!
 translation = (aPoint) ->
 	this.transformation(@transformation.clone().offset(aPoint))! !
+
+!KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 15:25'!
+width = () ->
+	return @extent.x()! !
 
 !KSBox methodsFor: 'geometry access' stamp: 'yo 1/8/2013 13:41'!
 width = (aNumber) ->
@@ -2005,6 +2220,10 @@ haloLayout = () ->
 	var m = whole.atName("menu")
 	if d && m
 		d.topLeft(m.topRight())! !
+
+!KSBox methodsFor: 'halo' stamp: 'yo 8/29/2012 20:41'!
+wantsHaloFromClick = (aBoolean) ->
+	this.wantsHaloFromClick = aBoolean! !
 
 !KSBox methodsFor: 'hand' stamp: 'yo 3/6/2013 21:13'!
 beHand = () ->
@@ -2601,6 +2820,10 @@ layOut = () ->
 	if @layout
 		 @layout.layOut(this)! !
 
+!KSBox methodsFor: 'layout' stamp: 'yo 1/8/2013 15:30'!
+layout = () ->
+	return @layout! !
+
 !KSBox methodsFor: 'layout' stamp: 'yo 1/30/2013 10:52'!
 layout = (layout) ->
 	this.layout.set(layout)
@@ -2924,6 +3147,10 @@ layerDescription = () ->
 name = () ->
 	return @name! !
 
+!KSBox methodsFor: 'services' stamp: 'yo 10/4/2012 23:08'!
+name = (aName) ->
+	this.name.set(aName)! !
+
 !KSBox methodsFor: 'services' stamp: 'yo 7/20/2012 09:10'!
 printToFile = (fName, theDPI) ->
 	// Make Gezira render this box into a form at printer resolution and store as a .png file
@@ -2953,11 +3180,19 @@ thumbnailScale: scaleNum centeredWithin: aPoint transformedBy: trans
 	self drawOn: canv.
 	^GeziraFillImage new setForm: (canv instVarNamed: 'target').! !
 
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+borderFill = () ->
+	return @shape.borderFill()! !
+
 !KSBox methodsFor: 'shape' stamp: 'yo 2/8/2013 11:39'!
 borderFill = (aFill) ->
 	this.ensurePathsForShapeTransformer(() ->
 		this.shape(@shape.borderFill(aFill)))
 	return this! !
+
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+borderWidth = () ->
+	return @shape.borderWidth()! !
 
 !KSBox methodsFor: 'shape' stamp: 'yo 2/8/2013 11:39'!
 borderWidth = (aNumber) ->
@@ -2969,6 +3204,10 @@ borderWidth = (aNumber) ->
 clipping = (aBoolean) ->
 	this.clipping.set(aBoolean)
 	this.layoutChanged()! !
+
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+cornerRadius = () ->
+	return @shape.cornerRadius()! !
 
 !KSBox methodsFor: 'shape' stamp: 'yo 2/8/2013 11:39'!
 cornerRadius = (aNumber) ->
@@ -2987,6 +3226,10 @@ ensurePathsForShapeTransformer = (aFunction) ->
 		delete this.paths
 		this.cut(this.stretcherCut)! !
 
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+extent = () ->
+	return @extent! !
+
 !KSBox methodsFor: 'shape' stamp: 'yo 3/1/2013 21:22'!
 extent = (aPoint) ->
 	if !!aPoint.closeTo(@extent)
@@ -2994,6 +3237,10 @@ extent = (aPoint) ->
 		this.layoutChanged()
 	if !!(aPoint.closeTo(@extent))
 		this.desiredExtent.set(aPoint)! !
+
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+fill = () ->
+	return @shape.fill()! !
 
 !KSBox methodsFor: 'shape' stamp: 'yo 10/10/2012 10:59'!
 fill = (aFill) ->
@@ -3011,6 +3258,10 @@ lineTop = () ->
 rightAtY = (y) ->
 	return @shape.rightAtY(y)! !
 
+!KSBox methodsFor: 'shape' stamp: 'yo 1/8/2013 15:49'!
+shape = () ->
+	return @shape! !
+
 !KSBox methodsFor: 'shape' stamp: 'yo 9/3/2013 15:03'!
 shape = (anObject) ->
 	this.ksAssign(#"shape", anObject)
@@ -3024,6 +3275,10 @@ shape = (anObject) ->
 !KSBox methodsFor: 'shape' stamp: 'yo 2/21/2013 14:30'!
 texture = () ->
 	return this.shape().texture()! !
+
+!KSBox methodsFor: 'shape' stamp: 'yo 8/27/2012 12:03'!
+texture = (aTexture) ->
+	this.shape(@shape.texture(aTexture))! !
 
 !KSBox methodsFor: 'shape editor' stamp: 'ael 3/27/2013 23:11'!
 bePathMover = () ->

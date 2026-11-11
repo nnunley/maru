@@ -262,6 +262,11 @@ dependencyEvaluatorClass = () ->
 	else
 		return KSDependencyEvaluator! !
 
+!KSObject methodsFor: 'frp' stamp: 'yo 3/14/2013 13:37'!
+eventStream = () ->
+	// Create an event stream that represents events. As this is an event, there is no initial value.
+	return this.class().eventStreamClass().of(undefined)! !
+
 !KSObject methodsFor: 'frp' stamp: 'yo 3/14/2013 14:23'!
 eventStream = (selector, code, extraDep, arguments) ->
 	// When selector is a known combinator name, it creates that type of combinator.  If not, it falls back the general expression combinator and creates it.

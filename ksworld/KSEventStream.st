@@ -34,6 +34,10 @@ code = () ->
 	return this.__code__! !
 
 !KSEventStream methodsFor: 'accessing' stamp: 'yo 3/1/2013 23:54'!
+dormant = () ->
+	return this.__dormant__! !
+
+!KSEventStream methodsFor: 'accessing' stamp: 'yo 3/1/2013 23:54'!
 dormant = (aValue) ->
 	this.__dormant__ = aValue! !
 
@@ -65,6 +69,10 @@ name = (aString) ->
 property = (aString) ->
 	return this[aString]! !
 
+!KSEventStream methodsFor: 'accessing' stamp: 'yo 1/23/2013 14:28'!
+sources = () ->
+	return this.__sources__! !
+
 !KSEventStream methodsFor: 'accessing' stamp: 'yo 1/23/2013 14:43'!
 sources = (aCollection) ->
 	this.__sources__ = aCollection! !
@@ -84,6 +92,10 @@ synching = () ->
 !KSEventStream methodsFor: 'accessing' stamp: 'yo 1/23/2013 14:19'!
 type = () ->
 	return this.__type__! !
+
+!KSEventStream methodsFor: 'accessing' stamp: 'yo 1/23/2013 15:23'!
+visited = () ->
+	return this.__visited__! !
 
 !KSEventStream methodsFor: 'accessing' stamp: 'yo 1/23/2013 15:24'!
 visited = (aBoolean) ->

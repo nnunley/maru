@@ -396,6 +396,12 @@ beReadOnly = (readOnly) ->
 		if !!this.textDoButtonDown
 			this.behavior()! !
 
+!KSTextLayout methodsFor: 'initialization' stamp: 'tk 2/27/2013 13:15'!
+beSingleLineInput = () ->
+// Make carriage return take the current contents and push it to the box's @contentsAccepted stream
+
+	this.beSingleLineInput(true)! !
+
 !KSTextLayout methodsFor: 'initialization' stamp: 'ael 3/11/2013 14:37'!
 beSingleLineInput = (beSingleLine) ->
 // Make carriage return take the current contents and push it to the box's @contentsAccepted stream

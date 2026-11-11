@@ -5,7 +5,7 @@ class, its definition and then its methods by category, `!` doubled as the chunk
 Most of KSWorld's behaviour is KScript (`name = (args) -> body`), kept in Smalltalk method chunks; the KScript compiler
 and parser (`KSCompiler`, `KSParser`, `KSParser2`) are Smalltalk.
 
-92 classes, 2,447 methods: `INDEX.txt` counts each class's methods, KScript and Smalltalk (KScript as `ksworld-source.l`
+92 classes, 2,491 methods: `INDEX.txt` counts each class's methods, KScript and Smalltalk (KScript as `ksworld-source.l`
 tells it: `selector = (`). Each class's comment is kept, as a chunk the file-out reader passes over.
 
 ## Where it comes from
@@ -21,7 +21,9 @@ VM writes source there as it's accepted and commits the image's pointers to it o
 decides, with the changes and sources files the only inputs. Each of its compiled methods
 ends in a source pointer, a position in `frank.changes` (or `SqueakV41.sources`); walking `frank.image` (a 32-bit V3 object
 memory, format 6505) for every method's trailer gives the positions of the 28,564 sources it runs, and each KS method here is
-the version at one of them. Class definitions and comments, which nothing here points at, come from replaying the file
+the version at one of them. A KScript method is named as KSWorld's compiler names it (`KSSqueakParser>>parseSelector:`):
+`name = ()` is `name`, `name = (a)` is `name:` and `name = (a, b)` is `name:with:`, so `KSBox>>textContents` and `textContents:` are two
+methods. Class definitions and comments, which nothing here points at, come from replaying the file
 session by session: what a session wrote counts only if it was saved (`----SNAPSHOT----`, or a `----QUIT----` that saves;
 201 of Frank's sessions end `----QUIT/NOSAVE----`), with `removeClassNamed:` and `renameClassNamed:as:` applied.
 
