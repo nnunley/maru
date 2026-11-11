@@ -92,6 +92,12 @@
       (gezira-fill-clipped gezira m *ksworld-stages* width height paint floats count)
     (gezira-fill-path gezira m width height paint floats count)))
 
+;; whether a box clips what it holds: KSBox>>drawOn: clips by drawingBounds if clipping is on and the box isn't a glyph
+;; (isGlyph, a box with a font)
+(define-function ks-clips? (box)
+  (and (= 't (ks-val box 'clipping))
+       (let ((font (ks-val box 'font))) (or (not font) (= 'undefined font)))))
+
 ;; a clipping box's rectangle in its own coordinates: its extent from its origin (KSShape's drawingBounds, less a stroke
 ;; outside it)
 (define-function ks-clip-rect (box)
@@ -123,7 +129,7 @@
 (define-function ksworld-render-box (box m gezira width height)
   (when (and (ks-object? box) (not (ks-slot-false? box 'visible)))
     (let* ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation))))
-	   (outer *ksworld-stages*) (rect (and (= 't (ks-val box 'clipping)) (ks-clip-rect box))))
+	   (outer *ksworld-stages*) (rect (and (ks-clips? box) (ks-clip-rect box))))
       (if (not rect)
 	  (ksworld-render-box-contents box here gezira width height)
 	(set *ksworld-stages* (concat-list outer (list (cons here rect))))	; a stage, and what it holds drawn in its coordinates

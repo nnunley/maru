@@ -45,7 +45,9 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   its width and height; `drawingBounds` adds a stroke's width outside it, which this leaves out. A Gezira that doesn't
   clip, as the check's recording one, is given the path placed in the image. The check's fixture `check/ksworld/clip.pp`
   is a 30@20 clipping box at 100@50 holding a square scaled past its bottom edge and a square inside it; both go in the
-  box's coordinates inside one stage, the box's matrix and (0 0 30 20).
+  box's coordinates inside one stage, the box's matrix and (0 0 30 20). A glyph (a box with a font, `isGlyph`) doesn't clip, as
+  `drawOn:` skips it. Presses follow the clip: `KSBox>>receive:` passes a point on through a clipping box only if the
+  box holds it, so `ksworld-box-at` finds the overhanging square at 110@60, inside the box, and nothing at 110@75, below it.
   `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
   quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
   KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,
