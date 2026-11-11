@@ -1,6 +1,6 @@
 ;;; KSWorld's own methods from its sources (ksworld-source.l): a class's file-out (ksworld/CLASS.st, Squeak's chunk format,
 ;;; read by st-fileout.g) gives each method's category and source; a KScript one is read by kscript.g, and becomes a method
-;;; of its class, answering the sends a document makes of its instances.  KSTextLayout's 73 methods are 72 KScript and 1
+;;; of its class, answering the sends a document makes of its instances.  KSTextLayout's 74 methods are 73 KScript and 1
 ;;; Smalltalk, as ksworld/INDEX.txt counts them.
 (require "ksworld-source.l")
 (define ok 1)
@@ -12,8 +12,8 @@
        (unread (let ((out ())) (list-do m ms (and (<ks-source-method>-kscript? m) (not (<ks-source-method>-tree m))
 						 (push out (<ks-source-method>-selector m))))
 		     out)))
-  (expect "every method of the file-out" (list-length ms) 73)
-  (expect "KScript ones as INDEX.txt counts them" kscript 72)
+  (expect "every method of the file-out" (list-length ms) 74)
+  (expect "KScript ones as INDEX.txt counts them" kscript 73)
   (expect "every KScript method read" unread ())
   (let ((do08 (let ((f ())) (list-do m ms (and (= 'do08 (<ks-source-method>-selector m)) (set f m))) f)))
     (expect "a method's class and category" (list (<ks-source-method>-class do08) (<ks-source-method>-category do08))
