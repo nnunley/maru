@@ -15,9 +15,12 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
   field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
-  collection, true as a test, never nil. An object's `[k]` is its field `k`, as `a.k` is (the property access KScript
-  compiles to), so a stream answers as itself, and is a dependency where its key is a string or a name the home holds. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
-  them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
+  collection, true as a test, never nil. KScript compiles to Smalltalk, and a chain reads as KSWorld's compiler reads it.
+  `a[k]` and `a.k` are `KSCompiler>>get`'s `ksAt:`, the slot itself, so a stream answers as itself. A chain down to
+  `@name` is a `quotedVar` (`KSQuoteTranslator`): in a stream's own expression, a reference to the stream it ends at, with
+  its root, an index's key and that stream as dependencies; in a function's body or a method, the value it ends at
+  (`ks-read-chains`, as each stream's code and each KScript method is read). Truth is Maru's: true is `t`, false and nil
+  are one value, `()`, as test-pepsi.l has them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
