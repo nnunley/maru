@@ -4,7 +4,7 @@
 # Appendices I and II).  Inherits C's lexing and arithmetic from <cexpr> and
 # adds indentation-structured blocks, closures, event streams (<-, fby, on,
 # startsWith, when/then, @ref, lag '), comprehensions, and dictionary literals;
-# and, as KSWorld's own methods (ksworld/*.st) write them, += and -=, #'symbols'
+# and, as KSWorld's own methods (ksworld/*.st) write them, += and -=, #'symbols' (or #"symbols")
 # and $$(expr) streams.
 
 <kscript> : <cexpr> ()
@@ -26,7 +26,8 @@ paramlist	= ident?:a ("," _ ident)*:b					-> `(,@a ,@b) ;
 dictpair	= (anyident | string | sglstring):k (":" | "->") _ expr:v	-> (list k v) ;
 dictpairs	= dictpair?:a (("," | ".") _ dictpair)*:b			-> `(,@a ,@b) ;
 
-symbolname	= "'" (!"'" .)* $:x "'" _					-> (string->symbol x) ;
+symbolname	= "'" (!"'" .)* $:x "'" _					-> (string->symbol x)
+		| "\"" (!"\"" .)* $:x "\"" _					-> (string->symbol x) ;	# KSParser's symbol is $# string, either quote
 
 primary		= "..." _							-> 'ellipsis
 		| "#" symbolname:x						-> `(symbol ,x)	# #'wordWidth', a Squeak Symbol
