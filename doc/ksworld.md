@@ -38,12 +38,14 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
   A box whose `clipping` is true draws its shape, text and children only inside its extent, as `KSBox>>drawOn:` clips its
-  canvas by `drawingBounds` (the rectangle around the extent's corners as placed in the image, met with any clip above
-  it). Gezira clips only to the image, so a path that crosses the clip is placed in the image and clipped in Maru by
-  Gezira's own `ClipBeziers` (`gezira/nile/gezira.nl`): a curve inside passes, one wholly to one side is clamped onto the
-  edge, any other is split at its middle. That path goes to Gezira with the identity matrix; a path inside the clip goes
-  as before. The check's fixture `check/ksworld/clip.pp` is a 30@20 clipping box at 100@50 holding a square scaled past
-  its bottom edge, given clipped to x 105 to 125 and y 57 to 70, and a square inside it, given as the shape holds it.
+  canvas by `drawingBounds` after `transformBy:`. Gezira clips as `GeziraCanvas` does: each clip is a stage of the
+  pipeline, a `TransformBeziers` into the clip's coordinates and a `ClipBeziers` to its rectangle, interleaved with the
+  transforms outside it (`gezira.l`'s `gezira-fill-clipped`, Nile's `gezira_fill_clipped`). Inside a clipping box the
+  paths go in the box's own coordinates, so a turned box clips in its own frame. The rectangle is the extent, (0, 0) to
+  its width and height; `drawingBounds` adds a stroke's width outside it, which this leaves out. A Gezira that doesn't
+  clip, as the check's recording one, is given the path placed in the image. The check's fixture `check/ksworld/clip.pp`
+  is a 30@20 clipping box at 100@50 holding a square scaled past its bottom edge and a square inside it; both go in the
+  box's coordinates inside one stage, the box's matrix and (0 0 30 20).
   `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
   quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
   KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,

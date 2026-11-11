@@ -48,6 +48,25 @@
     (rectangle-check g)
     (gezira-stop g)))
 
+;; the rectangle inside clipping stages (gezira_fill_clipped), as GeziraCanvas clips: in a stage at (10, 20) whose rectangle
+;; is 20 by 15, only that part of it; in a stage turned a quarter (x' = 40 - y, y' = x + 10) whose rectangle is 10 by 30
+;; in its own coordinates, the part of it that rectangle holds, from x 10 to 40 and y 10 to 20 in the image
+(let ((g (gezira-maru 64 64 1)) (red (list 'uniform 1.0 1.0 0.0 0.0)))
+  (gezira-clear g)
+  (gezira-fill-clipped g (ks-matrix 1.0 0.0 0.0 1.0 0.0 0.0) (list (cons (ks-matrix 1.0 0.0 0.0 1.0 10.0 20.0) '(0 0 20 15))) 64 64 red
+		       (floats-of rectangle) 24)
+  (expect "inside the stage's rectangle, red" (= (gezira-pixel g 15 25) (gezira-pixel g 25 30)))
+  (expect "inside the stage's rectangle, painted" (not (= -1 (gezira-pixel g 15 25))))
+  (expect "the rectangle past the stage's right edge, untouched" (= -1 (gezira-pixel g 35 25)))
+  (expect "the rectangle past the stage's bottom edge, untouched" (= -1 (gezira-pixel g 15 40)))
+  (gezira-clear g)
+  (gezira-fill-clipped g (ks-matrix 1.0 0.0 0.0 1.0 0.0 0.0) (list (cons (ks-matrix 0.0 1.0 -1.0 0.0 40.0 10.0) '(0 0 10 30))) 64 64 red
+		       (floats-of rectangle) 24)
+  (expect "a turned stage: inside its rectangle, painted" (not (= -1 (gezira-pixel g 25 15))))
+  (expect "a turned stage: the rectangle outside its rectangle, untouched" (= -1 (gezira-pixel g 25 25)))
+  (expect "a turned stage: nothing past its own right edge" (= -1 (gezira-pixel g 45 15)))
+  (gezira-stop g))
+
 (if (= 0 failures)
     (println "gezira maru ok")
     (println failures " failures"))
