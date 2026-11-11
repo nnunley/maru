@@ -65,6 +65,12 @@
   (expect "a turned stage: inside its rectangle, painted" (not (= -1 (gezira-pixel g 25 15))))
   (expect "a turned stage: the rectangle outside its rectangle, untouched" (= -1 (gezira-pixel g 25 25)))
   (expect "a turned stage: nothing past its own right edge" (= -1 (gezira-pixel g 45 15)))
+  ;; stages counted but not given are refused (BAD_ARG, 2), before anything is drawn
+  (gezira-clear g)
+  (expect "a stage counted but not given, refused"
+	  (= 2 (gezira-fill-clipped-entry (<gezira-maru>-init g) (<gezira-maru>-image g) 64 64
+					  (gezira-params (ks-matrix 1.0 0.0 0.0 1.0 0.0 0.0) red) (floats-of rectangle) 24 0 1)))
+  (expect "and nothing drawn" (= -1 (gezira-pixel g 25 30)))
   (gezira-stop g))
 
 (if (= 0 failures)

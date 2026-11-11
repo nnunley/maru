@@ -345,3 +345,4 @@
 +11 review fixes: a make line equal to an earlier one is dropped by structure (forms read from a file were never member? of each other), and replay.l write refuses a ledger with a line its plan's rules refuse instead of emptying it (plan-replay-write); their tests
 +92 a box whose clipping is on draws only inside its bounds, as KSBox>>drawOn: clips: a path crossing the clip is placed and clipped in Maru by a port of Gezira's ClipBeziers, with its check and fixture
 +65 review of box clipping: Gezira clips, as GeziraCanvas does, through gezira_fill_clipped's ClipBeziers stage per clip interleaved with its transforms (nile's gezira-api.k), in place of the Maru port of ClipBeziers; the recording double and both checks follow
+-2 review of gezira_fill_clipped: gezira_fill and gezira_fill_image are the clipped fills with no stages, one copy of each check, and stages counted but not given are refused, with a check
