@@ -10,6 +10,12 @@ Nile's compiler on Maru, its runtime in typed Maru, Gezira, and the runtime's la
 - `nile_text_layout` (`check/check.l`): `text-layout.nl`, compiled by `nile-to-maru-compiler.sh` as module `text_layout`,
   runs through the Maru runtime (`nile/runtimes/maru/test/text-layout.k`) with 1 and 8 workers and lays four glyphs out
   as (0,0) (3,0) (6,0) (0,1).
+- `gezira_vector` (`check/gezira-vector.k`, `check/gezira/vector-kernels.nl`): Gezira's `Vector` arithmetic, run. Two kernels
+  appended to `gezira.nl` add vector pairs and a number to a vector through Nile's Maru back end and the runtime, and the
+  sums are vector sums: `(1, 2) + (10, 20)` is `(11, 22)`, `(1, 2) + 5` is `(6, 7)`. A departure from the 2016 source: its
+  `u:Vector + v:Vector` answered `(x1 + y1, x2 + y2)`, each vector's own components summed (`(3, 30)` here); the fork
+  (`gezira` on `maru-runtime`) answers `(x1 + x2, y1 + y2)`. No kernel of Gezira's own adds two vectors, so nothing it draws
+  changes (its compiled kernels are byte for byte the same either way), and this case is the rule's only check.
 - `gezira_image` (`check/check.l`): `gezira/nile/gezira.nl`, Gezira in the 2016 Nile dialect, compiled by Nile's Maru back end
   and built with the runtime, with `nile/runtimes/maru/gezira-image.k` (the ARGB32 composite) renders a 40 by 30 rectangle at
   (10.5, 20) through TransformBeziers, ClipBeziers, Rasterize and ApplyTexturer: full pixels red, edge columns half covered, the

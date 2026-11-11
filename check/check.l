@@ -939,6 +939,16 @@
     (run "gezira-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && $R/nile/compilers/maru/nile-to-maru-compiler.sh gezira $R/gezira/nile/gezira.nl"))
     (concat-strings gen "/gezira.k")))
 
+;; Gezira's Vector arithmetic run (check/gezira-vector.k): two kernels appended to gezira.nl add vector pairs and a number
+;; to a vector, and the sums come out as vector sums. No kernel of Gezira's own adds two vectors, so this is the only check
+;; of the rule.
+(check "gezira_vector"
+  (let* ((gen (concat-strings tmp "/gezira-vector-gen"))
+	 (_   (run "gezira-vector-gen" (concat-strings "R=$PWD; mkdir -p " gen " && cd " gen " && cat $R/gezira/nile/gezira.nl $R/check/gezira/vector-kernels.nl > gezira_vector.nl && $R/nile/compilers/maru/nile-to-maru-compiler.sh gezira_vector gezira_vector.nl")))
+	 (bin (nile-build "nile-gezira-vector" (list (concat-strings gen "/gezira_vector.k") "check/gezira-vector.k") "")))
+    (unit-assert (equal (run "nile-gezira-vector" (concat-strings bin " && test ! -s " tmp "/nile-gezira-vector.err") 300)
+			'("gezira vector ok")))))
+
 (check "gezira_image"
   (let* ((bin (nile-build "nile-gezira-image" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k") (concat-strings nile-dir "test/gezira-image.k")) "")))
     (list-do n '("1" "4")
