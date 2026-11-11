@@ -282,17 +282,11 @@
 	(else (ks-no-method recv sel))))
 ;; a send: the receiver's kind's method, up its superclasses; else, as in Smalltalk, doesNotUnderstand: with a Message (its
 ;; selector in Squeak's form and ours, its arguments), which KSObject answers from its slots and Object at the root natively
-;; a stream answers its own class's methods, not those it inherits from KSObject, which are a box's (center, width ...):
-;; any other send goes to its value
-(define-function ks-stream-method (sel args)
-  (or (ks-own-method 'KSEventStream sel) (and args (ks-own-method 'KSEventStream (ks-squeak-selector sel (list-length args))))))
 (define-function ks-send (recv sel args env this)
   (if (= recv 'undefined) 'undefined	; undefined goes through every send
     (let* ((type (type-of recv))	; a class object's type is its metaclass
-	   (stream (ks-stream? recv))
-	   (m (if stream (ks-stream-method sel args)
-		(or (ks-method-for-type type sel) (and args (ks-method-for-type type (ks-squeak-selector sel (list-length args)))))))
-	   (dnu (and (not m) (not stream) (ks-method-for-type type '_doesNotUnderstand))))
+	   (m (or (ks-method-for-type type sel) (and args (ks-method-for-type type (ks-squeak-selector sel (list-length args))))))
+	   (dnu (and (not m) (ks-method-for-type type '_doesNotUnderstand))))
       (cond (m (m recv args env this))
 	    (dnu (dnu recv (list (ks-new-object 'Message 0 () (list (cons 'selector (ks-squeak-name sel)) (cons 'name sel) (cons 'arguments (list->array args))) () 0))
 		      env this))
@@ -805,37 +799,47 @@
   (new <ks-evaluator> () -1))
 
 (define-function ks-chain? (ast) (and (pair? ast) (or (= (car ast) 'field) (= (car ast) 'index))))
-;; How KSWorld reads a chain down to @name (a quotedVar): in a stream's own expression, KSQuoteTranslator>>quotedVar
-;; makes it a reference to the stream it ends at (ks-collect-chain-deps has its dependencies); in a function's body, its
-;; trans reads each step's currentValue, so the chain is the value it ends at.  A method is a function.  Other chains,
-;; recv.k and recv[k], are KSCompiler>>get's ksAt:, the slot itself.  A lag (@x') and an assignment's place are as written.
-(define-function ks-quoted-chain? (ast)
-  (while (ks-chain? ast) (set ast (cadr ast)))
-  (and (pair? ast) (= (car ast) 'stream-ref)))
+;; How KSWorld reads a chain, as a stream's code or a KScript method is read (ks-read-chains).  A reference is a chain down
+;; to @name (KSQuoteTranslator>>quotedVar), or, in code a document marks KScript 2 (:__version__ "2", KSParser2's), a chain
+;; down to a name (KSVariableAttributor2 makes it a fieldRef, or a tempRef for a local).  In a stream's own expression a
+;; reference is the stream it ends at (ks-collect-chain-deps has its dependencies), and a send to it is a combinator's on
+;; the stream only if the selector names one: KSObject>>eventStream falls back to exprE, a send to its value, for any other.
+;; In a function's body, and so in a method, a reference reads each step's currentValue (quotedVar's trans,
+;; KSCompiler>>fieldRef), so it is the value it ends at.  Other chains, recv.k and recv[k], are KSCompiler>>get's ksAt:, the
+;; slot itself.  A lag (@x') and an assignment's place are as written.
+(define *ks-combinators* '(collectE delayE doE exprE getE mapE mergeE oneE switchColE timerE update))	; KSEventStream's
+(define-function ks-reference? (ast v2)
+  (let ((root ast))
+    (while (ks-chain? root) (set root (cadr root)))
+    (or (and (pair? root) (= (car root) 'stream-ref))
+	(and v2 (ks-chain? ast) (symbol? root)))))
 (define ks-read-chain-keys)	; defined below: the two read each other
-(define-function ks-read-chains-in (ast in-fn)
+(define-function ks-read-chains-in (ast in-fn v2)
   (cond ((not (pair? ast)) ast)
 	((= (car ast) 'lag) ast)
-	((= (car ast) 'fn) `(fn ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b 't)) (cddr ast))))
-	((and in-fn (or (ks-chain? ast) (= (car ast) 'stream-ref)) (ks-quoted-chain? ast))
-	 `(chain-value ,(ks-read-chain-keys ast in-fn)))
-	((ks-chain? ast) (ks-read-chain-keys ast in-fn))
+	((= (car ast) 'fn) `(fn ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b 't v2)) (cddr ast))))
+	((and in-fn (or (ks-chain? ast) (= (car ast) 'stream-ref)) (ks-reference? ast v2))
+	 `(chain-value ,(ks-read-chain-keys ast in-fn v2)))
+	((ks-chain? ast) (ks-read-chain-keys ast in-fn v2))
+	((and (not in-fn) (= (car ast) 'send) (ks-reference? (cadr ast) v2) (not (memq (caddr ast) *ks-combinators*)))
+	 `(send (chain-value ,(ks-read-chain-keys (cadr ast) in-fn v2)) ,(caddr ast)
+		,@(map (lambda (b) (ks-read-chains-in b in-fn v2)) (cdddr ast))))
 	((or (= (car ast) 'assign) (= (car ast) 'assign-add) (= (car ast) 'assign-sub))
-	 `(,(car ast) ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b in-fn)) (cddr ast))))
-	(else (cons (car ast) (map (lambda (b) (ks-read-chains-in b in-fn)) (cdr ast))))))
-(define-function ks-read-chain-keys (ast in-fn)	; a chain's steps as they are, its root and index keys read
+	 `(,(car ast) ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b in-fn v2)) (cddr ast))))
+	(else (cons (car ast) (map (lambda (b) (ks-read-chains-in b in-fn v2)) (cdr ast))))))
+(define-function ks-read-chain-keys (ast in-fn v2)	; a chain's steps as they are, its root and index keys read
   (cond ((or (not (pair? ast)) (= (car ast) 'stream-ref)) ast)	; its root, a name or @name, as written
-	((not (ks-chain? ast)) (ks-read-chains-in ast in-fn))
-	((= (car ast) 'field) `(field ,(ks-read-chain-keys (cadr ast) in-fn) ,(caddr ast)))
-	(else `(index ,(ks-read-chain-keys (cadr ast) in-fn) ,(ks-read-chains-in (caddr ast) in-fn)))))
-(define-function ks-read-chains (ast) (ks-read-chains-in ast ()))
+	((not (ks-chain? ast)) (ks-read-chains-in ast in-fn v2))
+	((= (car ast) 'field) `(field ,(ks-read-chain-keys (cadr ast) in-fn v2) ,(caddr ast)))
+	(else `(index ,(ks-read-chain-keys (cadr ast) in-fn v2) ,(ks-read-chains-in (caddr ast) in-fn v2)))))
+(define-function ks-read-chains (ast v2) (ks-read-chains-in ast () v2))
 
 (define-function ks-stream-ast (s)
   (or (ks-attr s ':__ast__)
       (let ((code (ks-attr s ':__code__))
 	    (type (ks-attr s ':__type__)))
 	(when (and code (not (= type "setter")))
-	  (let ((ast (ks-read-chains (car (kscript-parse code)))))
+	  (let ((ast (ks-read-chains (car (kscript-parse code)) (= (ks-attr s ':__version__) "2"))))
 	    (ks-set-attr s ':__ast__ ast)
 	    ast)))))
 

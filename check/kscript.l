@@ -119,7 +119,7 @@ for i in [0...10] by 5 total := total + i
 	  '(t t))
   ;; @n in a function's body is n's value: KSQuoteTranslator>>trans reads each step's currentValue there
   (expect "a function's @chain: its read, and the value it ends at"
-	  (let ((fn (ks-read-chains (car (kscript-parse "() -> @n")))))
+	  (let ((fn (ks-read-chains (car (kscript-parse "() -> @n")) ())))
 	    (list fn (ks-apply (ks-eval fn () box) () () box)))
 	  '((fn () (chain-value (stream-ref n))) 5)))
 ;; a chain's end as KSNewEventStream>>findForGet: finds it: the root's value, then v ksAt: key for each key, a slot not
@@ -134,12 +134,17 @@ for i in [0...10] by 5 total := total + i
 	  (= (ks-chain-end (car (kscript-parse "@a.b")) box) (ks-slot x 'b)) 't)
   (expect "a three-step chain ends at the last key on the object holding the one before it"
 	  (= (ks-chain-end (car (kscript-parse "@a.b.c")) box) (ks-slot x 'c)) 't))
-;; a stream answers its own class's methods, and any other send as its value does, even one KSObject has for a box:
-;; a box's bounds, a stream of a rectangle, answers its rectangle's center (deviation-demo's slider1.bounds.center())
-(let ((box (box-of "b <- P(10, 20).extent(P(30, 40))\n")))
+;; a send to a reference in a stream's expression: a combinator's on the stream, any other to its value, as
+;; KSObject>>eventStream falls back to exprE; in KScript 2 code a chain from a name is a reference (a fieldRef), and in a
+;; function's body reads its value at each step (KSCompiler>>fieldRef): deviation-demo's slider1.bounds.center()
+(let* ((box (box-of "b <- P(10, 20).extent(P(30, 40))\n"))
+       (run (lambda (text v2) (ks-stream-curr (ks-eval (ks-read-chains (car (kscript-parse text)) v2) () box)))))
   (expect "a stream of a rectangle, its center and width"
-	  (map (lambda (text) (ks-stream-curr (ks-eval (car (kscript-parse text)) () box))) '("this.b.center().y()" "this.b.width()"))
-	  '(40 30)))
+	  (list (run "this.b.center().y()" 't) (run "@b.center().y()" ()) (ks-apply (run "() -> this.b.width()" 't) () () box))
+	  '(40 40 30))
+  (expect "a combinator's receiver, the stream itself"
+	  (ks-read-chains (car (kscript-parse "this.b.mapE((r) -> r.width())")) 't)
+	  '(send (field this b) mapE (fn (r) (send r width)))))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 

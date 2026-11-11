@@ -13,9 +13,7 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   reports the button just pressed; layout and rendering don't exist yet.
   Methods are defined per class (`ks-methods`: a KSWorld object's class, or `Number`, `String`, `Point` …), each a method of
   the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
-  field or entry it already has, but never makes one, which would hide a missing method. A stream answers its own
-  class's methods (`set`, `mapE` …) and any other send as its value does: KSObject's are a box's (`center`, `width`), and
-  a box's bounds, a stream of a rectangle, answers its rectangle's. A field read on any other value (`ev.hand`) is a send with no arguments.
+  field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
   collection, true as a test, never nil. KScript compiles to Smalltalk, and a chain reads as KSWorld's compiler reads it.
   `a[k]` and `a.k` are `KSCompiler>>get`'s `ksAt:`, the slot itself, so a stream answers as itself. A chain down to
@@ -23,7 +21,11 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   its root, an index's key and that stream as dependencies. It ends where `KSNewEventStream>>findForGet:` does: the root's
   value, then `ksAt:` each key, a slot not unwrapped, so a key after the first is the stream's own or its home object's
   (`@a.b.c` ends at `c` on the object holding `b`); in a function's body or a method, the value it ends at
-  (`ks-read-chains`, as each stream's code and each KScript method is read). Truth is Maru's: true is `t`, false and nil
+  (`ks-read-chains`, as each stream's code and each KScript method is read). In code a document marks KScript 2
+  (`:__version__ "2"`, KSParser2's, with no `@`), a chain from a name is a reference too, `KSVariableAttributor2`'s
+  `fieldRef`, and in a function's body reads `currentValue` at each step (`KSCompiler>>fieldRef`). In a stream's own
+  expression a send to a reference is a combinator's on the stream (`mapE`, `doE` …) and any other goes to its value, as
+  `KSObject>>eventStream` falls back to `exprE`: deviation-demo's `slider1.bounds.center()` is its rectangle's. Truth is Maru's: true is `t`, false and nil
   are one value, `()`, as test-pepsi.l has them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
