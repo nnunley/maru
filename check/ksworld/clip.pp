@@ -1,9 +1,14 @@
 (objects :root "1"
-	(KSBox :ref "1" :size "4"
+	(KSBox :ref "1" :size "5"
 		(slot :keyClass "Symbol" :keyValue "transformation" :name "1" :valueClass "MatrixTransform2x3" :valueValue "1.0 0.0 100.0 0.0 1.0 50.0")
 		(slot :keyClass "Symbol" :keyValue "extent" :name "2" :valueClass "Point" :valueValue "30.0@20.0")
 		(slot :keyClass "Symbol" :keyValue "clipping" :name "3" :valueClass "True" :valueValue "true")
-		(slot :keyClass "Symbol" :keyValue "contents" :name "4" :valueId "3"))
+		(slot :keyClass "Symbol" :keyValue "contents" :name "4" :valueId "3")
+		(slot :keyClass "Symbol" :keyValue "shape" :name "5" :valueId "14"))
+	(KSShape :ref "14"
+		(slot :class "Rectangle" :name "drawingBounds" :value "-1.0@-1.0 corner: 31.0@21.0")
+		(slot :name "elements" :ref "15"))
+	(Array :ref "15" :size "0")
 	(KSContentsCollection :ref "3" :size "3"
 		(slot :name "1" :ref "4")
 		(slot :name "2" :ref "11")

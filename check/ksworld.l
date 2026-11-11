@@ -112,8 +112,9 @@
 
 ;; a box whose clipping is on draws what it holds only inside its bounds, as KSBox>>drawOn: clips by drawingBounds: here
 ;; a 30@20 box at 100@50 holding a square scaled past its bottom edge, and one inside it.  Gezira clips (gezira.l's
-;; gezira-fill-clipped): each path goes in the box's own coordinates, inside one stage, the box's matrix and its bounds
-(let* ((paths (drawn "check/ksworld/clip.pp" 200 150)) (stage '(((1.0 0.0 0.0 1.0 100.0 50.0) 0 0 30.0 20.0))))
+;; gezira-fill-clipped): each path goes in the box's own coordinates, inside one stage, the box's matrix and its shape's
+;; drawingBounds, which reach a border's width past its extent
+(let* ((paths (drawn "check/ksworld/clip.pp" 200 150)) (stage '(((1.0 0.0 0.0 1.0 100.0 50.0) -1.0 -1.0 31.0 21.0))))
   (expect "what crosses the clip: in the box's coordinates, inside its stage"
 	  (list (car (car paths)) (car (cddddr (car paths)))) (list '(2.0 0.0 0.0 2.0 5.0 7.0) stage))
   (expect "what lies inside the clip: the same"

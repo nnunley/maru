@@ -98,11 +98,16 @@
   (and (= 't (ks-val box 'clipping))
        (let ((font (ks-val box 'font))) (or (not font) (= 'undefined font)))))
 
-;; a clipping box's rectangle in its own coordinates: its extent from its origin (KSShape's drawingBounds, less a stroke
-;; outside it)
+;; a clipping box's rectangle in its own coordinates, (left top right bottom): KSBox>>drawingBounds, its shape's
+;; drawingBounds, which takes in a border outside the extent.  Every shape with elements saves it; one that doesn't is
+;; computed as KSShape>>computeBounds does for a shape without elements, offset extent: extent
 (define-function ks-clip-rect (box)
-  (let ((e (ks-val box 'extent)))
-    (and (ks-point? e) (list 0 0 (<ks-point>-x e) (<ks-point>-y e)))))
+  (let ((shape (ks-val box 'shape)))
+    (and (ks-object? shape)
+	 (let ((r (ks-slot shape 'drawingBounds)) (o (ks-slot shape 'offset)) (e (ks-slot shape 'extent)))
+	   (cond ((ks-rect? r) (list (<ks-rect>-left r) (<ks-rect>-top r) (<ks-rect>-right r) (<ks-rect>-bottom r)))
+		 (else (let ((x (if (ks-point? o) (<ks-point>-x o) 0)) (y (if (ks-point? o) (<ks-point>-y o) 0)))
+			 (list x y (+ x (if (ks-point? e) (<ks-point>-x e) 0)) (+ y (if (ks-point? e) (<ks-point>-y e) 0))))))))))
 
 (define-function ksworld-render-path (path m gezira width height)
   (let ((floats (ks-slot (ks-slot path 'floats) 'data)))
