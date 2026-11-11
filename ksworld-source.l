@@ -67,7 +67,7 @@
 (define-function ks-source-tree (src)	; (fn PARAMS BODY...) as kscript.g reads "selector = (PARAMS) -> BODY", or ()
   (let ((forms (ks-parse-or-nil (lambda () (kscript-parse src)))))
     (and (pair? forms) (not (cdr forms)) (= 'assign (caar forms)) (pair? (caddr (car forms))) (= 'fn (car (caddr (car forms))))
-	 (caddr (car forms)))))
+	 (ks-read-chains (caddr (car forms))))))
 (define-function ks-squeak-method (src ivars classvars)	; (SELECTOR (fn PARAMS BODY...)) as squeak.g reads a Smalltalk method, or ()
   (let ((p (text-parser-for-on <squeak> src)))
     (set *squeak-ivars* ivars)

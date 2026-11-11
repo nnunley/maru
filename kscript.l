@@ -458,7 +458,7 @@
 	 (let ((cur obj) (k (if (double? idx) (double->long idx) idx)))
 	   (while (and cur (< 0 k)) (set cur (cdr cur)) (decr k))
 	   (if cur (car cur) ())))
-	((ks-object? obj)	; its field, as obj.key answers it: a stream as itself
+	((ks-object? obj)	; KSCompiler>>get: c[n] is c ksAt: n asKSKey, the slot itself, so a stream as itself
 	 (let ((key (if (symbol? idx) idx (string->symbol (ks-to-string idx)))))
 	   (or (ks-slot obj key) (ks-field obj key ()))))
 	(else ())))
@@ -542,6 +542,7 @@
 	      (if (ks-object? recv)
 		  (or (ks-slot recv fname) (ks-field recv fname ()))
 		(ks-field recv fname ())))))
+	 ((= op 'chain-value) (ks-stream-curr (ks-eval (cadr exp) env this)))	; see ks-read-chains
 	 ((= op 'index)
 	  (ks-index (ks-stream-curr (ks-eval (cadr exp) env this))
 		    (ks-stream-curr (ks-eval (caddr exp) env this))))
@@ -797,28 +798,68 @@
 (define-function ks-evaluator-new ()
   (new <ks-evaluator> () -1))
 
+(define-function ks-chain? (ast) (and (pair? ast) (or (= (car ast) 'field) (= (car ast) 'index))))
+;; How KSWorld reads a chain down to @name (a quotedVar): in a stream's own expression, KSQuoteTranslator>>quotedVar
+;; makes it a reference to the stream it ends at (ks-collect-chain-deps has its dependencies); in a function's body, its
+;; trans reads each step's currentValue, so the chain is the value it ends at.  A method is a function.  Other chains,
+;; recv.k and recv[k], are KSCompiler>>get's ksAt:, the slot itself.  A lag (@x') and an assignment's place are as written.
+(define-function ks-quoted-chain? (ast)
+  (while (ks-chain? ast) (set ast (cadr ast)))
+  (and (pair? ast) (= (car ast) 'stream-ref)))
+(define ks-read-chain-keys)	; defined below: the two read each other
+(define-function ks-read-chains-in (ast in-fn)
+  (cond ((not (pair? ast)) ast)
+	((= (car ast) 'lag) ast)
+	((= (car ast) 'fn) `(fn ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b 't)) (cddr ast))))
+	((and in-fn (or (ks-chain? ast) (= (car ast) 'stream-ref)) (ks-quoted-chain? ast))
+	 `(chain-value ,(ks-read-chain-keys ast in-fn)))
+	((ks-chain? ast) (ks-read-chain-keys ast in-fn))
+	((or (= (car ast) 'assign) (= (car ast) 'assign-add) (= (car ast) 'assign-sub))
+	 `(,(car ast) ,(cadr ast) ,@(map (lambda (b) (ks-read-chains-in b in-fn)) (cddr ast))))
+	(else (cons (car ast) (map (lambda (b) (ks-read-chains-in b in-fn)) (cdr ast))))))
+(define-function ks-read-chain-keys (ast in-fn)	; a chain's steps as they are, its root and index keys read
+  (cond ((or (not (pair? ast)) (= (car ast) 'stream-ref)) ast)	; its root, a name or @name, as written
+	((not (ks-chain? ast)) (ks-read-chains-in ast in-fn))
+	((= (car ast) 'field) `(field ,(ks-read-chain-keys (cadr ast) in-fn) ,(caddr ast)))
+	(else `(index ,(ks-read-chain-keys (cadr ast) in-fn) ,(ks-read-chains-in (caddr ast) in-fn)))))
+(define-function ks-read-chains (ast) (ks-read-chains-in ast ()))
+
 (define-function ks-stream-ast (s)
   (or (ks-attr s ':__ast__)
       (let ((code (ks-attr s ':__code__))
 	    (type (ks-attr s ':__type__)))
 	(when (and code (not (= type "setter")))
-	  (let ((ast (car (kscript-parse code))))
+	  (let ((ast (ks-read-chains (car (kscript-parse code)))))
 	    (ks-set-attr s ':__ast__ ast)
 	    ast)))))
 
-;; recv's field fname, recv a name the home holds: its stream, if it is one, is a dependency
-(define-function ks-collect-slot-dep (recv fname home acc)
-  (when (and (ks-object? home) fname (or (symbol? recv) (and (pair? recv) (= (car recv) 'stream-ref))))
-    (let ((robj (ks-val home (if (symbol? recv) recv (cadr recv)))))
-      (when (ks-object? robj)
-	(let ((fs (ks-slot robj fname)))
-	  (and (ks-stream? fs) (not (memq fs (car acc))) (set-car acc (cons fs (car acc)))))))))
 ;; an index's key as a field name: a string, or a name the home holds a string or symbol in; () if neither
 (define-function ks-index-key (idx home)
   (let ((k (cond ((string? idx) idx)
-		 ((and (ks-object? home) (symbol? idx)) (ks-val home idx))
-		 ((and (ks-object? home) (pair? idx) (= (car idx) 'stream-ref)) (ks-val home (cadr idx))))))
+		 ((symbol? idx) (ks-val home idx))
+		 ((and (pair? idx) (= (car idx) 'stream-ref)) (ks-val home (cadr idx))))))
     (cond ((symbol? k) k) ((string? k) (string->symbol k)))))
+;; the slot a chain down to a name or @name ends at, found as KSWorld's getE finds it (KSEventStream>>findForGet): the
+;; root's value, then each key's slot in the value before it.  () if the chain has another root or ends nowhere
+(define-function ks-chain-end (ast home)
+  (cond ((symbol? ast) (ks-slot home ast))
+	((and (pair? ast) (= (car ast) 'stream-ref)) (ks-slot home (cadr ast)))
+	((ks-chain? ast)
+	 (let ((at (ks-chain-end (cadr ast) home))
+	       (key (if (= (car ast) 'field) (caddr ast) (ks-index-key (caddr ast) home))))
+	   (let ((v (if (ks-stream? at) (ks-stream-curr at) at)))
+	     (and key (ks-object? v) (ks-slot v key)))))))
+(define-function ks-add-dep (s acc) (and (ks-stream? s) (not (memq s (car acc))) (set-car acc (cons s (car acc)))))
+(define ks-collect-deps)	; defined below: a chain's dependencies and the rest read each other
+;; a chain's dependencies, as KSQuoteTranslator>>quotedVar makes them: its root, any stream an index's key names, and,
+;; through the getE it makes for the rest, the stream the chain ends at
+(define-function ks-collect-chain-deps (ast home acc triggers?)
+  (let ((cur ast))
+    (while (ks-chain? cur)
+      (and (= (car cur) 'index) (ks-collect-deps (caddr cur) home acc triggers?))
+      (set cur (cadr cur)))
+    (ks-collect-deps cur home acc triggers?))
+  (and (ks-object? home) (ks-add-dep (ks-chain-end ast home) acc)))
 
 ;; Collect synchronous stream dependencies of AST; lag (') and delayE break cycles (section 3.2).
 (define-function ks-collect-deps (ast home acc triggers?)
@@ -836,13 +877,7 @@
 	  (when (ks-object? home)
 	    (let ((s (ks-slot home (cadr ast))))
 	      (and (ks-stream? s) (not (memq s (car acc))) (set-car acc (cons s (car acc)))))))
-	 ((= op 'field)
-	  (ks-collect-deps (cadr ast) home acc triggers?)
-	  (ks-collect-slot-dep (cadr ast) (caddr ast) home acc))
-	 ((= op 'index)	; recv[key] is recv's field key, a key the home holds (deviation-demo's @cellName) as well
-	  (ks-collect-deps (cadr ast) home acc triggers?)
-	  (ks-collect-deps (caddr ast) home acc triggers?)
-	  (ks-collect-slot-dep (cadr ast) (ks-index-key (caddr ast) home) home acc))
+	 ((ks-chain? ast) (ks-collect-chain-deps ast home acc triggers?))	; deviation-demo's @tableHandler[@cellName]
 	 ((and (= op 'call) (or (= (cadr ast) 'anyE) (= (cadr ast) 'switchColE)))
 	  (let ((col-exp (caddr ast)) (sname-exp (cadddr ast)))
 	    (ks-collect-deps col-exp home acc triggers?)
