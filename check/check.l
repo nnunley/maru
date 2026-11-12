@@ -743,6 +743,14 @@
 		      "b8 2a 00 00 00 01 ca 53 8b 7c b5 08 cd 80 81 c4 e8 03 00 00 e8 e7 ff ff ff c3 8b 45 00 8b 7c b5 00 ")))
 
 (check "ir2"        (unit-assert (equal (last (run "ir2" (ir2-build "ir2" "check/ir2.k"))) "ir2 ok")))
+;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
+(check "ir2_objects"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "(define-function main "))
+					    (contents-of-file-named "check/native/objects.k")
+					    (contents-of-file-named "check/objects.k"))
+			    (concat-strings tmp "/objects.k"))
+    (unit-assert (equal (last (run "objects" (ir2-build "objects" (concat-strings tmp "/objects.k")))) "objects ok"))))
 (check "zero_global" (unit-assert (equal (last (run "zero_global" (ir2-build "zero-global" "check/zero-global.k"))) "zero global ok")))
 
 ;; Upstream's own ir2 conformance test: one "... ok" line per section.

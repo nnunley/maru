@@ -1,0 +1,34 @@
+;;; check/native/objects.k through the C back end (doc/ir2-objects.md): check.l puts maru-gc.k, less its main, and
+;;; objects.k ahead of this main, which asserts what check/native.l asserts natively.  Prints "objects ok".
+
+(define-form expect (what test)
+  `(unless ,test
+     (printf "FAIL %s\n" ,what)
+     (exit 1)))
+
+(define-function main int ((argc int) (argv char * *))
+  (gc_initialise)
+  (let (((buffer oop) (cast (malloc (cast (* 4 (sizeof long)) long)) oop)))
+    (set (<pair>-head buffer) (cast 11 oop))
+    (set (<pair>-tail buffer) (cast 22 oop))
+    (pair-swap buffer)
+    (expect "pair fields swap" (and (= (cast (<pair>-head buffer) long) 22) (= (cast (<pair>-tail buffer) long) 11)))
+    (expect "long bits" (= (long-bits buffer) 22)))
+  (let (((p oop) (make-pair (cast 5 oop) (cast 7 oop))))
+    (expect "a new pair's type id, in the word before it" (= (indir (cast p long *) -1) 19))
+    (expect "a new pair's fields" (and (= (cast (<pair>-head p) long) 5) (= (cast (<pair>-tail p) long) 7)))
+    (expect "a boxed long" (= (box 42) 42))
+    (let (((l oop) (make-late)))
+      (expect "a type declared after its use" (and (= (indir (cast l long *) -1) 20) (= (<late>-x l) 99)))
+      (expect "object-type of nil, an odd word, a pair"
+	      (and (= (type-of-arg (cast 0 oop)) 0) (= (type-of-arg (cast 7 oop)) 3) (= (type-of-arg p) 19)))
+      (expect "object-is <pair> of a pair and of nil" (and (= (is-pair p) 1) (= (is-pair (cast 0 oop)) 0)))
+      (expect "object-type's operand, evaluated once" (= (once) 1))
+      (expect "get of a pair" (= (cast (checked-head p) long) 5))
+      (checked-put p (cast 9 oop))
+      (expect "put on a pair" (= (cast (<pair>-tail p) long) 9))
+      (expect "nothing failed yet" (= (failure) 0))
+      (checked-head l)
+      (expect "get of a <late>: type_check_fail, expected 19, got 20" (= (failure) 1920))))
+  (printf "objects ok\n")
+  (return 0))
