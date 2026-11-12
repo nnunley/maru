@@ -10,3 +10,13 @@ Expr.my-if=(c a b)
 Expr=(n x)
 15
 x
+1
+1
+2
+2
+()
+42
+Expr.set-foo=(a b)
+3
+(<...all the globals...>)
+(*global-namespace* <...all the globals...>)

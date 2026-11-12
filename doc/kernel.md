@@ -6,7 +6,8 @@ oecm (TR-2011-002) §5.1, which keeps the grounded part minimal (dispatch from t
 and colaswp (RN-2006-001-a) §6.1, which reimplements the static layer one level up. eval, eval2 and eval3 stay as
 the oracles.
 
-`kernel.k` loads the sections in eval3's order, after maru-gc.k less its main. Only the objects are written so far.
+`kernel.k` loads the sections in eval3's order, after maru-gc.k less its main: objects, lists and the printer, the
+reader, and eval and apply. The primitives, main and the REPL come next (the plan's Tasks 5 and 6).
 
 ## Objects (`kernel-objects.k`)
 
@@ -91,9 +92,12 @@ the oracles.
   leave the sentinel).
 - **The printer writes to stdout only**, with `printf`, and doesn't flush: eval3 flushes stdout after each print, but
   the kernel can't name stdout yet, and `fflush(NULL)` would also move a stream another process shares (eval2's own
-  reading of a check, which a native check's child inherits). Flushing comes with the kernel's main (Task 6). eval3's `fprint` to another stream, its globals' special
-  cases (`<the global environment>`) and `%type-names` for a boot-declared type come with the globals (Task 4); until
-  then such a type prints `<type=N>`. `<data[N]>` prints the collector's size (a whole number of words) until
+  reading of a check, which a native check's child inherits). Flushing comes with the kernel's main (Task 6). eval3's `fprint` to another stream comes with it, and
+  `%type-names` for a boot-declared type with boot2.l (Task 6); until then such a type prints `<type=N>`. The globals
+  print as eval3 prints them: the binding of `*globals*` as `<the global environment>`, the global namespace met in a
+  list as `<...all the globals...>`, and the binding met as a list's tail as `<the global association>`. eval3's
+  `<loop>` marker for a structure met while it is being printed isn't there: it keeps a count in each object's header,
+  which maru-gc.k's header lacks. `<data[N]>` prints the collector's size (a whole number of words) until
   kernel-gc.k keeps the length asked for.
 - **An empty `[]` or `{}` reads as `(bracket)` or `(brace)`.** eval3 crashes on them: `newPairFrom` reads the source
   of nil. The kernel's source of nil is nil, the Null Object choice.
@@ -110,9 +114,11 @@ the oracles.
 
 ## Checks
 
-- `kernel_native` (`check/kernel.l`, on eval2): each unit in `check/kernel/` is compiled natively after maru-gc.k
-  and kernel.k, and its main runs in a child, once with integers boxed and once tagged.
-- `kernel_c` (`check/check.l`): the same units through ir-gen-c.k and the C compiler, in both modes.
+- `kernel_native` (`check/kernel.l`, on eval2): the units in `check/kernel/` are compiled natively into one image a
+  mode, after maru-gc.k and kernel.k, each unit's main renamed, and each main runs in a child, once with integers
+  boxed and once tagged.
+- `kernel_c` (`check/check.l`): each unit through ir-gen-c.k and the C compiler, in both modes. It isn't built
+  under ASan (`law_objects` is), so an overrun shows only when it changes what a unit prints.
 - `check/kernel/longs.k` asserts round trips through `k_newLong` and `k_getLong` at 0, ±1, ±42, 2^62 − 1, 2^62,
   −2^62, −2^62 − 1, INT64_MAX and INT64_MIN. Each is a `<long>` and an `isLong`, and it is an odd word just when the
   kernel is tagged and the value fits. A symbol isn't an `isLong`. `boxed?` is false for nil and an odd word, true for
@@ -127,8 +133,11 @@ the oracles.
 - `check/kernel/eval.k` reads `check/kernel/eval.txt`, expands and evaluates each expression in the global namespace
   and dumps its value, on the poisoning collector with a collection on every allocation. The drivers compare the
   lines with `check/kernel/eval.expected`, what `./eval3 -b boot2.l` prints for the same expressions: a closure kept
-  past its caller, recursion 1,000 deep, a `<form>` expanding both ways, `let` and `set`, an `*applicators*` entry
-  applying a `<long>`, and `quote`. Its subrs and fsubrs (`+`, `-`, `<`, `cons`, `car`, `form`, `set-array-at`,
+  past its caller, recursion 1,000 deep, a `<form>` whose condition is true and one whose condition is false, `let`
+  and `set`, an `*applicators*` entry applying a `<long>`, `quote`, a global redefined (the global cache answers the
+  new value), a symbol `<form>`, and `(set (foo 1) 2)` rewritten to `(set-foo 1 2)`. Then it prints the global
+  namespace and its head binding, compared with what `./eval3` prints with an empty boot file, since boot2.l rebinds
+  `*globals*`. `k_encode` isn't run: eval3 runs it only with `-g`, which comes with main (Task 6). Its subrs and fsubrs (`+`, `-`, `<`, `cons`, `car`, `form`, `set-array-at`,
   `quote`, `lambda`, `if`, `set`, `let`, `define`) are minimal stand-ins for Task 5's, each called through its `imp`,
   natively too. maru-gc.k's "N collections" progress lines are left out of the comparison until kernel-gc.k replaces
   it.

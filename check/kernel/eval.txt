@@ -10,3 +10,11 @@
 (set-array-at *applicators* 2 (lambda (n x) (+ n x)))
 (5 10)
 (car (quote (x y)))
+(define x 1)
+x
+(define x 2)
+x
+(define answer (form () (lambda (s) 42)))
+answer
+(define set-foo (lambda (a b) (+ a b)))
+(set (foo 1) 2)

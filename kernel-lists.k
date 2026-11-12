@@ -67,9 +67,15 @@
 		   `(if (= ,t ,(car clause)) (let () ,@(cdr clause)) ,@(and chain (list chain))))))
     chain))
 
+;; the binding of *globals* (kernel-eval.k makes it): the printer names it, and the global namespace, rather than print
+;; them, as eval3's doprint does (eval3.c:891, 948-953)
+(define (k_globals oop) 0)
+
 (define-function k_doprint void ((obj oop) (storing long))
   (if (= obj nil)
       (printf "()")
+    (if (= obj k_globals)
+	(printf "<the global environment>")
     (type-case (object-type obj)
       (0 (printf "UNDEFINED"))
       ;; Data's length is the collector's size until kernel-gc.k keeps the length asked for (doc/kernel.md)
@@ -94,7 +100,7 @@
 	  (if (isatty 1) (printf "\033[m") (printf ">")))
       (12 (if (<subr>-name obj) (printf "%ls" (<subr>-name obj)) (printf "Subr<%p>" (<subr>-imp obj))))
       ;; a type boot declared: eval3 names it from %type-names, which comes with the globals (Task 4)
-      (else (printf "<type=%d>" (cast (object-type obj) int))))))
+      (else (printf "<type=%d>" (cast (object-type obj) int)))))))
 
 ;; a string's characters; stored, in quotes with " and \ escaped and a control character in octal (eval3.c:917)
 (define-function k_printString void ((p int32 *) (storing long))
@@ -112,15 +118,21 @@
 	(set p (+ p (sizeof int32))))
       (printf "\""))))
 
-;; a list; an element that is a binding whose tail is the list itself, as a global's association, prints as <name>
+;; a list; an element that is a binding whose tail is the list itself, as a namespace's head, prints as <name>; the
+;; global namespace, met as a tail, prints as <...all the globals...>, and the binding of *globals* as <the global
+;; association>, each ending the list (eval3.c:948-953)
 (define-function k_printList void ((head oop) (storing long))
   (printf "(")
   (let (((more long) 1))
     (while more
-      (let (((h oop) (<pair>-head head)))
-	(if (and (object-is <pair> h) (object-is <symbol> (<pair>-head h)) (= head (<pair>-tail h)))
-	    (printf "<%ls>" (<symbol>-bits (<pair>-head h)))
-	  (k_doprint h storing)))
+      (if (= head (k_cdr k_globals))
+	  (let () (printf "<...all the globals...>") (set head nil))
+	(if (= head k_globals)
+	    (let () (printf "<the global association>") (set head nil))
+	  (let (((h oop) (<pair>-head head)))
+	    (if (and (object-is <pair> h) (object-is <symbol> (<pair>-head h)) (= head (<pair>-tail h)))
+		(printf "<%ls>" (<symbol>-bits (<pair>-head h)))
+	      (k_doprint h storing)))))
       (set head (k_cdr head))
       (if (object-is <pair> head) (printf " ") (set more 0))))
   (if (!= head nil) (let () (printf " . ") (k_doprint head storing)))

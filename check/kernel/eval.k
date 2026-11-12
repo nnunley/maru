@@ -121,5 +121,9 @@
 	(k_dumpln obj)
 	(set obj (k_readExpr fp)))
       (k_endSource)))
+  ;; the printer's globals, as ./eval3 prints them with an empty boot file (boot2.l rebinds *globals*): the global
+  ;; namespace, and its head binding, whose tail is the namespace
+  (k_dumpln (<pair>-tail k_globals))
+  (k_dumpln (k_car (<pair>-tail k_globals)))
   (printf "kernel eval ok\n")
   (return 0))

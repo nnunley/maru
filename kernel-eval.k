@@ -5,7 +5,6 @@
 ;;; hooks stay commented out, as in eval3: an unknown type cannot be evaluated.
 
 (define (k_globalNamespace	oop)	0)
-(define (k_globals		oop)	0)	; the bindings of *globals* … *output*, each (name . value)
 (define (k_expanders		oop)	0)
 (define (k_encoders		oop)	0)
 (define (k_evaluators		oop)	0)
@@ -428,6 +427,7 @@
   (gc_push_root (cast (addressof k_globalNamespace) void *))
   (set k_globalNamespace (k_cons (k_internC "*global-namespace*") nil))
   (set (<pair>-tail k_globalNamespace) (k_cons k_globalNamespace nil))
+  (set k_globalNamespace (<pair>-tail k_globalNamespace))	; the inner cell, as eval3's setTail answers it (eval3.c:3537)
   (gc_push_root (cast (addressof k_globals) void *))	(set k_globals	(k_define k_globalNamespace (k_internC "*globals*") k_globalNamespace))
   (gc_push_root (cast (addressof k_expanders) void *))	(set k_expanders	(k_define k_globalNamespace (k_internC "*expanders*") nil))
   (gc_push_root (cast (addressof k_encoders) void *))	(set k_encoders	(k_define k_globalNamespace (k_internC "*encoders*") nil))
