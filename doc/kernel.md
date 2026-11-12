@@ -102,6 +102,9 @@ the oracles.
   - **The bite** (`fixtures/objects-unwritten.law`): over the same programs, "nothing reads S" is refuted, so the
     sentinel does show where a program reads what nothing wrote.
   - **Limits.** ASan sees nil and wild accesses and overruns past a heap block. It can't see an overrun inside the
-    collector's own blocks; there the model's distinct values are what catch a wrong field. The law runs through C
-    only: the native back end shares `ir-object-lower` with it, and Task 6 runs the REPL natively on the poisoning
-    collector.
+    collector's own blocks; there the model's distinct values are what catch a wrong field.
+- `law_objects_native`: the same law in both modes natively. law.l runs on eval2, `check/laws/objects-native.l`
+  compiles the driver once with native.l, and each program runs in a forked child with the program on its stdin
+  (`native-run-main-status`, check/native-run.l). Making it found a bare `(return)` in the driver that only C
+  accepted. It is slow: the driver's generated dispatch takes about 60 s to compile natively, beyond the kernel's 30,
+  as native compile time grows faster than a function's size. So check-quick leaves it out.

@@ -802,6 +802,24 @@
 	(unit-assert (= 256 (run-cpu-status 300 (concat-strings "exec </dev/null >" bite " 2>&1; exec " env
 								 " check/law.l check/laws/objects-model.l check/laws/fixtures/objects-unwritten.law"))))
 	(unit-assert (starts (car (lines (contents-of-file-named bite))) "law unwritten: REFUTED p="))))))
+;; the same law natively, in both modes: law.l on eval2 compiles the driver once with native.l (check/laws/objects-native.l)
+;; and runs each program in a forked child, so the native back end's objects are held to the model too.  Slow (the
+;; driver's dispatch compiles natively in about 90 s), so check-quick leaves it out
+(check "law_objects_native"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do mode kernel-modes
+      (let* ((name (concat-strings "objects-native-" (cdr mode)))
+	     (unit (kernel-c-unit gc name "check/objects-run.k" (car mode)))
+	     (dir  (concat-strings tmp "/" name))
+	     (env  (concat-strings "env OBJECTS_LAW_UNIT=" unit " OBJECTS_LAW_TMP=" dir
+				   " OBJECTS_LAW_TAGGED=" (if (equal (cdr mode) "tagged") "1" "0") " ./eval2")))
+	(run (concat-strings name "-dir") (concat-strings "mkdir -p " dir))
+	(let ((out (law-file-holds (concat-strings "law_objects_native_" (cdr mode)) env
+				   "check/laws/objects-model.l check/laws/objects-native.l" "check/laws/objects.law")))
+	  (unit-assert out)
+	  (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
+				  (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (")
+				       (equal (cadr ls) "law initialised: PROVED 33"))))))))))
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
     (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"
