@@ -92,6 +92,42 @@ align on eval3.c). Grounding: oecm §5.1 (the grounded part is minimal: dispatch
   Expected: all pass.
 - [ ] **Step 5: Commit** with the message "kernel: eval3's types as objects, on maru-gc.k".
 
+### Task 1b: A law over object access, with a poisoning allocator
+
+The user (2026-11-12): test access patterns with laws, so nothing reads uninitialised memory. The precedent is
+`check/laws/gc-programs.law` and `gc-model.law`: generated programs, given a meaning on a Maru model and on real
+objects.
+
+**Files:**
+- Create `check/laws/objects.law`, `check/laws/objects-model.l` and `check/objects-run.k`. The last is a typed driver
+  that runs a generated program's operations through the object level.
+- Modify `maru-gc.k`: a constant `gc_poison`. When it is set, `gc_malloc` fills a new body with a sentinel word
+  instead of zeroes; atoms are filled too. It is set only in the law's builds and Task 6's poisoned run.
+- Modify `check/check.l`: add `law_objects`.
+
+**Interfaces:**
+- Programs are sequences of these operations, over the kernel's 13 types and a few user types:
+  - `new(T)`;
+  - `set(slot, T, field, v)`, `get(slot, T, field)`, `put(...)`;
+  - `type_of(slot)`;
+  - a `get`/`put` naming the wrong type, with a `type_check_fail` that records and returns;
+  - `collect`.
+- **The model** (Maru) keeps each object's type and, for each field, written-or-unwritten and its value.
+- **The claims:**
+  - every compiled read equals the model's;
+  - a read of an unwritten field is never made by the program under test: the sentinel never appears in a result;
+  - a wrong-type access leaves the model unchanged and answers 0;
+  - the C build under `-fsanitize=address` (as `png_asan`) exits 0, which catches reads and writes past an object
+    or through nil.
+- Generated programs follow doc/laws.md's guidance: rules bounded by size, generating rather than filtering,
+  deterministic shrinking within the domain, and `classify` over the operation mix.
+
+- [ ] **Step 1: Write the law and the model.** Run `make check CHECKS="law_objects"`. Expected: FAIL (no driver yet).
+- [ ] **Step 2: Implement the driver and `gc_poison`.**
+- [ ] **Step 3: Run it and see it pass.** Expected: `law objects:` `TESTED n` with each class share. Also prove the law
+  bites: a fixture that reads a field before writing it is `REFUTED` with a shrunk case.
+- [ ] **Step 4: Commit** with the message "kernel: a law over object access, on a poisoning collector".
+
 ### Task 2: Lists, arrays, the printer
 
 **Files:** Create `kernel-lists.k` and `check/kernel/lists.k`, with a check entry.
@@ -196,7 +232,8 @@ align on eval3.c). Grounding: oecm §5.1 (the grounded part is minimal: dispatch
   with two built-in declarations swapped makes the kernel stop, naming the type.
 - [ ] **Step 2: Run it and see it fail.**
 - [ ] **Step 3: Implement.** Debug boot2.l's load against `./eval3` by form: the first form whose value differs.
-- [ ] **Step 4: Run it and see it pass.** Run `make check CHECKS="kernel_repl kernel_repl_c eval3"`.
+- [ ] **Step 4: Run it and see it pass.** Run `make check CHECKS="kernel_repl kernel_repl_c eval3"`. Also run `kernel_repl` once on the poisoning collector (`gc_poison`): the same output, so the kernel
+  reads no field it hasn't written.
 - [ ] **Step 5: Write doc/kernel.md**: the sections, each one's eval3.c lines, the departures (word size, anything
   measured, the `*evaluators*` decision), the checks, and the measured primitive list.
 - [ ] **Step 6: Run the full suite** with `caffeinate -i make check`, then add the ledger entries. Commit with the
