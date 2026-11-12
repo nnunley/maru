@@ -5,6 +5,7 @@
 ;;; Registers itself with asm-table.l as the instruction set arm64.
 
 (require "text-parser.l")
+(require "asm-table.l")
 (load "arm64.g.l")
 
 (define-function arm64-array-from (s i)	(let ((a (array))) (for (j i (string-length s)) (array-append a (string-at s j))) a))
@@ -386,13 +387,18 @@
 ;;; any other list.  A kind that its test reads from the value takes every
 ;;; number, and a kind this does not know takes anything.
 
+;; A register's shape, by its name: one shape for each class and kind.
+(define arm64-register-shapes (identity-hash-table))
+(list-do r arm64-registers
+  (hash-at-put arm64-register-shapes (car r) (asm-intern-shape (list 'reg (cadr r) (cadddr r)))))
+
 (define-function arm64-shape (op)
   (cond ((or (long? op) (double? op) (arm64-reloc? op))	'num)
-	((symbol? op)				(let ((r (assq op arm64-registers)))
-						  (if r (list 'reg (cadr r) (cadddr r)) 'sym)))
+	((symbol? op)				(or (hash-at arm64-register-shapes op) 'sym))
 	((arm64-vector? op)			'vec)
-	((memq (car op) '(off pre post))	(list 'mem (car op) (arm64-shape (cadr op)) (arm64-shape (caddr op))))
-	(else					(list 'pair (car op)))))
+	((memq (car op) '(off pre post))	(asm-intern-shape (list 'mem (car op) (arm64-shape (cadr op))
+									(arm64-shape (caddr op)))))
+	(else					(asm-intern-shape (list 'pair (car op))))))
 
 (define-function arm64-accepts (k s)
   (let ((c (car k)))

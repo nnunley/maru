@@ -11,6 +11,7 @@
 ;;; are not encoded.
 
 (require "text-parser.l")
+(require "asm-table.l")
 (load "x86.g.l")
 
 (define-function x86-nth (l i)	(while (< 0 i) (set l (cdr l)) (set i (- i 1))) (car l))
@@ -482,7 +483,7 @@
 
 (define-function x86-shape (op)
   (cond ((or (long? op) (x86-reloc? op))	'num)
-	((x86-mem? op)				(list (car op)))
+	((x86-mem? op)				(asm-intern-shape (list (car op))))
 	((symbol? op)				op)
 	(else					())))
 
