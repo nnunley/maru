@@ -13,9 +13,13 @@ have no word before the object.
 | `(define-object <pair> 19 ((head oop) (tail oop)))` | An object type: its id (evaluated when the form is read) and its fields. Add `atom` last when the collector traces none of them. |
 | `oop` | The type of a reference to a Maru object. |
 | `(new <pair>)` | A new `<pair>`: its id in the word before it, from the unit's `gc_malloc` (`gc_malloc_atomic` for an atom). |
+| `(new <_array> bytes)` | The same, `bytes` longer than its fields: a variable-sized object, as eval3's `_newOops`. |
 | `(<pair>-head x)`, `(set (<pair>-head x) v)` | A field, unchecked at run time, as eval.l's raw accessors. `x` must still be an object statically (an `oop`, a `void *` or 0), or it is refused. |
 | `(get <pair> head x)`, `(put <pair> head x v)` | A field, once `x`'s type is checked, as eval.l's `get` and `put` check it. On a mismatch they call the unit's `type_check_fail` with the expected and the actual id. The access runs only when the type is right. On a mismatch, should `type_check_fail` return (a handler that recovers, where eval.l's `fatal2` exits), `get` answers 0 of the field's type and `put` writes nothing, so neither touches the wrong object or follows nil. A struct-valued field is refused by both. Like `object-type`, they need `<undefined>` and `<long>` declared. |
+| `(get <long> bits x)` of an odd word | Its value, `x >> 1`: an odd word is a tagged `<long>` (eval.l's and eval3's `TAG_INT`), with no body to read. `put` to one calls `type_check_fail`, as there is no field to write. |
+| `nil` | The object level's constant, `<undefined>`'s object, of type `oop`. Natively and through C it is the zero word (nil as a Null Object, option A); a back end without addresses lowers it to a singleton instead (colaswp §4.2's `vtblnil`), which a `(cast 0 oop)` couldn't be told apart from the number 0 for. Typed code writes `nil`, never the cast. |
 | `(object-type x)` | `<undefined>`'s id for nil, `<long>`'s for an odd word, otherwise the id in the word before the object. The unit must declare `<undefined>` and `<long>`. |
+| `(boxed? x)` | Whether `x` has a body: neither nil nor an odd word (a tagged `<long>`), as colaswp's `bind` sets nil and a tagged integer apart before it reads the word before an object. Its operand is evaluated once. |
 | `(object-is <pair> x)` | Whether `x`'s type is `<pair>`, as ir2's boolean. |
 
 ## How it is generated
@@ -63,6 +67,10 @@ back end is the case in mind.
   - a new pair's id in the word before it, and its fields;
   - a boxed long;
   - a type declared after its use;
+  - a variable-sized object's id and last word;
+  - `nil`: the zero word, `<undefined>`'s type, equal to a zero word and to nothing else;
+  - `get` of an odd word's bits answering its value, `put` to one failing its type check, and `boxed?` of nil, an odd
+    word and a pair;
   - `object-type` of nil, an odd word and a pair;
   - `object-is`;
   - `object-type`'s operand evaluated once;
