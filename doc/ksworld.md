@@ -18,7 +18,9 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   collection, true as a test, never nil. KScript compiles to Smalltalk, and a chain reads as KSWorld's compiler reads it.
   `a[k]` and `a.k` are `KSCompiler>>get`'s `ksAt:`, the slot itself, so a stream answers as itself. A chain down to
   `@name` is a `quotedVar` (`KSQuoteTranslator`): in a stream's own expression, a reference to the stream it ends at, with
-  its root, an index's key and that stream as dependencies; in a function's body or a method, the value it ends at
+  its root, an index's key and that stream as dependencies. It ends where `KSNewEventStream>>findForGet:` does: the root's
+  value, then `ksAt:` each key, a slot not unwrapped, so a key after the first is the stream's own or its home object's
+  (`@a.b.c` ends at `c` on the object holding `b`); in a function's body or a method, the value it ends at
   (`ks-read-chains`, as each stream's code and each KScript method is read). Truth is Maru's: true is `t`, false and nil
   are one value, `()`, as test-pepsi.l has them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
