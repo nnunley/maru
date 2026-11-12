@@ -22,7 +22,10 @@ PEG and tpeg grammars, left recursion, composition, typed tree matching and gram
   parent is `<source-parser>` matches any source through the input selectors (`input.l`, `source-parser.l`): lists,
   a user's type, bytes (`input-binary.l`; not on `eval2`, which says it skipped them). A pattern enters a list or an array, a rule's
   arguments are cells on its input and leaving one unread is an error, memos live on the stream's cells, and a foreign
-  rule reads through proxy cells with fresh memos. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
+  rule reads through proxy cells with fresh memos. A value entered twice reuses its stream, found in a hash table (a
+  string by its text, anything else by identity, as Maru's `=`), so `tree_memo` asserts that entering four times the
+  values takes less than eight times as long; a list of every value entered made it quadratic, and native-arm64.g's
+  lowering of a 4,600-intent function took 24 s, not 3. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
   interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.
 - `grammar_reflect` (`check/grammar-reflect.l`, plan `doc/plans/2026-11-09-grammar-engine.md`): a tpeg grammar keeps its
   definition (`grammar.l`): `(grammar-of type)` is its `<grammar>` (name, type, own fields, rules), each rule a

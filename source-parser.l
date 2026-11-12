@@ -2,18 +2,20 @@
 ;;; --on source generates for it. Its position is a stream cell, so value-pe's save and restore of
 ;;; self.position carry over. Text stays on <text-parser> (text-parser.l), which doesn't load this.
 (require "input.l")
+(require "hash.l")
 (require "text-parser.l")	; <memo>, put, get and the states memos use, as text does; peg-enable-* apply here too
 
 (define-structure <source-parser> (source position result foreign streams))
 
-;; the stream of a value, kept on this parser: a value entered twice reuses its stream, and so its memos
+;; the stream of a value, kept on this parser: a value entered twice reuses its stream, and so its memos.  The streams
+;; are a hash table, the same as Maru's = (a string by its text, anything else by identity), so finding one takes no
+;; longer however many the parser has entered (a list searched them all: a long function's lowering was quadratic)
+(define-function source-parser-stream-hash (value) (if (string? value) (equal-hash value) (hash-identity value)))
 (define-function source-parser-stream-of (self value)
-  (let ((hit (assq value (<source-parser>-streams self))))
-    (if hit
-	(cdr hit)
-      (let ((c (stream-of value)))
-	(set (<source-parser>-streams self) (cons (cons value c) (<source-parser>-streams self)))
-	c))))
+  (let ((streams (or (<source-parser>-streams self)
+		     (set (<source-parser>-streams self) (make-hash-table source-parser-stream-hash =)))))
+    (or (hash-at streams value)
+	(hash-at-put streams value (stream-of value)))))
 
 (define-function source-parser-for (class source)
   (let ((p (new class source () () () ())))

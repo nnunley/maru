@@ -7,3 +7,5 @@ counted = -> (set self.count (+ 1 (or self.count 0))) `( 'x ) ;
 twice = &counted counted ;
 same = `( counted2 ) `( counted2 ) ;
 counted2 = -> (set self.count (+ 1 (or self.count 0))) 'x ;
+# each element of a list entered as a value of its own
+entered = (`( 'x ))*:l !. -> (list-length l) ;
