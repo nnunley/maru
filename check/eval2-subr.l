@@ -13,6 +13,8 @@
 (expect ((subr "powf" "ff>f") 2.0 3.0) 8.0)
 (expect ((subr "abs" "i") -3) 3)			; no return type: an integer, as before
 (expect ((subr "snprintf" "pls.>i") 0 0 "%d-%d" 12 345) 6)	; variadic, then a return type
+;; a void function's result is nil, whatever its return register held
+(expect ((subr "srand" "i>v") 7) ())
 ;; a char * result is a string, copied, and NULL is nil
 (expect ((subr "getenv" "s>s") "MARU_SUBR_STRING") "returned")
 (expect ((subr "getenv" "s>s") "MARU_SUBR_NO_SUCH_VARIABLE") ())

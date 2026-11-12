@@ -8,7 +8,7 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   cases, and `dlextern` (`check/dlextern.l`, as `libsdl2.k` uses it) calls libc
   through `subr` in `eval3` and `eval2` alike.
 - `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
-  by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil), variadic
+  by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil; `>v` calls a void function, its result nil), variadic
   calls and raw byte access. On `eval` a function `subr` made by name survives a saved image: it keeps a copy of its name and
   its signature's text, which the image holds and loading reads again.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,

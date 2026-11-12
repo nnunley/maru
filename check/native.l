@@ -171,7 +171,7 @@
       (buffer ((subr "calloc" "ll>p") 4 8)))
   (set-byte-at buffer 0 11)
   (set-byte-at buffer 8 22)
-  ((fn image 'pair-swap "p>l") buffer)
+  ((fn image 'pair-swap "p>v") buffer)
   (expect "pair fields swap" (list (byte-at buffer 0) (byte-at buffer 8)) '(22 11))
   (expect "long bits" ((fn image 'long-bits "p>l") buffer) 22))
 (refuses "a field the object type doesn't have" (lambda () (native-compile-file "check/native/objects-bad-field.k"))

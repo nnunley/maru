@@ -1785,6 +1785,7 @@ static oop ffcall(oop subr, oop arguments)
 	case 'i':
 	case 'j':	return newLong((long)(int)result.i);
 	case 's':	return result.i ? newString(mbs2wcs((char *)(intptr_t)result.i)) : nil;
+	case 'v':	return nil;
     }
     return newLong((long)result.i);
 }
@@ -2876,6 +2877,7 @@ static subr(subr)
 				    case 'l':	sig->ret_type= &ffi_type_slong;		break;
 				    case 'p':	sig->ret_type= &ffi_type_pointer;	break;
 				    case 's':	sig->ret_type= &ffi_type_pointer;	break;	/* a char *, copied to a String; NULL is nil */
+				    case 'v':	sig->ret_type= &ffi_type_void;		break;	/* nothing: the result is nil */
 				    default:	fatal("illegal return type specification: %s", get(arg, String,bits));
 				}
 				if (spec[1]) fatal("characters after the return type in: %s", get(arg, String,bits));
