@@ -30,3 +30,27 @@
     (return l)))
 
 (define-object <late> 20 ((x long)))
+
+;; object-type: nil is <undefined>, an odd word is <long>, anything else the id in the word before it
+(define-object <undefined> 0 ())
+
+(define-function type-of-arg long ((x oop)) (return (object-type x)))
+(define-function is-pair int ((x oop)) (return (object-is <pair> x)))
+
+;; the operand is evaluated once
+(define (calls long) 0)
+(define-function next oop () (set calls (+ calls 1)) (return (make-pair (cast 0 oop) (cast 0 oop))))
+(define-function once long ()
+  (let (((t long) (object-type (next))))
+    (return (+ calls (* 0 t)))))
+
+;; get and put check the object's type first, as eval.l's do, calling the unit's type_check_fail when it isn't
+(define (failed-expected long) 0)
+(define (failed-actual long) 0)
+(define-function type_check_fail void ((expected long) (actual long))
+  (set failed-expected expected)
+  (set failed-actual actual))
+
+(define-function checked-head oop ((p oop)) (return (get <pair> head p)))
+(define-function checked-put long ((p oop) (v oop)) (put <pair> tail p v) (return 0))
+(define-function failure long () (return (+ (* 100 failed-expected) failed-actual)))

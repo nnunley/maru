@@ -162,6 +162,28 @@
 	(ir-object-new type)
       (maru-compile-operator (cons 'new (cdr exp)) ir))))
 
+;; the ids object-type needs: <undefined>'s and <long>'s, declared in the unit
+(define-function maru-object-type-ids (exp ir)
+  (let ((u (cdr (assq '<undefined> (<ir>-struct-types ir))))
+	(l (cdr (assq '<long> (<ir>-struct-types ir)))))
+    (or (and u l (ir-object-type? u) (ir-object-type? l))
+	(maru-error exp "object-type needs <undefined> and <long> declared: "exp))
+    (list (<ir-object-type>-id u) (<ir-object-type>-id l))))
+
+(define-function maru-compile-object-type (exp ir)
+  (ir-object-type-of (maru-object-type-ids exp ir) (maru-compile (cadr exp) ir)))
+
+(define-function maru-compile-object-is (exp ir)	; (object-is <name> x)
+  (ir-eq (list (maru-compile-object-type (list 'object-type (caddr exp)) ir)
+	       (ir-lit (<ir-object-type>-id (ir-object ir (cadr exp))) IR-LONG))))
+
+(define-function maru-compile-object-get (exp ir)	; (get <name> field x)
+  (ir-object-get (ir-object ir (cadr exp)) (caddr exp) (maru-object-type-ids exp ir) (maru-compile (cadddr exp) ir)))
+
+(define-function maru-compile-object-put (exp ir)	; (put <name> field x v)
+  (ir-object-put (ir-object ir (cadr exp)) (caddr exp) (maru-object-type-ids exp ir)
+		 (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir)))
+
 (define-function maru-compile-indir (exp ir)
   (ir-indir (maru-compile (cadr  exp) ir)
 	    (if (caddr  exp) (maru-compile (caddr  exp) ir) (ir-lit 0))))
@@ -198,6 +220,10 @@
     (member	. ,maru-compile-member)
     (set-member	. ,maru-compile-set-member)
     (object-new	. ,maru-compile-new)
+    (object-type	. ,maru-compile-object-type)
+    (object-is	. ,maru-compile-object-is)
+    (object-get	. ,maru-compile-object-get)
+    (object-put	. ,maru-compile-object-put)
     (object-slot	. ,maru-compile-object-slot)
     (set-object-slot	. ,maru-compile-set-object-slot)
     (indir	. ,maru-compile-indir)
@@ -313,13 +339,20 @@
     (ir-generate ir gen)
     ))
 
+;; In a unit, new, get and put are an object's (doc/ir2-objects.md): boot's new, and parser.l's get and put, would expand
+;; them first.  Bound in the unit's namespace alone, ahead of its parent's bindings; define would rebind the global ones.
+(define-function maru-unit-forms (ns)
+  (list-do name-to '((new . object-new) (get . object-get) (put . object-put))
+    (let ((to (cdr name-to)))
+      (set-cdr ns (cons (cons (car name-to) (form (lambda args (cons to args)))) (cdr ns))))))
+
 (define *compilation*)
 
 (define-form compile-begin ()
   '(let ()
      (set *compilation* (new-namespace '*compilation*))
      (set *globals* *compilation*)
-     (define-form new args (cons 'object-new args))))	; boot's new would expand it first
+     (maru-unit-forms *compilation*)))
 
 (define-form compile-end ()
   '(let ()

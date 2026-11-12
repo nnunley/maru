@@ -589,6 +589,53 @@
 													    (ir-lit (<ir-object-type>-id otype) IR-LONG))
 											      (ir-get-var '%new)))
 									   ir val?)))
+
+;; object-type: nil is <undefined>, an odd word <long>, anything else the id in the word before it; its parameters are
+;; the ids of <undefined> and <long>
+(define-class <ir-object-type-of> <ir-object-insn> ())	(define-function ir-object-type-of (ids value)
+							  (new <ir-object-type-of> ids (list value)))
+
+(define-method ir-check-type <ir-object-type-of> (ir val?)
+  (let ((x (lambda () (ir-get-var '%type-of))))	; an instruction once: checking a variable's binds it
+    (ir-object-lower self (ir-let '(%type-of) (list IR-OOP) (list (car self.operands))
+				  (list (ir-if (ir-eq (list (ir-cast IR-LONG (x)) (ir-lit 0 IR-LONG)))
+					       (ir-lit (car self.parameters) IR-LONG)
+					       (ir-if (ir-bitand (list (ir-cast IR-LONG (x)) (ir-lit 1 IR-LONG)))
+						      (ir-lit (cadr self.parameters) IR-LONG)
+						      (ir-indir (ir-cast (ir-pointer-to IR-LONG) (x)) (ir-lit -1))))))
+		     ir val?)))
+
+;; get and put: a field, once the object's type is checked as eval.l's get and put check it, calling the unit's
+;; type_check_fail with the expected and the actual id when it isn't the type's; parameters: the type, the field, and
+;; object-type's ids
+(define-function ir-object-checked (otype ids access)	; access: the field's instruction, given the object
+  (let ()
+    (ir-let '(%checked) (list IR-OOP) (list (car (<ir-insn>-operands access)))
+	    (list (ir-if (ir-ne (list (ir-object-type-of ids (ir-get-var '%checked)) (ir-lit (<ir-object-type>-id otype) IR-LONG)))
+			 (ir-call (ir-get-var 'type_check_fail)
+				  (list (ir-lit (<ir-object-type>-id otype) IR-LONG) (ir-object-type-of ids (ir-get-var '%checked))))
+			 (ir-nop))
+		  (let ()
+		    (set-car (<ir-insn>-operands access) (ir-get-var '%checked))
+		    access)))))
+
+(define-class <ir-object-get> <ir-object-insn> ())	(define-function ir-object-get (otype field ids value)
+							  (new <ir-object-get> (list otype field ids) (list value)))
+
+(define-method ir-check-type <ir-object-get> (ir val?)
+  (let ((otype (car self.parameters)))
+    (ir-object-lower self (ir-object-checked otype (caddr self.parameters)
+					     (ir-object-slot otype (cadr self.parameters) (car self.operands)))
+		     ir val?)))
+
+(define-class <ir-object-put> <ir-object-insn> ())	(define-function ir-object-put (otype field ids value init)
+							  (new <ir-object-put> (list otype field ids) (list value init)))
+
+(define-method ir-check-type <ir-object-put> (ir val?)
+  (let ((otype (car self.parameters)))
+    (ir-object-lower self (ir-object-checked otype (caddr self.parameters)
+					     (ir-set-object-slot otype (cadr self.parameters) (car self.operands) (cadr self.operands)))
+		     ir val?)))
 ;
 
 (define-class <ir-indir> <ir-insn> ())			(define-function ir-indir (base index)	(new <ir-indir> () (list base index)))
