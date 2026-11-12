@@ -775,6 +775,7 @@
       (let ((unit (lambda (u) (let ((name (concat-strings "kernel-" u "-" (cdr mode))))
 				(run name (ir2-build name (kernel-c-unit gc name (concat-strings "check/kernel/" u ".k") (car mode))))))))
 	(unit-assert (equal (unit "lists") kernel-lists-printed))
+	(unit-assert (equal (unit "reader") (concat-list (lines (contents-of-file-named "check/kernel/read.expected")) '("kernel reader ok"))))
 	(unit-assert (equal (last (unit "objects")) "kernel objects ok"))
 	(unit-assert (equal (last (unit "longs")) "kernel longs ok"))))))
 ;; the kernel's objects over generated programs (check/laws/objects.law), in both modes: check/objects-run.k after

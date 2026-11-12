@@ -19,6 +19,7 @@
 
 (define (strlen	  (long char *)			*)	(extern strlen))
 (define (mbstowcs (long int32 * char * long)	*)	(extern mbstowcs))
+(define (wcslen	  (long int32 *)		*)	(extern wcslen))
 
 ;; eval3's typecheck failure is fatal (eval3.c:152); recoverable errors come with the REPL's error handling.  Each
 ;; failure is counted and its ids kept; a law's driver clears type_check_fatal, so get answers 0 and put writes nothing
@@ -87,6 +88,23 @@
   (let* (((len long) (strlen cstr))
 	 ((obj oop) (k__newString len)))
     (mbstowcs (<string>-bits obj) cstr (+ len 1))
+    (return obj)))
+
+;; from wide characters, as eval3's newString and newSymbol take them (the reader's buffer, say)
+(define-function k_newString oop ((wcs int32 *))
+  (let* (((len long) (wcslen wcs))
+	 ((obj oop) (k__newString len)))
+    (memcpy (cast (<string>-bits obj) void *) (cast wcs void *) (* (+ len 1) (sizeof int32)))
+    (return obj)))
+
+(define-function k_newSymbol oop ((wcs int32 *))	; the characters copied, as eval3's wcsdup copies them
+  (let* (((len long) (wcslen wcs))
+	 ((chars int32 *) (cast (malloc (* (sizeof int32) (+ len 1))) int32 *))
+	 ((obj oop) (cast 0 oop)))
+    (memcpy (cast chars void *) (cast wcs void *) (* (+ len 1) (sizeof int32)))
+    (set obj (new <symbol>))
+    (set (<symbol>-bits obj) chars)
+    (set (<symbol>-flags obj) 0)
     (return obj)))
 
 (define-function k_newSymbolC oop ((cstr char *))

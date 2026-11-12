@@ -40,6 +40,19 @@ the oracles.
 - **Pointer steps are in bytes**, as ir2's arithmetic is (ir2.k:872), so a step over a character or an element is
   written with `sizeof`.
 
+## The reader (`kernel-reader.k`)
+
+- **`k_readExpr`** is eval3's `readExpr` (eval3.c:694). It reads integers (decimal, negative, `0x` hexadecimal),
+  doubles (a `.` or an `e` after the digits), strings with every escape (`k_readChar`: named, `\u` and four hex digits,
+  `\x` and up to two, up to three octal), characters (`?c`), symbols, lists with a dot, `'`, `` ` ``, `,` and `,@`,
+  `[ ]` and `{ }` as `(bracket …)` and `(brace …)`, and comments. It answers `k_done` at the end of the input or before
+  a closing delimiter, as eval3 answers `DONE`.
+- **Character classes** are chartab.h's flags, kept as one string of '0' + the flags for each of 0 … 127.
+- **Symbols** are interned as eval3 interns them: by binary search in a sorted array (`k_intern`, eval3.c:533).
+- **Source positions**: `k_beginSource`, `k_advanceSource` (each line) and `k_endSource` keep the current
+  `(path . line)`, and every pair the reader makes takes it (`k_newPairFrom`).
+- `k_initReader` makes the symbol table and the symbols the reader reads specially, and roots them.
+
 ## Departures from eval3
 
 - **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object
@@ -57,6 +70,9 @@ the oracles.
   cases (`<the global environment>`) and `%type-names` for a boot-declared type come with the globals (Task 4); until
   then such a type prints `<type=N>`. `<data[N]>` prints the collector's size (a whole number of words) until
   kernel-gc.k keeps the length asked for.
+- **An empty `[]` or `{}` reads as `(bracket)` or `(brace)`.** eval3 crashes on them: `newPairFrom` reads the source
+  of nil. The kernel's source of nil is nil, the Null Object choice.
+- **The reader's errors print to stdout** and exit, as its fatal errors will until the REPL's error handling (Task 6).
 - **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6). Each failure is
   counted and its ids kept (`type_check_failures`, `type_check_expected`, `type_check_actual`). A driver that clears
   `type_check_fatal` has `get` answer 0 and `put` write nothing instead.
@@ -82,6 +98,11 @@ the oracles.
   tab; a binding. The drivers compare them with what `./eval3 -b boot2.l` prints for the same structures, byte for
   byte, on the poisoning collector, with a collection on every allocation. It also asserts an array grown to 100
   with nil between, an insert, an append, `car`/`cdr` of a non-pair, `cadr` and `caddr`.
+- `check/kernel/reader.k` reads `check/kernel/read.txt` and dumps each datum, on the poisoning collector with a
+  collection on every allocation. The drivers compare the lines with `check/kernel/read.expected`, what
+  `./eval3 -b boot2.l` prints for the same file (its last line, `[] {}`, aside: eval3 crashes on it). The fixture has
+  each literal kind, INT64_MAX, INT64_MIN and 2^62, doubles from `-2.5e-3` to `4.0e18`, every string escape,
+  characters, symbols, dotted, quoted and bracketed lists, comments, and a list nested 200 deep.
 - `law_objects`, in both modes (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
   generated programs over the kernel's 13 types and two of the driver's own (`<knot>`, and `<pixel>`, an atom).
   - **Tagged**, a long a constructor makes is an immediate: the model holds it as a Maru integer, equal to another by

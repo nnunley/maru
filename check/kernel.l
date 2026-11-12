@@ -7,7 +7,7 @@
 ;; one unit for all the check files, so the kernel compiles once a mode: maru-gc.k up to its real main, the integers'
 ;; mode (kernel-tagged-int, boxed unless the prefix says), kernel.k's sections, then each check with its main renamed
 ;; main_NAME, and a main that runs the one its first argument names
-(define kernel-units '("objects" "longs" "lists"))
+(define kernel-units '("objects" "longs" "lists" "reader"))
 (define-function kernel-unit (prefix)
   (let* ((gc (contents-of-file-named "maru-gc.k"))
 	 (main (let ((i 0)) (while (not (prefix-at? "\n(define-function main " gc i)) (set i (+ i 1))) i))
@@ -37,12 +37,21 @@
   "(\"he\\\"l\\\\lo\" sym -42 3.500000 () Array<3>(1 () \"s\") (1 . 2) Array<0>())"
   "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
 
+;; what ./eval3 -b boot2.l prints for check/kernel/read.txt (check/kernel/read.expected), then the unit's last line
+(define kernel-reader-printed
+  (let ((text (contents-of-file-named "check/kernel/read.expected")) (out ()) (start 0) (i 0))
+    (while (< i (string-length text))
+      (and (= 10 (string-at text i)) (let () (push out (string-copy text start (- i start))) (set start (+ i 1))))
+      (set i (+ i 1)))
+    (list-reverse! (cons "kernel reader ok" out))))
+
 ;; each unit with integers boxed (eval3 as built), then tagged (its TAG_INT)
 (list-do mode '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged"))
   (let ((tag (concat-string " " (cdr mode)))
 	(image (kernel-image (car mode))))
     (expect (concat-string "check/kernel/objects.k" tag) (last (native-run-main image '("objects"))) "kernel objects ok")
     (expect (concat-string "check/kernel/longs.k" tag) (last (native-run-main image '("longs"))) "kernel longs ok")
-    (expect (concat-string "check/kernel/lists.k" tag) (native-run-main image '("lists")) kernel-lists-printed)))
+    (expect (concat-string "check/kernel/lists.k" tag) (native-run-main image '("lists")) kernel-lists-printed)
+    (expect (concat-string "check/kernel/reader.k" tag) (native-run-main image '("reader")) kernel-reader-printed)))
 
 (println (if ok "kernel ok" "kernel FAILED"))

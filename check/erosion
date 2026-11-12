@@ -20,3 +20,5 @@ erosion +2 check/kernel/longs.k: its main asserts boxed? case by case in one fun
 verbosity -1 boxed? and the wide-literal check: forms none of the verbose patterns flag
 erosion -1 check/objects-run.k: main's four field dispatches moved into op_set, op_look, op_get and op_put
 verbosity +1 check/objects-run.k: show_oop's early returns written as nested ifs, which native code needs
+erosion +4 kernel-reader.k: readExpr, readChar and readNumber keep eval3's switches on a character (CC 35, 18 and 14); a readtable would dispatch by character instead
+verbosity -1 kernel-reader.k: forms none of the verbose patterns flag

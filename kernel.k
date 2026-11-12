@@ -2,3 +2,4 @@
 ;;; less its main.  Each section is a file of its own, loaded in eval3's order.
 (load "kernel-objects.k")
 (load "kernel-lists.k")
+(load "kernel-reader.k")
