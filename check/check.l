@@ -746,7 +746,7 @@
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
-    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "(define-function main "))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"
 					    (contents-of-file-named "check/native/objects.k")
 					    (contents-of-file-named "check/objects.k"))
 			    (concat-strings tmp "/objects.k"))
@@ -783,7 +783,7 @@
 ;; check/gc.k replaces maru-gc.k's main to test growing and merging.
 (check "maru_gc_coalesce"
   (let ((gc (contents-of-file-named "maru-gc.k")))
-    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "(define-function main "))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"
 					    (contents-of-file-named "check/gc.k"))
 			    (concat-strings tmp "/gc.k"))
     (unit-assert (equal (last (run "gc" (ir2-build "gc" (concat-strings tmp "/gc.k")))) "gc ok"))))

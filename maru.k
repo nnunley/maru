@@ -177,12 +177,19 @@
   (ir-eq (list (maru-compile-object-type (list 'object-type (caddr exp)) ir)
 	       (ir-lit (<ir-object-type>-id (ir-object ir (cadr exp))) IR-LONG))))
 
+;; get and put of a declared object type; anything else, as new, is a call (the unit's own get, say)
+(define-function maru-object-form? (exp ir)
+  (let ((type (cdr (assq (cadr exp) (<ir>-struct-types ir)))))
+    (and type (ir-object-type? type))))
+
 (define-function maru-compile-object-get (exp ir)	; (get <name> field x)
-  (ir-object-get (ir-object ir (cadr exp)) (caddr exp) (maru-object-type-ids exp ir) (maru-compile (cadddr exp) ir)))
+  (if (not (maru-object-form? exp ir)) (maru-compile-operator (cons 'get (cdr exp)) ir)
+  (ir-object-get (ir-object ir (cadr exp)) (caddr exp) (maru-object-type-ids exp ir) (maru-compile (cadddr exp) ir))))
 
 (define-function maru-compile-object-put (exp ir)	; (put <name> field x v)
+  (if (not (maru-object-form? exp ir)) (maru-compile-operator (cons 'put (cdr exp)) ir)
   (ir-object-put (ir-object ir (cadr exp)) (caddr exp) (maru-object-type-ids exp ir)
-		 (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir)))
+		 (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir))))
 
 (define-function maru-compile-indir (exp ir)
   (ir-indir (maru-compile (cadr  exp) ir)
