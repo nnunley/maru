@@ -752,6 +752,16 @@
 
 (check "ir2"        (unit-assert (equal (last (run "ir2" (ir2-build "ir2" "check/ir2.k"))) "ir2 ok")))
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
+;; The kernel (doc/kernel.md): each check unit natively (check/kernel.l), and through the C back end
+(check "kernel_native" (unit-assert (equal (last (run "kernel_native" "./eval2 check/kernel.l" 300)) "kernel ok")))
+(check "kernel_c"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do unit '("objects")
+      (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
+					      (contents-of-file-named (concat-strings "check/kernel/" unit ".k")))
+			      (concat-strings tmp "/kernel-" unit ".k"))
+      (unit-assert (equal (last (run (concat-strings "kernel-" unit) (ir2-build (concat-strings "kernel-" unit) (concat-strings tmp "/kernel-" unit ".k"))))
+			  (concat-strings "kernel " unit " ok"))))))
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
     (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"

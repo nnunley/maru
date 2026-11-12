@@ -10,7 +10,7 @@
 (define (memcpy	(void * void * void * long)	*)	(extern memcpy))
 
 (define-constant gc_quantum	59392)	; 50k
-(define-constant gc_frequency	32768)
+(define (gc_frequency long)	32768)	; a variable: a check collects on every allocation by setting it to 1
 
 (define-struct <header> ((size long) (flags long) (next struct <header> *) (type long)))
 
@@ -73,7 +73,7 @@
     `(let ()
        ,@(map make-push-root vars)
        ,@body
-       ,@(reverse-map make-pop-root vars))))
+       ,@(list-reverse! (map make-pop-root vars)))))	; popped last first (reverse-map keeps the order)
 
 (define-function gc_grow_memory void ((size long))
   (let ((brk (cast (new_memory_block size) struct <header> *)))
@@ -140,7 +140,7 @@
 
 (define-function gc_malloc (void *) ((size long))
   (set size (& (+ size (cast (- (sizeof long) 1) long)) (cast (- (sizeof long)) long)))
-  (and (= gc_alloc_count gc_frequency) (gc_gcollect))
+  (and (>= gc_alloc_count gc_frequency) (gc_gcollect))
   (let* ((first (. gc_memory_last next))
 	 (chunk first)
 	 (ssize (+ size (sizeof struct <header>))))
