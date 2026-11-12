@@ -245,6 +245,14 @@ objects.
   message "kernel: boots boot2.l and runs repl.l as eval3 does".
 
 ## After this plan (not in it)
+- **2a, the kernel's collector (chosen 2026-11-12):** port gc.c's design to Maru as `kernel-gc.k`, replacing
+  maru-gc.k inside the kernel; maru-gc.k stays for its own checks. It brings what eval3's memory has and maru-gc.k
+  lacks:
+  - a per-object `length` in the header, which `data-length` reads;
+  - ephemerons and weak keys (`GC_weaken`, `GC_weak_settle`), which hash.l's weak tables need;
+  - heap limits, `GC_check_heap`, `GC_collect_every`, realloc and free.
+  The `gc_laws` and `gc_model` laws, which hold gc.c today, are pointed at the port, so it inherits their oracle.
+  It comes after Task 6 (boot2.l and the repl test need none of it) and before 2b loads the rest of the system.
 - **2b:** maru.k on the kernel (on eval3 it needs ir2 loaded first: `./eval3 maru.k` alone stops at `IR-VOID`), then
   maru.k on the kernel compiles the kernel: the evaluator compiling itself, plan 3f.
 - **2c:** a standalone native executable for the kernel: the RFC's unimplemented `native-executable`, from exe.l.

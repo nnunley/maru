@@ -24,7 +24,7 @@ the oracles.
 
 ## Departures from eval3
 
-- **The collector is maru-gc.k**, not gc.c. It has no `length` in the header yet, so `data-length` will need it.
+- **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object length, ephemerons, heap limits).
 - **`k_cons`, `k_newForm` and `k_newFixed` root their arguments** while they allocate. eval3 leaves that to its
   callers.
 - **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6).
