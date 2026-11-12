@@ -1,9 +1,9 @@
 ;;; A law's verdict, from check/law.l's text to a value John holds, through the ledger's own language, and what the plan makes of it.
 (require "john-eval.l")
 (require "check/temp.l")
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 (define events-file (concat-string check-tmp "/plan-evidence.events"))
-(system (concat-strings "./eval notes/plan/law-events.l abc check/laws/fixtures/report.txt > " events-file))
+(program-status '("./eval" "notes/plan/law-events.l" "abc" "check/laws/fixtures/report.txt") () events-file)
 (define events (contents-of-file-named events-file))
 (define-function expect (what ok) (or ok (let () (println "FAIL " what) (exit 1))))
 (define evidence-set

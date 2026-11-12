@@ -34,5 +34,8 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   as `eval`'s C primitives do (the cases pass under both evaluators).
 - `cross_eval`: on arm64 macOS with Rosetta, `bin/x86_64/eval` and `eval2`
   are built.
-- `run_limit`: `run` ends a command still running at its limit (120 s; 1 s in
-  the check) by an alarm set in the child, through `subr` (no perl or coreutils).
+- `run_limit`: `spawn.l` starts a program without a shell and answers its status (0, `false`'s 256), and ends one
+  still running at its limit (120 s; 1 s in the check) by an alarm set in the child, through `subr` (no perl or
+  coreutils). Each argument reaches the program as written (`;`, `|`, `$`, `>` and a space among them), a hundred of them
+  too (`execvp` of a built `argv`, not the FFI's variadic few); `env` reaches the child, `dir` sets its directory, and one
+  file can take both its output and its errors.

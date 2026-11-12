@@ -6,7 +6,8 @@
 ;;;   (sat-write-dimacs path n clauses) a formula over n variables, as DIMACS
 
 (define *sat-library* ())
-(define *sat-path* (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin"))
+(require "spawn.l")
+(define *sat-path* (if (darwin?)
 		       "build/sat.dylib"
 		       "build/sat.so"))
 ;; its path in the tree, with a slash so dlopen searches nowhere (R-native)
@@ -59,7 +60,7 @@
 	  (concat-strings (list->string (list-reverse! chars)) "/maru-sat"))
       "/tmp/maru-sat")))
 (define-function sat-keep (text ext)
-  ((subr "system" "s>i") (concat-strings "mkdir -p " (sat-keep-dir)))
+  (make-directory (sat-keep-dir))
   (let ((path (concat-strings (sat-keep-dir) "/failed-" (format "%d" ((subr "getpid" ">l"))) ext)))
     (let ((f ((subr "fopen" "ss>p") path "w")))
       ((subr "fputs" "sp>i") text f)

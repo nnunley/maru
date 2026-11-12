@@ -6,6 +6,7 @@
 ;;; outside quoted data; maru-forms.l walks each top-level form once for its complexity, its forms, the verbose patterns in
 ;;; it and the variables it binds.
 (require "maru-forms.l")
+(require "spawn.l")	; a script run directly to find its forms
 (require "source.l")
 
 (define-structure <ledger-entry> (metric change reason))	; a line of check/erosion
@@ -29,7 +30,7 @@
 (define-function erosion-read-script (path text)
   (let ((spans (concat-strings "/tmp/maru-erosion-" (long->string (erosion-getpid)) ".forms"))
 	(forms ()))
-    (let* ((status ((subr "system" "s>i") (concat-strings "./eval tpeg-repl.l --forms '" path "' > " spans " 2>&1")))
+    (let* ((status (program-status (list "./eval" "tpeg-repl.l" "--forms" path) () spans spans))
 	   (out (contents-of-file-named spans)))
       ((subr "unlink" "s>i") spans)
       (or (= 0 status) (error "erosion: " path " failed as it ran, so its forms aren't all known"))	; not measured in part
