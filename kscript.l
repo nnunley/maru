@@ -839,16 +839,21 @@
 		 ((symbol? idx) (ks-val home idx))
 		 ((and (pair? idx) (= (car idx) 'stream-ref)) (ks-val home (cadr idx))))))
     (cond ((symbol? k) k) ((string? k) (string->symbol k)))))
-;; the slot a chain down to a name or @name ends at, found as KSWorld's getE finds it (KSEventStream>>findForGet): the
-;; root's value, then each key's slot in the value before it.  () if the chain has another root or ends nowhere
+;; KSNewEventStream>>ksAt: and KSObject's: a stream's own key, else its home object's; an object's slot, as it is
+(define-function ks-at (v key)
+  (cond ((ks-stream? v) (or (ks-slot v key) (ks-at (ks-attr v ':__home__) key)))
+	((ks-object? v) (ks-slot v key))))
+;; the slot a chain down to a name or @name ends at, found as KSWorld's getE finds it (KSNewEventStream>>findForGet:):
+;; the root's current value, then v ksAt: key for each key.  A key's slot isn't unwrapped, so after the first key v is a
+;; stream, and the next key is the stream's own or its home object's: @a.b.c ends at c on the object holding b.
+;; () if the chain has another root or ends nowhere
 (define-function ks-chain-end (ast home)
   (cond ((symbol? ast) (ks-slot home ast))
 	((and (pair? ast) (= (car ast) 'stream-ref)) (ks-slot home (cadr ast)))
 	((ks-chain? ast)
 	 (let ((at (ks-chain-end (cadr ast) home))
 	       (key (if (= (car ast) 'field) (caddr ast) (ks-index-key (caddr ast) home))))
-	   (let ((v (if (ks-stream? at) (ks-stream-curr at) at)))
-	     (and key (ks-object? v) (ks-slot v key)))))))
+	   (and key (ks-at (if (ks-chain? (cadr ast)) at (ks-stream-curr at)) key))))))
 (define-function ks-add-dep (s acc) (and (ks-stream? s) (not (memq s (car acc))) (set-car acc (cons s (car acc)))))
 (define ks-collect-deps)	; defined below: a chain's dependencies and the rest read each other
 ;; a chain's dependencies, as KSQuoteTranslator>>quotedVar makes them: its root, any stream an index's key names, and,

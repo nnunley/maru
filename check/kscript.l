@@ -122,6 +122,18 @@ for i in [0...10] by 5 total := total + i
 	  (let ((fn (ks-read-chains (car (kscript-parse "() -> @n")))))
 	    (list fn (ks-apply (ks-eval fn () box) () () box)))
 	  '((fn () (chain-value (stream-ref n))) 5)))
+;; a chain's end as KSNewEventStream>>findForGet: finds it: the root's value, then v ksAt: key for each key, a slot not
+;; unwrapped, so after the first key v is a stream and the next key is its own or its home object's.  a's value holds
+;; b, whose value holds c (2), and c (1) beside b: @a.b ends at b, and @a.b.c at the c beside b
+(let* ((x (ks-new-object 'KSBox 1 () () () 0)) (y (ks-new-object 'KSBox 1 () () () 0)) (box (ks-new-object 'KSBox 1 () () () 0)))
+  (ks-set-slot y 'c (ks-make-stream y "exprE" "" 2))
+  (ks-set-slot x 'b (ks-make-stream x "exprE" "" y))
+  (ks-set-slot x 'c (ks-make-stream x "exprE" "" 1))
+  (ks-set-slot box 'a (ks-make-stream box "exprE" "" x))
+  (expect "a two-step chain ends at the key's slot in the root's value"
+	  (= (ks-chain-end (car (kscript-parse "@a.b")) box) (ks-slot x 'b)) 't)
+  (expect "a three-step chain ends at the last key on the object holding the one before it"
+	  (= (ks-chain-end (car (kscript-parse "@a.b.c")) box) (ks-slot x 'c)) 't))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 
