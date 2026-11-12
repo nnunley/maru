@@ -38,14 +38,15 @@
 
 (define-function k_newData oop ((len long))	(return (new <data> len)))
 
-;; Integers are boxed, as eval3 is built, or tagged, as its TAG_INT makes them (eval3.c:207-214): kernel-tag-int is 0
-;; unless the build defines it 1 before kernel.k, and (if-tag-int TAGGED BOXED) picks a branch when the kernel compiles
-(define-form kernel-tag-int-default () (if (defined? 'kernel-tag-int) () '(define kernel-tag-int 0)))
-(kernel-tag-int-default)
-(define-form if-tag-int (tagged boxed) (if (= 1 kernel-tag-int) tagged boxed))
+;; Integers are boxed, as eval3 is built, or tagged, as its TAG_INT makes them (eval3.c:207-214): kernel-tagged-int is 0
+;; unless the build defines it 1 before kernel.k, and (if-tagged-int TAGGED BOXED) picks a branch when the kernel compiles,
+;; as eval.l's if-tagged-int (eval.l:12) does
+(define-form kernel-tagged-int-default () (if (defined? 'kernel-tagged-int) () '(define kernel-tagged-int 0)))
+(kernel-tagged-int-default)
+(define-form if-tagged-int (tagged boxed) (if (= 1 kernel-tagged-int) tagged boxed))
 
 ;; tagged, a value whose top two bits agree is (bits << 1) | 1, an odd word, and any other is boxed
-(if-tag-int
+(if-tagged-int
  (define-function k_newLong oop ((bits long))
    (if (>= (^ bits (<< bits 1)) 0) (return (cast (| (<< bits 1) 1) oop)))
    (return (k_boxLong bits)))

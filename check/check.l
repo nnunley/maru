@@ -754,7 +754,7 @@
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
 ;; The kernel (doc/kernel.md): each check unit natively (check/kernel.l), and through the C back end
 (check "kernel_native" (unit-assert (equal (last (run "kernel_native" "./eval2 check/kernel.l" 300)) "kernel ok")))
-;; maru-gc.k less its main, the integers' mode (PREFIX defines kernel-tag-int 1 for tagged; boxed otherwise), kernel.k,
+;; maru-gc.k less its main, the integers' mode (PREFIX defines kernel-tagged-int 1 for tagged; boxed otherwise), kernel.k,
 ;; then FILE: a unit in tmp named NAME.k, for ir2-build
 (define-function kernel-c-unit (gc name file prefix)
   (let ((path (concat-strings tmp "/" name ".k")))
@@ -763,7 +763,7 @@
 			    path)
     path))
 ;; the kernel's two modes for its integers: boxed (eval3 as built), and tagged (eval3's TAG_INT)
-(define kernel-modes '(("" . "boxed") ("\n(define kernel-tag-int 1)" . "tagged")))
+(define kernel-modes '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged")))
 ;; the lines ./eval3 -b boot2.l prints for check/kernel/lists.k's structures
 (define kernel-lists-printed
   '("(he\"l\\lo sym -42 3.500000 () Array<3>(1 () s) (1 . 2) Array<0>())"

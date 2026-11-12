@@ -1,4 +1,4 @@
-;;; The kernel's integers (doc/kernel.md), boxed or tagged as kernel-tag-int chooses when the kernel is compiled, as
+;;; The kernel's integers (doc/kernel.md), boxed or tagged as kernel-tagged-int chooses when the kernel is compiled, as
 ;;; eval3's TAG_INT does: check/kernel.l and check.l run this main in both modes.  Prints "kernel longs ok".
 
 (define-form expect (what test)
@@ -15,7 +15,7 @@
 	 ((fits long) 1))
     (if (< (^ x (<< x 1)) 0) (set fits 0))
     (return (and (= (k_getLong o) x) (= (object-type o) 2) (k_isLong o)
-		 (= (odd o) (if-tag-int fits 0))))))
+		 (= (odd o) (if-tagged-int fits 0))))))
 
 (define-function main int ((argc int) (argv char * *))
   (gc_initialise)
@@ -29,6 +29,13 @@
 					       (round-trip (- (- (cast 0 long) big) 1))))
     (expect "INT64_MAX and INT64_MIN" (and (round-trip max) (round-trip (- (- (cast 0 long) max) 1)))))
   (expect "a symbol isn't a long" (not (k_isLong (k_newSymbolC "x"))))
+  ;; boxed?: a word with a body, neither nil nor an immediate
+  (expect "boxed? of nil, an odd word, a pair and a symbol"
+	  (and (not (boxed? (cast 0 oop))) (not (boxed? (cast 85 oop))) (boxed? (k_cons (cast 0 oop) (cast 0 oop)))
+	       (boxed? (k_newSymbolC "x"))))
+  (expect "boxed? of a long that fits, and one that doesn't"
+	  (and (= (if-tagged-int 0 1) (if (boxed? (k_newLong 42)) 1 0))
+	       (boxed? (k_newLong (cast 4611686018427387904 long)))))
   ;; an odd word through the object level, whichever the mode: get answers its value; put has no field to write
   (expect "get of an odd word" (= (get <long> bits (cast 85 oop)) 42))
   (let (((before long) type_check_failures))

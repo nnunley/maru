@@ -159,7 +159,7 @@ history: Piumarta made integers "boxed or tagged" a switch (306ffb0, 2011), on i
 `check/objects-run.k`, `check/laws/objects-model.l`. Create `check/kernel/longs.k`.
 
 **Interfaces:**
-- `kernel-tag-int`: 0 (boxed) unless the build defines it 1 before `kernel.k`; `(if-tag-int TAGGED BOXED)` picks a branch
+- `kernel-tagged-int`: 0 (boxed) unless the build defines it 1 before `kernel.k`; `(if-tagged-int TAGGED BOXED)` picks a branch
   at compile time.
 - `k_newLong`, `k_getLong` and `k_isLong` as eval3.c:207-214 in each mode: tagged, a value whose top two bits agree is
   `(x << 1) | 1`, and any other boxes.

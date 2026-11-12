@@ -21,8 +21,8 @@ the oracles.
   `k_newStringC`, `k_newSymbolC`, `k_cons`, `k_newArray`, `k_newExpr`, `k_newForm`, `k_newFixed` and `k_newSubrC`.
   Each is eval3's, `k_`-prefixed; `C` marks one that takes a C string, widened as eval3's `mbs2wcs` widens it.
 - **Integers are boxed or tagged**, chosen when the kernel is compiled, as eval3's `TAG_INT` chooses (Piumarta made it
-  a switch in 306ffb0, 2011: on in eval.c, off in eval2.c and eval3.c). `kernel-tag-int` is 0, boxed as eval3 is
-  built, unless the build defines it 1 before `kernel.k`. `(if-tag-int TAGGED BOXED)` picks a branch at compile time,
+  a switch in 306ffb0, 2011: on in eval.c, off in eval2.c and eval3.c). `kernel-tagged-int` is 0, boxed as eval3 is
+  built, unless the build defines it 1 before `kernel.k`. `(if-tagged-int TAGGED BOXED)` picks a branch at compile time,
   and only that branch is compiled.
   - Tagged, `k_newLong` makes a value whose top two bits agree an odd word, `(x << 1) | 1`, and boxes any other
     (eval3.c:207–214).
@@ -68,7 +68,8 @@ the oracles.
 - `kernel_c` (`check/check.l`): the same units through ir-gen-c.k and the C compiler, in both modes.
 - `check/kernel/longs.k` asserts round trips through `k_newLong` and `k_getLong` at 0, ±1, ±42, 2^62 − 1, 2^62,
   −2^62, −2^62 − 1, INT64_MAX and INT64_MIN. Each is a `<long>` and an `isLong`, and it is an odd word just when the
-  kernel is tagged and the value fits. A symbol isn't an `isLong`. Through the object level, `get` of an odd word
+  kernel is tagged and the value fits. A symbol isn't an `isLong`. `boxed?` is false for nil and an odd word, true for
+  a pair, a symbol and a boxed long. Through the object level, `get` of an odd word
   answers its value and `put` to one fails its type check.
 - `check/kernel/objects.k` asserts:
   - each type's id;
@@ -84,7 +85,7 @@ the oracles.
 - `law_objects`, in both modes (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
   generated programs over the kernel's 13 types and two of the driver's own (`<knot>`, and `<pixel>`, an atom).
   - **Tagged**, a long a constructor makes is an immediate: the model holds it as a Maru integer, equal to another by
-    value, with no field to `look` at or `set` (the driver skips the unchecked accessors on an odd word), `get` of
+    value, with no field to `look` at or `set` (the driver skips the unchecked accessors on a word not `boxed?`), `get` of
     its `bits` answering its value, and `put` refused.
   - **The programs** fill four slots raw (`new`) or by a kernel constructor, write fields through the unchecked
     accessors (`set`) or `put`, and read them through the accessors (`look`) or `get`. `get` and `put` name a type of

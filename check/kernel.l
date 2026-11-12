@@ -5,7 +5,7 @@
 (require "check/native-run.l")
 
 ;; one unit for all the check files, so the kernel compiles once a mode: maru-gc.k up to its real main, the integers'
-;; mode (kernel-tag-int, boxed unless the prefix says), kernel.k's sections, then each check with its main renamed
+;; mode (kernel-tagged-int, boxed unless the prefix says), kernel.k's sections, then each check with its main renamed
 ;; main_NAME, and a main that runs the one its first argument names
 (define kernel-units '("objects" "longs" "lists"))
 (define-function kernel-unit (prefix)
@@ -38,7 +38,7 @@
   "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
 
 ;; each unit with integers boxed (eval3 as built), then tagged (its TAG_INT)
-(list-do mode '(("" . "boxed") ("\n(define kernel-tag-int 1)" . "tagged"))
+(list-do mode '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged"))
   (let ((tag (concat-string " " (cdr mode)))
 	(image (kernel-image (car mode))))
     (expect (concat-string "check/kernel/objects.k" tag) (last (native-run-main image '("objects"))) "kernel objects ok")

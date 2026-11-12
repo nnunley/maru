@@ -16,3 +16,5 @@ erosion +2 check/objects-run.k: the law's driver dispatches by type and field in
 verbosity -1 check/objects-run.k and check/laws/objects-model.l: forms none of the verbose patterns flag
 erosion -2 kernel-lists.k: many small definitions (car, cdr, arrays, the printer's parts) dilute the share held by callables over CC 10
 erosion -1 kernel task 2b: small definitions (k_boxLong, k_isLong, the mode's forms, the driver's immediate) dilute the share held by callables over CC 10
+erosion +2 check/kernel/longs.k: its main asserts boxed? case by case in one function, and the law's driver's main its guards, CC over 10
+verbosity -1 boxed? and the wide-literal check: forms none of the verbose patterns flag

@@ -138,7 +138,7 @@
     (scanf "%ld" (addressof n))
     (return n)))
 
-;; a checked access of type t on x, refused when x isn't a t (or is an immediate, which has no field to put): "F t actual"
+;; a checked access of type t on x, refused when x isn't a t (or isn't boxed?, as an immediate has no field to put): "F t actual"
 ;; first; afterwards ! unless type_check_fail was called exactly then, with t and x's type
 (define-function check_before long ((t long) (x oop) (refused int))	; refused: ir2's truth value
   (if refused (printf "F %ld %ld\n" t (object-type x)))
@@ -149,9 +149,6 @@
       (if (!= before type_check_failures) (printf "!\n"))
     (if (or (!= type_check_failures (+ before 1)) (!= type_check_expected t) (!= type_check_actual actual))
 	(printf "!\n"))))
-
-;; an immediate integer (tagged): no field the unchecked accessors may touch
-(define-function immediate int ((x oop)) (return (cast (& 1 (cast x long)) int)))
 
 (define-function main int ((argc int) (argv char * *))
   (gc_initialise)
@@ -177,10 +174,10 @@
       (if (= code 3) (let ()
 		       (set f (read_long))
 		       (set v (read_long))
-		       (if (not (immediate x)) (field-cases set (object-type x) f x v line ()))))
+		       (if (boxed? x) (field-cases set (object-type x) f x v line ()))))
       (if (= code 4) (let ()
 		       (set f (read_long))
-		       (if (immediate x) (printf "-\n") (field-cases look (object-type x) f x 0 line (printf "-\n")))))
+		       (if (not (boxed? x)) (printf "-\n") (field-cases look (object-type x) f x 0 line (printf "-\n")))))
       (if (= code 5) (let ()
 		       (set t (read_long))
 		       (set f (read_long))
@@ -193,9 +190,9 @@
 		       (set f (read_long))
 		       (set v (read_long))
 		       (set actual (object-type x))
-		       (set before (check_before t x (or (!= t actual) (immediate x))))
+		       (set before (check_before t x (or (!= t actual) (not (boxed? x)))))
 		       (field-cases put t f x v line ())
-		       (check_after t before actual (or (!= t actual) (immediate x)))))
+		       (check_after t before actual (or (!= t actual) (not (boxed? x))))))
       (if (= code 7) (printf "%ld\n" (object-type x)))
       (if (= code 8) (gc_gcollect))
       (set line (+ line 1))))
