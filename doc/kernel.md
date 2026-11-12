@@ -20,6 +20,9 @@ the oracles.
 - **Constructors**: `k_newData`, `k_newLong`/`k_getLong`, `k_newDouble`/`k_getDouble`, `k__newString`,
   `k_newStringC`, `k_newSymbolC`, `k_cons`, `k_newArray`, `k_newExpr`, `k_newForm`, `k_newFixed` and `k_newSubrC`.
   Each is eval3's, `k_`-prefixed; `C` marks one that takes a C string, widened as eval3's `mbs2wcs` widens it.
+- **Integers are boxed**, as eval3 builds them: its `TAG_INT` is off (eval3.c:37), so `newLong` always allocates a
+  `<long>` (eval3.c:212), as `k_newLong` does. eval3's tagged variant, odd words as integers, stays a build option the
+  kernel doesn't take; the object level already reads an odd word's type as `<long>`.
 - **A `<subr>`'s `imp`** is a function pointer of `(arguments env)`, called through the field.
 
 ## Departures from eval3
