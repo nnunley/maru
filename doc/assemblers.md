@@ -16,6 +16,18 @@ placeholder, so the first fitting row ends the search; the other instruction set
 A new instruction set with no shape and accept functions gets the full scan. Its rows alone do not build the table,
 since the table has to know what each kind accepts; that is per-ISA code, as encode and decode already are.
 
+Nothing on the encoding path searches a list. An instruction set is a structure, `<asm-isa>`, found by name in a hash
+table, with its rows by mnemonic in another. A shape is shared: equal shapes are one object (`asm-intern-shape`), and
+arm64 finds a register's shape in a table made once. So the candidates hang off a chain of identity tables, first by
+mnemonic and then by each operand's shape, and a lookup builds no key and compares only identities.
+
+Arm64 compiles each row once, when its rows are read (`arm64-plan`). Each named field of the diagram becomes a slot
+with its shift in the word, and each operand kind becomes a plan against those slots. Encoding binds the operands into
+a fresh array of slot values, plus one slot for the arrangement, then shifts each value into the row's fixed bits.
+Decoding is off the hot path and still reads the diagram. On eval, a whole arm64 `asm-attempt` costs about 132 µs an
+instruction, against 270 µs with the alists. Of that, about 46 µs is binding a row and 56 µs is finding the candidates.
+Most of the rest is hash.l and structure accessors, each of which checks its type unless eval runs with `-O`.
+
 ## Checks
 
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
