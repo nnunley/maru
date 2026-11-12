@@ -144,7 +144,14 @@ for i in [0...10] by 5 total := total + i
 	  '(40 40 30))
   (expect "a combinator's receiver, the stream itself"
 	  (ks-read-chains (car (kscript-parse "this.b.mapE((r) -> r.width())")) 't)
-	  '(send (field this b) mapE (fn (r) (send r width)))))
+	  '(send (field this b) mapE (fn (r) (send r width))))
+  ;; the combinators are KSNewEventStream's four-argument selectors, its 20, run here or not
+  (expect "every combinator KSNewEventStream defines, frpIf and timerEDuration among them"
+	  (list (list-length *ks-combinators*) (and (memq 'frpIf *ks-combinators*) (memq 'timerEDuration *ks-combinators*) 't))
+	  '(20 t))
+  (expect "a combinator kscript.l doesn't run yet still acts on the stream"
+	  (ks-read-chains (car (kscript-parse "@b.frpIf(1, 2)")) ())
+	  '(send (stream-ref b) frpIf 1 2)))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 

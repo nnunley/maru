@@ -807,7 +807,19 @@
 ;; In a function's body, and so in a method, a reference reads each step's currentValue (quotedVar's trans,
 ;; KSCompiler>>fieldRef), so it is the value it ends at.  Other chains, recv.k and recv[k], are KSCompiler>>get's ksAt:, the
 ;; slot itself.  A lag (@x') and an assignment's place are as written.
-(define *ks-combinators* '(collectE delayE doE exprE getE mapE mergeE oneE switchColE timerE update))	; KSEventStream's
+;; the combinators: the selectors KSNewEventStream answers with four arguments (selector:with:with:with:), as
+;; KSObject>>eventStream: asks canUnderstand: of them, read from its method headers in ksworld/KSNewEventStream.st.  One
+;; kscript.l doesn't run yet is still a combinator, so it fails as one rather than going to the stream's value
+(define-function ks-combinators-of (path)
+  (let ((out ()))
+    (list-do line (ks-split (contents-of-file-named path) 10)
+      (let ((ws (ks-split line 32)))
+	(and (= 8 (list-length ws)) (!= 9 (string-at (car ws) 0))
+	     (= ?: (string-at (car ws) (- (string-length (car ws)) 1)))
+	     (equal (list (caddr ws) (car (cddddr ws)) (car (cddddr (cddr ws)))) '("with:" "with:" "with:"))
+	     (push out (string->symbol (string-copy (car ws) 0 (- (string-length (car ws)) 1)))))))
+    (list-reverse! out)))
+(define *ks-combinators* (ks-combinators-of "ksworld/KSNewEventStream.st"))
 (define-function ks-reference? (ast v2)
   (let ((root ast))
     (while (ks-chain? root) (set root (cadr root)))

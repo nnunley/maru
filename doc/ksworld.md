@@ -24,7 +24,7 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   (`ks-read-chains`, as each stream's code and each KScript method is read). In code a document marks KScript 2
   (`:__version__ "2"`, KSParser2's, with no `@`), a chain from a name is a reference too, `KSVariableAttributor2`'s
   `fieldRef`, and in a function's body reads `currentValue` at each step (`KSCompiler>>fieldRef`). In a stream's own
-  expression a send to a reference is a combinator's on the stream (`mapE`, `doE` …) and any other goes to its value, as
+  expression a send to a reference is a combinator's on the stream (any of the 20 selectors `KSNewEventStream` answers with four arguments, read from `ksworld/KSNewEventStream.st`, whether `kscript.l` runs it yet or not) and any other goes to its value, as
   `KSObject>>eventStream` falls back to `exprE`: deviation-demo's `slider1.bounds.center()` is its rectangle's. Truth is Maru's: true is `t`, false and nil
   are one value, `()`, as test-pepsi.l has them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
