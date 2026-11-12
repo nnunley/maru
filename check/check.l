@@ -754,13 +754,16 @@
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
 ;; The kernel (doc/kernel.md): each check unit natively (check/kernel.l), and through the C back end
 (check "kernel_native" (unit-assert (equal (last (run "kernel_native" "./eval2 check/kernel.l" 300)) "kernel ok")))
-;; maru-gc.k less its main, kernel.k, then FILE: a unit in tmp named NAME.k, for ir2-build
-(define-function kernel-c-unit (gc name file)
+;; maru-gc.k less its main, the integers' mode (PREFIX defines kernel-tag-int 1 for tagged; boxed otherwise), kernel.k,
+;; then FILE: a unit in tmp named NAME.k, for ir2-build
+(define-function kernel-c-unit (gc name file prefix)
   (let ((path (concat-strings tmp "/" name ".k")))
-    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) prefix "\n(load \"kernel.k\")\n"
 					    (contents-of-file-named file))
 			    path)
     path))
+;; the kernel's two modes for its integers: boxed (eval3 as built), and tagged (eval3's TAG_INT)
+(define kernel-modes '(("" . "boxed") ("\n(define kernel-tag-int 1)" . "tagged")))
 ;; the lines ./eval3 -b boot2.l prints for check/kernel/lists.k's structures
 (define kernel-lists-printed
   '("(he\"l\\lo sym -42 3.500000 () Array<3>(1 () s) (1 . 2) Array<0>())"
@@ -768,30 +771,37 @@
   "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
 (check "kernel_c"
   (let ((gc (contents-of-file-named "maru-gc.k")))
-    (unit-assert (equal (run "kernel-lists" (ir2-build "kernel-lists" (kernel-c-unit gc "kernel-lists" "check/kernel/lists.k")))
-			kernel-lists-printed))
-    (unit-assert (equal (last (run "kernel-objects" (ir2-build "kernel-objects" (kernel-c-unit gc "kernel-objects" "check/kernel/objects.k"))))
-			"kernel objects ok"))))
-;; the kernel's objects over generated programs (check/laws/objects.law): check/objects-run.k after maru-gc.k and kernel.k,
-;; through C under ASan, on the poisoning collector, agrees with the law's model; and a program reading a field nothing
-;; wrote is refuted (fixtures/objects-unwritten.law), so the sentinel shows
+    (list-do mode kernel-modes
+      (let ((unit (lambda (u) (let ((name (concat-strings "kernel-" u "-" (cdr mode))))
+				(run name (ir2-build name (kernel-c-unit gc name (concat-strings "check/kernel/" u ".k") (car mode))))))))
+	(unit-assert (equal (unit "lists") kernel-lists-printed))
+	(unit-assert (equal (last (unit "objects")) "kernel objects ok"))
+	(unit-assert (equal (last (unit "longs")) "kernel longs ok"))))))
+;; the kernel's objects over generated programs (check/laws/objects.law), in both modes: check/objects-run.k after
+;; maru-gc.k and kernel.k, through C under ASan, on the poisoning collector, agrees with the law's model (told the mode by
+;; OBJECTS_LAW_TAGGED); and a program reading a field nothing wrote is refuted (fixtures/objects-unwritten.law), so the
+;; sentinel shows
 (check "law_objects"
-  (let* ((gc  (contents-of-file-named "maru-gc.k"))
-	 (src (kernel-c-unit gc "objects-run" "check/objects-run.k"))
-	 (bin (concat-strings tmp "/objects-run"))
-	 (dir (concat-strings tmp "/objects-law"))
-	 (env (concat-strings "env OBJECTS_LAW_RUN=" bin " OBJECTS_LAW_TMP=" dir " ./eval"))
-	 (bite (concat-strings tmp "/objects-unwritten.out")))
-    (run "objects-run-c" (concat-strings "./eval2 ir-gen-c.k maru.k " src " > " bin ".c"))
-    (run "objects-run-cc" (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " bin " " bin ".c -ldl"))
-    (run "objects-law-dir" (concat-strings "mkdir -p " dir))
-    (let ((out (law-file-holds "law_objects" env "check/laws/objects-model.l" "check/laws/objects.law")))
-      (unit-assert out)
-      (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
-			      (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (") (equal (cadr ls) "law initialised: PROVED 33"))))))
-    (unit-assert (= 256 (run-cpu-status 300 (concat-strings "exec </dev/null >" bite " 2>&1; exec " env
-							     " check/law.l check/laws/objects-model.l check/laws/fixtures/objects-unwritten.law"))))
-    (unit-assert (starts (car (lines (contents-of-file-named bite))) "law unwritten: REFUTED p="))))
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do mode kernel-modes
+      (let* ((name (concat-strings "objects-run-" (cdr mode)))
+	     (src  (kernel-c-unit gc name "check/objects-run.k" (car mode)))
+	     (bin  (concat-strings tmp "/" name))
+	     (dir  (concat-strings tmp "/objects-law-" (cdr mode)))
+	     (env  (concat-strings "env OBJECTS_LAW_RUN=" bin " OBJECTS_LAW_TMP=" dir
+				   " OBJECTS_LAW_TAGGED=" (if (equal (cdr mode) "tagged") "1" "0") " ./eval"))
+	     (bite (concat-strings tmp "/objects-unwritten-" (cdr mode) ".out")))
+	(run (concat-strings name "-c") (concat-strings "./eval2 ir-gen-c.k maru.k " src " > " bin ".c"))
+	(run (concat-strings name "-cc") (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " bin " " bin ".c -ldl"))
+	(run (concat-strings name "-dir") (concat-strings "mkdir -p " dir))
+	(let ((out (law-file-holds (concat-strings "law_objects_" (cdr mode)) env "check/laws/objects-model.l" "check/laws/objects.law")))
+	  (unit-assert out)
+	  (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
+				  (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (")
+				       (equal (cadr ls) "law initialised: PROVED 33"))))))
+	(unit-assert (= 256 (run-cpu-status 300 (concat-strings "exec </dev/null >" bite " 2>&1; exec " env
+								 " check/law.l check/laws/objects-model.l check/laws/fixtures/objects-unwritten.law"))))
+	(unit-assert (starts (car (lines (contents-of-file-named bite))) "law unwritten: REFUTED p="))))))
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
     (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"

@@ -2,7 +2,6 @@
 ;;; (eval3.c:281-336), and doprint with print, dump and dumpln (eval3.c:886-1087), for its thirteen types.
 
 (define (isatty	(int int)			*)	(extern isatty))
-(define (fflush	(int void *)			*)	(extern fflush))
 (define (memmove	(void * void * void * long)	*)	(extern memmove))
 
 (define-function k_car oop ((obj oop))	(if (object-is <pair> obj) (return (<pair>-head obj))) (return (cast 0 oop)))
@@ -136,6 +135,8 @@
       (set i (+ i 1)))
     (printf ")")))
 
-(define-function k_print void ((obj oop))	(k_doprint obj 0) (fflush (cast 0 void *)))
-(define-function k_dump void ((obj oop))	(k_doprint obj 1) (fflush (cast 0 void *)))
-(define-function k_dumpln void ((obj oop))	(k_dump obj) (printf "\n") (fflush (cast 0 void *)))
+;; eval3 flushes stdout after each; the kernel can't name stdout yet, and fflush(NULL) would also flush, and so move, a
+;; stream another process shares (eval2's own reading of a check), so flushing waits for the kernel's main (Task 6)
+(define-function k_print void ((obj oop))	(k_doprint obj 0))
+(define-function k_dump void ((obj oop))	(k_doprint obj 1))
+(define-function k_dumpln void ((obj oop))	(k_dump obj) (printf "\n"))

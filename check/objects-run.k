@@ -5,9 +5,10 @@
 ;;;   1 s t        new: slot s gets (new <t>)
 ;;;   2 s t a b    make: slot s gets what t's kernel constructor makes of a and b
 ;;;   3 s f v      set: the unchecked accessor of slot s's own type writes field f (mod the writable fields)
-;;;   4 s f        look: the unchecked accessor of slot s's own type reads field f (mod its fields), or - for none
+;;;   4 s f        look: the unchecked accessor of slot s's own type reads field f (mod its fields), or - for none (an
+;;;                immediate integer has none, and set leaves it alone)
 ;;;   5 s t f      get: (get <t> field slot), its type checked; prints "F t actual" first on a mismatch
-;;;   6 s t f v    put: (put <t> field slot value), the same
+;;;   6 s t f v    put: (put <t> field slot value), the same, and refused for an immediate
 ;;;   7 s          type: (object-type slot)
 ;;;   8            collect
 ;;; A written value is an object (v mod 5 names slot 0 to 3, or nil) for an oop field, or v * 64 + the line, so no
@@ -85,7 +86,8 @@
 (define-function show_ptr void ((w long))
   (if (= w objects_poison) (printf "S\n") (if w (printf "p\n") (printf "0\n"))))
 
-;; nil, S, @k for the first slot holding it, # and its value for a <long> no slot holds, or t and its type
+;; nil, S, @k for the first slot holding it, # and its value for a <long> no slot holds (an immediate, tagged, or boxed),
+;; or t and its type
 (define-function show_oop void ((x oop))
   (let (((s long) 0))
     (if (= x (cast 0 oop)) (let () (printf "nil\n") (return)))
@@ -94,7 +96,7 @@
       (if (= x (indir slots s)) (let () (printf "@%ld\n" s) (return)))
       (set s (+ s 1)))
     (if (= (object-type x) 2)
-	(let () (printf "#") (show_long (<long>-bits x)))
+	(let () (printf "#") (show_long (k_getLong x)))
       (printf "t%ld\n" (object-type x)))))
 
 (define-function new_of oop ((t long))
@@ -136,17 +138,20 @@
     (scanf "%ld" (addressof n))
     (return n)))
 
-;; a checked access of type t on x: "F t actual" first when x isn't a t; afterwards ! unless type_check_fail was called
-;; exactly then, with t and x's type
-(define-function check_before long ((t long) (x oop))
-  (if (!= t (object-type x)) (printf "F %ld %ld\n" t (object-type x)))
+;; a checked access of type t on x, refused when x isn't a t (or is an immediate, which has no field to put): "F t actual"
+;; first; afterwards ! unless type_check_fail was called exactly then, with t and x's type
+(define-function check_before long ((t long) (x oop) (refused int))	; refused: ir2's truth value
+  (if refused (printf "F %ld %ld\n" t (object-type x)))
   (return type_check_failures))
 
-(define-function check_after void ((t long) (x oop) (before long) (actual long))
-  (if (= t actual)
+(define-function check_after void ((t long) (before long) (actual long) (refused int))
+  (if (not refused)
       (if (!= before type_check_failures) (printf "!\n"))
     (if (or (!= type_check_failures (+ before 1)) (!= type_check_expected t) (!= type_check_actual actual))
 	(printf "!\n"))))
+
+;; an immediate integer (tagged): no field the unchecked accessors may touch
+(define-function immediate int ((x oop)) (return (cast (& 1 (cast x long)) int)))
 
 (define-function main int ((argc int) (argv char * *))
   (gc_initialise)
@@ -172,25 +177,25 @@
       (if (= code 3) (let ()
 		       (set f (read_long))
 		       (set v (read_long))
-		       (field-cases set (object-type x) f x v line ())))
+		       (if (not (immediate x)) (field-cases set (object-type x) f x v line ()))))
       (if (= code 4) (let ()
 		       (set f (read_long))
-		       (field-cases look (object-type x) f x 0 line (printf "-\n"))))
+		       (if (immediate x) (printf "-\n") (field-cases look (object-type x) f x 0 line (printf "-\n")))))
       (if (= code 5) (let ()
 		       (set t (read_long))
 		       (set f (read_long))
 		       (set actual (object-type x))
-		       (set before (check_before t x))
+		       (set before (check_before t x (!= t actual)))
 		       (field-cases get t f x 0 line ())
-		       (check_after t x before actual)))
+		       (check_after t before actual (!= t actual))))
       (if (= code 6) (let ()
 		       (set t (read_long))
 		       (set f (read_long))
 		       (set v (read_long))
 		       (set actual (object-type x))
-		       (set before (check_before t x))
+		       (set before (check_before t x (or (!= t actual) (immediate x))))
 		       (field-cases put t f x v line ())
-		       (check_after t x before actual)))
+		       (check_after t before actual (or (!= t actual) (immediate x)))))
       (if (= code 7) (printf "%ld\n" (object-type x)))
       (if (= code 8) (gc_gcollect))
       (set line (+ line 1))))

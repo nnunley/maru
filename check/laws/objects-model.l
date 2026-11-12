@@ -4,8 +4,8 @@
 ;;;   (clean ops pace)           accept if no line the driver prints holds the sentinel S, reject if one does, or (crash status)
 ;;;   (ops_using ops code)       how many operations have that code
 ;;;   (made_reads ops)           how many looks and gets read a slot a constructor last filled
-;;; OBJECTS_LAW_RUN names the driver and OBJECTS_LAW_TMP a directory for its input and output (check.l's law_objects
-;;; sets both).
+;;; OBJECTS_LAW_RUN names the driver, OBJECTS_LAW_TMP a directory for its input and output, and OBJECTS_LAW_TAGGED is 1
+;;; when the driver's kernel tags its integers (check.l's law_objects sets all three).
 
 (define-function ol-env (name)
   (let ((p ((subr "getenv" "s>p") name)) (chars ()) (i 0))
@@ -74,7 +74,8 @@
       (set i (+ i 1)))
     (list-reverse! out)))
 
-;; an object is an array: its type, then its fields' values.  A value is S (nothing wrote it), () for nil, an object,
+;; an object is an array: its type, then its fields' values; a tagged integer is a Maru integer, with no fields and equal
+;; to another by value.  A value is S (nothing wrote it), () for nil, an object,
 ;; an integer, or p (a C pointer a constructor wrote)
 (define-function ol-object (type values)
   (let ((obj (array (+ 1 (list-length (ol-kinds type))))) (i 1))
@@ -82,8 +83,11 @@
     (for (j 0 (list-length (ol-kinds type))) (set-array-at obj (+ j 1) 'S))
     (list-do v values (set-array-at obj i v) (set i (+ i 1)))
     obj))
-(define-function ol-type (obj) (if obj (array-at obj 0) 0))
-(define-function ol-long (n) (ol-object 2 (list n)))
+(define *ol-tagged* ())
+(define-function ol-immediate? (obj) (long? obj))
+(define-function ol-type (obj) (cond ((not obj) 0) ((ol-immediate? obj) 2) (else (array-at obj 0))))
+;; a <long> a kernel constructor makes: an immediate when tagged (every value here fits), otherwise boxed
+(define-function ol-long (n) (if *ol-tagged* n (ol-object 2 (list n))))
 
 (define *ol-slots* ())
 (define *ol-out* ())
@@ -105,6 +109,7 @@
       (for (s 0 4) (and (not slot) (= x (array-at *ol-slots* s)) (set slot s)))
       (cond
 	(slot			(concat-strings "@" (long->string slot)))
+	((ol-immediate? x)	(concat-strings "#" (long->string x)))
 	((= 2 (ol-type x))	(concat-strings "#" (ol-show 'long (array-at x 1))))
 	(else			(concat-strings "t" (long->string (ol-type x))))))))
 (define-function ol-zero (kind) (if (= kind 'oop) "nil" "0"))
@@ -115,7 +120,7 @@
 ;; what each kernel constructor makes of a and b (check/objects-run.k's make_of), by type; another type is made raw
 (define ol-makers (array 15))
 (define-form maker (type args . body) `(set-array-at ol-makers ,type (lambda ,args ,@body)))
-(maker 2  (a b line) (ol-object 2 (list (+ (* a 64) line))))
+(maker 2  (a b line) (ol-long (+ (* a 64) line)))
 (maker 3  (a b line) (ol-object 3 (list (+ (* a 64) line))))
 (maker 4  (a b line) (ol-object 4 (list (ol-long 2) 'p)))
 (maker 5  (a b line) (ol-object 5 (list 'p 0)))
@@ -128,9 +133,10 @@
 (define-function ol-make (type a b line)
   (let ((f (array-at ol-makers type))) (if f (f a b line) (ol-object type ()))))
 
-;; a checked access of type to obj: on a mismatch "F type actual" is printed, and the access isn't made
-(define-function ol-checked (type obj)
-  (or (= type (ol-type obj))
+;; a checked access of type to obj: on a mismatch, or a put to an immediate, "F type actual" is printed, and the access
+;; isn't made
+(define-function ol-checked (type obj putting)
+  (or (and (= type (ol-type obj)) (not (and putting (ol-immediate? obj))))
       (let () (ol-print (concat-strings "F " (long->string type) " " (long->string (ol-type obj)))) ())))
 
 ;; each operation, by its code (check/objects-run.k's header), given its line and its arguments after the code
@@ -139,23 +145,23 @@
 (operation 1 (s t) (set-array-at *ol-slots* s (ol-object t ())))
 (operation 2 (s t a b) (set-array-at *ol-slots* s (ol-make t a b line)))
 (operation 3 (s f v)
-  (let* ((obj (array-at *ol-slots* s)) (w (ol-writable (ol-type obj))))
+  (let* ((obj (array-at *ol-slots* s)) (w (and (not (ol-immediate? obj)) (ol-writable (ol-type obj)))))
     (when w
       (let ((i (ol-nth w (% f (list-length w)))))
 	(set-array-at obj (+ i 1) (ol-value (ol-nth (ol-kinds (ol-type obj)) i) v line))))))
 (operation 4 (s f)
-  (let* ((obj (array-at *ol-slots* s)) (ks (ol-kinds (ol-type obj))))
+  (let* ((obj (array-at *ol-slots* s)) (ks (and (not (ol-immediate? obj)) (ol-kinds (ol-type obj)))))
     (if ks
 	(let ((i (% f (list-length ks)))) (ol-print (ol-show (ol-nth ks i) (array-at obj (+ i 1)))))
       (ol-print "-"))))
 (operation 5 (s t f)
   (let* ((obj (array-at *ol-slots* s)) (ks (ol-kinds t)) (i (% f (list-length ks))))
-    (if (ol-checked t obj)
-	(ol-print (ol-show (ol-nth ks i) (array-at obj (+ i 1))))
+    (if (ol-checked t obj ())
+	(ol-print (if (ol-immediate? obj) (long->string obj) (ol-show (ol-nth ks i) (array-at obj (+ i 1)))))
       (ol-print (ol-zero (ol-nth ks i))))))
 (operation 6 (s t f v)
   (let* ((obj (array-at *ol-slots* s)) (w (ol-writable t)) (i (ol-nth w (% f (list-length w)))))
-    (and (ol-checked t obj)
+    (and (ol-checked t obj 't)
 	 (set-array-at obj (+ i 1) (ol-value (ol-nth (ol-kinds t) i) v line)))))
 (operation 7 (s) (ol-print (long->string (ol-type (array-at *ol-slots* s)))))
 (operation 8 () ())
@@ -163,6 +169,7 @@
 
 (define-function ol-model (ops)
   (let ((line 0))
+    (set *ol-tagged* (equal "1" (ol-env "OBJECTS_LAW_TAGGED")))
     (set *ol-slots* (array 4))
     (set *ol-out* ())
     (list-do op ops (ol-step op line) (set line (+ line 1)))

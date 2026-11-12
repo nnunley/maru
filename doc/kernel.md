@@ -20,9 +20,14 @@ the oracles.
 - **Constructors**: `k_newData`, `k_newLong`/`k_getLong`, `k_newDouble`/`k_getDouble`, `k__newString`,
   `k_newStringC`, `k_newSymbolC`, `k_cons`, `k_newArray`, `k_newExpr`, `k_newForm`, `k_newFixed` and `k_newSubrC`.
   Each is eval3's, `k_`-prefixed; `C` marks one that takes a C string, widened as eval3's `mbs2wcs` widens it.
-- **Integers are boxed**, as eval3 builds them: its `TAG_INT` is off (eval3.c:37), so `newLong` always allocates a
-  `<long>` (eval3.c:212), as `k_newLong` does. eval3's tagged variant, odd words as integers, stays a build option the
-  kernel doesn't take; the object level already reads an odd word's type as `<long>`.
+- **Integers are boxed or tagged**, chosen when the kernel is compiled, as eval3's `TAG_INT` chooses (Piumarta made it
+  a switch in 306ffb0, 2011: on in eval.c, off in eval2.c and eval3.c). `kernel-tag-int` is 0, boxed as eval3 is
+  built, unless the build defines it 1 before `kernel.k`. `(if-tag-int TAGGED BOXED)` picks a branch at compile time,
+  and only that branch is compiled.
+  - Tagged, `k_newLong` makes a value whose top two bits agree an odd word, `(x << 1) | 1`, and boxes any other
+    (eval3.c:207–214).
+  - `k_getLong` reads either through the object level, which untags an odd word itself (doc/ir2-objects.md).
+  - `k_isLong` is `object-is <long>`, which an odd word is in either mode.
 - **A `<subr>`'s `imp`** is a function pointer of `(arguments env)`, called through the field.
 
 ## Lists, arrays and the printer (`kernel-lists.k`)
@@ -46,7 +51,9 @@ the oracles.
   callers.
 - **New array capacity is filled with nil**, where eval3 has it from zeroed memory (the poisoning collector would
   leave the sentinel).
-- **The printer writes to stdout only**, with `printf`. eval3's `fprint` to another stream, its globals' special
+- **The printer writes to stdout only**, with `printf`, and doesn't flush: eval3 flushes stdout after each print, but
+  the kernel can't name stdout yet, and `fflush(NULL)` would also move a stream another process shares (eval2's own
+  reading of a check, which a native check's child inherits). Flushing comes with the kernel's main (Task 6). eval3's `fprint` to another stream, its globals' special
   cases (`<the global environment>`) and `%type-names` for a boot-declared type come with the globals (Task 4); until
   then such a type prints `<type=N>`. `<data[N]>` prints the collector's size (a whole number of words) until
   kernel-gc.k keeps the length asked for.
@@ -57,8 +64,12 @@ the oracles.
 ## Checks
 
 - `kernel_native` (`check/kernel.l`, on eval2): each unit in `check/kernel/` is compiled natively after maru-gc.k
-  and kernel.k, and its main runs in a child.
-- `kernel_c` (`check/check.l`): the same units through ir-gen-c.k and the C compiler.
+  and kernel.k, and its main runs in a child, once with integers boxed and once tagged.
+- `kernel_c` (`check/check.l`): the same units through ir-gen-c.k and the C compiler, in both modes.
+- `check/kernel/longs.k` asserts round trips through `k_newLong` and `k_getLong` at 0, ±1, ±42, 2^62 − 1, 2^62,
+  −2^62, −2^62 − 1, INT64_MAX and INT64_MIN. Each is a `<long>` and an `isLong`, and it is an odd word just when the
+  kernel is tagged and the value fits. A symbol isn't an `isLong`. Through the object level, `get` of an odd word
+  answers its value and `put` to one fails its type check.
 - `check/kernel/objects.k` asserts:
   - each type's id;
   - a pair's string head (its characters and size) and long tail;
@@ -70,8 +81,11 @@ the oracles.
   tab; a binding. The drivers compare them with what `./eval3 -b boot2.l` prints for the same structures, byte for
   byte, on the poisoning collector, with a collection on every allocation. It also asserts an array grown to 100
   with nil between, an insert, an append, `car`/`cdr` of a non-pair, `cadr` and `caddr`.
-- `law_objects` (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
+- `law_objects`, in both modes (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
   generated programs over the kernel's 13 types and two of the driver's own (`<knot>`, and `<pixel>`, an atom).
+  - **Tagged**, a long a constructor makes is an immediate: the model holds it as a Maru integer, equal to another by
+    value, with no field to `look` at or `set` (the driver skips the unchecked accessors on an odd word), `get` of
+    its `bits` answering its value, and `put` refused.
   - **The programs** fill four slots raw (`new`) or by a kernel constructor, write fields through the unchecked
     accessors (`set`) or `put`, and read them through the accessors (`look`) or `get`. `get` and `put` name a type of
     their own, so most mismatch, nil included. Programs also ask `object-type` and collect.

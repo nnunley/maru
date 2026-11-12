@@ -38,12 +38,29 @@
 
 (define-function k_newData oop ((len long))	(return (new <data> len)))
 
-(define-function k_newLong oop ((bits long))
+;; Integers are boxed, as eval3 is built, or tagged, as its TAG_INT makes them (eval3.c:207-214): kernel-tag-int is 0
+;; unless the build defines it 1 before kernel.k, and (if-tag-int TAGGED BOXED) picks a branch when the kernel compiles
+(define-form kernel-tag-int-default () (if (defined? 'kernel-tag-int) () '(define kernel-tag-int 0)))
+(kernel-tag-int-default)
+(define-form if-tag-int (tagged boxed) (if (= 1 kernel-tag-int) tagged boxed))
+
+;; tagged, a value whose top two bits agree is (bits << 1) | 1, an odd word, and any other is boxed
+(if-tag-int
+ (define-function k_newLong oop ((bits long))
+   (if (>= (^ bits (<< bits 1)) 0) (return (cast (| (<< bits 1) 1) oop)))
+   (return (k_boxLong bits)))
+ (define-function k_newLong oop ((bits long))
+   (return (k_boxLong bits))))
+
+(define-function k_boxLong oop ((bits long))
   (let (((obj oop) (new <long>)))
     (set (<long>-bits obj) bits)
     (return obj)))
 
+;; the object level reads an odd word's value itself (doc/ir2-objects.md)
 (define-function k_getLong long ((x oop))	(return (get <long> bits x)))
+
+(define-function k_isLong long ((x oop))	(if (object-is <long> x) (return 1)) (return 0))
 
 (define-function k_newDouble oop ((bits double))
   (let (((obj oop) (new <double>)))

@@ -150,6 +150,31 @@ objects.
 - [ ] **Step 4: Run it and see it pass.**
 - [ ] **Step 5: Commit** with the message "kernel: lists, arrays, the printer".
 
+### Task 2b: Integers boxed or tagged, chosen when the kernel is compiled
+
+The user (2026-11-12): toggle the representation as eval3's `TAG_INT` does, boxed by default (eval3 as built). The
+history: Piumarta made integers "boxed or tagged" a switch (306ffb0, 2011), on in eval.c, off in eval2.c and eval3.c.
+
+**Files:** Modify `kernel-objects.k`, `ir2.k` (checked access to an odd word), `check/kernel.l`, `check/check.l`,
+`check/objects-run.k`, `check/laws/objects-model.l`. Create `check/kernel/longs.k`.
+
+**Interfaces:**
+- `kernel-tag-int`: 0 (boxed) unless the build defines it 1 before `kernel.k`; `(if-tag-int TAGGED BOXED)` picks a branch
+  at compile time.
+- `k_newLong`, `k_getLong` and `k_isLong` as eval3.c:207-214 in each mode: tagged, a value whose top two bits agree is
+  `(x << 1) | 1`, and any other boxes.
+- The object level, in both modes: `(get <long> bits x)` of an odd word answers its value; `put` to one fails its type
+  check (an immediate has no field).
+
+- [ ] **Step 1: Write the failing checks.** `check/kernel/longs.k`: round trips at 0, ±1, ±42, 2^62 - 1, 2^62, -2^62,
+  -2^62 - 1, INT64_MAX and INT64_MIN; tagged, the values that fit are odd words and the rest boxed; boxed, none is odd;
+  `object-type` 2 for all; `get` of an odd word, `put` to one refused. Every kernel unit and `law_objects` run in both
+  modes; the law's model knows an immediate (no field to look at or set, equal by value).
+- [ ] **Step 2: Run them and see them fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run them and see them pass**, with `native_ir2 ir2_objects` unchanged.
+- [ ] **Step 5: Commit** with the message "kernel: integers boxed or tagged, chosen at compile time".
+
 ### Task 3: The reader
 
 **Files:** Create `kernel-reader.k`, `check/kernel/reader.k`, `check/kernel/read.txt` and

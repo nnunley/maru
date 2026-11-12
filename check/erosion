@@ -15,3 +15,4 @@ erosion +1 check/kernel/objects.k: its main asserts every constructor and type i
 erosion +2 check/objects-run.k: the law's driver dispatches by type and field in typed Maru, which has no selectors: field-cases, new_of, make_of and main over CC 10
 verbosity -1 check/objects-run.k and check/laws/objects-model.l: forms none of the verbose patterns flag
 erosion -2 kernel-lists.k: many small definitions (car, cdr, arrays, the printer's parts) dilute the share held by callables over CC 10
+erosion -1 kernel task 2b: small definitions (k_boxLong, k_isLong, the mode's forms, the driver's immediate) dilute the share held by callables over CC 10
