@@ -12,7 +12,8 @@
 	(println "FAIL " what))))
 (require "check/temp.l")
 (define dir check-tmp)
-((subr "system" "s>i") (concat-strings "mkdir -p " dir))
+(require "spawn.l")
+(make-directory dir)
 (define-function write-file (path text)
   (let ((f ((subr "fopen" "ss>p") path "w")))
     ((subr "fputs" "sp>i") text f)
@@ -53,8 +54,8 @@
 ;; RAT: a clause over a fresh variable follows
 (expect "a RAT addition is accepted" (= 1 (check-proof '((1) (-1)) 1 "2 0\n0\n")))
 ;; a passing check writes nothing to disk
-((subr "system" "s>i") (concat-strings "rm -rf " (sat-keep-dir)))
+(remove-tree (sat-keep-dir))
 (sat-decide 6 pigeons)
 (expect "a refutation that checks leaves no files"
-	(not (= 0 ((subr "system" "s>i") (concat-strings "test -e " (sat-keep-dir))))))
+	(not (exists? (sat-keep-dir))))
 (and ok (println "sat proof ok"))

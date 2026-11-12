@@ -38,13 +38,15 @@
 	(or (member? name known) (let () (println "no check named: " name) (jobs-exit 1))))
       (or *requested* known))))
 
-((subr "system" "s>i") (concat-strings "rm -rf " check-tmp " && mkdir -p " check-tmp))
+(command-status (make <command> argv: (list "rm" "-rf" check-tmp)))
+(command-status (make <command> argv: (list "mkdir" "-p" check-tmp)))
 (define failed
   (run-jobs jobs check-tmp
 	    (map (lambda (name)
 		   ;; the laws' expected lines assume their written trials and seeds
-		   (cons name (concat-strings "unset MARU_LAW_SEED MARU_LAW_TRIALS; MARU_CHECK_TMP=" check-tmp "/" name
-					      " exec ./eval check/check.l " name)))
+		   (let ((argv (list "./eval" "check/check.l" name))
+			 (env (list (cons "MARU_LAW_SEED" ()) (cons "MARU_LAW_TRIALS" ()) (cons "MARU_CHECK_TMP" (concat-strings check-tmp "/" name)))))
+		     (cons name (make <command> argv: argv env: env))))
 		 names)))
 (if failed
     (let ()

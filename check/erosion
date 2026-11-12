@@ -11,3 +11,6 @@ erosion -47 a cond's clauses testing one variable against distinct constants are
 verbosity +8 grammars measured (each .g file read by tpeg and each tpeg-repl.l script by tpeg-repl.l, each rule a callable: tpeg-forms.g, choices of distinct literals one lookup): their copied lexical rules (eol, space, comment ... in grammar after grammar) are clones; alone they measure verbosity 146 and erosion 390, which leaves the whole erosion where it was
 erosion +21 review: a cond lookup ends at the first clause that tests something else, which runs before any later constant is compared (forms-lookup); the Maru files alone measure 394
 erosion +6 review: a grammar choice's lookup ends at the first alternative led by no literal, and a headerless grammar (peg.g) is rules for the running grammar, each a callable; the grammars alone measure 433
+erosion -1 the check runner without a shell: commands as argument lists and small helpers (check/spawn.l, check.l), smaller callables than the shell strings they replace
+verbosity -1 the same: argument lists are forms the verbose patterns pass
+erosion -1 no shell in the checks: system() command strings replaced by spawn.l's small helpers

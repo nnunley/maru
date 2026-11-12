@@ -6,7 +6,7 @@
 (require "law-compile.l")
 (require "grammar-gen.l")
 
-(define system (subr "system" "s"))
+(require "spawn.l")
 (define ok 1)
 (require "check/temp.l")
 (define-function expect (what c) (or c (and (println "FAIL " what) (set ok ()))))
@@ -16,7 +16,7 @@
     (<= i n)))
 (define-function child (name args)
   (let ((out (concat-strings check-tmp "/law-" name ".out")))
-    (system (concat-strings "./eval check/law-compile-test.l " args " >" out " 2>&1"))
+    (program-status (concat-list '("./eval" "check/law-compile-test.l") args) () out out)
     (contents-of-file-named out)))
 
 (define-function suite ()
@@ -84,16 +84,16 @@
   (expect "a hole fills with a number or symbol"
     (equal (template-fill 'cexpr "{n}{s}" '((n . 42) (s . y))) "42y"))
 
-  (let ((out (child "line3" "file check/laws/fixtures/error-line3.law")))
+  (let ((out (child "line3" '("file" "check/laws/fixtures/error-line3.law"))))
     (expect "a malformed file fails with its line" (has? out "line 3")))
-  (let ((out (child "dash" "file check/laws/fixtures/error-dash.law")))
+  (let ((out (child "dash" '("file" "check/laws/fixtures/error-dash.law"))))
     (expect "-- inside an expression is no comment" (has? out "line 2")))
-  (let ((out (child "comment" "file check/laws/fixtures/error-comment.law")))
+  (let ((out (child "comment" '("file" "check/laws/fixtures/error-comment.law"))))
     (expect "--1 after a claim is no comment" (has? out "line 2")))
-  (let ((out (child "hole" "hole")))
+  (let ((out (child "hole" '("hole"))))
     (expect "an unbound hole is E_TEMPLATE_PARSE naming the template"
       (and (has? out "E_TEMPLATE_PARSE") (has? out "cexpr`{x} * c`"))))
-  (let ((out (child "parse" "parse")))
+  (let ((out (child "parse" '("parse"))))
     (expect "unparseable filled text is E_TEMPLATE_PARSE" (has? out "E_TEMPLATE_PARSE")))
   (and ok (println "law compile ok")))
 

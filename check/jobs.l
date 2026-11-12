@@ -1,7 +1,6 @@
-;;; (run-jobs JOBS DIR ENTRIES): runs each entry, (name . shell command), a few at a time, its output in DIR/name.log, and
+;;; (run-jobs JOBS DIR ENTRIES): runs each entry, (name . command), a <command> (spawn.l), a few at a time, its output in DIR/name.log, and
 ;;; prints that output whole as each ends.  Answers the names of those that failed, and prints the six slowest.
-(define jobs-fork	(subr "fork" ">i"))
-(define jobs-execl	(subr "execl" "ss.>i"))
+(require "spawn.l")
 (define jobs-wait4	(subr "wait4" "ipip>i"))
 (define jobs-exit	(subr "_exit" "i"))
 (define jobs-status ((subr "malloc" "l>p") 8))
@@ -37,12 +36,11 @@
 		  " blocked " (long->string (jobs-word rusage_nvcsw))
 		  " preempted " (long->string (jobs-word rusage_nivcsw))
 		  "\n"))
-(define-function jobs-start (dir entry)
-  (let ((pid (jobs-fork)))
-    (when (= 0 pid)
-      (jobs-execl "/bin/sh" "sh" "-c" (concat-strings "exec </dev/null >" dir "/" (car entry) ".log 2>&1; " (cdr entry)) 0)
-      (jobs-exit 127))
-    pid))
+(define-function jobs-start (dir entry)	; the entry's command started, no input, its output and errors in DIR/name.log
+  (let ((c (cdr entry)) (log (concat-strings dir "/" (car entry) ".log")))
+    (set (<command>-out c) log)
+    (set (<command>-err c) log)
+    (command-start c)))
 (define-function jobs-slowest (times)
   (let ((best (car times)))
     (list-do e times (and (> (car e) (car best)) (set best e)))

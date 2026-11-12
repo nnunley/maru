@@ -10,7 +10,7 @@
 (require "check/john-allocation.l")
 (require "check/temp.l")
 
-(define system (subr "system" "s"))
+(require "spawn.l")
 (define ok 1)
 (define-function expect (what c) (or c (let () (set ok ()) (println "FAIL " what))))
 (define-function has? (str sub)
@@ -19,10 +19,9 @@
     (<= i n)))
 (define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
 (define-function run-text (text) (john-run (john-read-text text)))
-(define-function child-mode (args)	; output and errors of this file run in a child with args
-  (system (concat-strings "./eval check/john-run.l " args " >" check-tmp "/john-run.out 2>&1"))
-  (contents-of-file-named (concat-strings check-tmp "/john-run.out")))
-(define-function child (text) (child-mode (concat-strings "program '" text "'")))
+(define-function child-mode (args)	; output and errors of this file run in a child with args, a list
+  (program-output (concat-list '("./eval" "check/john-run.l") args)))
+(define-function child (text) (child-mode (list "program" text)))
 
 (define trap "create Square near blocked. create Robot position.
   make Square S 2 yes. make Square D 1 no. make Square M 2 no. make Square G 0 no. make Robot R S.
@@ -151,7 +150,7 @@
 	     "satisfied by: [ Al assign R1 Va , Al assign R3 VB , Al assign R2 Vc , Al assign R3 Vd , Al split R1 R4 , Al assign R1 VE ]")))
   (expect "the x86 allocation fills each live range, slot by slot" (john-allocation-fits?))
   ;; the memo's puzzle goal reads live-vars, a name, where each live-vars is meant
-  (expect "the puzzle allocator's goal names nothing" (has? (child-mode "puzzle") "unknown name: live-vars"))
+  (expect "the puzzle allocator's goal names nothing" (has? (child-mode '("puzzle")) "unknown name: live-vars"))
   ;; RN-2008-003 section 10: past max-time-ahead levels the best-scoring world's next move is
   ;; certain and every other branch is dropped; same path here, fewer worlds looked at
   (expect "the maze, breadth first" (equal (maze '((satisfy R reach () () ())))

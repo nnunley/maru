@@ -1,13 +1,13 @@
 ;;; check/library-mode.l -- ir-gen-c's library mode (a unit with no main): build/library-mode.dylib, made by make from
 ;;; check/library-unit.k, opens from untyped Maru and its exports answer as their C says. Prints "library mode ok".
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
 (define failures 0)
 (define-function expect (what ok)
   (if (not ok)
       (let () (set failures (+ failures 1)) (println "FAIL " what))))
-(define path (if (= 0 (system "test `uname` = Darwin")) "build/library-mode.dylib" "build/library-mode.so"))
+(define path (if (darwin?) "build/library-mode.dylib" "build/library-mode.so"))
 (define lib (dlopen path 2))		; RTLD_NOW
 (expect "the library opens" (not (= 0 lib)))
 (if (not (= 0 lib))

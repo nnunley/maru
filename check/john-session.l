@@ -65,7 +65,7 @@
 ;; R-repl: each transcript's statements piped to the REPL answer what the transcript says.  grid.session is RN-2008-003
 ;; §14's nine blocks with one departure: the memo's top-neighbor has which row = its row - 1 yet answers B3 for B2, so
 ;; it is written row + 1 here, which gives the answer the memo prints
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 (define-function starts? (s p) (and (<= (string-length p) (string-length s)) (= p (string-copy s 0 (string-length p)))))
 (define-function file-lines (path)	; its lines, each without its newline
   (let ((out ()) (start 0) (text (or (contents-of-file-named path) "")))
@@ -80,14 +80,14 @@
     (let ((f ((subr "fopen" "ss>p") in "w")))
       (list-do l (list-reverse! inputs) ((subr "fputs" "sp>i") (concat-string l "\n") f))
       ((subr "fclose" "p>i") f))
-    (system (concat-strings "./eval john-repl.l < " in " > " out " 2>&1"))
+    (program-status '("./eval" "john-repl.l") in out out)
     (expect (concat-string "transcript " name) (file-lines out) (list-reverse! want))))
 
 
 ;; blank lines after the last statement are no unfinished statement
 (let ((in (concat-string check-tmp "/blank.in")) (out (concat-string check-tmp "/blank.out")))
   (let ((f ((subr "fopen" "ss>p") in "w"))) ((subr "fputs" "sp>i") "create C n.\n\n  \n" f) ((subr "fclose" "p>i") f))
-  (system (concat-strings "./eval john-repl.l < " in " > " out " 2>&1"))
+  (program-status '("./eval" "john-repl.l") in out out)
   (expect "trailing blank lines" (file-lines out) '("ok.")))
 ;; a relation one file declares, another file and the prompt use
 (let ((a (concat-string check-tmp "/rel-a.john")) (b (concat-string check-tmp "/rel-b.john"))
@@ -97,7 +97,7 @@
     ((subr "fclose" "p>i") f))
   (let ((f ((subr "fopen" "ss>p") b "w"))) ((subr "fputs" "sp>i") "qualify Box tiny if it smaller L.\n" f) ((subr "fclose" "p>i") f))
   (let ((f ((subr "fopen" "ss>p") in "w"))) ((subr "fputs" "sp>i") "S tiny.\nS smaller L.\n" f) ((subr "fclose" "p>i") f))
-  (system (concat-strings "./eval john-repl.l " a " " b " < " in " > " out " 2>&1"))
+  (program-status (list "./eval" "john-repl.l" a b) in out out)
   (expect "relations carry across files and to the prompt" (file-lines out) '("yes" "yes")))
 ;; recover.l loaded before john-eval.l keeps its try
 (let ((script (concat-string check-tmp "/order.l")) (out (concat-string check-tmp "/order.out")))
@@ -105,7 +105,7 @@
     ((subr "fputs" "sp>i") "(require \"recover.l\") (require \"john-eval.l\") (john-begin) (set *john-echo* 1)
 (list-do s (john-read-text \"create C n. C fly.\") (list-do l (john-enter s) (println l)))\n" f)
     ((subr "fclose" "p>i") f))
-  (system (concat-strings "./eval " script " > " out " 2>&1"))
+  (program-status (list "./eval" script) () out out)
   (expect "recover.l first, then john-eval.l" (file-lines out) '("ok." "john: no property or qualification fly of C")))
 
 (if ok (println "john session ok") (exit 1))

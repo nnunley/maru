@@ -1,5 +1,6 @@
 ;;; ksworld-pp.l -- Deserializer and object model for KSWorld / Frank (.pp bundles)
 
+(require "spawn.l")	; curl started directly
 (require "st-classes.l")
 ;; an object's slots are a hash table (hash.l), keyed by identity, as an IdentityDictionary's (every KSWorld object is one),
 ;; or by equality for a Dictionary (and its subclasses); its class is a Maru type (st-classes.l)
@@ -258,7 +259,7 @@
   (if (or (= 0 (string-compare path "http://" 0 7))
 	  (= 0 (string-compare path "https://" 0 8)))
       (let ((tmp "/tmp/ksworld-download.pp"))
-	((subr "system" "s>i") (concat-strings "curl -sL \"" path "\" -o " tmp))
+	(program-status (list "curl" "-sL" path "-o" tmp))
 	(car (read tmp)))
     (car (read path))))
 

@@ -1,7 +1,7 @@
 ;;; compile-irl.l --library compiles two irl files into one shared library (built by make), its exported
 ;;; functions called by address from untyped Maru; a top-level statement in library mode
 ;;; is an error.  Prints "irl library ok".
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
 (define ok 1)
@@ -16,9 +16,9 @@
     (<= i n)))
 (require "check/temp.l")
 (define dir check-tmp)
-(system (concat-strings "mkdir -p " dir))
+(make-directory dir)
 ;; make builds build/irl-lib.dylib (make check's CHECK_LIBS) from check/irl-lib-a.irl and -b.irl
-(define shlib (if (= 0 (system "test `uname` = Darwin")) "dylib" "so"))
+(define shlib (if (darwin?) "dylib" "so"))
 (let ((lib (dlopen (concat-string "build/irl-lib." shlib) 2)))	; RTLD_NOW
   (expect "the library opens by absolute path" (not (= 0 lib)))
   (or (= 0 lib)
@@ -36,12 +36,9 @@
 	(let ((init (dlsym lib "initialised")))
 	  (expect "globals keep their initialisers" (and (not (= 0 init)) (= (+ 46 ?i) ((subr init ">l")))))))))
 ;; a library has no main, so a statement at its top level would never run
-(system (concat-strings "printf 'printf(\"x\");\\n' > " dir "/irl-lib-bad.irl"))
-(system (concat-strings "./eval compile-irl.l --library "
-			dir
-			"/irl-lib-bad.irl > "
-			dir
-			"/irl-lib-bad.out 2>&1"))
+(contents-to-file-named "printf(\"x\");\n" (concat-string dir "/irl-lib-bad.irl"))
+(program-status (list "./eval" "compile-irl.l" "--library" (concat-string dir "/irl-lib-bad.irl"))
+		() (concat-string dir "/irl-lib-bad.out") (concat-string dir "/irl-lib-bad.out"))
 (expect "a top-level statement in library mode is an error"
 	(has? (contents-of-file-named (concat-string dir "/irl-lib-bad.out"))
 	      "irl library: top-level statement in"))

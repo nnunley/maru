@@ -8,7 +8,8 @@
 
 (define-structure <png> (width height pixels))
 
-(define png-library-path (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin")) "build/png.dylib" "build/png.so"))
+(require "spawn.l")
+(define png-library-path (if (darwin?) "build/png.dylib" "build/png.so"))
 (define png-library
   (let ((lib ((subr "dlopen" "si>p") png-library-path 2)))
     (and (= 0 lib) (error "png: " png-library-path " not built; run make " png-library-path))

@@ -6,7 +6,7 @@
 (require "john-sat.l")
 (require "check/john-allocation.l")
 
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 (define ok 1)
 (require "check/temp.l")
 (define-function expect (what c)
@@ -18,11 +18,7 @@
   (let ((i 0) (n (- (string-length str) (string-length sub))))
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (<= i n)))
-(define-function child (text)
-  (system (concat-strings "./eval check/sat-john.l program '"
-			  text
-			  "' >" check-tmp "/sat-john.out 2>&1"))
-  (contents-of-file-named (concat-strings check-tmp "/sat-john.out")))
+(define-function child (text) (program-output (list "./eval" "check/sat-john.l" "program" text)))	; its output and errors
 
 ;; a child: run TEXT and stop
 (define-function run-child (text)

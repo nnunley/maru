@@ -8,7 +8,7 @@
 	 (let ((chars ()) (i 0))
 	   (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
 	   (list->string (list-reverse! chars))))))
-;; only letters, digits, and - and . survive, so the name is one safe word in any shell command
+;; only letters, digits, and - and . survive, so the name is one plain word in a path
 (define-function checkout-name ()
   (let* ((buffer ((subr "malloc" "l>p") 4096))
 	 (_ ((subr "getcwd" "pl>p") buffer 4096))
@@ -34,4 +34,5 @@
     (if named
 	(if (safe-tmp? named) named (error "MARU_CHECK_TMP must be a plain path under /tmp/: " named))
       (concat-strings "/tmp/maru-check/" (checkout-name)))))
-((subr "system" "s>i") (concat-strings "mkdir -p " check-tmp))
+(require "spawn.l")
+(command-status (make <command> argv: (list "mkdir" "-p" check-tmp)))

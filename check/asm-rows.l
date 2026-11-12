@@ -9,7 +9,7 @@
 ;;; rows must refuse are tried with asm-attempt.  The last line is
 ;;; "asm rows ISA ok" only when everything holds.
 
-(define system (subr "system" "s"))
+(require "spawn.l")
 (define isa (string->symbol (next-argument)))
 (define tmp (next-argument))
 
@@ -67,7 +67,7 @@
 (define isa-text		(if (= isa 'arm64) arm64-text x86-text))
 (define isa-skip?		(if (= isa 'arm64) arm64-skip? (lambda (row ops) ())))
 (define isa-refused		(cond ((= isa 'arm64) arm64-refused) ((= isa 'x64) x64-refused) (else x86-refused)))
-(define isa-clang		(cond ((= isa 'arm64) "-target arm64-apple-macos") ((= isa 'x64) "-target x86_64-pc-linux") (else "-target i386-pc-linux")))
+(define isa-clang		(list "-target" (cond ((= isa 'arm64) "arm64-apple-macos") ((= isa 'x64) "x86_64-pc-linux") (else "i386-pc-linux"))))
 (define isa-section		(if (= isa 'arm64) "__text" ".text"))
 (set x86-sample-mode isa)
 
@@ -135,8 +135,9 @@
 
 ;; clang's bytes, from objdump -s's hex dump of the text section.
 (define base (concat-strings tmp "/" (symbol->string isa)))
-(system (concat-strings "/usr/bin/clang " isa-clang " -c " base ".s -o " base ".o && "
-			"$(command -v llvm-objdump || echo /usr/bin/objdump) -s -j " isa-section " " base ".o > " base ".dump"))
+(and (= 0 (program-status (concat-list (cons "/usr/bin/clang" isa-clang) (list "-c" (concat-string base ".s") "-o" (concat-string base ".o")))))
+     (program-status (list (or (find-program "llvm-objdump") "/usr/bin/objdump") "-s" "-j" isa-section (concat-string base ".o"))
+		     () (concat-string base ".dump")))
 
 (define-function hex-digit (c)
   (cond ((and (<= ?0 c) (<= c ?9)) (- c ?0)) ((and (<= ?a c) (<= c ?f)) (+ 10 (- c ?a))) (else ())))

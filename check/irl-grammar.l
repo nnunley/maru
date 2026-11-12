@@ -3,7 +3,7 @@
 ;;; actions are maru.k forms passed through ([R-irl-grammar], draft-ndn-maru-sat-00).
 ;;; Prints "irl grammar ok".
 (require "text-parser.l")
-(define system (subr "system" "s"))
+(require "spawn.l")
 (define ok 1)
 (define-function expect (what c)
   (or c
@@ -13,7 +13,7 @@
 (require "check/temp.l")
 (define dir check-tmp)
 ;; make builds both grammars and the irl library below (make check's CHECK_LIBS)
-(system (concat-strings "mkdir -p " dir))
+(make-directory dir)
 (load "build/tpeg-foreign-a.g.l")
 (load "build/tpeg-foreign-b.g.l")
 (define-function try (rule s)
@@ -25,7 +25,7 @@
   (let ((i 0) (n (- (string-length str) (string-length sub))))
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (<= i n)))
-(define shlib (if (= 0 ((subr "system" "s>i") "test `uname` = Darwin")) "dylib" "so"))
+(define shlib (if (darwin?) "dylib" "so"))
 (let ((lib ((subr "dlopen" "si>p") (concat-string "build/irl-grammar." shlib) 2)))
   (expect "the grammar library builds and opens" (not (= 0 lib)))
   (or (= 0 lib)
@@ -40,15 +40,8 @@
 (define-function compile-text (name text)
   (let ((f ((subr "fopen" "ss>p") (concat-strings dir "/" name ".irl") "w")))
     ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f))
-  (system (concat-strings "./eval compile-irl.l --library "
-			  dir
-			  "/"
-			  name
-			  ".irl > "
-			  dir
-			  "/"
-			  name
-			  ".out 2>&1"))
+  (let ((out (concat-strings dir "/" name ".out")))
+    (program-status (list "./eval" "compile-irl.l" "--library" (concat-strings dir "/" name ".irl")) () out out))
   (contents-of-file-named (concat-strings dir "/" name ".out")))
 (expect "a left-recursive rule is an error naming it"
 	(has? (compile-text "irl-grammar-lr"

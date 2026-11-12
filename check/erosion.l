@@ -7,7 +7,7 @@
 (define-function expect (what got want)
   (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
 (define fixtures (concat-strings check-tmp "/erosion-fixtures"))
-((subr "system" "s") (concat-strings "mkdir -p " fixtures))
+(make-directory fixtures)
 (define fixture-count 0)
 (define-function read-text (text)	; the forms Maru's reader makes of text, through a file of its own
   (let ((path (concat-strings fixtures "/f" (long->string (set fixture-count (+ fixture-count 1))) ".l")))

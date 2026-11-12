@@ -7,13 +7,13 @@
 (define dlopen (subr "dlopen" "si>p"))
 (define dlsym (subr "dlsym" "ps>p"))
 (require "ksworld-pp.l")
-(define system (subr "system" "s>i"))
+(require "spawn.l")
 
 (require "gezira.l")
 
 ;; the library's shared object, by the platform's suffix, opened once from the tree (as make builds it)
 (define gezira-lib-path
-  (if (= 0 (system "test `uname` = Darwin")) "build/gezira.dylib" "build/gezira.so"))
+  (if (darwin?) "build/gezira.dylib" "build/gezira.so"))
 (define gezira-lib (dlopen gezira-lib-path 2))		; RTLD_NOW
 (define-function gezira-entry (name sig)
   (let ((f (if (= 0 gezira-lib) 0 (dlsym gezira-lib name))))

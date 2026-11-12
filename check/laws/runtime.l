@@ -14,9 +14,9 @@
     (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
     (list->string (list-reverse! chars))))
 
-(define system (subr "system" "s>i"))
-(define-function rt_shell (cmd)
-  (or (= 0 (system cmd)) (error "runtime: nonzero exit running " cmd)))
+(require "spawn.l")
+(define-function rt_run_program (argv in out err)	; the driver run to its end, or an error naming it
+  (or (= 0 (program-status argv in out err)) (error "runtime: nonzero exit running " argv)))
 (define fopen (subr "fopen" "ss>p"))
 (define fprintf (subr "fprintf" "ps.>i"))
 (define fclose (subr "fclose" "p>i"))
@@ -42,8 +42,7 @@
     (or (and f (!= 0 f)) (error "runtime: can't write " in))
     (list-do x ints (fprintf f "%ld\n" x))
     (fclose f)
-    (rt_shell (concat-strings (rt_env "NILE_LAW_RUNTIME") " " (long->string workers) " " mode " " (long->string w)
-			      " < " in " > " out))
+    (rt_run_program (list (rt_env "NILE_LAW_RUNTIME") (long->string workers) mode (long->string w)) in out ())
     (rt_numbers (contents-of-file-named out))))
 
 (define-function run_on (kind workers xs) (rt_run kind workers 10 xs))
@@ -224,8 +223,7 @@
     (or (and f (!= 0 f)) (error "runtime: can't write " in))
     (list-do x ints (fprintf f "%ld\n" x))
     (fclose f)
-    (rt_shell (concat-strings (rt_env "NILE_LAW_RUNTIME") " " (long->string workers) " " kind " " (long->string w)
-			      " " (rt_pct_text s) " < " in " > " out " 2>/dev/null"))
+    (rt_run_program (list (rt_env "NILE_LAW_RUNTIME") (long->string workers) kind (long->string w) (rt_pct_text s)) in out "/dev/null")
     (let* ((text (contents-of-file-named out))
 	   (end (string-length text))
 	   (k (- end 2)))
