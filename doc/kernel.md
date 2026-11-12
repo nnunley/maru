@@ -53,6 +53,31 @@ the oracles.
   `(path . line)`, and every pair the reader makes takes it (`k_newPairFrom`).
 - `k_initReader` makes the symbol table and the symbols the reader reads specially, and roots them.
 
+## Environments, expand, encode, eval and apply (`kernel-eval.k`)
+
+- **Environments are alists**, as eval3's (eval3.c:440-520). A namespace's head is a binding whose tail is the
+  namespace itself (`k_findEnvironment`). `k_findVariable` finds a name's binding, the global namespace's through
+  eval3's cache of 2003 slots by the name's address. `k_findNamespaceVariable` looks only in env's own namespace,
+  `k_lookup` answers the value, and `k_define` puts a new binding `(name . value)` at the front of the namespace, after
+  its head, and answers it.
+- **`k_expand`** (eval3.c:1150) applies a `<form>`'s function to the unevaluated arguments, and a symbol's form to
+  the symbol, then expands the result again, giving it the source of what it replaced. `(set (NAME args…) value)`
+  becomes `(set-NAME args… value)`. `quote`'s argument isn't expanded.
+- **`k_encode`** (eval3.c:1212) warns once about each name bound nowhere, and about a call whose arguments don't
+  match its global `<expr>`'s formals. eval3 runs it only with `-g`.
+- **`k_eval`** (eval3.c:1545): undefined, long, double, string, form, subr and fixed are themselves; a symbol is its
+  binding's value, or a fatal "undefined variable"; a pair applies its head, a `<fixed>`'s function to the arguments
+  unevaluated, anything else to the arguments evaluated (`k_evlist`). Each pair is pushed on the trace stack that a
+  fatal error prints. Any other type is a fatal "cannot eval", as in eval3, whose `*evaluators*` hook is commented out.
+- **`k_apply`** (eval3.c:1611): an `<expr>` binds its formals (a rest formal takes the remaining arguments) onto the
+  environment it closed over and evaluates its body; a `<fixed>` applies its function; a `<subr>` is called through
+  its `imp` with `(arguments env)`; any other type through its `*applicators*` entry, with itself first, or is a fatal
+  "cannot apply".
+- **`k_initEval`** makes the global namespace and binds `*globals*`, `*expanders*`, `*encoders*`, `*evaluators*`,
+  `*applicators*`, `*backtrace*`, `*input*` and `*output*` in it, as eval3's main does, and roots them.
+- **Fatal errors** print the message and its objects, then `*backtrace*`'s answer if it is bound, or else the trace
+  stack with each expression's source, and exit.
+
 ## Departures from eval3
 
 - **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object
@@ -73,6 +98,12 @@ the oracles.
 - **An empty `[]` or `{}` reads as `(bracket)` or `(brace)`.** eval3 crashes on them: `newPairFrom` reads the source
   of nil. The kernel's source of nil is nil, the Null Object choice.
 - **The reader's errors print to stdout** and exit, as its fatal errors will until the REPL's error handling (Task 6).
+- **eval's fatal errors and encode's warnings print to stdout**, until the printer has a stream (Task 6); eval3
+  writes them to stderr.
+- **A foreign `<subr>`** (one with a `sig`, made by eval3's `subr` through libffi) is a fatal error in `k_apply` until
+  Task 5 decides the FFI.
+- **The undo log isn't there yet.** eval3's `define` and `set` note what they change in it; Task 5 decides it with
+  the primitives.
 - **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6). Each failure is
   counted and its ids kept (`type_check_failures`, `type_check_expected`, `type_check_actual`). A driver that clears
   `type_check_fatal` has `get` answer 0 and `put` write nothing instead.
@@ -93,6 +124,14 @@ the oracles.
   - a double, a symbol's characters, an array of 100, and an expr's three fields;
   - a subr called through its `imp`, natively too;
   - a list of 2,000 rooted pairs summing correctly with a collection on every allocation (`gc_frequency` 1).
+- `check/kernel/eval.k` reads `check/kernel/eval.txt`, expands and evaluates each expression in the global namespace
+  and dumps its value, on the poisoning collector with a collection on every allocation. The drivers compare the
+  lines with `check/kernel/eval.expected`, what `./eval3 -b boot2.l` prints for the same expressions: a closure kept
+  past its caller, recursion 1,000 deep, a `<form>` expanding both ways, `let` and `set`, an `*applicators*` entry
+  applying a `<long>`, and `quote`. Its subrs and fsubrs (`+`, `-`, `<`, `cons`, `car`, `form`, `set-array-at`,
+  `quote`, `lambda`, `if`, `set`, `let`, `define`) are minimal stand-ins for Task 5's, each called through its `imp`,
+  natively too. maru-gc.k's "N collections" progress lines are left out of the comparison until kernel-gc.k replaces
+  it.
 - `check/kernel/lists.k` prints four structures with `k_print` and `k_dumpln`: a list of a string with `"` and `\`,
   a symbol, a negative long, a double, nil, an array with a hole, a dotted pair and an empty array; a string with a
   tab; a binding. The drivers compare them with what `./eval3 -b boot2.l` prints for the same structures, byte for

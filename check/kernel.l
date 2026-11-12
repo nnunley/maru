@@ -7,7 +7,7 @@
 ;; one unit for all the check files, so the kernel compiles once a mode: maru-gc.k up to its real main, the integers'
 ;; mode (kernel-tagged-int, boxed unless the prefix says), kernel.k's sections, then each check with its main renamed
 ;; main_NAME, and a main that runs the one its first argument names
-(define kernel-units '("objects" "longs" "lists" "reader"))
+(define kernel-units '("objects" "longs" "lists" "reader" "eval"))
 (define-function kernel-unit (prefix)
   (let* ((gc (contents-of-file-named "maru-gc.k"))
 	 (main (let ((i 0)) (while (not (prefix-at? "\n(define-function main " gc i)) (set i (+ i 1))) i))
@@ -37,13 +37,24 @@
   "(\"he\\\"l\\\\lo\" sym -42 3.500000 () Array<3>(1 () \"s\") (1 . 2) Array<0>())"
   "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
 
-;; what ./eval3 -b boot2.l prints for check/kernel/read.txt (check/kernel/read.expected), then the unit's last line
-(define kernel-reader-printed
-  (let ((text (contents-of-file-named "check/kernel/read.expected")) (out ()) (start 0) (i 0))
+;; a file's lines, then a unit's last line: what ./eval3 -b boot2.l prints, kept in check/kernel/*.expected
+(define-function kernel-expected (path last-line)
+  (let ((text (contents-of-file-named path)) (out ()) (start 0) (i 0))
     (while (< i (string-length text))
       (and (= 10 (string-at text i)) (let () (push out (string-copy text start (- i start))) (set start (+ i 1))))
       (set i (+ i 1)))
-    (list-reverse! (cons "kernel reader ok" out))))
+    (list-reverse! (cons last-line out))))
+(define kernel-reader-printed (kernel-expected "check/kernel/read.expected" "kernel reader ok"))
+(define kernel-eval-printed (kernel-expected "check/kernel/eval.expected" "kernel eval ok"))
+
+;; a unit's lines less maru-gc.k's "N collections" progress lines (its gcdebug, on as Piumarta left it), which a unit
+;; that collects on every allocation prints, until kernel-gc.k replaces maru-gc.k in the kernel
+(define-function kernel-gc-line? (l)
+  (let ((i 0))
+    (while (and (< i (string-length l)) (<= ?0 (string-at l i)) (<= (string-at l i) ?9)) (set i (+ i 1)))
+    (and (< 0 i) (= (- (string-length l) i) 12) (prefix-at? " collections" l i))))
+(define-function kernel-run (image unit)
+  (let ((out ())) (list-do l (native-run-main image (list unit)) (or (kernel-gc-line? l) (push out l))) (list-reverse! out)))
 
 ;; each unit with integers boxed (eval3 as built), then tagged (its TAG_INT)
 (list-do mode '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged"))
@@ -52,6 +63,7 @@
     (expect (concat-string "check/kernel/objects.k" tag) (last (native-run-main image '("objects"))) "kernel objects ok")
     (expect (concat-string "check/kernel/longs.k" tag) (last (native-run-main image '("longs"))) "kernel longs ok")
     (expect (concat-string "check/kernel/lists.k" tag) (native-run-main image '("lists")) kernel-lists-printed)
-    (expect (concat-string "check/kernel/reader.k" tag) (native-run-main image '("reader")) kernel-reader-printed)))
+    (expect (concat-string "check/kernel/reader.k" tag) (native-run-main image '("reader")) kernel-reader-printed)
+    (expect (concat-string "check/kernel/eval.k" tag) (kernel-run image "eval") kernel-eval-printed)))
 
 (println (if ok "kernel ok" "kernel FAILED"))

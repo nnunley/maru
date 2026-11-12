@@ -762,6 +762,12 @@
 					    (contents-of-file-named file))
 			    path)
     path))
+;; maru-gc.k's "N collections" progress line (its gcdebug, on as Piumarta left it), which a kernel unit collecting on
+;; every allocation prints; the kernel checks leave it out until kernel-gc.k replaces maru-gc.k in the kernel
+(define-function kernel-gc-line? (l)
+  (let ((i 0))
+    (while (and (< i (string-length l)) (<= ?0 (string-at l i)) (<= (string-at l i) ?9)) (set i (+ i 1)))
+    (and (< 0 i) (= (- (string-length l) i) 12) (equal (string-copy l i 12) " collections"))))
 ;; the kernel's two modes for its integers: boxed (eval3 as built), and tagged (eval3's TAG_INT)
 (define kernel-modes '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged")))
 ;; the lines ./eval3 -b boot2.l prints for check/kernel/lists.k's structures
@@ -776,6 +782,7 @@
 				(run name (ir2-build name (kernel-c-unit gc name (concat-strings "check/kernel/" u ".k") (car mode))))))))
 	(unit-assert (equal (unit "lists") kernel-lists-printed))
 	(unit-assert (equal (unit "reader") (concat-list (lines (contents-of-file-named "check/kernel/read.expected")) '("kernel reader ok"))))
+	(unit-assert (equal (select (lambda (l) (not (kernel-gc-line? l))) (unit "eval")) (concat-list (lines (contents-of-file-named "check/kernel/eval.expected")) '("kernel eval ok"))))
 	(unit-assert (equal (last (unit "objects")) "kernel objects ok"))
 	(unit-assert (equal (last (unit "longs")) "kernel longs ok"))))))
 ;; the kernel's objects over generated programs (check/laws/objects.law), in both modes: check/objects-run.k after

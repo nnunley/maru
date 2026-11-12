@@ -3,3 +3,4 @@
 (load "kernel-objects.k")
 (load "kernel-lists.k")
 (load "kernel-reader.k")
+(load "kernel-eval.k")
