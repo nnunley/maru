@@ -1,9 +1,10 @@
 ;;; erosion-run.l -- ./eval erosion-run.l [--ledger FILE] [--unread FILE... --] FILE... measures the files (erosion.l) and prints
 ;;; their erosion and verbosity, per mille, then the ten callables of greatest mass.  With --ledger, each metric must equal
 ;;; the sum of the ledger's entries (erosion-ledger), and the last line says whether they do.
-;;; Each file is read by Maru's own reader.  A file after --unread is one it can't read whole, as a file that changes
-;;; language partway (test-pepsi.l) can't: it's not measured, and it must still fail to read, so the list doesn't outlive
-;;; its reason.
+;;; Each file is read by its own reader (erosion-read-file): a .g file by tpeg, a script tpeg-repl.l reads by it, any other
+;;; by Maru's.  A file after --unread is one it can't read whole, as a file that changes language partway (test-pepsi.l)
+;;; or is broken on purpose (check/tpeg-broken.g) can't: it's not measured, and it must still fail to read, so the list
+;;; doesn't outlive its reason.
 (require "erosion.l")
 (require "recover.l")
 (define ledger ())
@@ -14,12 +15,12 @@
   (while (and *arguments* (not (= "--" (car *arguments*)))) (push unread (next-argument)))
   (next-argument))
 (list-do path unread
-  (and (try (let () (find-and-read path) 't) (lambda (c) ()))
+  (and (try (let () (erosion-read-file path) 't) (lambda (c) ()))
        (error "erosion: " path " reads whole now: measure it (take it off --unread)")))
 (define sources ())
 (while *arguments*
   (let ((path (next-argument)))
-    (push sources (cons path (find-and-read path)))))
+    (push sources (cons path (erosion-read-file path)))))
 (let ((m (erosion-of (list-reverse! sources))) (ranked ()))
   (println "erosion " (<erosion-metrics>-erosion m) " verbosity " (<erosion-metrics>-verbosity m))
   (println (list-length (<erosion-metrics>-callables m)) " callables, " (<erosion-metrics>-forms m) " forms, "

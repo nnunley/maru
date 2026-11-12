@@ -24,6 +24,12 @@
 (expect "a straight line is 1" (cc-of "(define-function f (x) (g x) (h x))") 1)
 (expect "an if is 2" (cc-of "(define-function f (x) (if x 1 2))") 2)
 (expect "a cond of three clauses and an else is 4" (cc-of "(define-function f (x) (cond (a 1) (b 2) (c 3) (else 4)))") 4)
+;; a cond's clauses testing one variable against distinct constants are one lookup, a decision once
+(expect "a cond on distinct constants is one decision"
+	(cc-of "(define-function f (x) (cond ((= x 1) a) ((= x \"s\") b) ((= x 'k) c) ((= 0 x) d) (else e)))") 2)
+(expect "a constant met again, and any other test, is tried in turn"
+	(cc-of "(define-function f (x) (cond ((= x 1) a) ((= x 1) b) ((g x) c)))") 4)
+(expect "only tests of one variable are its lookup" (cc-of "(define-function f (x y) (cond ((= x 1) a) ((= y 2) b)))") 3)
 (expect "(and a b c) is 3" (cc-of "(define-function f () (and a b c))") 3)
 (expect "loops and when are decisions" (cc-of "(define-function f (l) (list-do x l (when x (while y (z)))))") 4)
 (expect "a nested lambda counts toward its definition" (cc-of "(define-function f () (map (lambda (x) (if x 1 2)) l))") 2)
@@ -90,6 +96,58 @@
 	333)
 (expect "a quasiquoted template's decisions belong to the code it makes; an unquoted part's are the callable's"
 	(list (cc-of "(define-form w (c . b) `(if ,c (let () ,@b)))") (cc-of "(define-form w (c) `(f ,(if c 1 2)))")) '(1 2))
+
+;; grammars: each rule a callable, read as tpeg reads a .g file (erosion-read-file); a decision is each alternative past the
+;; first, each repetition and each predicate, and the decisions in a rule's actions; a form is each node of the rule's tree
+(define-function grammar-text (rules) (concat-strings "<g> : <text-parser> ()\n" rules))
+(define-function read-grammar (text)	; the forms erosion reads from a .g file holding text
+  (let ((path (concat-strings fixtures "/f" (long->string (set fixture-count (+ fixture-count 1))) ".g")))
+    (contents-to-file-named text path)
+    (erosion-read-file path)))
+(define-function grammar-callables (rules) (<erosion-metrics>-callables (erosion-of (list (cons "g.g" (read-grammar (grammar-text rules)))))))
+(define-function grammar-cc (rules) (map (lambda (c) (<callable>-cc c)) (grammar-callables rules)))
+(define-function grammar-forms (rules) (map (lambda (c) (<callable>-forms c)) (grammar-callables rules)))
+(expect "each rule is a callable, named by its rule" (map (lambda (c) (<callable>-name c)) (grammar-callables "a = \"x\" ;\nb = a ;")) '(a b))
+(expect "a sequence is 1, two alternatives 2, three 3" (grammar-cc "a = \"x\" \"y\" ;\nb = x | y ;\nc = x | y | z ;") '(1 2 3))
+;; a choice's alternatives led by distinct literals (a string, an object, a list pattern's literal head) are one lookup on
+;; the next element, a decision if it has two keys or more; every other alternative is tried in turn, a decision each
+(expect "distinct literals are one lookup, however many" (grammar-cc "a = \"x\" | \"y\" | \"z\" ;\nb = 'p . | 'q . | 'r ;") '(2 2))
+(expect "a list pattern's literal head is its key" (grammar-cc "a = `( 'add . ) | `( 'mul . ) | `( 'neg ) ;") '(2))
+(expect "a choice of literals leading an alternative is its keys, and a lookup of its own"
+	(grammar-cc "a = ('p | 'q) . | 'r | 's ;") '(3))
+(expect "strings are keyed by their first character: \"ab\" and \"ac\" are tried after \"a\""
+	(grammar-cc "a = \"a\" | \"ab\" | \"ac\" ;") '(3))
+(expect "a literal met again is tried in turn" (grammar-cc "a = \"x\" \"y\" | \"x\" \"z\" ;") '(2))
+(expect "a key met again is tried in turn, beside a lookup of two" (grammar-cc "a = 'x b | 'x c | 'y ;") '(3))
+(expect "a lookup and an alternative after it" (grammar-cc "a = \"x\" | \"y\" | b ;\nc = \"x\" | b ;") '(3 2))
+(expect "each repetition is a decision" (grammar-cc "a = \"x\"* \"y\"? \"z\"+ ;") '(4))
+(expect "a predicate is a decision, and its action's decisions are the rule's"
+	(grammar-cc "a = !\"x\" . ;\nb = .:n &-> (cond (n 1) (else 2)) ;\nc = .:n -> (if n 1 2) ;") '(2 3 2))
+(expect "the rule, its sequence and its matches are forms; an empty parameter list isn't"
+	(grammar-forms "a = \"x\" \"y\" ;") '(4))
+(expect "a binding, an action and the action's lists are forms" (grammar-forms "a = \"x\":v -> (list v) ;") '(6))
+(expect "a rule's parameters are a form" (grammar-forms "a :p = \"x\" ;") '(3))
+(expect "an object literal is data, no form inside it" (grammar-forms "a = '(1 2) ;") '(2))
+(expect "a call's arguments are Maru forms" (grammar-forms "a = {b (f 1)} ;") '(3))
+
+;; a script tpeg-repl.l reads (#!./eval tpeg-repl.l) is read by it: its Maru forms and its blocks, not the input a block takes
+(define-function read-script (text)
+  (let ((path (concat-strings fixtures "/f" (long->string (set fixture-count (+ fixture-count 1))) ".l")))
+    (contents-to-file-named text path)
+    (erosion-read-file path)))
+(expect "a script's forms are its code and its blocks; a block's input isn't read"
+	(map car (read-script "#!./eval tpeg-repl.l\n(define-function f (x) x)\n{\n  <s> : <text-parser> ()\n  w = [a-z]+ ;\n}\n{ ([ \\n]* w)* [ \\n]* \".\" }\nnot a form here .\n(f 1)\n"))
+	'(define-function grammar-define grammar-eval f))
+(expect "a span after the script's own output without a newline is still read"
+	(map car (read-script "#!./eval tpeg-repl.l\n(print \"no newline\")\n(define-function g () 1)\n")) '(print define-function))
+(expect "a script that fails while it runs isn't measured in part: erosion stops, saying so"
+	(try (let () (read-script "#!./eval tpeg-repl.l\n(define-function g () 1)\n(error \"broken\")\n(define-function h () 2)\n") 'read)
+	     (lambda (c) 'refused))
+	'refused)
+(expect "its rules and functions are callables"
+	(map (lambda (c) (<callable>-name c))
+	     (<erosion-metrics>-callables (erosion-of (list (cons "s.l" (read-script "#!./eval tpeg-repl.l\n(define-function f (x) x)\n{\n  <s2> : <text-parser> ()\n  w = [a-z]+ ;\n}\n"))))))
+	'(w f))
 
 ;; the ratchet: a metric that moved without an entry doesn't match its ledger, and does with one
 (define m (make <erosion-metrics> erosion: 400 verbosity: 75))

@@ -1,9 +1,10 @@
 ;;; erosion.l -- SlopCodeBench's erosion and verbosity (Orlanski et al., NeurIPS 2026) over Maru source, counted in forms, as
 ;;; doc/plans/2026-11-10-erosion-by-reflection.md has them.  (erosion-of sources), sources ((path . forms) ...), the forms as
-;;; Maru's own reader made them, answers an <erosion-metrics>: erosion, the share of complexity mass (CC x sqrt(forms)) held
-;;; by callables of CC over 10, and verbosity, the share of forms a verbose pattern flags or a clone covers, each per mille,
-;;; rounded down.  A form is a list outside quoted data; maru-forms.l walks each top-level form once for its complexity, its
-;;; forms, the verbose patterns in it and the variables it binds.
+;;; each file's own reader made them (erosion-read-file: grammars' as tpeg reads them, each rule a callable), answers an
+;;; <erosion-metrics>: erosion, the share of complexity mass (CC x sqrt(forms)) held by callables of CC over 10, and
+;;; verbosity, the share of forms a verbose pattern flags or a clone covers, each per mille, rounded down.  A form is a list
+;;; outside quoted data; maru-forms.l walks each top-level form once for its complexity, its forms, the verbose patterns in
+;;; it and the variables it binds.
 (require "maru-forms.l")
 (require "source.l")
 
@@ -13,6 +14,7 @@
     (or (rule p) (error "erosion: can't read " what))
     (<text-parser>-result p)))
 (tpeg-load "erosion-ledger.g")
+(tpeg-load "erosion-spans.g")
 
 (define-structure <callable> (name path line cc forms))	; a definition, where it starts, its complexity and forms
 (define-structure <verbose-finding> (rule form))		; a form a verbose pattern flags
@@ -21,7 +23,44 @@
 (define sqrt (subr "sqrt" "d>d"))
 (define-function erosion-mass (c) (* (<callable>-cc c) (sqrt (* 1.0 (<callable>-forms c)))))
 
-;; callables: the definitions source.l reads from a file's forms (source-lift.g), all but types
+;; a script tpeg-repl.l reads: its forms and blocks, each read by tpeg's sexpression rule from where tpeg-repl.l --forms says
+;; it lies.  The input a block takes is found only by running the script, so a child process runs it.
+(define erosion-getpid (subr "getpid" ">i"))
+(define-function erosion-read-script (path text)
+  (let ((spans (concat-strings "/tmp/maru-erosion-" (long->string (erosion-getpid)) ".forms"))
+	(forms ()))
+    (let* ((status ((subr "system" "s>i") (concat-strings "./eval tpeg-repl.l --forms '" path "' > " spans " 2>&1")))
+	   (out (contents-of-file-named spans)))
+      ((subr "unlink" "s>i") spans)
+      (or (= 0 status) (error "erosion: " path " failed as it ran, so its forms aren't all known"))	; not measured in part
+      (list-do start (erosion-parse-text <erosion-spans> $spans out "a script's forms")
+	(when start
+	  (let ((p (text-parser-for-on <tpeg> text)))
+	    (set (<text-parser>-position p) start)
+	    (and ($sexpression p) (push forms (<text-parser>-result p)))))))
+    (list-reverse! forms)))
+
+;; a file's forms, read by its own reader: a .g file's grammar as tpeg reads it, one (grammar-define name parent fields
+;; rule...) form; a script tpeg-repl.l reads, as it reads it; any other file's as Maru's reader reads them
+(define *erosion-script-line* "#!./eval tpeg-repl.l")
+(define-function erosion-read-file (path)
+  (let ((text (contents-of-file-named path)))
+    (cond ((= ".g" (string-copy path (max 0 (- (string-length path) 2)) 2))
+	   (let ((spec (tpeg-parse-whole-file path))) (list `(grammar-define ,@(caar spec) ,@(cdr spec)))))
+	  ((and (<= (string-length *erosion-script-line*) (string-length text))
+		(= *erosion-script-line* (string-copy text 0 (string-length *erosion-script-line*))))
+	   (erosion-read-script path text))
+	  (else (find-and-read path)))))
+
+;; a grammar form's rules: each a callable, as a definition is
+(define-selector erosion-grammar-rules (form) ())
+(define-method erosion-grammar-rules <pair> ()
+  (let ((head (car self)))
+    (cond ((= head 'grammar-define) (cddddr self))
+	  ((= head 'grammar-extend) (cddr self))
+	  ((= head 'grammar-eval) (cadr self)))))
+
+;; callables: the definitions source.l reads from a file's forms (source-lift.g), all but types, and grammars' rules
 (define-function erosion-line (form)	; the line Maru's reader noted on form's first pair
   (let ((s (and (pair? form) (<pair>-source form)))) (and (pair? s) (cdr s))))
 
@@ -83,6 +122,7 @@
   (let ((callables ()) (forms 0) (flags (identity-hash-table)) (seen (identity-hash-table)) (occurrences ()) (tops ()))
     (list-do src sources
       (let ((walked (identity-hash-table)))	; each top-level form's walk, which a definition that is one reuses
+	(set *forms-rule-answers* (identity-hash-table))	; and each grammar rule's, which its callable reuses
 	(list-do form (cdr src)
 	  (let* ((binders (identity-hash-table)) (r (maru-forms-walk form binders flags)))
 	    (and (pair? form) (hash-at-put walked form r))
@@ -93,6 +133,11 @@
 			  (when (<= 12 atoms)
 			    (hash-at-put seen key (+ 1 (hash-at seen key 0)))
 			    (push occurrences (cons key x)))))))
+	(list-do form (cdr src)
+	  (list-do rule (erosion-grammar-rules form)
+	    (let ((r (or (hash-at *forms-rule-answers* rule) (maru-forms-walk-by $rule rule (identity-hash-table) (identity-hash-table)))))
+	      (push callables (make <callable> name: (car rule) path: (car src) line: (erosion-line rule)
+				    cc: (+ 1 (car r)) forms: (cadr r))))))
 	(list-do d (forms-definitions (car src) (cdr src))	; a definition inside a let is walked on its own
 	  (unless (= 'type (<definition>-kind d))
 	    (let* ((form (source-form d))

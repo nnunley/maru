@@ -1,6 +1,7 @@
 ;;; maru-forms.l -- maru-forms.g's walk over a form as Maru's reader made it: (maru-forms-walk form binders flags) answers
 ;;; (cc forms ()), adding the variables form binds to binders and each list a verbose pattern matches to flags, both identity
-;;; tables; (maru-forms-count form) is how many forms it holds, a form being a list outside quoted data (erosion.l, source.l).
+;;; tables, a grammar's form among them (tpeg-forms.g); (maru-forms-count form) is how many forms it holds, a form being a
+;;; list outside quoted data (erosion.l, source.l).
 (require "source-parser.l")
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
@@ -22,11 +23,49 @@
 (define-function forms-one (r) (forms-add r 0 1))					; r inside one more list
 (define-function forms-reader (r) (list (car r) (cadr r) 'reader))
 (define-function forms-flag (rule r) (list (car r) (cadr r) rule))
+(define-function forms-any-member? (xs ys)	; keys are made afresh, so compared by equal
+  (let ((hit ())) (list-do x xs (list-do y ys (and (equal x y) (set hit 't)))) hit))
+;; A lookup on the next element: of the choices, each a list of the keys it's led by, or () for none, those led by keys not
+;; met before are tried at once.  Answers (keys tried-in-turn): how many keys, and how many choices are tried one by one
+;; (led by a key met before, or by none).
+(define-function forms-lookup (key-lists)
+  (let ((keys ()) (in-turn 0))
+    (list-do kl key-lists
+      (if (and kl (not (forms-any-member? kl keys)))
+	  (set keys (concat-list kl keys))
+	(set in-turn (+ in-turn 1))))
+    (list (list-length keys) in-turn)))
+(define-function forms-lookup-decisions (l)	; a lookup a decision once, if it has two keys or more; each other try one
+  (+ (if (<= 2 (car l)) 1 0) (cadr l)))
+;; a grammar's choice: each alternative tried in turn after the first is a decision, those led by distinct literals one
+(define-function forms-choice (key-lists rs)
+  (let ((l (forms-lookup key-lists)))
+    (forms-add (forms-sum rs) (- (+ (forms-lookup-decisions l) (if (< 0 (car l)) 1 0)) 1) 0)))
+(define-function forms-string-keys (s)	; a string is looked up by its first character, so "a" and "ab" share a key
+  (and (< 0 (string-length s)) (list (cons 'char (string-at s 0)))))
+(define-function forms-keys-in (kind keys) (map (lambda (k) (cons kind k)) keys))
+(define-function forms-keys-all (key-lists) (let ((all ())) (list-do kl key-lists (if kl (set all (concat-list kl all)) (set all ()))) (and (not (memq () key-lists)) all)))
+;; a cond: each test clause is a decision (clause adds it), but those testing one variable against distinct constants,
+;; the first such variable's, are one lookup
+(define-function forms-constant? (x) (or (long? x) (string? x) (and (pair? x) (= 'quote (car x)) (not (pair? (cadr x))))))
+(define-function forms-constant (x) (if (pair? x) (cons 'quote (cadr x)) x))
+(define-function forms-test-key (a b)	; (v . k) for (= v k) or (= k v), v a variable and k a constant
+  (cond ((and (symbol? a) (forms-constant? b)) (cons a (forms-constant b)))
+	((and (symbol? b) (forms-constant? a)) (cons b (forms-constant a)))))
+(define-function forms-cond (ks cs)
+  (let* ((tests (let ((ts ())) (list-do k ks (or (= k 'else) (push ts k))) (list-reverse! ts)))
+	 (subject (let ((s ())) (list-do k tests (and (pair? k) (not s) (set s (car k)))) s))
+	 (key-lists (map (lambda (k) (and (pair? k) (= subject (car k)) (list (cdr k)))) tests))
+	 (l (forms-lookup key-lists)))
+    (forms-add (forms-sum cs) (- (+ (if (< 0 (car l)) 1 0) (cadr l)) (list-length tests)) 0)))
 ;; the actions that read the parser's fields, set once the grammar's type exists
 (define forms-bind ())
 (define forms-params ())
 (define forms-list ())
+(define *forms-rule-answers* ())	; each grammar rule's answer, by the rule, while erosion.l walks a file (or ())
+(define forms-rule ())
 (tpeg-load "maru-forms.g")
+(tpeg-load "tpeg-forms.g")	; and grammars, each rule a callable
 (set forms-bind (lambda (self v) (and v (symbol? v) (hash-at-put (<maru-forms>-binders self) v 't)) *forms-none*))
 (set forms-params	; a parameter list's names bound, its dotted rest among them; one form if it's a list
      (lambda (self ps)
@@ -41,11 +80,20 @@
 	     (else			(and (caddr r) (hash-at-put (<maru-forms>-flags self) x (caddr r)))
 					(list (car r) (+ 1 (cadr r)) ())))))
 
-(define-function maru-forms-walk (form binders flags)	; maru-forms.g's answer for form
-  (let ((p (source-parser-for <maru-forms> (list form))))
+(set forms-rule		; a grammar rule's answer, kept for its callable
+     (lambda (self x r)
+       (let ((a (forms-list self x r)))
+	 (and *forms-rule-answers* (hash-at-put *forms-rule-answers* x a))
+	 a)))
+(define *forms-grammar-heads* '(grammar-define grammar-extend grammar-eval))
+(define-function maru-forms-walk-by (rule x binders flags)	; rule's answer for x: tpeg-forms.g's for a grammar or its rule,
+  (let ((p (source-parser-for (if (or (= rule $rule) (and (pair? x) (memq (car x) *forms-grammar-heads*)))	; else maru-forms.g's
+				  <tpeg-forms> <maru-forms>)
+			      (list x))))
     (set (<maru-forms>-binders p) binders)
     (set (<maru-forms>-flags p) flags)
-    (or ($form p) (error "maru-forms: can't walk a form"))
+    (or (rule p) (error "maru-forms: can't walk a form"))
     (<source-parser>-result p)))
+(define-function maru-forms-walk (form binders flags) (maru-forms-walk-by $form form binders flags))
 (define-function maru-forms-count (form) (cadr (maru-forms-walk form (identity-hash-table) (identity-hash-table))))
 

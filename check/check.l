@@ -265,14 +265,16 @@
        (unit-assert (equal (last (run (concat-string ,name "2") (concat-strings "./eval2 -b boot2.l " ,file))) ,want))
        (unit-assert (equal (last (run (concat-string ,name "3") (concat-strings "./eval3 -b boot2.l " ,file))) ,want)))))
 (check "tree_selectors" (on-each-evaluator "tree_selectors" "check/tpeg-selectors.l"))
-(check "tree_source" (on-each-evaluator "tree_source" "check/tpeg-source.l"))
-(check "tree_lists" (on-each-evaluator "tree_lists" "check/tpeg-lists.l"))
-(check "tree_args" (on-each-evaluator "tree_args" "check/tpeg-args.l"))
+(check "tree_source" (on-each-evaluator "tree_source" "tpeg-repl.l check/tpeg-source.l"))
+(check "tree_lists" (on-each-evaluator "tree_lists" "tpeg-repl.l check/tpeg-lists.l"))
+(check "tree_args" (on-each-evaluator "tree_args" "tpeg-repl.l check/tpeg-args.l"))
 (check "tree_apply" (on-each-evaluator "tree_apply" "check/tpeg-apply.l"))
-(check "tree_memo" (on-each-evaluator "tree_memo" "check/tpeg-memo.l"))
-(check "tree_foreign" (on-each-evaluator "tree_foreign" "check/tpeg-foreign.l"))
-(check "tree_literals" (on-each-evaluator "tree_literals" "check/tpeg-literals.l"))
-;; what a grammar can't do stops compilation, saying why
+(check "tree_memo" (on-each-evaluator "tree_memo" "tpeg-repl.l check/tpeg-memo.l"))
+(check "tree_foreign" (on-each-evaluator "tree_foreign" "tpeg-repl.l check/tpeg-foreign.l"))
+(check "tree_literals" (on-each-evaluator "tree_literals" "tpeg-repl.l check/tpeg-literals.l"))
+;; what a grammar can't do stops its definition, saying why
+(check "tree_text_refuses" (on-each-evaluator "tree_text_refuses" "tpeg-repl.l check/tpeg-refuses.l"))
+;; cmd's output says word
 (define-function output-has (text word)
   (let ((i 0) (n (- (string-length text) (string-length word))) (found ()))
     (while (and (not found) (<= i n))
@@ -284,18 +286,6 @@
   (let ((out (concat-strings tmp "/" name ".out")))
     (and (not (= 0 (run-status 60 (concat-strings "exec </dev/null >" out " 2>&1; " cmd))))
 	 (output-has (contents-of-file-named out) word))))
-(define-function refuses (name word)
-  (fails-saying (concat-strings "refused-" name) (concat-strings "./eval compile-tpeg.l check/tpeg-refused/" name ".g") word))
-;; an argument its rule doesn't read is an error, and never reaches the caller's input
-(check "tree_args_unread"
-  (list-do rule '("leaves" "leavesall")
-    (unit-assert (fails-saying "tree_args_unread" (concat-strings "./eval check/tpeg-args-unread.l " rule) "left an argument unread"))))
-(check "tree_text_refuses"
-  (list-do f '("list" "literal" "apply" "super")
-    (unit-assert (refuses f "needs a grammar on <source-parser>")))
-  (unit-assert (refuses "reserved" "reserved"))
-  (unit-assert (refuses "param-lr" "left-recursive")))
-
 ;; the runner removes its directory, so it refuses one it couldn't safely remove, before removing anything
 (check "check_tmp"
   (list-do unsafe '("/" "" "/tmp/" "/Users" "/tmp/a b" "/tmp/x/../..")
@@ -444,7 +434,7 @@
   (unit-assert (equal (last (run "tree_interleave" "./eval tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))
   (unit-assert (equal (last (run "tree_interleave2" "./eval2 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok"))
   (unit-assert (equal (last (run "tree_interleave3" "./eval3 -b boot2.l tpeg-repl.l check/tpeg-interleave.l")) "tpeg interleave ok")))
-(check "tree_calc" (on-each-evaluator "tree_calc" "check/tpeg-calc.l"))
+(check "tree_calc" (on-each-evaluator "tree_calc" "tpeg-repl.l check/tpeg-calc.l"))
 ;; kscript.g reads the report's KScript listings, and kscript.l runs streams tick by tick (check/kscript.l).
 (check "kscript" (unit-assert (equal (last (run "kscript" "./eval check/kscript.l notes/sources/grammars/*.kscript")) "kscript ok")))
 ;; KSWorld documents headless (ksworld-run.l): a fixture of ours, and KSWorld.ks where the dbjr documents are
@@ -1116,10 +1106,11 @@
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
 ;; still fail to read.
 (define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
-			 "test-repl.l" "test.l"))
+			 "test-repl.l" "test.l"
+			 "check/tpeg-broken.g"))
 (check "erosion"
   (unit-assert (equal (last (run "erosion_fixtures" "./eval check/erosion.l")) "erosion ok"))
-  (let ((files (run "erosion_files" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k)$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | sed \"s,^[.]/,,\""))
+  (let ((files (run "erosion_files" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k|g)$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | sed \"s,^[.]/,,\""))
 	(measured ()))
     (list-do f files (or (member? f erosion-unread) (push measured f)))
     ;; a CPU limit, as law files have, not a wall clock: four cases at once mustn't fail it by contention

@@ -7,3 +7,5 @@ erosion -2 tokens on demand and source.l's backfill: small definitions, the toke
 erosion +1 review fixes in source.l: source-extent, finding a definition's list among the file's, has CC over 10
 erosion +1 check/gezira-vector.k: its main checks two kernels' sums in one function, CC over 10
 verbosity -1 check/gezira-vector.k: forms none of the verbose patterns flag
+erosion -47 a cond's clauses testing one variable against distinct constants are one lookup, a decision once, as a grammar's choice of distinct literals is (maru-forms.g's test, forms-cond)
+verbosity +8 grammars measured (each .g file read by tpeg and each tpeg-repl.l script by tpeg-repl.l, each rule a callable: tpeg-forms.g, choices of distinct literals one lookup): their copied lexical rules (eol, space, comment ... in grammar after grammar) are clones; alone they measure verbosity 146 and erosion 390, which leaves the whole erosion where it was
