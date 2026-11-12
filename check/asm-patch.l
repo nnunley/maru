@@ -64,7 +64,7 @@
 (define-function started () (let ((b (asm-buffer pc))) (asm isa b '(NOP)) b))
 (define at (asm-buffer-pc (started)))	; where each instruction starts, after the NOP
 
-(list-do row (cadr (asm-isa isa))
+(list-do row (<asm-isa>-rows (asm-isa isa))
   (let ((kinds (cadr row)) (pos 0))
     (let ((samples (map (lambda (k) (set pos (+ pos 1)) (absolute (car (samples-of row k pos)) at)) kinds)))
       (for (p 0 (list-length kinds))
@@ -82,7 +82,7 @@
 		    (set cases (+ cases 1))
 		    (let ((patched (copy-buffer b)) (direct (started)))
 		      (asm-patch isa patched report v)
-		      		      (let ((row-bytes ((caddr (asm-isa isa)) (caddr report) (asm-substitute insn p v) at)))
+		      		      (let ((row-bytes ((<asm-isa>-encode (asm-isa isa)) (caddr report) (asm-substitute insn p v) at)))
 			(list-do x (car row-bytes) (array-append (asm-buffer-bytes direct) x)))
 		      (or (same-bytes? patched direct) (fail insn " patched with " v " differs from encoding it directly"))))
 		  		  (list-do v (concat-list (if (< hi (+ hi step)) (list (+ hi step)) ())	; a full 64-bit field has no "past"

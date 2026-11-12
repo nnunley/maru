@@ -23,7 +23,7 @@
 (define-function arm64-skip? (row ops)	; constrained unpredictable: LDP with Rt == Rt2
   (and (= 'LDP (car row)) (= (car ops) (cadr ops))))
 
-(define isa-rows		(cadr (asm-isa isa)))
+(define isa-rows		(<asm-isa>-rows (asm-isa isa)))
 (define isa-samples		(if (= isa 'arm64) arm64-samples x86-samples))
 (define isa-variants		(if (= isa 'arm64) arm64-variants x86-variants))
 (define isa-set-variant		(if (= isa 'arm64) arm64-set-variant x86-set-variant))

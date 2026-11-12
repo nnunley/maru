@@ -40,28 +40,35 @@
 ;;; the full scan chooses; when no candidate fits, the full scan runs.  An ISA
 ;;; whose instructions all have one length takes the first fitting row when
 ;;; there is no open placeholder: no later row is shorter, or replaces it.
+;;;
+;;; Every lookup on the encoding path is hashed: the instruction set by name, its
+;;; rows by mnemonic (by identity), and the candidates by (mnemonic . shapes) (by
+;;; equality).
 
-(define *asm-isas* ())
+(require "hash.l")
 
-;; Each ISA is (name rows encode decode field-range parse-form by-mnemonic table),
-;; by-mnemonic an alist from mnemonic to its rows in file order, and table () or
-;; (shape accepts fixed-width cache): cache is a list whose car is an alist from
-;; (mnemonic . shapes) to candidate rows.
+;; An instruction set: its rows and functions, by-mnemonic a table from mnemonic
+;; to its rows in file order, and with a classifier (shape accepts fixed-width),
+;; candidates a table from (mnemonic . shapes) to candidate rows; without one,
+;; shape and candidates are ().
+(define-structure <asm-isa> (name rows encode decode field-range parse-form by-mnemonic
+			     shape accepts fixed-width candidates))
+
+(define *asm-isas* (identity-hash-table))	; name => <asm-isa>
+
 (define-function asm-register-isa (name rows encode decode field-range parse-form . classifier)
-  (let ((by ()))
-    (list-do r rows
-      (let ((e (assq (car r) by)))
-	(if e (set-cdr e (cons r (cdr e))) (set by (cons (list (car r) r) by)))))
-    (list-do e by (set-cdr e (list-reverse! (cdr e))))
-    (set *asm-isas* (cons (list name rows encode decode field-range parse-form by
-				(if classifier (list (car classifier) (cadr classifier) (caddr classifier) (list ())) ()))
-			  *asm-isas*))))
+  (let ((by (identity-hash-table)))
+    (list-do r rows (hash-at-put by (car r) (cons r (hash-at by (car r)))))
+    (hash-do by (lambda (m rs) (hash-at-put by m (list-reverse! rs))))
+    (hash-at-put *asm-isas* name
+		 (new <asm-isa> name rows encode decode field-range parse-form by
+		      (car classifier) (cadr classifier) (caddr classifier)
+		      (and classifier (equal-hash-table))))))
 
-(define-function asm-rows-for (i mnemonic)	(cdr (assq mnemonic (car (cdr (cddddr (cdr i)))))))
-(define-function asm-isa-table (i)		(cadr (cdr (cddddr (cdr i)))))
+(define-function asm-rows-for (i mnemonic)	(hash-at (<asm-isa>-by-mnemonic i) mnemonic))
 
 (define-function asm-isa (isa)
-  (or (assq isa *asm-isas*) (error "asm: unknown instruction set " isa)))
+  (or (hash-at *asm-isas* isa) (error "asm: unknown instruction set " isa)))
 
 (define-function asm-buffer (origin)	(cons origin (array)))
 (define-function asm-buffer-origin (b)	(car b))
@@ -85,14 +92,13 @@
     found))
 
 (define-function asm-field-range (isa row position pc . insn)	; insn: lengths of PC-relative fields
-  ((car (cddddr (asm-isa isa))) row position pc (car insn)))
+  ((<asm-isa>-field-range (asm-isa isa)) row position pc (car insn)))
 
 (define-function asm-data (buffer insn)	; (data byte...), bytes 0..255, emitted as given
   (if (list-detect b (cdr insn) (not (and (long? b) (<= 0 b) (<= b 255))))
       (cons 'error (list "asm: data bytes are 0..255: " insn))
     (list-do b (cdr insn) (array-append (asm-buffer-bytes buffer) b))))
 
-(define-function asm-isa-fixed-width? (i)	(let ((table (asm-isa-table i))) (and table (caddr table))))
 
 ;; The best fitting row of rows for insn at pc: (row . (bytes . positions)), or ().
 ;; Of the rows that fit, the shortest (the first among equals), or with an open
@@ -101,8 +107,8 @@
 ;; placeholder stops at the first fit.
 (define-function asm-best-row (isa rows pc insn open)
   (let* ((i (asm-isa isa))
-	 (encode (caddr i))
-	 (fixed (and (not open) (asm-isa-fixed-width? i)))
+	 (encode (<asm-isa>-encode i))
+	 (fixed (and (not open) (<asm-isa>-fixed-width i)))
 	 (size -1)
 	 (row ())
 	 (out ()))
@@ -143,23 +149,19 @@
       (set shapes (cdr shapes)))
     ok))
 
-(define-function asm-build-candidates (i table mnemonic shapes)
-  (let ((accepts (cadr table)) (out ()))
+(define-function asm-build-candidates (i mnemonic shapes)
+  (let ((accepts (<asm-isa>-accepts i)) (out ()))
     (list-do r (asm-rows-for i mnemonic)
       (and (asm-row-accepts? accepts r shapes) (set out (cons r out))))
     (list-reverse! out)))
 
-;; The cache's bucket for mnemonic is (mnemonic (shapes . rows) ...): found by identity, then by shapes.
-(define-function asm-cached-rows (i table mnemonic shapes)
-  (let* ((cache (cadddr table))
-	 (bucket (or (assq mnemonic (car cache))
-		     (let ((b (list mnemonic))) (set-car cache (cons b (car cache))) b)))
-	 (hit (list-detect e (cdr bucket) (equal (car e) shapes))))
+;; The candidates for mnemonic and shapes, built on first use and kept.
+(define-function asm-cached-rows (i mnemonic shapes)
+  (let* ((key (cons mnemonic shapes))
+	 (hit (hash-entry (<asm-isa>-candidates i) key)))
     (if hit
 	(cdr hit)
-      (let ((rows (asm-build-candidates i table mnemonic shapes)))
-	(set-cdr bucket (cons (cons shapes rows) (cdr bucket)))
-	rows))))
+      (hash-at-put (<asm-isa>-candidates i) key (asm-build-candidates i mnemonic shapes)))))
 
 ;; The shapes of ops under shape, or 'unknown when one has none.
 (define-function asm-shapes (shape ops)
@@ -172,11 +174,11 @@
 ;; the ISA has no classifier, or the mnemonic's candidates for its shapes.
 (define-function asm-candidate-rows (isa insn)
   (let* ((i (asm-isa isa))
-	 (table (asm-isa-table i))
-	 (shapes (if table (asm-shapes (car table) (cdr insn)) 'unknown)))
+	 (shape (<asm-isa>-shape i))
+	 (shapes (if shape (asm-shapes shape (cdr insn)) 'unknown)))
     (if (= 'unknown shapes)
 	(asm-rows-for i (car insn))
-      (asm-cached-rows i table (car insn) shapes))))
+      (asm-cached-rows i (car insn) shapes))))
 
 (define-function asm-attempt (isa buffer insn)
   (if (= 'data (car insn))
@@ -194,7 +196,8 @@
 	(apply error (cdr r))
       r)))
 
-(define-function asm-substitute (insn p v)	; insn with value v in operand position p: in its placeholder if it has one.
+;; insn with value v in operand position p: in its placeholder if it has one.
+(define-function asm-substitute (insn p v)
   (let ((replace (lambda (op) ())))
     (set replace (lambda (op) (cond ((not (pair? op)) op)
 				    ((= 'reloc (car op)) v)
@@ -208,7 +211,7 @@
   (let* ((offset (cadr report))
 	 (pc (+ (asm-buffer-origin buffer) offset))
 	 (insn (asm-substitute (cadddr report) (car report) value))
-	 	 (encode (caddr (asm-isa isa)))
+	 (encode (<asm-isa>-encode (asm-isa isa)))
 	 (out (encode (caddr report) insn pc))
 	 (was (encode (caddr report) (cadddr report) pc)))
     (if (and out (= (list-length (car out)) (list-length (car was))))	; never a different length
@@ -224,8 +227,7 @@
       r)))
 
 (define-function asm-decode (isa bytes pc)
-  ((cadddr (asm-isa isa)) bytes pc))
+  ((<asm-isa>-decode (asm-isa isa)) bytes pc))
 
 (define-function asm-parse-form (isa text)
-  ((cadr (cddddr (asm-isa isa))) text))
-
+  ((<asm-isa>-parse-form (asm-isa isa)) text))

@@ -44,7 +44,7 @@
     out))
 
 (define stream ())
-(list-do row (cadr (asm-isa isa))
+(list-do row (<asm-isa>-rows (asm-isa isa))
   (list-do variant (isa-variants row)
     (isa-set-variant variant)
     (let ((pos 0))
@@ -56,9 +56,9 @@
 
 ;; The encoder, counted: the attempts below count the rows they try.
 (define entry (asm-isa isa))
-(define encode (caddr entry))
+(define encode (<asm-isa>-encode entry))
 (define counted 0)
-(set-car (cddr entry) (lambda (row insn pc) (set counted (+ counted 1)) (encode row insn pc)))
+(set (<asm-isa>-encode entry) (lambda (row insn pc) (set counted (+ counted 1)) (encode row insn pc)))
 
 (define checked 0)
 (define refusals 0)
