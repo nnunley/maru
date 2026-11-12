@@ -1,0 +1,209 @@
+# The Grounded Kernel Boots boot2.l, Aligned on eval3: Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Maru's evaluator kernel, written in typed Maru through ir2 on the object level (doc/ir2-objects.md),
+runs natively and through C. It loads `boot2.l` and runs `repl.l test-repl.l` with output identical to
+`./eval3 -b boot2.l repl.l test-repl.l`'s.
+
+**Architecture:**
+- **The reference is eval3.c**, Piumarta's last iteration (2013): its 13 built-in types, environments as alists
+  (boot2.l's namespaces), `expand`/`encode`/`eval`/`apply`, `*applicators*` by type, and its 71 primitives, cut to
+  what boot2.l and repl.l use.
+- **eval.l** (2010) is precedent only, for how an evaluator is written in Maru: its collector (as maru-gc.k), its
+  reader and its root discipline.
+- **The kernel owns its type numbering**: eval3's enum, 0 … 12. After loading boot2.l it checks that boot's
+  `<undefined>` … `<subr>` equal its own ids.
+- **Each section ends with a typed check unit**, run natively in-process (as `native-run-main` does) and through C.
+- **The oracle is `./eval3`**, which stays unchanged, as eval and eval2 do (see the spec's Decision).
+
+**Tech Stack:** maru.k on eval2, ir2.k, native-gen.k (arm64), ir-gen-c.k, maru-gc.k, check/native-child.l.
+
+**Spec:** `/Users/ndn/.claude/plans/i-think-my-oldest-whimsical-scott.md`, Direction step 2 (the user, 2026-11-12:
+align on eval3.c). Grounding: oecm §5.1 (the grounded part is minimal: dispatch from type to meaning, and the
+`<subr>` call), colaswp §6.1 (Pepsi.coke). Step 1: doc/plans/2026-11-11-ir2-object-level.md.
+
+## Global Constraints
+- **eval, eval2 and eval3 are not modified or retired.** They are the oracles. The kernel is new files only.
+- **eval3.c is the meaning.** Replicate its mechanisms, including alist environments, `fixed`,
+  `form`, `*applicators*`, the backtrace stack and the `-b` boot option.
+  - **Departures** are stated in doc/kernel.md, each with its reason.
+  - eval3's `*evaluators*`, `*expanders*` and `*encoders*` hooks are commented out; the kernel keeps them commented
+    out (fatal "cannot eval" for an unknown type). Restoring them as oecm Fig 3 describes is a decision for the user,
+    noted in the doc, not taken here.
+- **The type contract is with boot2.l, not with the compile host.** Ids are the kernel's own constants, 0 … 12 in
+  eval3.c:87's order, never read from eval2. The kernel's own check after boot asserts boot's type variables equal them.
+- **Word size from `sizeof`**; eval3 uses `int64_t long_t` (eval3.c:92), which the kernel matches.
+- **Objects only through the object level**: `new`, `get`/`put` or `<T>-field`, `object-type`, `object-is`. Every
+  `define-object` goes at the top of its file, before any use (doc/ir2-objects.md, "Declaration order").
+  `oop-at` appears only inside primitives that are word access by definition.
+- **The type names are today's (`long`, `int`, `char`).** Explicit widths are iterated within this loop (laneq #120).
+- **Kernel files** are flat: `kernel.k` loads `kernel-objects.k`, `kernel-lists.k`, `kernel-reader.k`,
+  `kernel-eval.k`, `kernel-primitives.k` and `kernel-main.k`, after maru-gc.k less its main. Function names follow
+  eval3.c's (`eval`, `apply`, `expand`, `encode`, `findVariable`, `define` …) with a `k_` prefix, so each maps back to
+  its original.
+- New runtime code is Maru languages only. Checks match values in Maru. `make check` stays green, under
+  `caffeinate -i`, one suite at a time. Ledger entries go in `check/lines` and `check/erosion`. Each task ends in a
+  checkpoint commit.
+- Work in `.worktrees/kernel` on branch `kernel`, stacked on `ir2-objects`. Rebase onto main once step 1 merges.
+
+## Review Focus
+1. **A garbage collection in the middle of building an object.** Every local holding an object across an allocation
+   is rooted (`gc-protect`, as eval3's `GC_PROTECT`). The constructor and reader checks run with `gc_frequency` at 1
+   and assert the structures read back intact. Pinned in Tasks 1 and 3.
+2. **Integers at the edges**: 0, negatives, `INT64_MAX` and `INT64_MIN` through the reader, the printer and
+   arithmetic. Division by zero behaves as eval3's does. Pinned in Tasks 3 and 5.
+3. **Doubles**: the reader and printer match eval3 (`1.0`, `4.0e18`, `-2.5e-3`). Pinned in Task 3.
+4. **The type contract broken**: a boot file whose built-in declarations are out of order. The kernel names the first
+   type whose id differs and stops, before any program runs. Pinned in Task 6.
+5. **A `<subr>` called through its `_imp` field natively**: no native check calls through a field yet. Pinned in Task 4.
+
+---
+
+### Task 1: Kernel objects and the collector they live in
+
+**Files:**
+- Create: `kernel.k` (load order) and `kernel-objects.k`.
+- Modify: `maru-gc.k`: `gc-protect` answers its body's value (eval.l:30), and add `gc-let*` (eval.l:37).
+- Create: `check/kernel/objects.k` (a test main) and `check/kernel.l` (the driver, on eval2, like check/native.l).
+- Modify: `check/check.l`: `kernel_native` and `kernel_c`.
+
+**Interfaces:**
+- Produces, in `kernel-objects.k`:
+  - `define-object` for eval3's 13 types with boot2.l's fields (boot2.l:425–437) and the ids 0 … 12. `<long>`,
+    `<double>`, `<symbol>` and `<subr>` are atoms, as eval3 allocates them.
+  - Constructors `newLong`, `newDouble`, `newString`, `newSymbol`, `cons` (newPair), `newArray`, `newExpr`,
+    `newForm`, `newFixed` and `newSubr`, with eval3.c's signatures, `k_`-prefixed, each answering `oop`. Also
+    `k_getLong` and `k_getDouble`.
+- Produces, in `check/kernel.l`: `(kernel-run name test-file args)`. It concatenates maru-gc.k less its main, the
+  kernel's files and `test-file`, compiles them natively, runs `main` in a child, and answers its lines. Also
+  `(kernel-c name test-file args)`, the same through `ir2-build`.
+
+- [ ] **Step 1: Write the failing check.** `check/kernel/objects.k`'s main asserts:
+  - the ids are 0 … 12 in eval3's order;
+  - a pair of a string and a long reads back its head's characters and tail's value;
+  - an array grows to 100 elements;
+  - with `gc_frequency` at 1, a rooted list of 10,000 pairs still sums correctly (Review Focus 1).
+
+  It prints `kernel objects ok`.
+- [ ] **Step 2: Run it and see it fail.** Run `make check CHECKS="kernel_native"`. Expected: FAIL (no kernel.k).
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run it and see it pass.** Run `make check CHECKS="kernel_native kernel_c maru_gc maru_gc_coalesce"`.
+  Expected: all pass.
+- [ ] **Step 5: Commit** with the message "kernel: eval3's types as objects, on maru-gc.k".
+
+### Task 2: Lists, arrays, the printer
+
+**Files:** Create `kernel-lists.k` and `check/kernel/lists.k`, with a check entry.
+
+**Interfaces:**
+- Produces eval3's list and array functions (`car`, `cdr`, `arrayAt`, `arrayAtPut` (growing), `arrayAppend`,
+  `arrayInsert` …) and its printer (`doprint`, `print`, `dump`, `println`, `dumpln`) for its 13 types.
+- Output is eval3's, byte for byte, including its colour escapes for a named user type (eval3.c:1056–1065).
+
+- [ ] **Step 1: Write the failing check.** Print a nested list holding a string, a symbol, a negative long, a double,
+  an empty list and an array. Compare with the text `./eval3 -b boot2.l` prints for the same structure, captured
+  once as the expected string.
+- [ ] **Step 2: Run it and see it fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run it and see it pass.**
+- [ ] **Step 5: Commit** with the message "kernel: lists, arrays, the printer".
+
+### Task 3: The reader
+
+**Files:** Create `kernel-reader.k`, `check/kernel/reader.k`, `check/kernel/read.txt` and
+`check/kernel/read.expected`.
+
+**Interfaces:**
+- Produces `k_read (stream: FILE *) -> oop`, eval3's reader: longs, doubles, strings with escapes, characters,
+  symbols (interned as eval3 interns them), quote/quasiquote/unquote/unquote-splicing, and comments.
+
+- [ ] **Step 1: Write the failing check.** The fixture `read.txt` covers:
+  - each literal kind;
+  - `INT64_MAX` and `INT64_MIN`;
+  - nesting 200 deep;
+  - every string escape.
+
+  The check prints each datum with `k_dumpln`. The expected output is what `./eval3 -b boot2.l` prints for the same
+  file, captured into `read.expected`. It runs with `gc_frequency` at 1 (Review Focus 1, 2 and 3).
+- [ ] **Step 2: Run it and see it fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run it and see it pass.**
+- [ ] **Step 5: Commit** with the message "kernel: the reader, as eval3 reads".
+
+### Task 4: Environments, expand, encode, eval and apply
+
+**Files:** Create `kernel-eval.k` and `check/kernel/eval.k`.
+
+**Interfaces:**
+- Produces `k_findVariable`, `k_lookup`, `k_define` (eval3.c:499–520), `k_expand` (:1150), `k_encode` (:1308),
+  `k_eval` (:1545), `k_evlist` and `k_apply` (:1611), with eval3's semantics:
+  - alist environments;
+  - `<fixed>` taking unevaluated arguments;
+  - `<expr>` binding formals onto its closed environment;
+  - `*applicators*` for other applicable types;
+  - fatal "cannot eval" for unknown types.
+- A `<subr>` is called through its `_imp` field, typed as a function pointer. Its signature is eval3's subr
+  convention (arguments, env).
+
+- [ ] **Step 1: Write the failing check.** `check/kernel/eval.k`'s main installs a few subrs (`+`, `cons`, `car`) and
+  the fsubrs `define`, `lambda`, `let`, `if` and `set` (minimal versions of Task 5's). It then evaluates expressions
+  read with `k_read` from a string:
+  - a closure kept past its caller;
+  - recursion 1,000 deep;
+  - a `<form>` macro;
+  - an `*applicators*` entry for a user type.
+- [ ] **Step 2: Run it and see it fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run it and see it pass**, natively too, which proves the call through `_imp` (Review Focus 5).
+- [ ] **Step 5: Commit** with the message "kernel: eval and apply as eval3's, subrs through their _imp".
+
+### Task 5: The primitives boot2.l and repl.l use
+
+**Files:** Create `kernel-primitives.k`, `check/kernel/primitives.k`, `check/kernel/primitives.l` and
+`check/kernel/primitives.expected`.
+
+**Interfaces:**
+- Produces eval3's primitives that `boot2.l`, `repl.l` and `test-repl.l` use, each a `<subr>` whose `_imp` is a
+  typed Maru function. **Measure the list; don't guess it.** Run those files on a kernel that reports every unbound
+  name instead of stopping, then write the list into the doc.
+- eval3's FFI (`subr` through libffi, `dlextern`) is included only if those files use it. If so, it stays a call
+  out to libffi; the kernel doesn't reimplement it.
+
+- [ ] **Step 1: Write the failing check.** `primitives.l` runs each primitive on representative arguments, including
+  the integer edges and division by zero (Review Focus 2). Its expected output is
+  `./eval3 -b boot2.l check/kernel/primitives.l`'s, captured.
+- [ ] **Step 2: Run it and see it fail.**
+- [ ] **Step 3: Implement.** First measure the unbound list.
+- [ ] **Step 4: Run it and see it pass.**
+- [ ] **Step 5: Commit** with the message "kernel: the primitives boot2.l and repl.l use, as eval3's".
+
+### Task 6: Main and the REPL; boot2.l and the repl test
+
+**Files:**
+- Create `kernel-main.k`.
+- Modify `check/kernel.l` and `check/check.l`: add `kernel_repl` (native) and `kernel_repl_c`.
+- Create `doc/kernel.md` and add its AGENTS.md line.
+
+**Interfaces:**
+- Produces `main (argc, argv)`, as eval3's main does: root the globals, take `-b FILE` as the boot file (default
+  `boot2.l`), load it, check the type contract (Review Focus 4), load each remaining argument, then run the REPL on
+  stdin when none remain.
+
+- [ ] **Step 1: Write the failing check.** `kernel_repl` runs the kernel natively with `-b boot2.l repl.l
+  test-repl.l`. It asserts the 10x10 table, the last line `nfibs(15) is 1973`, and that the whole output equals
+  `./eval3 -b boot2.l repl.l test-repl.l`'s, line for line. `kernel_repl_c` does the same through C. A boot file
+  with two built-in declarations swapped makes the kernel stop, naming the type.
+- [ ] **Step 2: Run it and see it fail.**
+- [ ] **Step 3: Implement.** Debug boot2.l's load against `./eval3` by form: the first form whose value differs.
+- [ ] **Step 4: Run it and see it pass.** Run `make check CHECKS="kernel_repl kernel_repl_c eval3"`.
+- [ ] **Step 5: Write doc/kernel.md**: the sections, each one's eval3.c lines, the departures (word size, anything
+  measured, the `*evaluators*` decision), the checks, and the measured primitive list.
+- [ ] **Step 6: Run the full suite** with `caffeinate -i make check`, then add the ledger entries. Commit with the
+  message "kernel: boots boot2.l and runs repl.l as eval3 does".
+
+## After this plan (not in it)
+- **2b:** maru.k on the kernel (on eval3 it needs ir2 loaded first: `./eval3 maru.k` alone stops at `IR-VOID`), then
+  maru.k on the kernel compiles the kernel: the evaluator compiling itself, plan 3f.
+- **2c:** a standalone native executable for the kernel: the RFC's unimplemented `native-executable`, from exe.l.
+- **3:** `ir-gen-wasm.k`.
