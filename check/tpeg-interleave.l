@@ -1,3 +1,4 @@
+#!./eval tpeg-repl.l
 ;;; Run by tpeg-repl.l, as test-pepsi.l is by repl.l: code and grammars interleave on one stream. A block's rules
 ;;; enrich the running grammar, and a block's expression takes the input until it stops matching.
 (define *said* ())

@@ -1,15 +1,28 @@
-;;; Memoization and growth work on every source, and a value entered twice shares its memos.
+#!./eval tpeg-repl.l
+;;; Memoization and growth work on every source, and a value entered twice shares its memos.  Run by tpeg-repl.l: the
+;;; grammar is a block, and the cases are input to check/tpeg-cases.l's rule.
 (require "check/tpeg-run.l")
-(load "build/tpeg-memo.g.l")
+;; memos and left recursion on a source that isn't text
+{
+  <mt> : <source-parser> (count)
+  sum = sum:a 'plus .:b -> (+ a b) | .:n -> n ;
+  # two left-recursive alternatives: the second must not take the first's recursion as an answer
+  ex = ex:a 'plus .:b -> (+ a b) | ex:a 'minus .:b -> (- a b) | 'n .:v -> v ;
+  counted = -> (set self.count (+ 1 (or self.count 0))) `( 'x ) ;
+  twice = &counted counted ;
+  same = `( counted2 ) `( counted2 ) ;
+  counted2 = -> (set self.count (+ 1 (or self.count 0))) 'x ;
+}
 (peg-enable-recursion)
-
-(expect "left recursion over a list" (try <mt> $sum '(1 plus 2 plus 3)) '(6))
-(expect "left recursion over a user's type" (try <mt> $sum (new <countdown> '(1 plus 2))) '(3))
-
-(expect "both left-recursive alternatives grow" (try <mt> $ex '(n 5 minus 2 plus 1)) '(4))
-(expect "the second alternative doesn't take a recursion as an answer" (try <mt> $ex '(minus 2)) ())
-(expect "nor with a seed to find" (try <mt> $ex '(plus 2)) ())
-
+(tpeg-read-file "check/tpeg-cases.l")
+{ cases }
+"left recursion over a list"		<mt> $sum '(1 plus 2 plus 3)			=> 6
+"left recursion over a user's type"	<mt> $sum (new <countdown> '(1 plus 2))		=> 3
+"both left-recursive alternatives grow"	<mt> $ex '(n 5 minus 2 plus 1)			=> 4
+"the second alternative doesn't take a recursion as an answer"
+					<mt> $ex '(minus 2)				=> fails
+"nor with a seed to find"		<mt> $ex '(plus 2)				=> fails
+.
 (let ((p (source-parser-for <mt> '((x)))))
   (expect "matches twice" (and (source-parser-invoke-rule 'twice $twice p) 1) 1)
   (expect "the memo saved the second run" (<mt>-count p) 1))
