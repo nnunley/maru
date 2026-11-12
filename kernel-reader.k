@@ -76,7 +76,7 @@
 	((hi long) (- (k_arrayLength k_symbols) 1))
 	((m long) 0)
 	((c int) 0)
-	((s oop) (cast 0 oop)))
+	((s oop) nil))
     (while (<= lo hi)
       (set m (/ (+ lo hi) 2))
       (set s (k_arrayAt k_symbols m))
@@ -120,12 +120,12 @@
 ;; a pair whose source is source's: eval3's newPairFrom.  The source of nil is nil, where eval3 reads through nil (an
 ;; empty [] or {} crashed it)
 (define-function k_newPairFrom oop ((head oop) (tail oop) (source oop))
-  (let (((obj oop) (cast 0 oop)))
+  (let (((obj oop) nil))
     (gc-protect (head tail source)
       (set obj (new <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
-    (set (<pair>-source obj) (if (object-is <pair> source) (<pair>-source source) (cast 0 oop)))
+    (set (<pair>-source obj) (if (object-is <pair> source) (<pair>-source source) nil))
     (return obj)))
 
 (define-function k_setSource void ()		; the current source's position, from its path and line
@@ -135,7 +135,7 @@
 (define-function k_beginSource void ((path char *))
   (set k_currentPath (k_newStringC path))
   (set k_currentLine (k_newLong 1))
-  (set k_currentSource (k_cons k_currentSource (cast 0 oop)))
+  (set k_currentSource (k_cons k_currentSource nil))
   (k_setSource))
 
 (define-function k_advanceSource void ()
@@ -150,7 +150,7 @@
 
 (define-function k_currentSource-source oop ()
   (if (object-is <pair> k_currentSource) (return (<pair>-source k_currentSource)))
-  (return (cast 0 oop)))
+  (return nil))
 
 ;;; reading
 
@@ -159,16 +159,16 @@
   (exit 1))
 
 (define-function k_readList oop ((fp void *) (delim long))
-  (let (((head oop) (cast 0 oop))
-	((tail oop) (cast 0 oop))
-	((obj oop) (cast 0 oop))
+  (let (((head oop) nil)
+	((tail oop) nil)
+	((obj oop) nil)
 	((more long) 1)
 	((c long) 0))
     (gc-protect (head obj)
       (set obj (k_readExpr fp))
       (if (!= obj k_done)
 	  (let ()
-	    (set head (k_newPairFrom obj (cast 0 oop) k_currentSource))
+	    (set head (k_newPairFrom obj nil k_currentSource))
 	    (set tail head)
 	    (while more
 	      (set obj (k_readExpr fp))
@@ -183,7 +183,7 @@
 		      (if (!= obj k_done) (k_readerFatal "extra item after ."))
 		      (set more 0))
 		  (let ()
-		    (set obj (k_newPairFrom obj (cast 0 oop) k_currentSource))
+		    (set obj (k_newPairFrom obj nil k_currentSource))
 		    (set (<pair>-tail tail) obj)
 		    (set tail obj))))))))
     (set c (k_getc fp))
@@ -299,7 +299,7 @@
   (let (((obj oop) (k_readExpr fp)))
     (if (= obj k_done) (return sym))
     (gc-protect (obj)
-      (set obj (k_newPairFrom obj (cast 0 oop) k_currentSource))
+      (set obj (k_newPairFrom obj nil k_currentSource))
       (set obj (k_newPairFrom sym obj k_currentSource)))
     (return obj)))
 

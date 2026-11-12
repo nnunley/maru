@@ -10,7 +10,7 @@
   (set gc_frequency 1)
   (k_initReader)
   (let (((fp void *) (fopen "check/kernel/read.txt" "r"))
-	((obj oop) (cast 0 oop)))
+	((obj oop) nil))
     (if (= fp (cast 0 void *)) (let () (printf "FAIL can't open check/kernel/read.txt\n") (exit 1)))
     (gc-protect (obj)
       (k_beginSource "check/kernel/read.txt")

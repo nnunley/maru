@@ -20,13 +20,13 @@
   (gc_initialise)
   ;; eval3's type ids (eval3.c:87): the contract boot2.l's declarations meet
   (expect "ids of nil, long, double, string, symbol, pair"
-	  (and (= (object-type (cast 0 oop)) 0) (= (object-type (k_newLong 5)) 2) (= (object-type (k_newDouble 2.5)) 3)
+	  (and (= (object-type nil) 0) (= (object-type (k_newLong 5)) 2) (= (object-type (k_newDouble 2.5)) 3)
 	       (= (object-type (k_newStringC "maru")) 4) (= (object-type (k_newSymbolC "abc")) 5)
-	       (= (object-type (k_cons (cast 0 oop) (cast 0 oop))) 6)))
+	       (= (object-type (k_cons nil nil)) 6)))
   (expect "ids of data, _array, array, expr, form, fixed, subr"
 	  (and (= (object-type (k_newData 16)) 1) (= (object-type (<array>-_array (k_newArray 3))) 7)
-	       (= (object-type (k_newArray 3)) 8) (= (object-type (k_newExpr (cast 0 oop) (cast 0 oop))) 9)
-	       (= (object-type (k_newForm (cast 0 oop) (cast 0 oop))) 10) (= (object-type (k_newFixed (cast 0 oop))) 11)
+	       (= (object-type (k_newArray 3)) 8) (= (object-type (k_newExpr nil nil)) 9)
+	       (= (object-type (k_newForm nil nil)) 10) (= (object-type (k_newFixed nil)) 11)
 	       (= (object-type (k_newSubrC "first" first-argument)) 12)))
   ;; values read back through the fields
   (let (((p oop) (k_cons (k_newStringC "maru") (k_newLong 42))))
@@ -45,10 +45,10 @@
   ;; a subr called through its imp: a function pointer in a field, natively too
   (let (((s oop) (k_newSubrC "first" first-argument)))
     (expect "a subr called through its imp"
-	    (= (k_getLong ((<subr>-imp s) (k_cons (k_newLong 7) (cast 0 oop)) (cast 0 oop))) 7)))
+	    (= (k_getLong ((<subr>-imp s) (k_cons (k_newLong 7) nil) nil)) 7)))
   ;; a collection on every allocation: a rooted list keeps every pair and long
   (set gc_frequency 1)
-  (let (((l oop) (cast 0 oop)) ((i long) 0))
+  (let (((l oop) nil) ((i long) 0))
     (gc-protect (l)
       (while (< i 2000)
 	(set l (k_cons (k_newLong i) l))

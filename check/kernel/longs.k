@@ -31,7 +31,7 @@
   (expect "a symbol isn't a long" (not (k_isLong (k_newSymbolC "x"))))
   ;; boxed?: a word with a body, neither nil nor an immediate
   (expect "boxed? of nil, an odd word, a pair and a symbol"
-	  (and (not (boxed? (cast 0 oop))) (not (boxed? (cast 85 oop))) (boxed? (k_cons (cast 0 oop) (cast 0 oop)))
+	  (and (not (boxed? nil)) (not (boxed? (cast 85 oop))) (boxed? (k_cons nil nil))
 	       (boxed? (k_newSymbolC "x"))))
   (expect "boxed? of a long that fits, and one that doesn't"
 	  (and (= (if-tagged-int 0 1) (if (boxed? (k_newLong 42)) 1 0))

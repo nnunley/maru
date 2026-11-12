@@ -75,7 +75,7 @@
 ;; rooted while the string itself is made
 (define-function k__newString oop ((len long))
   (let (((chars int32 *) (cast (gc_malloc_atomic (* (sizeof int32) (+ len 1))) int32 *))
-	((obj oop) (cast 0 oop)))
+	((obj oop) nil))
     (gc-protect (chars)
       (set obj (new <string>))
       (gc-protect (obj)
@@ -100,7 +100,7 @@
 (define-function k_newSymbol oop ((wcs int32 *))	; the characters copied, as eval3's wcsdup copies them
   (let* (((len long) (wcslen wcs))
 	 ((chars int32 *) (cast (malloc (* (sizeof int32) (+ len 1))) int32 *))
-	 ((obj oop) (cast 0 oop)))
+	 ((obj oop) nil))
     (memcpy (cast chars void *) (cast wcs void *) (* (+ len 1) (sizeof int32)))
     (set obj (new <symbol>))
     (set (<symbol>-bits obj) chars)
@@ -119,24 +119,24 @@
 ;; head and tail are rooted while the pair is made: eval3 leaves that to its callers.  Every constructor writes every
 ;; field, nil where eval3 leaves its zeroed memory alone, so nothing the kernel reads was left as allocated
 (define-function k_cons oop ((head oop) (tail oop))
-  (let (((obj oop) (cast 0 oop)))
+  (let (((obj oop) nil))
     (gc-protect (head tail)
       (set obj (new <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
-    (set (<pair>-source obj) (cast 0 oop))
+    (set (<pair>-source obj) nil)
     (return obj)))
 
 ;; elements from to below to of an <_array>, nil: eval3 has them from zeroed memory
 (define-function k_nilFill void ((elts oop) (from long) (to long))
   (while (< from to)
-    (set (indir (cast elts oop *) from) (cast 0 oop))
+    (set (indir (cast elts oop *) from) nil)
     (set from (+ from 1))))
 
 (define-function k_newArray oop ((size long))
   (let (((cap long) (if size size 1))
-	((elts oop) (cast 0 oop))
-	((obj oop) (cast 0 oop)))
+	((elts oop) nil)
+	((obj oop) nil))
     (set elts (new <_array> (* (sizeof oop) cap)))
     (k_nilFill elts 0 cap)
     (gc-protect (elts)
@@ -147,18 +147,18 @@
     (return obj)))
 
 (define-function k_newExpr oop ((defn oop) (env oop))
-  (let (((obj oop) (cast 0 oop)))
+  (let (((obj oop) nil))
     (gc-protect (defn env)
       (set obj (new <expr>))
       (gc-protect (obj)
-	(set (<expr>-name obj) (cast 0 oop))
+	(set (<expr>-name obj) nil)
 	(set (<expr>-definition obj) defn)
 	(set (<expr>-environment obj) env)
 	(set (<expr>-profile obj) (k_newLong 0))))
     (return obj)))
 
 (define-function k_newForm oop ((fn oop) (sym oop))
-  (let (((obj oop) (cast 0 oop)))
+  (let (((obj oop) nil))
     (gc-protect (fn sym)
       (set obj (new <form>)))
     (set (<form>-function obj) fn)
@@ -166,7 +166,7 @@
     (return obj)))
 
 (define-function k_newFixed oop ((function oop))
-  (let (((obj oop) (cast 0 oop)))
+  (let (((obj oop) nil))
     (gc-protect (function)
       (set obj (new <fixed>)))
     (set (<fixed>-function obj) function)
