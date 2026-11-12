@@ -45,6 +45,8 @@
   (expect "sum of an array" ((fn image 'sum-array "pl>l") buffer 10) 55)
   (expect "a field of an indexed struct" (list ((fn image 'element-field "pl>l") buffer 2) (byte-at buffer (+ (* 2 16) 8))) '(41 41))
   (expect "through addressof" ((fn image 'via-address "l>l") 41) 42)
+  (expect "a literal wider than an int, kept whole" (list ((fn image 'wide-literal "l>l") 0) ((fn image 'wide-literal "l>l") 1))
+	  '(4611686018427387909 9223372036854775807))
   (expect "arithmetic and bits, C's signed results"
 	  (map (lambda (args) (apply (fn image 'arith "lll>l") args))
 	       '((-7 6 0) (-7 2 1) (-7 2 2) (12 10 3) (12 10 4) (12 10 5) (3 4 6) (-8 1 7) (5 0 8)))

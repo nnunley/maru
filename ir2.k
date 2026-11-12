@@ -337,7 +337,8 @@
   (array-do insn (<ir>-program ir)
     (ir-check-type insn ir ())))
 
-(define-method ir-check-type <long>   (ir val?)	IR-INT)
+;; an integer value is an int, or a long when an int can't hold it (natively, a wider one was cut to 32 bits)
+(define-method ir-check-type <long>   (ir val?)	(if (and (<= -2147483648 self) (<= self 2147483647)) IR-INT IR-LONG))
 (define-method ir-check-type <double> (ir val?)	IR-DOUBLE)
 (define-method ir-check-type <string> (ir val?)	IR-STRING)
 
