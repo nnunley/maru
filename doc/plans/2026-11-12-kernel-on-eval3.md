@@ -305,18 +305,30 @@ unchanged, for reasons not found. Option 2 bypasses that lookup anyway.
   `asm`, so a refusal's message is unchanged.
 - asm-table.l stays the general encoder for hand-written assembly.
 
-- [ ] **Step 1: Write the failing check.** Compile `maru-gc.k`, `maru-check.k` and `check/ir2.k` both ways, sites on
+- [ ] **Step 1: Bind by kind, not by a chain of conditions** (the user, 2026-11-12). `arm64-bind-plan` picks each
+  operand kind's handling through one chain of conditions (CC 71, the assembler's highest), the shape the old
+  `arm64-bind` had, against the rule of dispatch by type. Compile each operand kind's plan into a binder of its own
+  when the row is compiled (`arm64-plan-kind` answers a function of `(plan op vals pc)` with its slots closed over),
+  so the plan's binder is the dispatch and encoding no longer tests the kind. The gate:
+  - the bytes and reports for every arm64 sample, placeholder variants included, are the same as before (the sweep
+    over `check/asm-table.l`'s stream, as when the rows were compiled);
+  - `asm_table`, `asm_rows_arm64`, `asm_patch` and `asm_coverage` pass;
+  - `arm64-bind-plan`'s CC 71 leaves erosion's time sinks, ledgered;
+  - one real compile of each unit on eval2 and eval3 (best of five, CPU time) is no slower.
+  Commit it on its own, with the message "asm-arm64: each operand kind binds through its own compiled binder", before
+  the sites build on it.
+- [ ] **Step 2: Write the failing check.** Compile `maru-gc.k`, `maru-check.k` and `check/ir2.k` both ways, sites on
   and off. The two native images must be byte for byte the same, and each must run as `native_ir2` asks (maru-gc.k's
   11 reports, and the rest).
-- [ ] **Step 2: Run it and see it fail** (no sites yet).
-- [ ] **Step 3: Implement sites** for the `op` intents first, then `load`/`store` (`native-arm64-load`/`-store`,
+- [ ] **Step 3: Run it and see it fail** (no sites yet).
+- [ ] **Step 4: Implement sites** for the `op` intents first, then `load`/`store` (`native-arm64-load`/`-store`,
   where the offset decides the row).
-- [ ] **Step 4: Run it and see it pass**, then time one compile of each unit on eval2 and eval3. Use best of five
+- [ ] **Step 5: Run it and see it pass**, then time one compile of each unit on eval2 and eval3. Use best of five
   interleaved runs, CPU time by `clock()`, with the encoding share measured. Keep the change only if the whole
   compile gets faster on both evaluators.
-- [ ] **Step 5: Extend to the remaining intents** the coverage check lists (`asm_coverage`: 248 needs over 254 forms),
+- [ ] **Step 6: Extend to the remaining intents** the coverage check lists (`asm_coverage`: 248 needs over 254 forms),
   then write it into doc/assemblers.md and doc/native.md.
-- [ ] **Step 6: Commit** with the message "native-arm64: lowering rules choose their rows once".
+- [ ] **Step 7: Commit** with the message "native-arm64: lowering rules choose their rows once".
 
 Open: x86-64's lowering (native-x64.g) can take the same sites once arm64's are measured. x86 rows aren't compiled
 plans yet, so they need what Task 7 gives arm64 first.
