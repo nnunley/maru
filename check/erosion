@@ -8,3 +8,4 @@ erosion +1 review fixes in source.l: source-extent, finding a definition's list 
 erosion +1 check/gezira-vector.k: its main checks two kernels' sums in one function, CC over 10
 verbosity -1 check/gezira-vector.k: forms none of the verbose patterns flag
 erosion -2 ir2 objects: many small definitions (object instructions, form compilers) dilute the share held by callables over CC 10
+erosion +1 asm-arm64.l: arm64-bind-plan refuses vshl and vshr when the diagram lacks immh:immb, one more condition in its dispatch over operand kinds (CC 71), as arm64-bind's was
