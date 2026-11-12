@@ -78,3 +78,4 @@
   (let (((s oop) (new <slots> (* n (sizeof oop)))))
     (set (indir (cast s long *) (- n 1)) n)
     (return s)))
+(define-function slots-size long ((s oop)) (return (gc_size s)))	; the bytes the collector gave it

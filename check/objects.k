@@ -32,6 +32,11 @@
       (expect "nothing failed yet" (= (failure) 0))
       (checked-head l)
       (expect "get of a <late>: type_check_fail, expected 19, got 20" (= (failure) 1920))
+      (expect "get of nil, the handler returning: 0, nothing read" (= (get-of-nil) 0))
+      (expect "put on nil, the handler returning: nothing written" (= (put-on-nil) 1))
+      (let (((s oop) (make-slots 30)))
+	(expect "a variable-sized object: its id, its last word, and as long as its extra bytes"
+		(and (= (indir (cast s long *) -1) 21) (= (indir (cast s long *) 29) 30) (<= 240 (slots-size s)))))
       (expect "get of an odd word's bits: its value, a tagged <long>" (= (untag (cast 85 oop)) 42))
       (put-odd (cast 85 oop))
       (expect "put to an odd word: type_check_fail, expected 3, got 3" (= (failure) 303))

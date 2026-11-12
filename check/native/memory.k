@@ -61,3 +61,6 @@
 (define-function wide-literal long ((which long))
   (if which (return (cast 9223372036854775807 long)))
   (return (cast 4611686018427387909 long)))
+;; so is a global whose type comes from its initial value
+(define wide-global 4611686018427387909)
+(define-function wide-global-value long () (return (cast wide-global long)))

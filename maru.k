@@ -78,10 +78,10 @@
        (maru->ir-type (cdr decl) ir)))
 
 (define-method maru-compile <undefined> (ir)	(ir-nop))
-(define-method maru-compile <long>   	(ir)	(ir-lit self IR-INT))
+(define-method maru-compile <long>   	(ir)	(ir-lit self (ir-integer-type self)))	; a define takes its type from it
 (define-method maru-compile <double> 	(ir)	(ir-lit self IR-DOUBLE))
 (define-method maru-compile <string> 	(ir)	(ir-lit self IR-STRING))
-(define-method maru-compile <symbol> 	(ir)	(if (= 'nil self) (ir-object-nil) (ir-get-var self)))	; nil: the object level's
+(define-method maru-compile <symbol> 	(ir)	(if (= 'nil self) (ir-object-nil) (ir-get-var self)))	; nil: the object level's constant
 (define-method maru-compile <extern> 	(ir)	(ir-extern self.name))
 
 (define-function maru-compile-define (exp ir)

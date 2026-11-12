@@ -47,6 +47,7 @@
   (expect "through addressof" ((fn image 'via-address "l>l") 41) 42)
   (expect "a literal wider than an int, kept whole" (list ((fn image 'wide-literal "l>l") 0) ((fn image 'wide-literal "l>l") 1))
 	  '(4611686018427387909 9223372036854775807))
+  (expect "a global whose initial value is wider than an int, kept whole" ((fn image 'wide-global-value ">l")) 4611686018427387909)
   (expect "arithmetic and bits, C's signed results"
 	  (map (lambda (args) (apply (fn image 'arith "lll>l") args))
 	       '((-7 6 0) (-7 2 1) (-7 2 2) (12 10 3) (12 10 4) (12 10 5) (3 4 6) (-8 1 7) (5 0 8)))
@@ -203,7 +204,8 @@
       (expect "get of nil, the handler returning: 0, nothing read" ((fn image 'get-of-nil ">l")) 0)
       (expect "put on nil, the handler returning: nothing written" ((fn image 'put-on-nil ">l")) 1)
       (let ((s ((fn image 'make-slots "l>p") 30)))
-	(expect "a variable-sized object: its id, and its last word" (list (byte-at (- s 8) 0) (byte-at s (* 8 29))) '(21 30)))
+	(expect "a variable-sized object: its id, and its last word" (list (byte-at (- s 8) 0) (byte-at s (* 8 29))) '(21 30))
+	(expect "a variable-sized object: as long as its extra bytes" (<= 240 ((fn image 'slots-size "p>l") s)) 't))
       (expect "get of an odd word's bits: its value, a tagged <long>" ((fn image 'untag "p>l") 85) 42)
       ((fn image 'put-odd "p>l") 85)
       (expect "put to an odd word: type_check_fail, expected 3, got 3" ((fn image 'failure ">l")) 303)
