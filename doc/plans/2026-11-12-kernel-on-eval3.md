@@ -269,6 +269,58 @@ history: Piumarta made integers "boxed or tagged" a switch (306ffb0, 2011), on i
 - [ ] **Step 6: Run the full suite** with `caffeinate -i make check`, then add the ledger entries. Commit with the
   message "kernel: boots boot2.l and runs repl.l as eval3 does".
 
+### Task 7: Lowering rules choose their arm64 rows once (assembler option 2)
+
+Added 2026-11-12 at the user's request, parked behind Task 6. The kernel is compiled natively, unit after unit and
+mode after mode, so compile time is this plan's cost.
+
+**Why.** native-arm64.g knows which instruction each rule means: `(op add d a b) -> ((ADD ,d ,a ,b))`. It emits a
+symbolic form, and asm-table.l then rediscovers the row. It classifies each operand, looks up the candidate rows and
+tries binding them. Measured on real native compiles (one compile of `maru-check.k`, 12,038 instructions, CPU time):
+
+| | eval2 total | eval2 encoding | eval3 total | eval3 encoding |
+|---|---|---|---|---|
+| main (d23a382) | 13.2 s | 8.7 s, 722 µs an instruction | 18.1 s | 10.7 s, 887 µs |
+| compiled rows | 6.7 s | 2.8 s, 232 µs | 8.3 s | 3.6 s, 299 µs |
+
+The compiled rows are the assemblers branch: candidate table, `<asm-isa>`, shared shapes, `arm64-plan`. Encoding is
+still 28–42% of a compile. Staging the choice is oecm §5.1's staged evaluation: the choice depends on meaning, so it
+is made before the encoder.
+
+Measured and set aside: shapes and mnemonics as array ids (a0b023f, branch `asm-ids`). They gained about 10% in eval3's
+encoding, but on eval2 install grew from about 7.5 s to about 10.7 s over five interleaved runs, with encoding
+unchanged, for reasons not found. Option 2 bypasses that lookup anyway.
+
+**Files:** Modify `native-arm64.g`, `asm-arm64.l`, and `native-link.l` if a pre-encoded form needs more than `(data
+…)`. Add a check beside `native_ir2`.
+
+**Interfaces:**
+- Consumes the compiled rows: `arm64-plan` and `arm64-encode-row`.
+- Produces a site per lowering rule: its mnemonic and the operand kinds it declares (an X register, a W register, a
+  slot offset). The site's candidate rows are resolved once, when the grammar is built, and kept with the rule. At
+  run time the rule binds its operands' values into those rows' plans and emits the four bytes as `(data b0 b1 b2
+  b3)`, which `asm` already passes through.
+- A value-dependent choice (does an immediate fit?) is narrowed to the site's two or three rows when the grammar is
+  built. Branches, label operands and anything a site can't encode keep today's path, the symbolic form through
+  `asm`, so a refusal's message is unchanged.
+- asm-table.l stays the general encoder for hand-written assembly.
+
+- [ ] **Step 1: Write the failing check.** Compile `maru-gc.k`, `maru-check.k` and `check/ir2.k` both ways, sites on
+  and off. The two native images must be byte for byte the same, and each must run as `native_ir2` asks (maru-gc.k's
+  11 reports, and the rest).
+- [ ] **Step 2: Run it and see it fail** (no sites yet).
+- [ ] **Step 3: Implement sites** for the `op` intents first, then `load`/`store` (`native-arm64-load`/`-store`,
+  where the offset decides the row).
+- [ ] **Step 4: Run it and see it pass**, then time one compile of each unit on eval2 and eval3. Use best of five
+  interleaved runs, CPU time by `clock()`, with the encoding share measured. Keep the change only if the whole
+  compile gets faster on both evaluators.
+- [ ] **Step 5: Extend to the remaining intents** the coverage check lists (`asm_coverage`: 248 needs over 254 forms),
+  then write it into doc/assemblers.md and doc/native.md.
+- [ ] **Step 6: Commit** with the message "native-arm64: lowering rules choose their rows once".
+
+Open: x86-64's lowering (native-x64.g) can take the same sites once arm64's are measured. x86 rows aren't compiled
+plans yet, so they need what Task 7 gives arm64 first.
+
 ## After this plan (not in it)
 - **2a, the kernel's collector (chosen 2026-11-12):** port gc.c's design to Maru as `kernel-gc.k`, replacing
   maru-gc.k inside the kernel; maru-gc.k stays for its own checks. It brings what eval3's memory has and maru-gc.k
