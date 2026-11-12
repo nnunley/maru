@@ -24,7 +24,7 @@
     (list-reverse! names)))
 
 ;; what --quick leaves out: the longest by far, as the slowest line reports them.  Everything runs before a merge.
-(define slow-cases '("gc_laws" "gc_model" "asm_rows_x64" "asm_rows_x86" "asm_rows_arm64" "exe" "sat_john" "sat_proof" "recover" "lines"))
+(define slow-cases '("gc_laws" "gc_model" "asm_rows_x64" "asm_rows_x86" "asm_rows_arm64" "asm_table" "exe" "sat_john" "sat_proof" "recover" "lines"))
 (define *requested* *arguments*)
 (set *arguments* ())
 (define known (case-names))
