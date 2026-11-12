@@ -232,6 +232,14 @@
 (check "asm_rows_x86"
   (unit-assert (equal (last (run "asm-rows-x86" (concat-string "./eval check/asm-rows.l x86 " tmp) 600)) "asm rows x86 ok")))
 
+;; The candidate table answers as the full scan does, on every row's samples and refusals, and tries fewer rows.
+(check "asm_table"
+  (unit-assert (equal (last (run "asm-table-arm64" "./eval check/asm-table.l arm64" 600)) "asm table arm64 ok"))
+  (unit-assert (equal (last (run "asm-table-x64" "./eval check/asm-table.l x64" 600)) "asm table x64 ok"))
+  (unit-assert (equal (last (run "asm-table-x86" "./eval check/asm-table.l x86" 600)) "asm table x86 ok"))
+  (unit-assert (equal (last (run "asm-table-arm64-2" "./eval2 -b boot2.l check/asm-table.l arm64" 600)) "asm table arm64 ok"))
+  (unit-assert (equal (last (run "asm-table-x86-2" "./eval2 -b boot2.l check/asm-table.l x86" 600)) "asm table x86 ok")))
+
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
     (unit-assert (equal (last (run "asm-coverage-x64" "./eval check/asm-coverage.l x64")) "asm coverage x64 ok"))

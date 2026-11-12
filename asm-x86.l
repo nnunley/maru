@@ -474,13 +474,38 @@
   (let ((p (text-parser-for-on <x86spec> text)))
     (and ($form p) (<text-parser>-result p))))
 
+;;; Operand shapes for the candidate table (asm-table.l), by what an operand is:
+;;; 'num (a number or a placeholder), a register's name, (m tag) for a memory
+;;; operand with its tag (m32 ...), and nothing for any other operand.  Mode and
+;;; whether an immediate fits are left to the encoder, so every row whose kind
+;;; could take the operand is a candidate.
+
+(define-function x86-shape (op)
+  (cond ((or (long? op) (x86-reloc? op))	'num)
+	((x86-mem? op)				(list (car op)))
+	((symbol? op)				op)
+	(else					())))
+
+(define-function x86-mem-size (s)	(and (pair? s) (cdr (assq (car s) x86-mem-tags))))
+
+;; The kind k takes shape s, as x86-matches? reads it with the mode and the value set aside.
+(define-function x86-accepts (k s)
+  (let* ((c (x86-kind k)) (kc (car c)) (size (cadr c)) (reg (x86-reg s)))
+    (cond ((memq kc '(r x y))	(and reg (= kc (cadr reg)) (= size (caddr reg))))
+	  ((= kc 'rm)		(if (pair? s) (= size (x86-mem-size s)) (and reg (= 'r (cadr reg)) (= size (caddr reg)))))
+	  ((memq kc '(xm ym))	(if (pair? s) (= size (x86-mem-size s)) (and reg (= (if (= kc 'xm) 'x 'y) (cadr reg)))))
+	  ((= kc 'mem)		(and (pair? s) (= size (x86-mem-size s))))
+	  ((= kc 'm)		(pair? s))
+	  ((memq kc '(imm rel one))	(= 'num s))
+	  (else			(= k s)))))
+
 (asm-register-isa 'x64 x64-rows
 		  (lambda (row insn pc) (x86-encode-row row insn pc 'x64))
 		  (lambda (bytes pc) (x86-decode x64-decode-table bytes pc 'x64))
 		  (lambda (row position pc . insn) (x86-field-range row position pc (car insn) 'x64))
-		  x86-parse-form)
+		  x86-parse-form x86-shape x86-accepts ())
 (asm-register-isa 'x86 x86-rows
 		  (lambda (row insn pc) (x86-encode-row row insn pc 'x86))
 		  (lambda (bytes pc) (x86-decode x86-decode-table bytes pc 'x86))
 		  (lambda (row position pc . insn) (x86-field-range row position pc (car insn) 'x86))
-		  x86-parse-form)
+		  x86-parse-form x86-shape x86-accepts ())

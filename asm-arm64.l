@@ -379,4 +379,33 @@
   (let ((p (text-parser-for-on <arm64spec> text)))
     (and ($form p) (<text-parser>-result p))))
 
-(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range arm64-parse-form)
+;;; Operand shapes for the candidate table (asm-table.l), by what an operand is:
+;;; 'num (a number or a placeholder), (reg class special) for a register
+;;; (special sp or zr for X and W 31), 'sym (any other symbol), 'vec (a vector
+;;; or a lane), (mem tag base offset) for a memory operand, and (pair tag) for
+;;; any other list.  A kind that its test reads from the value takes every
+;;; number, and a kind this does not know takes anything.
+
+(define-function arm64-shape (op)
+  (cond ((or (long? op) (double? op) (arm64-reloc? op))	'num)
+	((symbol? op)				(let ((r (assq op arm64-registers)))
+						  (if r (list 'reg (cadr r) (cadddr r)) 'sym)))
+	((arm64-vector? op)			'vec)
+	((memq (car op) '(off pre post))	(list 'mem (car op) (arm64-shape (cadr op)) (arm64-shape (caddr op))))
+	(else					(list 'pair (car op)))))
+
+(define-function arm64-accepts (k s)
+  (let ((c (car k)))
+    (cond ((= c 'reg)		(and (pair? s) (= 'reg (car s)) (= (arm64-reg-class (cadr k)) (cadr s))
+				     (or (not (caddr s)) (= (caddr s) (if (caddr k) 'sp 'zr)))))
+	  ((memq c '(vreg vlane))	(= 'vec s))
+	  ((= c 'vbrace)		(arm64-accepts (cadr k) s))
+	  ((memq c '(vshl vshr imm simm pcrel pcpage bimm lslimm fimm))	(= 'num s))
+	  ((memq c '(cond invcond))	(= 'sym s))
+	  ((= c 'lsl)			(and (pair? s) (= 'pair (car s)) (= 'LSL (cadr s))))
+	  ((memq c '(off pre post))	(and (pair? s) (= 'mem (car s)) (= c (cadr s))
+					     (arm64-accepts (cadr k) (caddr s)) (arm64-accepts (caddr k) (cadddr s))))
+	  (else				1))))
+
+(asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range arm64-parse-form
+		  arm64-shape arm64-accepts 1)

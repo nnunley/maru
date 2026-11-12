@@ -98,7 +98,7 @@ where it departs from VPRI's original, and its limits. This file holds only a li
 - [Maru objects in typed Maru](doc/ir2-objects.md): `define-object`, `new`, fields by name, `get`/`put` checked, `object-type`, lowered to eval.l's layout. Checks: `ir2_objects`, `native_ir2`.
 - [irl](doc/irl.md): The C-like irl language over ir2: programs, libraries and grammar blocks. Checks: `irl`, `irl_library`, `irl_grammar`.
 - [Native code from ir2](doc/native.md): Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT. Checks: `native_ir2`, `native_ir2_x64`, `native_image`, `jit_run`.
-- [Assemblers and executables](doc/assemblers.md): Table-driven encoders for x86, x86-64 and arm64, and `exe.l`'s executables with no toolchain. Checks: `asm_x86`, `asm_interface`, `asm_rows_arm64`, `asm_rows_x64`, `asm_rows_x86`, `asm_coverage`, `asm_patch`, `exe`.
+- [Assemblers and executables](doc/assemblers.md): Table-driven encoders for x86, x86-64 and arm64, and `exe.l`'s executables with no toolchain. Checks: `asm_x86`, `asm_interface`, `asm_rows_arm64`, `asm_rows_x64`, `asm_rows_x86`, `asm_coverage`, `asm_patch`, `asm_table`, `exe`.
 - [JOHN](doc/john.md): Samimi's planning language: parsing, the possible-worlds evaluator, sessions and call by meaning. Checks: `john_forms`, `john_run`, `john_session`, `call_by_meaning`, `plan_evidence`.
 - [SAT solving](doc/sat.md): The CDCL solver in irl, DIMACS, DRAT proofs, and JOHN's SAT planner. Checks: `sat_core`, `sat_dimacs`, `sat_proof`, `sat_john`.
 - [Laws and rules](doc/laws.md): The rule engine, `.law` files and their runner, and the laws over C expressions and Nile. Checks: `law_engine`, `law_cexpr`, `law_rules`, `law_nile`.

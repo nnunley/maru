@@ -146,3 +146,41 @@
 							((> d 0) (concat-strings t " + " (long->string d)))
 							(else t)))))
 		       "]")))))
+
+;; Instructions each instruction set must refuse, shared by check/asm-rows.l and check/asm-table.l.
+(define arm64-refused
+  '((ADD X0 X1 4096)		; imm12 out of range
+    (ADD X0 X1 -1)		; negative value for an unsigned field
+    (ADD XZR X1 1)		; register 31 is SP in this form, not XZR
+        (ADD X0 W1 3)		; no form mixes X and W this way
+    (AND X0 X1 5)		; 0b101 is not a rotated run of ones: no logical immediate
+    (AND X0 X1 0)		; nor are all zeros
+    (AND W0 W1 -1)		; nor all ones
+    (FMOV S0 0.1)		; not +/-(16+m)/16 * 2^n
+    (LSL X0 X1 64)		; shift out of range
+    (CSET X0 AL)		; AL and NV have no inverse
+    (LDR X0 (off X1 4))		; offset not a multiple of 8
+        (FADD S0 S1 D2)		; mixed precision
+    (ADD (V 0 4S) (V 1 2S) (V 2 4S))	; arrangements must agree
+    (MUL (V 0 2D) (V 1 2D) (V 2 2D))	; MUL has no 2D form
+    (FADD (V 0 8B) (V 1 8B) (V 2 8B))	; no byte floating point
+    (SHL (V 0 4S) (V 1 4S) 32)		; shift beyond the element
+        (USHR (V 0 4S) (V 1 4S) 0)		; right shifts are 1..esize
+    (AND W0 W1 0x100000001)))		; a 32-bit logical immediate wider than 32 bits
+
+(define x86-refused
+  '((INT -5)			; INT's vector is unsigned (the spike encoded it as 251)
+    (RET -1000)			; so is RET's byte count (the spike: 64536)
+    (ADD EAX R8D)		; no R8D in 32-bit mode
+    (ADD RAX 1)			; nor 64-bit registers
+    (ADD (m32 0 RIP () 1) 5)	; nor RIP-relative addressing
+        (VADDPS YMM9 YMM1 YMM2)	; nor YMM8-YMM15
+    (MOV EAX (m32 (reloc 32) EBX () 1))))	; nor a placeholder beside a base register
+(define x64-refused
+  '((MOV AH R8B)		; AH cannot be encoded with a REX prefix
+    (MOV AH SIL)		; nor beside SIL, which needs one
+    (ADD (m32 0 EAX () 1) 5)	; 32-bit addresses (prefix 67) are not encoded
+        (PUSH EAX)			; no 32-bit push in 64-bit mode
+    (ADD RAX 0x100000000)	; imm32 sign-extends; this does not fit
+    (MOV EAX (m32 (reloc 32) RBX () 1))	; a placeholder beside a base register: its width
+    (MOV EAX (m32 (reloc) RBX () 1))))	; would depend on the value, so it is refused

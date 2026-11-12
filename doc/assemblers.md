@@ -2,6 +2,20 @@
 
 Table-driven encoders for x86, x86-64 and arm64, and `exe.l`'s executables with no toolchain.
 
+## The candidate table
+
+`asm-attempt` no longer encodes an instruction against every row of its mnemonic. `asm-table.l` keys a candidate
+list on the mnemonic and each operand's shape (a register and its class, a memory operand's form, a number), and the
+encoder tries only those rows, in file order, with the same shortest-or-widest choice as before. A list is built on
+first use for each (mnemonic, shapes) and kept per instruction set. An instruction set registers its shape and accept
+functions with its rows (`arm64-shape`/`arm64-accepts`, `x86-shape`/`x86-accepts`); both are conservative, so every
+row that can encode an instruction is a candidate. A kind whose test reads the value takes every number. When no
+candidate fits, the full scan runs, and a refusal's error text is unchanged. Arm64 has a fixed width and no open
+placeholder, so the first fitting row ends the search; the other instruction sets keep scanning.
+
+A new instruction set with no shape and accept functions gets the full scan. Its rows alone do not build the table,
+since the table has to know what each kind accepts; that is per-ISA code, as encode and decode already are.
+
 ## Checks
 
 - `asm_x86` (`check/asm-x86.l`): the x86 assembler that make generates from
@@ -14,6 +28,10 @@ Table-driven encoders for x86, x86-64 and arm64, and `exe.l`'s executables with 
   row of `arm64.spec` or `x86.spec`, sampled in every operand position (and
   every NEON arrangement), assembles to the bytes clang gives and decodes
   back to them; unencodable operands are refused.
+- `asm_table` (`check/asm-table.l`): the candidate table answers as the full scan does, for every row's samples (each
+  number in turn a placeholder) and every refusal, with the same bytes, reports and error text, and a refusal writing
+  nothing; every row that encodes an instruction is among its candidates; over the whole stream the table tries fewer
+  encodes than the scan (arm64, x64 and x86, under `eval`, and arm64 and x86 under `eval2`).
 - `asm_coverage` (`check/asm-coverage.l`): every form in `asm-coverage.spec`
   has a row, and every operation `ir2.k` declares, on every type, is named
   there for each instruction set.
