@@ -23,3 +23,4 @@ verbosity +1 check/objects-run.k: show_oop's early returns written as nested ifs
 erosion +4 kernel-reader.k: readExpr, readChar and readNumber keep eval3's switches on a character (CC 35, 18 and 14); a readtable would dispatch by character instead
 verbosity -1 kernel-reader.k: forms none of the verbose patterns flag
 erosion -4 kernel-eval.k: eval3's evaluator as many small functions (environments, expand's helpers, encode's binding and arity helpers, applyExpr apart from apply) dilutes the share held by callables over CC 10
+verbosity +1 the split into two branches: boxed?'s and the wide literal's verbosity entry is ir2-object-level's, and was counted again by the kernel's

@@ -2,23 +2,7 @@
 ;;; code region, and its functions called by address through subr.  Runs on eval2, which runs maru.k.
 (require "native.l")
 (require "check/native-child.l")
-(define-function fn (image name signature) (subr (cdr (assq name image)) signature))
-(define-function last (l) (if (cdr l) (last (cdr l)) (car l)))
-;; a unit's main, run in a child: the lines it printed
-(define-function native-run-main (image args)
-  (let* ((argv ((subr "malloc" "l>p") (* 8 (+ 2 (list-length args)))))
-	 (k 0)
-	 (out (native-child
-	       (lambda ()
-		 (list-do a (cons "prog" args)
-		   (let ((p ((subr "strdup" "s>p") a))) (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) (& 255 (>> p (* 8 j)))))) (set k (+ k 1)))
-		 (for (j 0 8) (set-byte-at argv (+ (* 8 k) j) 0))
-		 (and code-region-write-protect (code-region-write-protect 1))	; a forked thread's JIT pages may start writable, not executable
-		 (let ((status ((fn image 'main "ip>i") (+ 1 (list-length args)) argv)))
-		   ((subr "fflush" "p>i") (native-stdout))	; stdout only: fflush(NULL) would reposition the loader's shared input
-		   status)))))
-    (expect "the child's exit status" (car out) 0)
-    (cdr out)))
+(require "check/native-run.l")
 
 (let ((image (native-install (native-compile-file "check/native/add.k"))))
   (expect "add3 of 1, 2, 3" ((fn image 'add3 "lll>l") 1 2 3) 6)
@@ -153,9 +137,6 @@
 
 ;; the collector written in typed Maru, held to what maru_gc asks of it under cc: eleven reports, the nth after n
 ;; thousand rounds of 256 cells (the last after ten thousand), and at the end everything freed and none left in use
-(define-function prefix-at? (p s i)	; whether s holds p at i
-  (and (<= (+ i (string-length p)) (string-length s))
-       (let ((k 0)) (while (and (< k (string-length p)) (= (string-at p k) (string-at s (+ i k)))) (set k (+ k 1))) (= k (string-length p)))))
 (define-function prefix? (p s) (prefix-at? p s 0))
 (define-function select (keep? l) (let ((out ())) (list-do x l (and (keep? x) (push out x))) (list-reverse! out)))
 (let* ((reports (map (lambda (l) (pieces l 32)) (select (lambda (l) (prefix? "GC: " l)) (native-run-main (native-install (native-compile-file "maru-gc.k")) ()))))
