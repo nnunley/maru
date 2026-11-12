@@ -754,27 +754,34 @@
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
 ;; The kernel (doc/kernel.md): each check unit natively (check/kernel.l), and through the C back end
 (check "kernel_native" (unit-assert (equal (last (run "kernel_native" "./eval2 check/kernel.l" 300)) "kernel ok")))
+;; maru-gc.k less its main, kernel.k, then FILE: a unit in tmp named NAME.k, for ir2-build
+(define-function kernel-c-unit (gc name file)
+  (let ((path (concat-strings tmp "/" name ".k")))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
+					    (contents-of-file-named file))
+			    path)
+    path))
+;; the lines ./eval3 -b boot2.l prints for check/kernel/lists.k's structures
+(define kernel-lists-printed
+  '("(he\"l\\lo sym -42 3.500000 () Array<3>(1 () s) (1 . 2) Array<0>())"
+  "(\"he\\\"l\\\\lo\" sym -42 3.500000 () Array<3>(1 () \"s\") (1 . 2) Array<0>())"
+  "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
 (check "kernel_c"
   (let ((gc (contents-of-file-named "maru-gc.k")))
-    (list-do unit '("objects")
-      (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
-					      (contents-of-file-named (concat-strings "check/kernel/" unit ".k")))
-			      (concat-strings tmp "/kernel-" unit ".k"))
-      (unit-assert (equal (last (run (concat-strings "kernel-" unit) (ir2-build (concat-strings "kernel-" unit) (concat-strings tmp "/kernel-" unit ".k"))))
-			  (concat-strings "kernel " unit " ok"))))))
+    (unit-assert (equal (run "kernel-lists" (ir2-build "kernel-lists" (kernel-c-unit gc "kernel-lists" "check/kernel/lists.k")))
+			kernel-lists-printed))
+    (unit-assert (equal (last (run "kernel-objects" (ir2-build "kernel-objects" (kernel-c-unit gc "kernel-objects" "check/kernel/objects.k"))))
+			"kernel objects ok"))))
 ;; the kernel's objects over generated programs (check/laws/objects.law): check/objects-run.k after maru-gc.k and kernel.k,
 ;; through C under ASan, on the poisoning collector, agrees with the law's model; and a program reading a field nothing
 ;; wrote is refuted (fixtures/objects-unwritten.law), so the sentinel shows
 (check "law_objects"
   (let* ((gc  (contents-of-file-named "maru-gc.k"))
-	 (src (concat-strings tmp "/objects-run.k"))
+	 (src (kernel-c-unit gc "objects-run" "check/objects-run.k"))
 	 (bin (concat-strings tmp "/objects-run"))
 	 (dir (concat-strings tmp "/objects-law"))
 	 (env (concat-strings "env OBJECTS_LAW_RUN=" bin " OBJECTS_LAW_TMP=" dir " ./eval"))
 	 (bite (concat-strings tmp "/objects-unwritten.out")))
-    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
-					    (contents-of-file-named "check/objects-run.k"))
-			    src)
     (run "objects-run-c" (concat-strings "./eval2 ir-gen-c.k maru.k " src " > " bin ".c"))
     (run "objects-run-cc" (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " bin " " bin ".c -ldl"))
     (run "objects-law-dir" (concat-strings "mkdir -p " dir))

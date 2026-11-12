@@ -91,11 +91,18 @@
     (set (<pair>-source obj) (cast 0 oop))
     (return obj)))
 
+;; elements from to below to of an <_array>, nil: eval3 has them from zeroed memory
+(define-function k_nilFill void ((elts oop) (from long) (to long))
+  (while (< from to)
+    (set (indir (cast elts oop *) from) (cast 0 oop))
+    (set from (+ from 1))))
+
 (define-function k_newArray oop ((size long))
   (let (((cap long) (if size size 1))
 	((elts oop) (cast 0 oop))
 	((obj oop) (cast 0 oop)))
     (set elts (new <_array> (* (sizeof oop) cap)))
+    (k_nilFill elts 0 cap)
     (gc-protect (elts)
       (set obj (new <array>))
       (gc-protect (obj)

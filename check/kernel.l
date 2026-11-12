@@ -23,4 +23,11 @@
 (let ((out (kernel-run "check/kernel/objects.k" ())))
   (expect "check/kernel/objects.k" (last out) "kernel objects ok"))
 
+;; the lines eval3 -b boot2.l prints for the same structures
+(define kernel-lists-printed
+  '("(he\"l\\lo sym -42 3.500000 () Array<3>(1 () s) (1 . 2) Array<0>())"
+  "(\"he\\\"l\\\\lo\" sym -42 3.500000 () Array<3>(1 () \"s\") (1 . 2) Array<0>())"
+  "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
+(expect "check/kernel/lists.k" (kernel-run "check/kernel/lists.k" ()) kernel-lists-printed)
+
 (println (if ok "kernel ok" "kernel FAILED"))

@@ -25,6 +25,16 @@ the oracles.
   kernel doesn't take; the object level already reads an odd word's type as `<long>`.
 - **A `<subr>`'s `imp`** is a function pointer of `(arguments env)`, called through the field.
 
+## Lists, arrays and the printer (`kernel-lists.k`)
+
+- **Lists**: `k_car`, `k_cdr` (nil for a non-pair) and their compositions, as eval3.c:165.
+- **Arrays**: `k_arrayLength`, `k_arrayAt` (nil past the end), `k_arrayAtPut`, `k_arrayAppend` and `k_arrayInsert`.
+  Written past its end, an array's capacity doubles until the index fits, as eval3.c:297.
+- **The printer**: `k_doprint` with `k_print`, `k_dump` and `k_dumpln`, eval3's text for its 13 types. `dump` writes
+  strings as the reader reads them back, and a binding whose tail is its own list prints as `<name>`.
+- **Pointer steps are in bytes**, as ir2's arithmetic is (ir2.k:872), so a step over a character or an element is
+  written with `sizeof`.
+
 ## Departures from eval3
 
 - **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object
@@ -34,6 +44,12 @@ the oracles.
   WasmGC struct, made with all its fields, needs.
 - **`k_cons`, `k_newForm` and `k_newFixed` root their arguments** while they allocate. eval3 leaves that to its
   callers.
+- **New array capacity is filled with nil**, where eval3 has it from zeroed memory (the poisoning collector would
+  leave the sentinel).
+- **The printer writes to stdout only**, with `printf`. eval3's `fprint` to another stream, its globals' special
+  cases (`<the global environment>`) and `%type-names` for a boot-declared type come with the globals (Task 4); until
+  then such a type prints `<type=N>`. `<data[N]>` prints the collector's size (a whole number of words) until
+  kernel-gc.k keeps the length asked for.
 - **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6). Each failure is
   counted and its ids kept (`type_check_failures`, `type_check_expected`, `type_check_actual`). A driver that clears
   `type_check_fatal` has `get` answer 0 and `put` write nothing instead.
@@ -49,6 +65,11 @@ the oracles.
   - a double, a symbol's characters, an array of 100, and an expr's three fields;
   - a subr called through its `imp`, natively too;
   - a list of 2,000 rooted pairs summing correctly with a collection on every allocation (`gc_frequency` 1).
+- `check/kernel/lists.k` prints four structures with `k_print` and `k_dumpln`: a list of a string with `"` and `\`,
+  a symbol, a negative long, a double, nil, an array with a hole, a dotted pair and an empty array; a string with a
+  tab; a binding. The drivers compare them with what `./eval3 -b boot2.l` prints for the same structures, byte for
+  byte, on the poisoning collector, with a collection on every allocation. It also asserts an array grown to 100
+  with nil between, an insert, an append, `car`/`cdr` of a non-pair, `cadr` and `caddr`.
 - `law_objects` (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
   generated programs over the kernel's 13 types and two of the driver's own (`<knot>`, and `<pixel>`, an atom).
   - **The programs** fill four slots raw (`new`) or by a kernel constructor, write fields through the unchecked
