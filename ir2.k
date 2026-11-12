@@ -128,6 +128,9 @@
 (define-class <ir-object-type> <ir-struct-type> (id atom))		(define-function ir-object-type? (x)	(inherits-from (type-of x) <ir-object-type>))
 
 (define-function ir-declare-object-type (self name id members atom)
+  (list-do s (<ir>-struct-types self)
+    (and (ir-object-type? (cdr s)) (= id (<ir-object-type>-id (cdr s)))
+	 (error "duplicate object type id "id": "(car s)" and "name)))
   (let ((type (make <ir-object-type> name: name members: members defined: 1 id: id atom: atom)))
     (push (<ir>-struct-types self) (cons name type))
     type))
@@ -571,6 +574,20 @@
 							  (ir-object-lower self (ir-set-member (cadr self.parameters)
 											       (ir-cast (ir-pointer-to otype) (car self.operands))
 											       (cadr self.operands))
+									   ir val?)))
+
+;; new: an object in its type's family, its id in the word before it, from the unit's gc_malloc (gc_malloc_atomic for
+;; an atom)
+(define-class <ir-object-new> <ir-object-insn> ())	(define-function ir-object-new (otype)	(new <ir-object-new> (list otype) ()))
+
+(define-method ir-check-type <ir-object-new> (ir val?)	(let* ((otype (car self.parameters))
+							       (alloc (if (<ir-object-type>-atom otype) 'gc_malloc_atomic 'gc_malloc)))
+							  (ir-object-lower self (ir-let '(%new) (list IR-OOP)
+											(list (ir-cast IR-OOP (ir-call (ir-get-var alloc) (list (ir-sizeof otype)))))
+											(list (ir-set-indir (ir-cast (ir-pointer-to IR-LONG) (ir-get-var '%new))
+													    (ir-lit -1)
+													    (ir-lit (<ir-object-type>-id otype) IR-LONG))
+											      (ir-get-var '%new)))
 									   ir val?)))
 ;
 

@@ -154,6 +154,14 @@
 (define-function maru-compile-set-object-slot (exp ir)
   (ir-set-object-slot (ir-object ir (cadr exp)) (caddr exp) (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir)))
 
+;; (new <name>) makes an object of a type define-object declared (compile-begin turns new into object-new, before boot's
+;; new can expand it); any other new is a call
+(define-function maru-compile-new (exp ir)
+  (let ((type (cdr (assq (cadr exp) (<ir>-struct-types ir)))))
+    (if (and type (ir-object-type? type) (not (cddr exp)))
+	(ir-object-new type)
+      (maru-compile-operator (cons 'new (cdr exp)) ir))))
+
 (define-function maru-compile-indir (exp ir)
   (ir-indir (maru-compile (cadr  exp) ir)
 	    (if (caddr  exp) (maru-compile (caddr  exp) ir) (ir-lit 0))))
@@ -189,6 +197,7 @@
     (sizeof	. ,maru-compile-sizeof)
     (member	. ,maru-compile-member)
     (set-member	. ,maru-compile-set-member)
+    (object-new	. ,maru-compile-new)
     (object-slot	. ,maru-compile-object-slot)
     (set-object-slot	. ,maru-compile-set-object-slot)
     (indir	. ,maru-compile-indir)
@@ -212,10 +221,19 @@
         (<  . ,ir-lt )    (<= . ,ir-le )    (=  . ,ir-eq )    (!= . ,ir-ne )    (>= . ,ir-ge )    (>  . ,ir-gt)
 	))
 
+;; (<name>-field x) reads an object's field, (set-<name>-field x v) writes it
+(define-function maru-compile-object-access (self acc ir)
+  (let ((otype (caddr acc)) (field (cdddr acc)) (args (map-with maru-compile (cdr self) ir)))
+    (if (cadr acc)
+	(ir-object-slot otype field (car args))
+      (ir-set-object-slot otype field (car args) (cadr args)))))
+
 (define-function maru-compile-operator (self ir)
   ;; uncomment the following to allow (x . y) to stand for (member x y)
   ;; (if (symbol? (cdr self))
   ;;     (ir-member (cdr self) (maru-compile-value (car self) ir))
+    (let ((acc (and (symbol? (car self)) (assq (car self) *maru-object-accessors*))))
+      (if acc (maru-compile-object-access self acc ir)
     (let* ((name (car self))
 	   (args (map-with maru-compile (cdr self) ir))
 	   (len  (list-length args))
@@ -223,7 +241,7 @@
       (if (or (and (= len 1) (set op (cdr (assq name maru->ir-unary-map ))))
 	      (and (= len 2) (set op (cdr (assq name maru->ir-binary-map)))))
 	  (op args)
-	(ir-call (maru-compile name ir) args))))
+	(ir-call (maru-compile name ir) args))))))
   ;;)
 
 (define-method maru-compile <pair> (ir)
@@ -261,6 +279,17 @@
     (cons name type)))
 
 (define *maru-objects* (array))
+(define *maru-object-accessors* ())	; ((<name>-field getter otype . field) ...) for the unit being compiled
+
+(define-function maru-object-accessors (ir)
+  (set *maru-object-accessors* ())
+  (array-do o *maru-objects*
+    (let ((otype (ir-object ir (car o))))
+      (list-do f (cadddr o)
+	(let ((field (maru-declaration-name f f)))
+	  (push *maru-object-accessors* (cons (concat-symbols (car o) '- field) (cons 1 (cons otype field))))
+	  (push *maru-object-accessors* (cons (concat-symbols 'set- (car o) '- field) (cons () (cons otype field)))))))))
+
 
 (define-function compile-namespace (ns)
   (let ((ir  (ir-new ()))
@@ -270,6 +299,7 @@
       (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
     (array-do o *maru-objects*
       (ir-declare-object-type ir (car o) (cadr o) (map-with maru-struct-member (cadddr o) ir) (caddr o)))
+    (maru-object-accessors ir)
     (list-do name-type *maru-types*
       (or (ir-type? (cdr name-type))
 	  (maru->ir-type (cdr name-type) ir)))
@@ -288,24 +318,27 @@
 (define-form compile-begin ()
   '(let ()
      (set *compilation* (new-namespace '*compilation*))
-     (set *globals* *compilation*)))
+     (set *globals* *compilation*)
+     (define-form new args (cons 'object-new args))))	; boot's new would expand it first
 
 (define-form compile-end ()
   '(let ()
      (set *globals* *global-namespace*)
      (compile-namespace *compilation*)))
 
-(define-form extern (name . type)	`(new <extern> ',name ',type))
+(define-function maru-extern (name type)	(new <extern> name type))	; a function: a unit's new is an object's
+(define-form extern (name . type)	`(maru-extern ',name ',type))
 
 (define-form define-struct (name members)
   (array-append *maru-structs* (cons name members))
   ())
 
 ;; a Maru object's type (doc/ir2-objects.md): its id, evaluated here, and its fields, each read and written by name
-;; through (<name>-field x); `atom` last when the collector traces none of them
+;; as (<name>-field x) and (set (<name>-field x) v); `atom` last when the collector traces none of them.  A function
+;; before the declaration reaches the fields by name when it is compiled, unless boot has an accessor of that name.
 (define-form define-object (name id fields . atom)
   (array-append *maru-objects* (list name (eval id) (and atom 1) fields))
-  `(let ()
+  `(let ()	; forms too, before boot's accessors for a type of the same name (<pair>-head ...) can expand them
      ,@(map (lambda (f)
 	      (let ((field (maru-declaration-name f f)))
 		`(let ()

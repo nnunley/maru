@@ -189,7 +189,7 @@
 (require "native-x64.g.l")
 (require "native-link.l")
 
-;; a unit is one compilation: maru.k's declarations (structs, types, exports) accumulate, as it compiles once a process,
+;; a unit is one compilation: maru.k's declarations (structs, objects, types, exports) accumulate, as it compiles once a process,
 ;; so each unit starts from what maru.k itself declared
 (define native-maru-state (list (array-length *maru-structs*) *maru-types* *maru-exports*))
 (define-function native-compile-file (path)
@@ -198,6 +198,7 @@
     (set *maru-structs* structs))
   (set *maru-types* (cadr native-maru-state))
   (set *maru-exports* (caddr native-maru-state))
+  (set *maru-objects* (array))		; maru.k declares none itself
   (compile-begin)
   (load path)
   (compile-end)
