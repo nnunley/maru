@@ -11,6 +11,7 @@
 
 (define-constant gc_quantum	59392)	; 50k
 (define (gc_frequency long)	32768)	; a variable: a check collects on every allocation by setting it to 1
+(define (gc_poison long)	0)	; the byte new memory is filled with: a law sets a sentinel, so what nothing wrote shows
 
 (define-struct <header> ((size long) (flags long) (next struct <header> *) (type long)))
 
@@ -173,7 +174,7 @@
 		      (set gc_memory_last chunk)
 		      (debug (printf "alloc chunk %p\n" chunk))
 		      (let ((obj (+ chunk (sizeof struct <header>))))
-			(memset obj (cast 0 int) csize)
+			(memset obj (cast gc_poison int) csize)
 			(set gc_alloc_count (+ gc_alloc_count 1))
 			(set gc_allocation_count (+ gc_allocation_count 1))
 			(return obj))))))

@@ -762,6 +762,29 @@
 			      (concat-strings tmp "/kernel-" unit ".k"))
       (unit-assert (equal (last (run (concat-strings "kernel-" unit) (ir2-build (concat-strings "kernel-" unit) (concat-strings tmp "/kernel-" unit ".k"))))
 			  (concat-strings "kernel " unit " ok"))))))
+;; the kernel's objects over generated programs (check/laws/objects.law): check/objects-run.k after maru-gc.k and kernel.k,
+;; through C under ASan, on the poisoning collector, agrees with the law's model; and a program reading a field nothing
+;; wrote is refuted (fixtures/objects-unwritten.law), so the sentinel shows
+(check "law_objects"
+  (let* ((gc  (contents-of-file-named "maru-gc.k"))
+	 (src (concat-strings tmp "/objects-run.k"))
+	 (bin (concat-strings tmp "/objects-run"))
+	 (dir (concat-strings tmp "/objects-law"))
+	 (env (concat-strings "env OBJECTS_LAW_RUN=" bin " OBJECTS_LAW_TMP=" dir " ./eval"))
+	 (bite (concat-strings tmp "/objects-unwritten.out")))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n(load \"kernel.k\")\n"
+					    (contents-of-file-named "check/objects-run.k"))
+			    src)
+    (run "objects-run-c" (concat-strings "./eval2 ir-gen-c.k maru.k " src " > " bin ".c"))
+    (run "objects-run-cc" (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " bin " " bin ".c -ldl"))
+    (run "objects-law-dir" (concat-strings "mkdir -p " dir))
+    (let ((out (law-file-holds "law_objects" env "check/laws/objects-model.l" "check/laws/objects.law")))
+      (unit-assert out)
+      (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
+			      (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (") (equal (cadr ls) "law initialised: PROVED 33"))))))
+    (unit-assert (= 256 (run-cpu-status 300 (concat-strings "exec </dev/null >" bite " 2>&1; exec " env
+							     " check/law.l check/laws/objects-model.l check/laws/fixtures/objects-unwritten.law"))))
+    (unit-assert (starts (car (lines (contents-of-file-named bite))) "law unwritten: REFUTED p="))))
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
     (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"

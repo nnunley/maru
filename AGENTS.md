@@ -96,7 +96,7 @@ where it departs from VPRI's original, and its limits. This file holds only a li
 - [Small languages](doc/languages.md): The Smalltalk-like pepsi, a language built at the REPL, and the start of Ruby. Checks: `pepsi`, `repl`, `maruby`.
 - [Typed Maru (ir2) and the C back end](doc/ir2.md): `maru.k`'s typed language, its sizes from `osdefs.k`, and `ir-gen-c.k`. Checks: `osdefs`, `maru_test`, `ir2`, `core_forms`, `zero_global`, `maru_check`, `maru_label`, `exit_status`, `ir_retired`, `library_mode`.
 - [Maru objects in typed Maru](doc/ir2-objects.md): `define-object`, `new`, fields by name, `get`/`put` checked, `object-type`, lowered to eval.l's layout. Checks: `ir2_objects`, `native_ir2`.
-- [The grounded kernel](doc/kernel.md): Maru's evaluator in typed Maru through ir2, aligned on eval3.c, natively and through C. Checks: `kernel_native`, `kernel_c`.
+- [The grounded kernel](doc/kernel.md): Maru's evaluator in typed Maru through ir2, aligned on eval3.c, natively and through C, and a law over its objects. Checks: `kernel_native`, `kernel_c`, `law_objects`.
 - [irl](doc/irl.md): The C-like irl language over ir2: programs, libraries and grammar blocks. Checks: `irl`, `irl_library`, `irl_grammar`.
 - [Native code from ir2](doc/native.md): Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT. Checks: `native_ir2`, `native_ir2_x64`, `native_image`, `jit_run`.
 - [Assemblers and executables](doc/assemblers.md): Table-driven encoders for x86, x86-64 and arm64, and `exe.l`'s executables with no toolchain. Checks: `asm_x86`, `asm_interface`, `asm_rows_arm64`, `asm_rows_x64`, `asm_rows_x86`, `asm_coverage`, `asm_patch`, `asm_table`, `exe`.

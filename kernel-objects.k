@@ -20,10 +20,21 @@
 (define (strlen	  (long char *)			*)	(extern strlen))
 (define (mbstowcs (long int32 * char * long)	*)	(extern mbstowcs))
 
-;; eval3's typecheck failure is fatal (eval3.c:152); recoverable errors come with the REPL's error handling
+;; eval3's typecheck failure is fatal (eval3.c:152); recoverable errors come with the REPL's error handling.  Each
+;; failure is counted and its ids kept; a law's driver clears type_check_fatal, so get answers 0 and put writes nothing
+(define (type_check_fatal	long)	1)
+(define (type_check_failures	long)	0)
+(define (type_check_expected	long)	0)
+(define (type_check_actual	long)	0)
+
 (define-function type_check_fail void ((expected long) (actual long))
-  (printf "\nerror: typecheck failed (%ld != %ld)\n" expected actual)
-  (exit (cast 1 int)))
+  (set type_check_failures (+ type_check_failures 1))
+  (set type_check_expected expected)
+  (set type_check_actual actual)
+  (if type_check_fatal
+      (let ()
+	(printf "\nerror: typecheck failed (%ld != %ld)\n" expected actual)
+	(exit (cast 1 int)))))
 
 (define-function k_newData oop ((len long))	(return (new <data> len)))
 
@@ -69,13 +80,15 @@
     (set (<symbol>-flags obj) 0)
     (return obj)))
 
-;; head and tail are rooted while the pair is made: eval3 leaves that to its callers
+;; head and tail are rooted while the pair is made: eval3 leaves that to its callers.  Every constructor writes every
+;; field, nil where eval3 leaves its zeroed memory alone, so nothing the kernel reads was left as allocated
 (define-function k_cons oop ((head oop) (tail oop))
   (let (((obj oop) (cast 0 oop)))
     (gc-protect (head tail)
       (set obj (new <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
+    (set (<pair>-source obj) (cast 0 oop))
     (return obj)))
 
 (define-function k_newArray oop ((size long))
@@ -95,6 +108,7 @@
     (gc-protect (defn env)
       (set obj (new <expr>))
       (gc-protect (obj)
+	(set (<expr>-name obj) (cast 0 oop))
 	(set (<expr>-definition obj) defn)
 	(set (<expr>-environment obj) env)
 	(set (<expr>-profile obj) (k_newLong 0))))

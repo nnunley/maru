@@ -12,3 +12,5 @@ erosion +1 asm-arm64.l: arm64-bind-plan refuses vshl and vshr when the diagram l
 erosion +1 check/objects.k: its main asserts each object form in one function, CC over 10, now nil, tagged longs and boxed? too
 verbosity -1 nil, boxed? and their checks: forms none of the verbose patterns flag
 erosion +1 check/kernel/objects.k: its main asserts every constructor and type in one function, CC over 10
+erosion +2 check/objects-run.k: the law's driver dispatches by type and field in typed Maru, which has no selectors: field-cases, new_of, make_of and main over CC 10
+verbosity -1 check/objects-run.k and check/laws/objects-model.l: forms none of the verbose patterns flag

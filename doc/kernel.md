@@ -24,10 +24,16 @@ the oracles.
 
 ## Departures from eval3
 
-- **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object length, ephemerons, heap limits).
+- **The collector is maru-gc.k**, not gc.c, until the plan's step 2a ports gc.c's design as `kernel-gc.k` (per-object
+  length, ephemerons, heap limits).
+- **Every constructor writes every field.** eval3 leaves a pair's `source` and an expr's `name` to its zeroed memory;
+  the kernel writes nil there. So nothing it reads was left as allocated, which `law_objects` holds it to, and a
+  WasmGC struct, made with all its fields, needs.
 - **`k_cons`, `k_newForm` and `k_newFixed` root their arguments** while they allocate. eval3 leaves that to its
   callers.
-- **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6).
+- **A failed type check is fatal**, as eval3's is, until the REPL's error handling comes (Task 6). Each failure is
+  counted and its ids kept (`type_check_failures`, `type_check_expected`, `type_check_actual`). A driver that clears
+  `type_check_fatal` has `get` answer 0 and `put` write nothing instead.
 
 ## Checks
 
@@ -40,3 +46,23 @@ the oracles.
   - a double, a symbol's characters, an array of 100, and an expr's three fields;
   - a subr called through its `imp`, natively too;
   - a list of 2,000 rooted pairs summing correctly with a collection on every allocation (`gc_frequency` 1).
+- `law_objects` (`check/laws/objects.law`, its programs in `objects-programs.law`, its model in `objects-model.l`):
+  generated programs over the kernel's 13 types and two of the driver's own (`<knot>`, and `<pixel>`, an atom).
+  - **The programs** fill four slots raw (`new`) or by a kernel constructor, write fields through the unchecked
+    accessors (`set`) or `put`, and read them through the accessors (`look`) or `get`. `get` and `put` name a type of
+    their own, so most mismatch, nil included. Programs also ask `object-type` and collect.
+  - **The driver**, `check/objects-run.k`, is compiled after maru-gc.k and kernel.k through C under ASan. It runs on
+    the poisoning collector: `gc_poison` 0xa5 fills new memory, so a field nothing wrote reads S. A write is made
+    distinct by its line, so a write to the wrong field shows.
+  - **`agree`**: the driver prints what the model says, line for line, at three collection paces (every allocation,
+    every 7th, every 32,768th). That covers raw fields reading S, a checked access's mismatch (it prints
+    `F expected actual`, answers 0, writes nothing, and calls `type_check_fail` once with those ids), and objects
+    reached only through fields surviving collection. Its classes show the operation mix, and at least 15% of
+    programs read an object a constructor made.
+  - **`initialised`**: no field of anything a kernel constructor makes reads S, for every constructor and pace.
+  - **The bite** (`fixtures/objects-unwritten.law`): over the same programs, "nothing reads S" is refuted, so the
+    sentinel does show where a program reads what nothing wrote.
+  - **Limits.** ASan sees nil and wild accesses and overruns past a heap block. It can't see an overrun inside the
+    collector's own blocks; there the model's distinct values are what catch a wrong field. The law runs through C
+    only: the native back end shares `ir-object-lower` with it, and Task 6 runs the REPL natively on the poisoning
+    collector.
