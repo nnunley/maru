@@ -33,6 +33,11 @@ align on eval3.c). Grounding: oecm §5.1 (the grounded part is minimal: dispatch
     noted in the doc, not taken here.
 - **The type contract is with boot2.l, not with the compile host.** Ids are the kernel's own constants, 0 … 12 in
   eval3.c:87's order, never read from eval2. The kernel's own check after boot asserts boot's type variables equal them.
+- **nil is the zero word, with behaviour by type** (the user, 2026-11-12, option A of the Null Object pattern;
+  colaswp §4.2's `vtblnil`). `<undefined>` has its applicator and dispatch entries like any type. Checked `get`/`put` on
+  nil answer nil (0 of the field's type) and touch nothing. Raw `<T>-field` accessors on nil are not safe natively
+  (page zero is unmapped); a singleton Null Object for nil is the WasmGC back end's lowering (step 3), and native's
+  later if raw access on nil must be safe.
 - **Word size from `sizeof`**; eval3 uses `int64_t long_t` (eval3.c:92), which the kernel matches.
 - **Objects only through the object level**: `new`, `get`/`put` or `<T>-field`, `object-type`, `object-is`. Every
   `define-object` goes at the top of its file, before any use (doc/ir2-objects.md, "Declaration order").
