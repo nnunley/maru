@@ -16,8 +16,9 @@
 	  ((= ?R (string-at s 0))		5)
 	  (else					(string->number (array->string (arm64-array-from s 3)))))))
 
-;; A row: (mnemonic operands fields mask value allowed), fields as strings of
-;; bits or (name . width); allowed is the row's T=... arrangements, or ().
+;; A row: (mnemonic operands fields mask value allowed plan), fields as strings
+;; of bits or (name . width); allowed is the row's T=... arrangements, or ();
+;; plan its compiled diagram, added once the rows are read (arm64-plan).
 (define arm64-rows
   (map (lambda (row)
 	 (let ((fields (map (lambda (f) (if (string? f) f (cons (car f) (arm64-field-width f)))) (caddr row)))
@@ -270,7 +271,7 @@
 			       (and q (arm64-put-ref ref q (arm64-put vals (cadr p) (cadr op)))))))
       ((memq c '(vshl vshr))
 			(let* ((bound (array-at vals (<arm64-plan>-t-slot plan))) (e (and bound (arm64-esize bound))))
-			  (and e (long? op)
+			  (and e (cadr p) (long? op)
 			       (if (= c 'vshl) (and (<= 0 op) (< op e)) (and (< 0 op) (<= op e)))
 			       (arm64-put-ref (cadr p) (if (= c 'vshl) (+ e op) (- (* 2 e) op)) vals))))
       ((= c 'bimm)	(let ((f (and (long? op) (arm64-bitmask op (cadr p)))))
