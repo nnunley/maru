@@ -20,6 +20,7 @@
     (long    . ,IR-LONG)	    (int64   . ,IR-INT64)
     (float   . ,IR-FLOAT)	    (float32 . ,IR-FLOAT32)
     (double  . ,IR-DOUBLE)	    (float64 . ,IR-FLOAT64)
+    (oop     . ,IR-OOP)
     (struct  .  struct)
     (...     . ,IR-VARARGS)
     ))
@@ -147,6 +148,12 @@
     (or (symbol? field) (maru-error exp "illegal field name: "exp))
     (ir-set-member field value init)))
 
+(define-function maru-compile-object-slot (exp ir)
+  (ir-object-slot (ir-object ir (cadr exp)) (caddr exp) (maru-compile (cadddr exp) ir)))
+
+(define-function maru-compile-set-object-slot (exp ir)
+  (ir-set-object-slot (ir-object ir (cadr exp)) (caddr exp) (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir)))
+
 (define-function maru-compile-indir (exp ir)
   (ir-indir (maru-compile (cadr  exp) ir)
 	    (if (caddr  exp) (maru-compile (caddr  exp) ir) (ir-lit 0))))
@@ -182,6 +189,8 @@
     (sizeof	. ,maru-compile-sizeof)
     (member	. ,maru-compile-member)
     (set-member	. ,maru-compile-set-member)
+    (object-slot	. ,maru-compile-object-slot)
+    (set-object-slot	. ,maru-compile-set-object-slot)
     (indir	. ,maru-compile-indir)
     (set-indir	. ,maru-compile-set-indir)
     (return	. ,maru-compile-return)
@@ -251,12 +260,16 @@
 	(type (maru-declaration-type decl ir)))
     (cons name type)))
 
+(define *maru-objects* (array))
+
 (define-function compile-namespace (ns)
   (let ((ir  (ir-new ()))
 	(gen (ir-gen-new)))
     (list-do int-ext *maru-exports* (ir-export-symbol-as ir (car int-ext) (cdr int-ext)))
     (array-do s *maru-structs*
       (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
+    (array-do o *maru-objects*
+      (ir-declare-object-type ir (car o) (cadr o) (map-with maru-struct-member (cadddr o) ir) (caddr o)))
     (list-do name-type *maru-types*
       (or (ir-type? (cdr name-type))
 	  (maru->ir-type (cdr name-type) ir)))
@@ -287,6 +300,18 @@
 (define-form define-struct (name members)
   (array-append *maru-structs* (cons name members))
   ())
+
+;; a Maru object's type (doc/ir2-objects.md): its id, evaluated here, and its fields, each read and written by name
+;; through (<name>-field x); `atom` last when the collector traces none of them
+(define-form define-object (name id fields . atom)
+  (array-append *maru-objects* (list name (eval id) (and atom 1) fields))
+  `(let ()
+     ,@(map (lambda (f)
+	      (let ((field (maru-declaration-name f f)))
+		`(let ()
+		   (define-form ,(concat-symbols name '- field) (x) (list 'object-slot ',name ',field x))
+		   (define-form ,(concat-symbols 'set- name '- field) (x v) (list 'set-object-slot ',name ',field x v)))))
+	    fields)))
 
 (define-form export names
   (list-do name names

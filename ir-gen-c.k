@@ -114,6 +114,9 @@
 
 ;
 
+;; an object instruction is what ir2 lowered it to, in eval.l's layout (doc/ir2-objects.md)
+(define-method ir-gen-c <ir-object-insn> (gen) (ir-gen-c self.lowered gen))
+
 (define-method ir-gen-c <ir-member> (gen)
   (let* ((field (car self.parameters))
 	 (fname (<ir-struct-member>-name field))

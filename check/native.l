@@ -166,6 +166,19 @@
     (expect "maru-gc.k's cells in use" (string->long (cadr final)) 0)
     (expect "maru-gc.k's bytes in use" (string->long (car (cddddr (cddddr (cdr final))))) 0)))
 
+;; Maru objects by type and field name (check/native/objects.k), in eval.l's layout
+(let ((image (native-install (native-compile-file "check/native/objects.k")))
+      (buffer ((subr "calloc" "ll>p") 4 8)))
+  (set-byte-at buffer 0 11)
+  (set-byte-at buffer 8 22)
+  ((fn image 'pair-swap "p>l") buffer)
+  (expect "pair fields swap" (list (byte-at buffer 0) (byte-at buffer 8)) '(22 11))
+  (expect "long bits" ((fn image 'long-bits "p>l") buffer) 22))
+(refuses "a field the object type doesn't have" (lambda () (native-compile-file "check/native/objects-bad-field.k"))
+	 "no such field")
+(refuses "an oop written to a long field" (lambda () (native-compile-file "check/native/objects-bad-assign.k"))
+	 "type mismatch")
+
 ;; check/gc.k in place of maru-gc.k's main: the heap grows when needed and adjacent free chunks merge
 (let* ((gc (contents-of-file-named "maru-gc.k"))
        (main (let ((i 0)) (while (not (prefix-at? "(define-function main " gc i)) (set i (+ i 1))) i))

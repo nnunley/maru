@@ -78,6 +78,11 @@
 		type))))
 
 (define IR-VOID*	(ir-pointer-to IR-VOID))
+
+;; a Maru object's reference (doc/ir2-objects.md): a pointer as wide as any, to an object whose type is known only from
+;; the forms that use it
+(define-class <ir-oop-type> <ir-pointer-type> ())
+(define IR-OOP (new <ir-oop-type> 'oop sizeof-pointer alignof-pointer () () IR-VOID))
 (define IR-STRING	(ir-pointer-to IR-INT8))
 
 (define-function ir-bool? (type)	(or (ir-integral-type? type) (ir-pointer-type? type)))
@@ -117,6 +122,20 @@
 (define-function ir-struct (ir name)
   (or (cdr (assq name (<ir>-struct-types ir)))
       (ir-create-struct-type ir name () ())))
+
+;; a Maru object's type: a struct of its fields, laid out as any struct, with the id its objects carry and whether it is
+;; an atom (no field the collector traces)
+(define-class <ir-object-type> <ir-struct-type> (id atom))		(define-function ir-object-type? (x)	(inherits-from (type-of x) <ir-object-type>))
+
+(define-function ir-declare-object-type (self name id members atom)
+  (let ((type (make <ir-object-type> name: name members: members defined: 1 id: id atom: atom)))
+    (push (<ir>-struct-types self) (cons name type))
+    type))
+
+(define-function ir-object (ir name)
+  (let ((type (cdr (assq name (<ir>-struct-types ir)))))
+    (or (and type (ir-object-type? type)) (error "no such object type: "name))
+    type))
 
 (define-structure <ir-struct-member> (name type offset))
 
@@ -525,6 +544,34 @@
 							    (set self.parameters (list m))
 							    (set self.type mtype))))
 
+;
+
+;; Object instructions use a Maru object as an object; their first parameter is its <ir-object-type>, which maru.k finds
+;; by name (a function's own <ir> has no struct types).  Checking its type builds `lowered`, the same meaning in the
+;; instructions above, in eval.l's layout; a generator that has no use for objects of its own generates `lowered`.
+(define-class <ir-object-insn> <ir-insn> (lowered))
+
+(define-function ir-object-lower (self lowered ir val?)
+  (set (<ir-insn>-source lowered) (<ir-insn>-source self))
+  (set (<ir-object-insn>-lowered self) lowered)
+  (set (<ir-insn>-type self) (ir-check-type lowered ir val?)))
+
+(define-class <ir-object-slot> <ir-object-insn> ())	(define-function ir-object-slot (otype field value)
+							  (new <ir-object-slot> (list otype field) (list value)))
+
+(define-method ir-check-type <ir-object-slot> (ir val?)	(let ((otype (car self.parameters)))
+							  (ir-object-lower self (ir-member (cadr self.parameters)
+											   (ir-cast (ir-pointer-to otype) (car self.operands)))
+									   ir val?)))
+
+(define-class <ir-set-object-slot> <ir-object-insn> ())	(define-function ir-set-object-slot (otype field value init)
+							  (new <ir-set-object-slot> (list otype field) (list value init)))
+
+(define-method ir-check-type <ir-set-object-slot> (ir val?)	(let ((otype (car self.parameters)))
+							  (ir-object-lower self (ir-set-member (cadr self.parameters)
+											       (ir-cast (ir-pointer-to otype) (car self.operands))
+											       (cadr self.operands))
+									   ir val?)))
 ;
 
 (define-class <ir-indir> <ir-insn> ())			(define-function ir-indir (base index)	(new <ir-indir> () (list base index)))
