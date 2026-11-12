@@ -64,14 +64,6 @@
       (set w (+ w (cdr (list-detect f (caddr row) (and (pair? f) (= part (car f))))))))
     w))
 
-;; Bind q, a value of the joined field name, onto env part by part.
-(define-function arm64-bind-field (row name q env)
-  (list-do part (list-reverse! (arm64-parts name))
-    (let ((w (arm64-width-of row part)))
-      (set env (cons (cons part (& q (- (<< 1 w) 1))) env))
-      (set q (>> q w))))
-  env)
-
 ;;; Bit patterns: logical immediates (DecodeBitMasks) and FP immediates (VFPExpandImm).
 
 (define-function arm64-ones (n)		(if (< n 64) (- (<< 1 n) 1) -1))
@@ -155,18 +147,6 @@
 
 (define-function arm64-esize (arr)	(<< 8 (cadr (assq arr arm64-arrangements))))	; bits per element
 
-;; Bind arrangement arr for row onto env, consistently with any already bound.
-(define-function arm64-bind-arrangement (row arr env)
-  (let ((a (assq arr arm64-arrangements)) (bound (assq 'T env)))
-    (and a (memq arr (arm64-allowed row)) (or (not bound) (= (cdr bound) arr))
-	 (let ((sz (- (cadr a) 2)))
-	   (and (or (not (arm64-has-field? row 'sz)) (<= 0 sz))
-		(let ((e (cons (cons 'T arr) env)))
-		  (and (arm64-has-field? row 'q) (set e (cons (cons 'q (caddr a)) e)))
-		  (and (arm64-has-field? row 'size) (set e (cons (cons 'size (cadr a)) e)))
-		  (and (arm64-has-field? row 'sz) (set e (cons (cons 'sz sz) e)))
-		  e))))))
-
 (define-function arm64-vector? (op)	; (V n count size) or a lane (V n size index)
   (and (pair? op) (= 'V (car op)) (= 4 (list-length op)) (long? (cadr op)) (<= 0 (cadr op)) (< (cadr op) 32)))
 
@@ -179,80 +159,165 @@
 (define-function arm64-has-reloc? (op)	(and (pair? op) (or (arm64-reloc? op) (arm64-has-reloc? (car op)) (arm64-has-reloc? (cdr op)))))
 (define-function arm64-page (pc)	(& pc -4096))
 
-;; The field value for v under arm64-operand kind (imm|simm|pcrel f scale), or () if it doesn't fit.
-(define-function arm64-scaled (row k v)
-  (let* ((w (arm64-width-of row (cadr k))) (s (caddr k)) (q (and (long? v) (/ v s))))
+;;; ---------------------------------------------------------------- compiled rows
+;;;
+;;; A row's plan is made once, when the rows are read: each named field of its
+;;; diagram is a slot, numbered in diagram order, with its shift in the word, and
+;;; each operand kind is compiled against those slots.  Encoding binds the
+;;; operands into a fresh array of slot values, one more slot holding the
+;;; arrangement (T), then shifts each value into the row's fixed bits: no field
+;;; is looked up by name.  A field reference is (width (slot . width) ...), its
+;;; parts low first.
+
+(define-structure <arm64-plan> (names shifts kinds t-slot allowed q size sz))
+
+(define-function arm64-row-plan (row)	(cadr (cdr (cddddr row))))
+
+(define-function arm64-slot (slots name)	(cadr (assq name slots)))	; slots: ((name slot shift width) ...)
+
+(define-function arm64-field-ref (slots name)	; or () when the diagram lacks a part
+  (let ((parts ()) (w 0) (ok 1))
+    (list-do part (arm64-parts name)
+      (let ((s (assq part slots)))
+	(if s
+	    (let () (set parts (cons (cons (cadr s) (cadddr s)) parts)) (set w (+ w (cadddr s))))
+	  (set ok ()))))
+    (and ok (cons w parts))))
+
+;; The plan of operand kind k against slots: (tag info...), what arm64-bind-plan needs, names resolved.
+(define-function arm64-plan-kind (slots k)
+  (let ((c (car k)))
+    (cond ((= c 'reg)		(list 'reg (arm64-slot slots (arm64-reg-field (cadr k))) (arm64-reg-class (cadr k))
+				      (if (caddr k) 'sp 'zr)))
+	  ((= c 'vreg)		(list 'vreg (arm64-slot slots (arm64-reg-field (cadr k))) (caddr k)))
+	  ((= c 'vbrace)	(arm64-plan-kind slots (cadr k)))
+	  ((= c 'vlane)		(list 'vlane (arm64-slot slots (arm64-reg-field (cadr k))) (string->symbol (caddr k))
+				      (arm64-plan-kind slots (cadddr k))))
+	  ((memq c '(vshl vshr))	(list c (arm64-field-ref slots 'immh:immb)))
+	  ((= c 'bimm)		(list 'bimm (cadr k) (arm64-slot slots 'n) (arm64-slot slots 'immr) (arm64-slot slots 'imms)))
+	  ((= c 'lslimm)	(list 'lslimm (cadr k) (arm64-slot slots 'immr) (arm64-slot slots 'imms)))
+	  ((= c 'fimm)		(list 'fimm (arm64-slot slots 'imm8)))
+	  ((memq c '(cond invcond))	(list c (arm64-slot slots 'cond)))
+	  ((= c 'mreg)		(list 'mreg (list-length k) (cdddr k)
+				      (arm64-plan-kind slots (cadr k)) (arm64-plan-kind slots (caddr k))))
+	  ((and (= c 'imm) (= 'imm0 (cadr k)))	(list 'imm0))
+	  ((memq c '(imm simm pcrel pcpage))	(list c (arm64-field-ref slots (cadr k)) (caddr k)))
+	  ((= c 'lsl)		(list 'lsl (arm64-field-ref slots (cadr k)) (caddr k)))
+	  (else			(list 'tag c (arm64-plan-kind slots (cadr k)) (arm64-plan-kind slots (caddr k)))))))
+
+(define-function arm64-plan (row)
+  (let ((slots ()) (shift 32) (n 0))
+    (list-do f (caddr row)
+      (let ((w (if (string? f) (string-length f) (cdr f))))
+	(set shift (- shift w))
+	(when (pair? f)
+	  (and (assq (car f) slots) (error (car row)": field "(car f)" twice in its diagram"))
+	  (set slots (cons (list (car f) n shift w) slots))
+	  (set n (+ n 1)))))
+    (let ((names (array n)) (shifts (array n)))
+      (list-do s slots (set-array-at names (cadr s) (car s)) (set-array-at shifts (cadr s) (caddr s)))
+      (new <arm64-plan> names shifts (map (lambda (k) (arm64-plan-kind slots k)) (cadr row)) n
+	   (arm64-allowed row) (arm64-slot slots 'q) (arm64-slot slots 'size) (arm64-slot slots 'sz)))))
+
+;; Field reference ref takes value q, part by part, low first.
+(define-function arm64-put-ref (ref q vals)
+  (list-do part (cdr ref)
+    (set-array-at vals (car part) (& q (- (<< 1 (cdr part)) 1)))
+    (set q (>> q (cdr part))))
+  vals)
+
+(define-function arm64-put (vals slot v)	(and slot (set-array-at vals slot v)) vals)
+
+;; The field value for v, a multiple of s in a field w bits wide (signed unless tag is imm), or () if it doesn't fit.
+(define-function arm64-scaled (tag w s v)
+  (let ((q (and (long? v) (/ v s))))
     (and q (= v (* q s))
-	 (if (= 'imm (car k))
+	 (if (= 'imm tag)
 	     (and (<= 0 q) (< q (<< 1 w)) q)
 	   (and (<= (- (<< 1 (- w 1))) q) (< q (<< 1 (- w 1))) (& q (- (<< 1 w) 1)))))))
 
-;; Bind the fields arm64-operand op fills under kind k, onto env; () if it doesn't match.
-(define-function arm64-bind (row k op env pc)
-  (let ((c (car k)))
+;; Bind arrangement arr, consistently with any already bound.
+(define-function arm64-bind-arrangement (plan arr vals)
+  (let ((a (assq arr arm64-arrangements)) (bound (array-at vals (<arm64-plan>-t-slot plan))))
+    (and a (memq arr (<arm64-plan>-allowed plan)) (or (not bound) (= bound arr))
+	 (let ((sz (- (cadr a) 2)))
+	   (and (or (not (<arm64-plan>-sz plan)) (<= 0 sz))
+		(let ()
+		  (set-array-at vals (<arm64-plan>-t-slot plan) arr)
+		  (arm64-put vals (<arm64-plan>-q plan) (caddr a))
+		  (arm64-put vals (<arm64-plan>-size plan) (cadr a))
+		  (arm64-put vals (<arm64-plan>-sz plan) sz)))))))
+
+;; A register's entry, (name class number kind), by its name.
+(define arm64-register-table (identity-hash-table))
+(list-do r arm64-registers (hash-at-put arm64-register-table (car r) r))
+
+;; Bind op under the compiled kind p into vals; vals, or () if it doesn't match.
+(define-function arm64-bind-plan (plan p op vals pc)
+  (let ((c (car p)))
     (cond
-            ((= c 'reg)	(let ((r (assq op arm64-registers)))
-			  (and r (= (cadr r) (arm64-reg-class (cadr k)))
-			       (or (not (cadddr r)) (= (cadddr r) (if (caddr k) 'sp 'zr)))
-			       (cons (cons (arm64-reg-field (cadr k)) (caddr r)) env))))
-                  ((= c 'vreg)	(and (arm64-vector? op) (long? (caddr op))
-			     (let* ((arr (arm64-data-arr op))
-				    (e (if (= 'T (caddr k)) (arm64-bind-arrangement row arr env) (and (= (caddr k) arr) env))))
-			       (and e (cons (cons (arm64-reg-field (cadr k)) (cadr op)) e)))))
-      ((= c 'vbrace)	(arm64-bind row (cadr k) op env pc))
-            ((= c 'vlane)	(and (arm64-vector? op) (symbol? (caddr op)) (= (string->symbol (caddr k)) (caddr op))
-			     (let ((q (arm64-scaled row (cadddr k) (cadddr op))))
-			       (and q (arm64-bind-field row (cadr (cadddr k)) q (cons (cons (arm64-reg-field (cadr k)) (cadr op)) env))))))
+      ((= c 'reg)	(let ((r (and (symbol? op) (hash-at arm64-register-table op))))
+			  (and r (= (cadr r) (caddr p))
+			       (or (not (cadddr r)) (= (cadddr r) (cadddr p)))
+			       (arm64-put vals (cadr p) (caddr r)))))
+      ((= c 'vreg)	(and (arm64-vector? op) (long? (caddr op))
+			     (let ((arr (arm64-data-arr op)))
+			       (and (if (= 'T (caddr p)) (arm64-bind-arrangement plan arr vals) (= (caddr p) arr))
+				    (arm64-put vals (cadr p) (cadr op))))))
+      ((= c 'vlane)	(and (arm64-vector? op) (symbol? (caddr op)) (= (caddr p) (caddr op))
+			     (let* ((lane (cadddr p)) (ref (cadr lane))
+				    (q (and ref (arm64-scaled (car lane) (car ref) (caddr lane) (cadddr op)))))
+			       (and q (arm64-put-ref ref q (arm64-put vals (cadr p) (cadr op)))))))
       ((memq c '(vshl vshr))
-			(let* ((bound (assq 'T env)) (e (and bound (arm64-esize (cdr bound)))))
+			(let* ((bound (array-at vals (<arm64-plan>-t-slot plan))) (e (and bound (arm64-esize bound))))
 			  (and e (long? op)
 			       (if (= c 'vshl) (and (<= 0 op) (< op e)) (and (< 0 op) (<= op e)))
-			       (arm64-bind-field row 'immh:immb (if (= c 'vshl) (+ e op) (- (* 2 e) op)) env))))
-      ((= c 'bimm)	(let ((f (and (long? op) (arm64-bitmask op (cadr k)))))
-			  (and f (cons (cons 'n (car f)) (cons (cons 'immr (cadr f)) (cons (cons 'imms (caddr f)) env))))))
-      ((= c 'lslimm)	(let ((w (cadr k)))
+			       (arm64-put-ref (cadr p) (if (= c 'vshl) (+ e op) (- (* 2 e) op)) vals))))
+      ((= c 'bimm)	(let ((f (and (long? op) (arm64-bitmask op (cadr p)))))
+			  (and f (arm64-put (arm64-put (arm64-put vals (caddr p) (car f)) (cadddr p) (cadr f))
+					    (car (cddddr p)) (caddr f)))))
+      ((= c 'lslimm)	(let ((w (cadr p)))
 			  (and (long? op) (<= 0 op) (< op w)
-			       (cons (cons 'immr (& (- w op) (- w 1))) (cons (cons 'imms (- (- w 1) op)) env)))))
-      ((= c 'fimm)	(let ((q (arm64-fp8 op))) (and q (cons (cons 'imm8 q) env))))
-      ((= c 'cond)	(let ((q (arm64-cond-code op))) (and q (cons (cons 'cond q) env))))
+			       (arm64-put (arm64-put vals (caddr p) (& (- w op) (- w 1))) (cadddr p) (- (- w 1) op)))))
+      ((= c 'fimm)	(let ((q (arm64-fp8 op))) (and q (arm64-put vals (cadr p) q))))
+      ((= c 'cond)	(let ((q (arm64-cond-code op))) (and q (arm64-put vals (cadr p) q))))
       ((= c 'invcond)	(let ((q (arm64-cond-code op)))	; CSET encodes the inverted condition
-			  (and q (< q 14) (cons (cons 'cond (if (= 0 (& q 1)) (+ q 1) (- q 1))) env))))
-      ((= c 'mreg)	(and (pair? op) (= 'reg (car op)) (= (list-length op) (list-length k))
-			     (equal (cdddr op) (cdddr k))
-			     (let ((e (arm64-bind row (cadr k) (cadr op) env pc)))
-			       (and e (arm64-bind row (caddr k) (caddr op) e pc)))))
-            ((and (memq c '(imm simm pcrel pcpage)) (arm64-reloc? op))	; a placeholder: zero for now
-			(and (not (= 'imm0 (cadr k)))
-			     (or (not (cdr op)) (= (cadr op) (arm64-width-of row (cadr k))))
-			     (arm64-bind-field row (cadr k) 0 env)))
-            ((and (= c 'imm) (= 'imm0 (cadr k)))	(and (= op 0) env))
-      ((memq c '(imm simm))
-			(let ((q (arm64-scaled row k op))) (and q (arm64-bind-field row (cadr k) q env))))
-      ((= c 'pcrel)	(let ((q (and (long? op) (arm64-scaled row k (- op pc))))) (and q (arm64-bind-field row (cadr k) q env))))
-      ((= c 'pcpage)	(let ((q (and (long? op) (arm64-scaled row (cons 'simm (cdr k)) (- op (arm64-page pc))))))
-			  (and q (arm64-bind-field row (cadr k) q env))))
-      ((= c 'lsl)	(and (pair? op) (= 'LSL (car op))
-			     (let ((q (arm64-scaled (list () () (caddr row)) (list 'imm (cadr k) (caddr k)) (cadr op))))
-			       (and q (cons (cons (cadr k) q) env)))))
-      (else		(and (pair? op) (= c (car op))
-			     (let ((e (arm64-bind row (cadr k) (cadr op) env pc)))
-			       (and e (arm64-bind row (caddr k) (caddr op) e pc))))))))
+			  (and q (< q 14) (arm64-put vals (cadr p) (if (= 0 (& q 1)) (+ q 1) (- q 1))))))
+      ((= c 'mreg)	(and (pair? op) (= 'reg (car op)) (= (list-length op) (cadr p))
+			     (equal (cdddr op) (caddr p))
+			     (arm64-bind-plan plan (cadddr p) (cadr op) vals pc)
+			     (arm64-bind-plan plan (car (cddddr p)) (caddr op) vals pc)))
+      ((= c 'imm0)	(and (= op 0) vals))
+      ((and (memq c '(imm simm pcrel pcpage)) (arm64-reloc? op))	; a placeholder: zero for now
+			(let ((ref (cadr p)))
+			  (and ref (or (not (cdr op)) (= (cadr op) (car ref))) (arm64-put-ref ref 0 vals))))
+      ((memq c '(imm simm pcrel pcpage lsl))
+			(let* ((ref (cadr p))
+			       (v (cond ((= c 'pcrel)	(and (long? op) (- op pc)))
+					((= c 'pcpage)	(and (long? op) (- op (arm64-page pc))))
+					((= c 'lsl)	(and (pair? op) (= 'LSL (car op)) (cadr op)))
+					(else		op)))
+			       (q (and ref v (arm64-scaled (if (memq c '(imm lsl)) 'imm 'simm) (car ref) (caddr p) v))))
+			  (and q (arm64-put-ref ref q vals))))
+      (else		(and (pair? op) (= (cadr p) (car op))
+			     (arm64-bind-plan plan (caddr p) (cadr op) vals pc)
+			     (arm64-bind-plan plan (cadddr p) (caddr op) vals pc))))))
+
+(list-do row arm64-rows (set-cdr (cdr (cddddr row)) (list (arm64-plan row))))
 
 (define-function arm64-encode-row (row ops pc)
-  (let ((env ()) (ok 1) (kinds (cadr row)))
+  (let* ((plan (arm64-row-plan row)) (kinds (<arm64-plan>-kinds plan)))
     (and (= (list-length kinds) (list-length ops))
-	 (let ()
-	   (list-do k kinds
-	     (and ok (or (set env (arm64-bind row k (car ops) env pc)) (set ok ())))
+	 (let ((vals (array (+ 1 (<arm64-plan>-t-slot plan)))) (ok 1))
+	   (list-do p kinds
+	     (and ok (or (arm64-bind-plan plan p (car ops) vals pc) (set ok ())))
 	     (set ops (cdr ops)))
 	   (and ok
-		(let ((word 0))
-		  (list-do f (caddr row)
-		    (if (string? f)
-			(string-do c f (set word (| (<< word 1) (- c ?0))))
-		      (let ((b (assq (car f) env)))
-			(or b (error (car row)": field "(car f)" has no arm64-operand"))
-			(set word (| (<< word (cdr f)) (cdr b))))))
+		(let ((word (car (cddddr row))) (shifts (<arm64-plan>-shifts plan)))	; the fixed bits, then each field
+		  (for (i 0 (<arm64-plan>-t-slot plan))
+		    (let ((v (array-at vals i)))
+		      (or v (error (car row)": field "(array-at (<arm64-plan>-names plan) i)" has no arm64-operand"))
+		      (set word (| word (<< v (array-at shifts i))))))
 		  word))))))
 
 ;;; ---------------------------------------------------------------- decoding
