@@ -1,0 +1,4 @@
+(make Hotspot H_aaa_x_l_3 "x" "x.l" 3 12 500 "aaa" no)
+(make Hotspot H_bbb_x_l_3 "x" "x.l" 3 12 300 "bbb" no)
+(world (f observed (value failed (tree "aaa"))) ((f evidence (value failed (tree "aaa")))))
+(world (a observed (value passed (tree "bbb"))) ((a evidence (value passed (tree "bbb"))) (a last-good (value passed (tree "bbb")))))

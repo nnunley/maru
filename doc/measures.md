@@ -14,7 +14,8 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   soft, so the check reports the total but doesn't fail over it. Prefer a DSL or grammar (as `gen-asm-x86.k` generates
   the x86 assembler) over writing code out, tests included.
 - `erosion` (`check/erosion.l`, `erosion-run.l`, `doc/plans/2026-11-10-erosion-by-reflection.md`): SlopCodeBench's erosion and
-  verbosity (Orlanski et al., NeurIPS 2026), per mille, counted in forms, over Maru's `.l` and `.k` files in the `lines` check's set,
+  verbosity (Orlanski et al., NeurIPS 2026), per mille, counted in forms, over Maru's `.l` and `.k` files in the `lines` check's set
+  (`check/erosion-files`, less `check/erosion-unread.l`'s),
   held to `check/erosion`'s ledger as `lines` is to `check/lines`: each metric equals the sum of its entries (`erosion-ledger.g`), so
   a rise or a fall is written down with its reason. A form is a list outside quoted data (a quoted datum, its `(quote ...)` too, is
   none; `()` is NIL, an atom, as in McCarthy's paper and Maru's `pair?`, though a tpeg list pattern enters it as an empty
@@ -32,3 +33,6 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   it at 11; each rule's example flagged and its plain form not; a clone at exactly 12 atoms and none at 11; a finding inside a
   clone counted once. The case takes about 41 CPU seconds, from 102 when it read text through a grammar
   (`doc/plans/2026-11-10-erosion-by-reflection.md`'s Baseline).
+  `./eval erosion-run.l --hotspots FILE…` prints only each callable over CC 10, `hotspot NAME FILE LINE CC MASS`, mass
+  rounded to a whole number, for the evidence plans to minimize (`doc/evidence-plan.md`); the case asserts it on a
+  fixture's CC 11 callable and not its CC 10 one.

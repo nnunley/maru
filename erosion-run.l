@@ -4,8 +4,12 @@
 ;;; Each file is read by Maru's own reader.  A file after --unread is one it can't read whole, as a file that changes
 ;;; language partway (test-pepsi.l) can't: it's not measured, and it must still fail to read, so the list doesn't outlive
 ;;; its reason.
+;;; With --hotspots it prints only every callable over CC 10, `hotspot NAME FILE LINE CC MASS`, mass CC x sqrt(forms) to the
+;;; nearest whole number: what the evidence plans minimize (doc/evidence-plan.md).
 (require "erosion.l")
 (require "recover.l")
+(define hotspots ())
+(when (and *arguments* (= "--hotspots" (car *arguments*))) (next-argument) (set hotspots 1))
 (define ledger ())
 (when (and *arguments* (= "--ledger" (car *arguments*))) (next-argument) (set ledger (next-argument)))
 (define unread ())
@@ -20,7 +24,13 @@
 (while *arguments*
   (let ((path (next-argument)))
     (push sources (cons path (find-and-read path)))))
+(define-function print-hotspots (m)
+  (list-do c (<erosion-metrics>-callables m)
+    (and (< 10 (<callable>-cc c))
+	 (println "hotspot " (<callable>-name c) " " (<callable>-path c) " " (<callable>-line c) " " (<callable>-cc c) " "
+		  (double->long (+ 0.5 (erosion-mass c)))))))
 (let ((m (erosion-of (list-reverse! sources))) (ranked ()))
+  (if hotspots (let () (print-hotspots m) (exit 0)))
   (println "erosion " (<erosion-metrics>-erosion m) " verbosity " (<erosion-metrics>-verbosity m))
   (println (list-length (<erosion-metrics>-callables m)) " callables, " (<erosion-metrics>-forms m) " forms, "
 	   (<erosion-metrics>-flagged m) " verbose, " (list-length unread) " files not read")

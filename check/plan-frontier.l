@@ -32,4 +32,7 @@
 (expect "next.l with a lane no plan has fails, naming the plans"
 	(= 0 ((subr "system" "s>i")
 	      "./eval notes/plan/next.l --lane nope 2>&1 | grep -q 'E_UNKNOWN_LANE: nope (plans: ksworld, render, tree-matching)'")))
+(expect "a current hotspot: the failing build less the mass left, simplifying it, the aging build; the older hotspot never"
+	(equal (steps (lane-frontier "check/plan/hotspot" "gamma" "aaa"))
+	       '(("gamma" "T build F" 500) ("gamma" "T simplify H_aaa_x_l_3" 0) ("gamma" "T build A" -400))))
 (if ok (println "plan frontier ok") (exit 1))

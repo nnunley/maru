@@ -1,0 +1,8 @@
+#!/bin/sh
+# check/erosion-files: the files erosion measures, one a line: every .l and .k file of the tree and its submodules, tracked
+# or not (ignored ones aside), but notes/, and not derived or unused.  The erosion case and the plans' Erosion measure read it.
+for d in . nile gezira; do
+  (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E "[.](l|k)$" |
+    git check-attr --stdin derived | grep ": unspecified$" | cut -d: -f1 |
+    git check-attr --stdin unused | grep ": unspecified$" | cut -d: -f1 | sed "s,^,$d/,")
+done | sed "s,^[.]/,,"

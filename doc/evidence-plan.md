@@ -71,6 +71,13 @@ first (`--lane NAME`, or `MARU_PLAN`'s), then the other plans' steps by name, as
 `then: …` lines, each plan's skipped retired lines first, or `nothing left to build`. A lane no plan has fails:
 `E_UNKNOWN_LANE: NAME (plans: …)`. Several agents take work from the same frontier, each in its own lane.
 
+Erosion is something every plan minimizes. The `Erosion` measure (`./eval notes/plan/erosion-hotspots.l`, cadence full)
+runs `erosion-run.l --hotspots` over the files the erosion case measures, and `observe.l` declares each callable over
+CC 10 for this code in the ledger: `(make Hotspot H_TREE_FILE_LINE "NAME" "FILE" LINE CC MASS "TREE" no)`. Each plan
+may `simplify` a current hotspot, and its last heuristic weighs a world 1 per unit of mass left unsimplified, so a
+simplify step scores the hotspot's mass above leaving it. A hotspot of older code is never a step. `observe.l NAME…`
+asks just the checks named.
+
 ## Checks
 
 - `plan_evidence` (`check/plan-evidence.l`): what `check/law.l` prints, read by `notes/plan/law-report.g` to events, one
@@ -94,3 +101,5 @@ first (`--lane NAME`, or `MARU_PLAN`'s), then the other plans' steps by name, as
   order; a plan all done gives no step, and nothing anywhere prints `nothing left to build`; a lane no plan has is
   `E_UNKNOWN_LANE` naming the plans, from `lane-frontier` and from `next.l --lane`; a plan's skipped retired lines are
   said before the `next:` and `then:` lines.
+  A plan with a current hotspot of mass 500 and one of older code (`check/plan/hotspot/gamma`): the failing build less the
+  mass left (500), simplifying the current hotspot (0), the aging build (-400); the older hotspot is never a step.

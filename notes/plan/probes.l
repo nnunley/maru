@@ -57,12 +57,29 @@
 		      (let ((name (symbol->string self)))
 			(probe-run name 600 (concat-strings "MARU_RECORD=0 make check CHECKS='" name "'"))))))
 
-;;; ---- a command whose exit status is the answer; what a test suite shows counts for the cases it ran
+;;; ---- a command whose exit status is the answer; what a test suite shows counts for the cases it ran, and the hotspots
+;;; it prints (erosion-run.l --hotspots) are kept for observe.l to declare
+
+(define *hotspots* ())	; ((name file line cc mass) ...), as a measure printed them
+(define-function probe-words (line)
+  (let ((out ()) (start 0) (n (string-length line)))
+    (for (i 0 (+ n 1))
+      (when (or (= i n) (= ?  (string-at line i)))
+	(and (< start i) (push out (string-copy line start (- i start))))
+	(set start (+ i 1))))
+    (list-reverse! out)))
+(define-function probe-collect-hotspots (name)
+  (list-do line (probe-lines (contents-of-file-named (concat-strings probe-logs name ".log")))
+    (let ((w (probe-words line)))
+      (and (= 6 (list-length w)) (= "hotspot" (car w))
+	   (push *hotspots* (list (cadr w) (caddr w) (string->long (cadddr w))
+				  (string->long (car (cddddr w))) (string->long (cadr (cddddr w)))))))))
 
 (define-john-builtin command-succeeds john-command-succeeds)
 (define-method john-command-succeeds <symbol> ()
   (let* ((name (symbol->string self)) (ok (probe-run name 1800 (probe-prop self 'command))))
     (probe-collect-shown name)
+    (probe-collect-hotspots name)
     (set *cases-ran* 1)	; if a case isn't shown it runs alone
     (probe-evidence ok)))
 

@@ -1140,13 +1140,10 @@
 
 ;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
 ;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
-;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
-;; still fail to read.
-(define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
-			 "test-repl.l" "test.l"))
+(require "check/erosion-unread.l")
 (check "erosion"
   (unit-assert (equal (last (run "erosion_fixtures" "./eval check/erosion.l")) "erosion ok"))
-  (let ((files (run "erosion_files" "for d in . nile gezira; do (cd $d && git ls-files -co --exclude-standard -- . :!notes | grep -E \"[.](l|k)$\" | git check-attr --stdin derived | grep \": unspecified$\" | cut -d: -f1 | git check-attr --stdin unused | grep \": unspecified$\" | cut -d: -f1 | sed \"s,^,$d/,\"); done | sed \"s,^[.]/,,\""))
+  (let ((files (run "erosion_files" "check/erosion-files"))
 	(measured ()))
     (list-do f files (or (member? f erosion-unread) (push measured f)))
     ;; a CPU limit, as law files have, not a wall clock: four cases at once mustn't fail it by contention

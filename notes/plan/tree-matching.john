@@ -33,6 +33,7 @@ qualify Measure routine if its cadence = "routine".
 
 ; first, because what a whole run shows counts for the cases below, and they then needn't run again
 make Measure WholeSuite untested untested "nice make check" "full".
+make Measure Erosion untested untested "./eval notes/plan/erosion-hotspots.l" "full".
 
 make Case tree_selectors untested untested.
 make Case tree_source untested untested.
@@ -123,13 +124,20 @@ qualify Check observed-within: N if
 create Team.
 make Team T.
 action Team build Capability consequence Capability planned = yes.
+create Hotspot callable file line cc mass tree planned.	; a callable over CC 10 (erosion-run.l --hotspots), for this code
+qualify Hotspot current if its tree = Now tree.
+action Team simplify Hotspot consequence Hotspot planned = yes.
+rule Team simplify is Hotspot current = yes.
+rule Team simplify is Hotspot planned = no.
 rule Team build is Capability done = no.
 rule Team build is Capability ready = yes.
 goal Team deliver try for every all Capability do each done = yes.
-; what the next step is worth: a regression first, then a failure, then answers about older code, then what's untried
+; what the next step is worth: a regression first, then a failure, then answers about older code, then what's untried,
+; and less erosion: each hotspot left costs its mass
 heuristic Team deliver 10000 maximize (select all Capability by which planned = yes and which regressing = yes) size.
 heuristic Team deliver 1000 maximize (select all Capability by which planned = yes and which failing = yes) size.
 heuristic Team deliver 100 maximize (select all Capability by which planned = yes and which aging = yes) size.
 heuristic Team deliver 10 maximize (select all Capability by which planned = yes and which untried = yes) size.
+heuristic Team deliver 1 minimize total (select all Hotspot by which planned = no and which current = yes) by which mass.
 ; every capability, in some order that respects builds-on: no choice to search among
 goal-strategy Team deliver sat.

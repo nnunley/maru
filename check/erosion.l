@@ -106,4 +106,15 @@
 (expect "an entry with no reason is refused" (try (erosion-ledger "erosion 4\n") (lambda (c) 'refused)) 'refused)
 (expect "an entry naming neither is refused" (try (erosion-ledger "lines 4 why\n") (lambda (c) 'refused)) 'refused)
 
+
+;; erosion-run.l --hotspots: every callable over CC 10, with its mass, for the plans to minimize
+(require "check/temp.l")
+(define hot (concat-string check-tmp "/hot.l"))
+(let ((f ((subr "fopen" "ss>p") hot "w")))
+  ((subr "fputs" "sp>i") (concat-strings "(define-function f () " (ifs 10) ")\n(define-function g () " (ifs 9) ")\n") f)
+  ((subr "fclose" "p>i") f))
+((subr "system" "s>i") (concat-strings "./eval erosion-run.l --hotspots " hot " > " hot ".out 2>&1"))
+(expect "--hotspots: the CC 11 callable with its mass, CC x sqrt(forms), not the CC 10 one"
+	(contents-of-file-named (concat-string hot ".out")) (concat-strings "hotspot f " hot " 1 11 36\n"))	; 11 x sqrt(11 forms), rounded
+
 (println (if ok "erosion ok" "erosion FAILED"))

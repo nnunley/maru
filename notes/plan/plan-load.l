@@ -8,7 +8,7 @@
 ;;;   (plan-ledger-drift dir name) () if the ledger is what the plan's actions write now, else which line isn't
 ;;;   (plan-write-forms path forms) the ledger rewritten whole, one form a line, renamed into place
 ;;;   (ledger-dedupe forms)       forms less each world the same as its check's world before (a union merge's repeats)
-;;;   (plan-append dir name from) the worlds after time from appended to DIR/NAME.answers, deduplicated
+;;;   (plan-append dir name from [forms]) forms, then the worlds after time from, appended to DIR/NAME.answers, deduplicated
 (require "john-serialize.l")
 (define-function plan-file-lines (path)	; a file's lines, or () if there is no file
   (and (= 0 ((subr "access" "si>i") path 4))
@@ -87,7 +87,7 @@
 (define-function plan-ledger-forms (dir name)
   (let ((ledger (plan-ledger-path dir name)))
     (and (= 0 ((subr "access" "si>i") ledger 4)) (read ledger))))
-(define-function plan-append (dir name from)
+(define-function plan-append (dir name from . forms)
   (let* ((old (plan-ledger-forms dir name))
-	 (merged (ledger-dedupe (concat-list old (john-serialize-worlds from *john-world*)))))
+	 (merged (ledger-dedupe (concat-list old (concat-list (car forms) (john-serialize-worlds from *john-world*))))))
     (or (equal merged old) (plan-write-forms (plan-ledger-path dir name) merged))))
