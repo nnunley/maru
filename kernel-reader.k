@@ -6,7 +6,6 @@
 (define (ungetwc	(int int void *)		*)	(extern ungetwc))
 (define (wcstod		(double int32 * void *)		*)	(extern wcstod))
 (define (wcstoul	(long int32 * void * int)	*)	(extern wcstoul))
-(define (wcscmp		(int int32 * int32 *)		*)	(extern wcscmp))
 (define (realloc	(void * void * long)		*)	(extern realloc))
 
 ;; the next wide character, or a negative at the end (WEOF), as a long

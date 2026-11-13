@@ -93,11 +93,15 @@ reader, and eval and apply. The primitives, main and the REPL come next (the pla
 - **The printer writes to stdout only**, with `printf`, and doesn't flush: eval3 flushes stdout after each print, but
   the kernel can't name stdout yet, and `fflush(NULL)` would also move a stream another process shares (eval2's own
   reading of a check, which a native check's child inherits). Flushing comes with the kernel's main (Task 6). eval3's `fprint` to another stream comes with it, and
-  `%type-names` for a boot-declared type with boot2.l (Task 6); until then such a type prints `<type=N>`. The globals
-  print as eval3 prints them: the binding of `*globals*` as `<the global environment>`, the global namespace met in a
-  list as `<...all the globals...>`, and the binding met as a list's tail as `<the global association>`. eval3's
-  `<loop>` marker for a structure met while it is being printed isn't there: it keeps a count in each object's header,
-  which maru-gc.k's header lacks. `<data[N]>` prints the collector's size (a whole number of words) until
+  `%type-names` for a boot-declared type with boot2.l (Task 6); until then such a type prints `<type=N>`.
+- **The globals print in full, once a print** (the user, 2026-11-12). eval3 prints `<the global environment>`,
+  `<...all the globals...>` or `<the global association>` in place of the global namespace and never shows its
+  bindings. The kernel prints the namespace the first time a print meets it as `#1=(...)`, its bindings sorted by name
+  (then by place), and as `#1#` wherever it is met again, including the `*globals*` binding inside it: Common Lisp's
+  notation for shared structure. The printer still allocates nothing: it finds each binding by a pass for the next in
+  order.
+- **The printer has no `<loop>` marker** for a structure met while it is being printed: eval3 keeps a count in each
+  object's header, which maru-gc.k's header lacks. `<data[N]>` prints the collector's size (a whole number of words) until
   kernel-gc.k keeps the length asked for.
 - **An empty `[]` or `{}` reads as `(bracket)` or `(brace)`.** eval3 crashes on them: `newPairFrom` reads the source
   of nil. The kernel's source of nil is nil, the Null Object choice.
@@ -136,8 +140,8 @@ reader, and eval and apply. The primitives, main and the REPL come next (the pla
   past its caller, recursion 1,000 deep, a `<form>` whose condition is true and one whose condition is false, `let`
   and `set`, an `*applicators*` entry applying a `<long>`, `quote`, a global redefined (the global cache answers the
   new value), a symbol `<form>`, and `(set (foo 1) 2)` rewritten to `(set-foo 1 2)`. Then it prints the global
-  namespace and its head binding, compared with what `./eval3` prints with an empty boot file, since boot2.l rebinds
-  `*globals*`. `k_encode` isn't run: eval3 runs it only with `-g`, which comes with main (Task 6). Its subrs and fsubrs (`+`, `-`, `<`, `cons`, `car`, `form`, `set-array-at`,
+  namespace, and the `*globals*` binding that holds it, each once in full and sorted, then by reference (`#1=`,
+  `#1#`): the kernel's own format, a departure, so those two lines are the kernel's, checked by hand. `k_encode` isn't run: eval3 runs it only with `-g`, which comes with main (Task 6). Its subrs and fsubrs (`+`, `-`, `<`, `cons`, `car`, `form`, `set-array-at`,
   `quote`, `lambda`, `if`, `set`, `let`, `define`) are minimal stand-ins for Task 5's, each called through its `imp`,
   natively too. maru-gc.k's "N collections" progress lines are left out of the comparison until kernel-gc.k replaces
   it.

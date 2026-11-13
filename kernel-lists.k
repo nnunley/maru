@@ -3,6 +3,7 @@
 
 (define (isatty	(int int)			*)	(extern isatty))
 (define (memmove	(void * void * void * long)	*)	(extern memmove))
+(define (wcscmp		(int int32 * int32 *)		*)	(extern wcscmp))
 
 (define-function k_car oop ((obj oop))	(if (object-is <pair> obj) (return (<pair>-head obj))) (return nil))
 (define-function k_cdr oop ((obj oop))	(if (object-is <pair> obj) (return (<pair>-tail obj))) (return nil))
@@ -67,15 +68,69 @@
 		   `(if (= ,t ,(car clause)) (let () ,@(cdr clause)) ,@(and chain (list chain))))))
     chain))
 
-;; the binding of *globals* (kernel-eval.k makes it): the printer names it, and the global namespace, rather than print
-;; them, as eval3's doprint does (eval3.c:891, 948-953)
-(define (k_globals oop) 0)
+;; the binding of *globals* (kernel-eval.k makes it).  Within one print, the global namespace prints once in full, its
+;; bindings sorted by name, as #1=(...), and wherever it is met again as #1#: shared structure in Common Lisp's notation
+;; (the user, 2026-11-12), where eval3 prints <the global environment>, <...all the globals...> or <the global
+;; association> in its place and never shows the bindings (eval3.c:891, 948-953)
+(define (k_globals		oop)	0)
+(define (k_printedGlobals	long)	0)	; 1 once this print has printed the global namespace in full
+
+;; a binding's name, or none (sorted first)
+(define-function k_globalName (int32 *) ((binding oop))
+  (if (and (object-is <pair> binding) (object-is <symbol> (<pair>-head binding))) (return (<symbol>-bits (<pair>-head binding))))
+  (return (cast 0 int32 *)))
+
+;; the order of two bindings, by name and then by place in the namespace: below 0, 0 or above
+(define-function k_globalOrder int ((a int32 *) (ai long) (b int32 *) (bi long))
+  (let (((c int) 0))
+    (if (= a (cast 0 int32 *))
+	(if (!= b (cast 0 int32 *)) (set c -1))
+      (if (= b (cast 0 int32 *)) (set c 1) (set c (wcscmp a b))))
+    (if (!= c 0) (return c))
+    (if (< ai bi) (return -1))
+    (if (> ai bi) (return 1))
+    (return 0)))
+
+;; the global namespace: in full, sorted, the first time this print meets it, and as #1# after.  Each binding is found
+;; by a pass for the next in order, so the printer allocates nothing, as eval3's doesn't
+(define-function k_printGlobalNamespace void ((storing long))
+  (if k_printedGlobals
+      (printf "#1#")
+    (let (((lastName int32 *) (cast 0 int32 *))
+	  ((lastIndex long) -1)
+	  ((first long) 1)
+	  ((more long) 1))
+      (set k_printedGlobals 1)
+      (printf "#1=(")
+      (while more
+	(let (((best oop) nil)
+	      ((bestName int32 *) (cast 0 int32 *))
+	      ((bestIndex long) -1)
+	      ((i long) 0)
+	      ((l oop) (k_cdr k_globals)))
+	  (while (object-is <pair> l)
+	    (let* (((e oop) (<pair>-head l))
+		   ((n int32 *) (k_globalName e)))
+	      (if (and (or (< lastIndex 0) (> (k_globalOrder n i lastName lastIndex) 0))
+		       (or (< bestIndex 0) (< (k_globalOrder n i bestName bestIndex) 0)))
+		  (let () (set best e) (set bestName n) (set bestIndex i))))
+	    (set i (+ i 1))
+	    (set l (<pair>-tail l)))
+	  (if (< bestIndex 0)
+	      (set more 0)
+	    (let ()
+	      (if (not first) (printf " "))
+	      (set first 0)
+	      (k_doprint best storing)
+	      (set lastName bestName)
+	      (set lastIndex bestIndex)))))
+      (printf ")"))))
 
 (define-function k_doprint void ((obj oop) (storing long))
   (if (= obj nil)
       (printf "()")
-    (if (= obj k_globals)
-	(printf "<the global environment>")
+    (if (= obj (k_cdr k_globals))
+	(k_printGlobalNamespace storing)
     (type-case (object-type obj)
       (0 (printf "UNDEFINED"))
       ;; Data's length is the collector's size until kernel-gc.k keeps the length asked for (doc/kernel.md)
@@ -118,23 +173,18 @@
 	(set p (+ p (sizeof int32))))
       (printf "\""))))
 
-;; a list; an element that is a binding whose tail is the list itself, as a namespace's head, prints as <name>; the
-;; global namespace, met as a tail, prints as <...all the globals...>, and the binding of *globals* as <the global
-;; association>, each ending the list (eval3.c:948-953)
+;; a list; an element that is a binding whose tail is the list itself, as a namespace's head, prints as <name>; a tail
+;; that is the global namespace prints after " . " as the namespace does (k_printGlobalNamespace)
 (define-function k_printList void ((head oop) (storing long))
   (printf "(")
   (let (((more long) 1))
     (while more
-      (if (= head (k_cdr k_globals))
-	  (let () (printf "<...all the globals...>") (set head nil))
-	(if (= head k_globals)
-	    (let () (printf "<the global association>") (set head nil))
-	  (let (((h oop) (<pair>-head head)))
-	    (if (and (object-is <pair> h) (object-is <symbol> (<pair>-head h)) (= head (<pair>-tail h)))
-		(printf "<%ls>" (<symbol>-bits (<pair>-head h)))
-	      (k_doprint h storing)))))
+      (let (((h oop) (<pair>-head head)))
+	(if (and (object-is <pair> h) (object-is <symbol> (<pair>-head h)) (= head (<pair>-tail h)))
+	    (printf "<%ls>" (<symbol>-bits (<pair>-head h)))
+	  (k_doprint h storing)))
       (set head (k_cdr head))
-      (if (object-is <pair> head) (printf " ") (set more 0))))
+      (if (and (object-is <pair> head) (!= head (k_cdr k_globals))) (printf " ") (set more 0))))
   (if (!= head nil) (let () (printf " . ") (k_doprint head storing)))
   (printf ")"))
 
@@ -149,6 +199,6 @@
 
 ;; eval3 flushes stdout after each; the kernel can't name stdout yet, and fflush(NULL) would also flush, and so move, a
 ;; stream another process shares (eval2's own reading of a check), so flushing waits for the kernel's main (Task 6)
-(define-function k_print void ((obj oop))	(k_doprint obj 0))
-(define-function k_dump void ((obj oop))	(k_doprint obj 1))
+(define-function k_print void ((obj oop))	(set k_printedGlobals 0) (k_doprint obj 0))
+(define-function k_dump void ((obj oop))	(set k_printedGlobals 0) (k_doprint obj 1))
 (define-function k_dumpln void ((obj oop))	(k_dump obj) (printf "\n"))

@@ -18,5 +18,5 @@ x
 42
 Expr.set-foo=(a b)
 3
-(<...all the globals...>)
-(*global-namespace* <...all the globals...>)
+#1=((*applicators* . Array<3>(() () Expr=(n x))) (*backtrace*) (*encoders*) (*evaluators*) (*expanders*) (*global-namespace* . #1#) (*globals* . #1#) (*input*) (*output*) (+ . +) (- . -) (< . <) (add-three . Expr.add-three=(x)) (answer . Form((), Expr=(s))) (car . car) (cons . cons) (define . Fixed<define>) (depth . Expr.depth=(n)) (form . form) (if . Fixed<if>) (lambda . Fixed<lambda>) (let . Fixed<let>) (make-adder . Expr.make-adder=(n)) (my-if . Form(Expr.my-if=(c a b), ())) (quote . Fixed<quote>) (set . Fixed<set>) (set-array-at . set-array-at) (set-foo . Expr.set-foo=(a b)) (x . 2))
+(*globals* . #1=((*applicators* . Array<3>(() () Expr=(n x))) (*backtrace*) (*encoders*) (*evaluators*) (*expanders*) (*global-namespace* . #1#) (*globals* . #1#) (*input*) (*output*) (+ . +) (- . -) (< . <) (add-three . Expr.add-three=(x)) (answer . Form((), Expr=(s))) (car . car) (cons . cons) (define . Fixed<define>) (depth . Expr.depth=(n)) (form . form) (if . Fixed<if>) (lambda . Fixed<lambda>) (let . Fixed<let>) (make-adder . Expr.make-adder=(n)) (my-if . Form(Expr.my-if=(c a b), ())) (quote . Fixed<quote>) (set . Fixed<set>) (set-array-at . set-array-at) (set-foo . Expr.set-foo=(a b)) (x . 2)))
