@@ -123,9 +123,12 @@ check_select
 A case's run MUST be recorded partial when, during it, the runner's `run` or `run-status` or Maru's `system` starts a
 command whose program isn't one of the evaluators, or code binds a native function that opens files (`fopen`,
 `freopen`, `open`, `openat`, `opendir`) other than through the logged readers, as native code compiled in process does
-when it resolves such an extern. A run whose inputs log is missing or unreadable is partial. [R-partial]
+when it resolves such an extern. A run whose inputs log is missing or unreadable is partial. One command is known: `make -q
+TARGET…`, which only asks whether its targets are current, MUST NOT make a run partial, and each target counts as an
+input, by the sources make builds it from. [R-partial]
 Such a run can read files nobody logs: cc reads the C it is given, git reads the index, a compiled program opens its
-fixtures. `lines`, `erosion` and every case that builds with make or cc stay partial, and so always run.
+fixtures. `lines`, `erosion` and every case that builds with make or cc stay partial, and so always run; the cases that only
+assert their libraries are built (`make -q build/…`, at the time of writing four calls in `check/check.l`) don't.
 
 ```maru-check @R-partial
 check_select
