@@ -108,6 +108,10 @@ make Capability NothingElseBroke "every other check in the repository still pass
 qualify Capability proven if its shown-by size > 0 and for every its shown-by do each holds = yes.
 qualify Capability done if it proven = yes or it planned = yes.
 qualify Capability ready if for every its builds-on do each done = yes.
+qualify Capability regressing if for some its shown-by do each regressed = yes.
+qualify Capability failing if for some its shown-by do (each failing = yes and each regressed = no).
+qualify Capability aging if for some its shown-by do each stale = yes.
+qualify Capability untried if for some its shown-by do each untested = yes.
 rel-qualify Capability:A depends-on Capability:B if B in A builds-on.
 rel-qualify Check:C supports Capability:K if C in K shown-by.
 
@@ -122,5 +126,10 @@ action Team build Capability consequence Capability planned = yes.
 rule Team build is Capability done = no.
 rule Team build is Capability ready = yes.
 goal Team deliver try for every all Capability do each done = yes.
+; what the next step is worth: a regression first, then a failure, then answers about older code, then what's untried
+heuristic Team deliver 10000 maximize (select all Capability by which planned = yes and which regressing = yes) size.
+heuristic Team deliver 1000 maximize (select all Capability by which planned = yes and which failing = yes) size.
+heuristic Team deliver 100 maximize (select all Capability by which planned = yes and which aging = yes) size.
+heuristic Team deliver 10 maximize (select all Capability by which planned = yes and which untried = yes) size.
 ; every capability, in some order that respects builds-on: no choice to search among
 goal-strategy Team deliver sat.

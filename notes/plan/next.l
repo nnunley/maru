@@ -1,5 +1,16 @@
-;;; ./eval notes/plan/next.l: what's done now, what isn't and why, and the next step.  Runs no check.
+;;; ./eval notes/plan/next.l [--lane NAME]: what's done now in the plan (MARU_PLAN), what isn't and why, then the frontier:
+;;; every step the plans allow, scored by their heuristics, the lane's plan first (MARU_PLAN's if no lane is named).
+;;; Runs no check.
+(define next-args *arguments*)
+(set *arguments* ())
+(or (not next-args) (and (= "--lane" (car next-args)) (cdr next-args) (not (cddr next-args)))
+    (let () (println "usage: ./eval notes/plan/next.l [--lane NAME]") (exit 1)))
 (require "notes/plan/plan-world.l")
+(require "notes/plan/frontier.l")
+(define lane (if next-args (cadr next-args) plan-name))
+(or (member? lane (plan-names "notes/plan"))
+    (let ((names "")) (list-do n (plan-names "notes/plan") (set names (concat-strings names (if (= "" names) "" ", ") n)))
+      (println "E_UNKNOWN_LANE: " lane " (plans: " names ")") (exit 1)))
 (define-function not-holding (capability)
   (let ((out ()))
     (list-do c (plan-ask capability 'shown-by) (or (plan-yes? c 'holds) (push out c)))
@@ -9,8 +20,6 @@
     (cond ((plan-yes? c 'stale) (concat-strings "older code: " evidence))
 	  ((= 'untested (plan-ask c 'evidence)) evidence)
 	  (else (concat-strings evidence " (see " probe-logs ")")))))
-(define stale 0)
-(list-do c (john-instances 'Check) (and (plan-yes? c 'stale) (set stale (+ stale 1))))
 (list-do capability (john-instances 'Capability)
   (println (if (plan-yes? capability 'proven) "done     " "not done ") capability ": " (plan-ask capability 'what))
   (or (plan-yes? capability 'proven)
@@ -22,14 +31,5 @@
 (list-do c (john-instances 'Check)
   (and (plan-yes? c 'regressed) (println "regressed: " c)))
 (println "this code: " plan-tree ", events of evidence: " (<john-world>-time *john-world*))
-;; the plan's answer starts with the evidence, the world chain's own history; what's new starts at now
-(if (< 0 stale)
-    (println "next: notes/plan/record full (" stale " answers are about older code)")
-  (let ((now (<john-world>-time *john-world*)))
-    (john-statement '(satisfy T deliver () (build) ()))
-    (let ((steps (john-path *john-world*)) (n now))
-      (while (and steps (> n 0)) (set steps (cdr steps)) (set n (- n 1)))
-      (cond (steps (println "next: " (john-step-text (car steps))))
-	    ((= 'yes (john-eval '(every (all Capability) (= (send each done) yes)) *john-world* ())) (println "nothing left to build"))
-	    (else (println "no plan: " (car *john-out*))))
-      (list-do st (and steps (cdr steps)) (println "then: " (john-step-text st))))))
+;; the frontier, over every plan, the lane's first
+(list-do line (frontier-lines "notes/plan" lane plan-tree) (println line))

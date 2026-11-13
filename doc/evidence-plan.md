@@ -12,8 +12,8 @@ passed(tree: T)` or `failed`, with `WholeSuite` passed too when the run was comp
 records nothing (the probes' own `make check`s set it), and a ledger that can't be written is reported without changing
 the run's outcome. `./eval notes/plan/observe.l [full]` asks what `make check` doesn't (measures, and every tree grammar
 compiled live on each evaluator, reading its language), leaving out a case whose answer for this code the ledger
-already holds, and `notes/plan/record [full]` records its answers; `./eval notes/plan/next.l` shows
-what's done and the next step, running nothing. A law's check answers its verdict, with what backs it, and only tested
+already holds, and `notes/plan/record [full]` records its answers; `./eval notes/plan/next.l [--lane NAME]`
+shows what's done in the plan and the frontier, running nothing. A law's check answers its verdict, with what backs it, and only tested
 or proved counts. Planning says `using build`, so under `sat` the evidence is constant. `notes/plan/LOOP.md` holds the
 loop's rules and notes.
 
@@ -61,6 +61,16 @@ A ledger line naming an object the plan doesn't declare fails, naming the ledger
 is declared `retired NAME.` in its plan, and its lines are skipped and kept (`render.john` retires `ksworld_render`,
 `ksworld_text`, `nile_threads` and `nile_tsan`, planned under names no case has).
 
+## The frontier
+
+`notes/plan/frontier.l` asks each plan `choices T deliver`: every step it allows now (build a capability not done whose
+`builds-on` are), each scored by the world it leads to. Each plan qualifies a capability `regressing`, `failing`,
+`aging` (a check's latest answer is about older code) and `untried`, and weighs them 10000, 1000, 100 and 10, so a
+regression comes first and answers about older code rank work rather than block it. `next.l` prints the lane's plan
+first (`--lane NAME`, or `MARU_PLAN`'s), then the other plans' steps by name, as `next: PLAN: STEP  score N` and
+`then: …` lines, each plan's skipped retired lines first, or `nothing left to build`. A lane no plan has fails:
+`E_UNKNOWN_LANE: NAME (plans: …)`. Several agents take work from the same frontier, each in its own lane.
+
 ## Checks
 
 - `plan_evidence` (`check/plan-evidence.l`): what `check/law.l` prints, read by `notes/plan/law-report.g` to events, one
@@ -78,3 +88,9 @@ is declared `retired NAME.` in its plan, and its lines are skipped and kept (`re
   no failure, not with one; two lanes' same answer kept once, an answer going back to an earlier one kept; a retired
   name's lines kept while the retirement is younger than `MARU_RETIRE_AFTER` and dropped once it's as old;
   `MARU_RECORD=0` and a missing results file record nothing.
+- `plan_frontier` (`check/plan-frontier.l`): fixture plans in `check/plan/frontier/`: alpha's four ready capabilities
+  in the order regressing, failing, aging, untried, scored 10000, 1000, 100, 10, then beta's; lane beta puts beta's first;
+  with every answer about older code there's still a frontier, each answered capability aging and ties in the plan's
+  order; a plan all done gives no step, and nothing anywhere prints `nothing left to build`; a lane no plan has is
+  `E_UNKNOWN_LANE` naming the plans, from `lane-frontier` and from `next.l --lane`; a plan's skipped retired lines are
+  said before the `next:` and `then:` lines.

@@ -517,6 +517,7 @@
   (unit-assert (= 0 (run-status 120 "exec </dev/null >/dev/null 2>&1; exec ./eval notes/plan/next.l"))))
 
 (check "plan_record" (unit-assert (equal (last (run "plan_record" "./eval check/plan-record.l")) "plan record ok")))
+(check "plan_frontier" (unit-assert (equal (last (run "plan_frontier" "./eval check/plan-frontier.l")) "plan frontier ok")))
 
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.

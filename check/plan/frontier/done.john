@@ -1,0 +1,32 @@
+set Evidence = untested | passed(tree) | failed(tree).
+group Good passed.
+group Check Case.
+create Case evidence last-good.
+create Code tree.
+action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.
+qualify Check holds if its evidence is Good and its evidence tree = Now tree.
+qualify Check failing if not its evidence is Good and not its evidence is untested and its evidence tree = Now tree.
+qualify Check regressed if it failing = yes and its last-good is Good.
+qualify Check stale if not its evidence is untested and not its evidence tree = Now tree.
+qualify Check untested if its evidence is untested.
+create Capability what shown-by builds-on planned.
+; a fixture for check/plan-frontier.l: everything proven
+make Case d untested untested.
+make Capability D "proven" [ d ] [ ] no.
+qualify Capability proven if its shown-by size > 0 and for every its shown-by do each holds = yes.
+qualify Capability done if it proven = yes or it planned = yes.
+qualify Capability ready if for every its builds-on do each done = yes.
+qualify Capability regressing if for some its shown-by do each regressed = yes.
+qualify Capability failing if for some its shown-by do (each failing = yes and each regressed = no).
+qualify Capability aging if for some its shown-by do each stale = yes.
+qualify Capability untried if for some its shown-by do each untested = yes.
+create Team.
+make Team T.
+action Team build Capability consequence Capability planned = yes.
+rule Team build is Capability done = no.
+rule Team build is Capability ready = yes.
+goal Team deliver try for every all Capability do each done = yes.
+heuristic Team deliver 10000 maximize (select all Capability by which planned = yes and which regressing = yes) size.
+heuristic Team deliver 1000 maximize (select all Capability by which planned = yes and which failing = yes) size.
+heuristic Team deliver 100 maximize (select all Capability by which planned = yes and which aging = yes) size.
+heuristic Team deliver 10 maximize (select all Capability by which planned = yes and which untried = yes) size.

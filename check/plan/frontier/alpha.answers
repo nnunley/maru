@@ -1,0 +1,5 @@
+(world (r observed (value passed (tree "bbb"))) ((r evidence (value passed (tree "bbb"))) (r last-good (value passed (tree "bbb")))))
+(world (r observed (value failed (tree "aaa"))) ((r evidence (value failed (tree "aaa")))))
+(world (f observed (value failed (tree "aaa"))) ((f evidence (value failed (tree "aaa")))))
+(world (a observed (value passed (tree "bbb"))) ((a evidence (value passed (tree "bbb"))) (a last-good (value passed (tree "bbb")))))
+(world (gone observed (value passed (tree "aaa"))) ((gone evidence (value passed (tree "aaa")))))

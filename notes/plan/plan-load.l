@@ -23,6 +23,7 @@
 (define-function plan-load (dir name tree)
   (john-run (concat-list (john-read (concat-strings dir "/" name ".john")) (list (list 'make 'Code 'Now tree))))
   (let ((ledger (plan-ledger-path dir name)))
+    (set *john-skipped* ())
     (set *john-ledger-file* (list dir "/" name ".answers"))
     (and (= 0 ((subr "access" "si>i") ledger 4)) (john-deserialize (read ledger)))
     (set *john-ledger-file* ())))
