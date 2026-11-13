@@ -752,6 +752,82 @@
 
 (check "ir2"        (unit-assert (equal (last (run "ir2" (ir2-build "ir2" "check/ir2.k"))) "ir2 ok")))
 ;; Maru objects through the C back end: maru-gc.k, less its main, then check/native/objects.k and check/objects.k's main
+;; The kernel (doc/kernel.md): each check unit natively (check/kernel.l), and through the C back end
+(check "kernel_native" (unit-assert (equal (last (run "kernel_native" "./eval2 check/kernel.l" 300)) "kernel ok")))
+;; maru-gc.k less its main, the integers' mode (PREFIX defines kernel-tagged-int 1 for tagged; boxed otherwise), kernel.k,
+;; then FILE: a unit in tmp named NAME.k, for ir2-build
+(define-function kernel-c-unit (gc name file prefix)
+  (let ((path (concat-strings tmp "/" name ".k")))
+    (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) prefix "\n(load \"kernel.k\")\n"
+					    (contents-of-file-named file))
+			    path)
+    path))
+;; maru-gc.k's "N collections" progress line (its gcdebug, on as Piumarta left it), which a kernel unit collecting on
+;; every allocation prints; the kernel checks leave it out until kernel-gc.k replaces maru-gc.k in the kernel
+(define-function kernel-gc-line? (l)
+  (let ((i 0))
+    (while (and (< i (string-length l)) (<= ?0 (string-at l i)) (<= (string-at l i) ?9)) (set i (+ i 1)))
+    (and (< 0 i) (= (- (string-length l) i) 12) (equal (string-copy l i 12) " collections"))))
+;; the kernel's two modes for its integers: boxed (eval3 as built), and tagged (eval3's TAG_INT)
+(define kernel-modes '(("" . "boxed") ("\n(define kernel-tagged-int 1)" . "tagged")))
+;; the lines ./eval3 -b boot2.l prints for check/kernel/lists.k's structures
+(define kernel-lists-printed
+  '("(he\"l\\lo sym -42 3.500000 () Array<3>(1 () s) (1 . 2) Array<0>())"
+  "(\"he\\\"l\\\\lo\" sym -42 3.500000 () Array<3>(1 () \"s\") (1 . 2) Array<0>())"
+  "\"tab\\011here\"" "((quote . 7))" "kernel lists ok"))
+(check "kernel_c"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do mode kernel-modes
+      (let ((unit (lambda (u) (let ((name (concat-strings "kernel-" u "-" (cdr mode))))
+				(run name (ir2-build name (kernel-c-unit gc name (concat-strings "check/kernel/" u ".k") (car mode))))))))
+	(unit-assert (equal (unit "lists") kernel-lists-printed))
+	(unit-assert (equal (unit "reader") (concat-list (lines (contents-of-file-named "check/kernel/read.expected")) '("kernel reader ok"))))
+	(unit-assert (equal (select (lambda (l) (not (kernel-gc-line? l))) (unit "eval")) (concat-list (lines (contents-of-file-named "check/kernel/eval.expected")) '("kernel eval ok"))))
+	(unit-assert (equal (last (unit "objects")) "kernel objects ok"))
+	(unit-assert (equal (last (unit "longs")) "kernel longs ok"))))))
+;; the kernel's objects over generated programs (check/laws/objects.law), in both modes: check/objects-run.k after
+;; maru-gc.k and kernel.k, through C under ASan, on the poisoning collector, agrees with the law's model (told the mode by
+;; OBJECTS_LAW_TAGGED); and a program reading a field nothing wrote is refuted (fixtures/objects-unwritten.law), so the
+;; sentinel shows
+(check "law_objects"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do mode kernel-modes
+      (let* ((name (concat-strings "objects-run-" (cdr mode)))
+	     (src  (kernel-c-unit gc name "check/objects-run.k" (car mode)))
+	     (bin  (concat-strings tmp "/" name))
+	     (dir  (concat-strings tmp "/objects-law-" (cdr mode)))
+	     (env  (concat-strings "env OBJECTS_LAW_RUN=" bin " OBJECTS_LAW_TMP=" dir
+				   " OBJECTS_LAW_TAGGED=" (if (equal (cdr mode) "tagged") "1" "0") " ./eval"))
+	     (bite (concat-strings tmp "/objects-unwritten-" (cdr mode) ".out")))
+	(run (concat-strings name "-c") (concat-strings "./eval2 ir-gen-c.k maru.k " src " > " bin ".c"))
+	(run (concat-strings name "-cc") (concat-strings "cc -g -O1 -fsanitize=address,undefined -fno-builtin -w -o " bin " " bin ".c -ldl"))
+	(run (concat-strings name "-dir") (concat-strings "mkdir -p " dir))
+	(let ((out (law-file-holds (concat-strings "law_objects_" (cdr mode)) env "check/laws/objects-model.l" "check/laws/objects.law")))
+	  (unit-assert out)
+	  (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
+				  (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (")
+				       (equal (cadr ls) "law initialised: PROVED 33"))))))
+	(unit-assert (= 256 (run-cpu-status 300 (concat-strings "exec </dev/null >" bite " 2>&1; exec " env
+								 " check/law.l check/laws/objects-model.l check/laws/fixtures/objects-unwritten.law"))))
+	(unit-assert (starts (car (lines (contents-of-file-named bite))) "law unwritten: REFUTED p="))))))
+;; the same law natively, in both modes: law.l on eval2 compiles the driver once with native.l (check/laws/objects-native.l)
+;; and runs each program in a forked child, so the native back end's objects are held to the model too.  Slow (the
+;; driver's dispatch compiles natively in about 90 s), so check-quick leaves it out
+(check "law_objects_native"
+  (let ((gc (contents-of-file-named "maru-gc.k")))
+    (list-do mode kernel-modes
+      (let* ((name (concat-strings "objects-native-" (cdr mode)))
+	     (unit (kernel-c-unit gc name "check/objects-run.k" (car mode)))
+	     (dir  (concat-strings tmp "/" name))
+	     (env  (concat-strings "env OBJECTS_LAW_UNIT=" unit " OBJECTS_LAW_TMP=" dir
+				   " OBJECTS_LAW_TAGGED=" (if (equal (cdr mode) "tagged") "1" "0") " ./eval2")))
+	(run (concat-strings name "-dir") (concat-strings "mkdir -p " dir))
+	(let ((out (law-file-holds (concat-strings "law_objects_native_" (cdr mode)) env
+				   "check/laws/objects-model.l check/laws/objects-native.l" "check/laws/objects.law")))
+	  (unit-assert out)
+	  (unit-assert (and out (let ((ls (lines (contents-of-file-named out))))
+				  (and (= 2 (list-length ls)) (starts (car ls) "law agree: TESTED 300 (")
+				       (equal (cadr ls) "law initialised: PROVED 33"))))))))))
 (check "ir2_objects"
   (let ((gc (contents-of-file-named "maru-gc.k")))
     (contents-to-file-named (concat-strings (string-copy gc 0 (string-find gc "\n(define-function main ")) "\n"

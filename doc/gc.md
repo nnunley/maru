@@ -6,6 +6,12 @@ The collector in C and the one written in Maru, held to laws over generated grap
 
 - `maru_gc`: the GC written in Maru allocates 2.56M cells, collects, and
   frees everything.
+- maru-gc.k's `gc_frequency` is a variable (collect when the allocations since the last collection reach it), so a
+  check can collect on every allocation (`kernel_native`, doc/kernel.md). Its `gc-protect` pops the roots it pushed last
+  first; with two or more variables it once popped them in pushed order (`reverse-map` keeps a list's order), which
+  `gc_pop_root` refuses as "non-lifo root".
+- maru-gc.k's `gc_poison` is the byte new memory is filled with: 0, or 0xa5 under `law_objects` (doc/kernel.md), so a
+  field nothing wrote reads a sentinel. Every word of it is odd, which the collector never follows.
 - `maru_gc_coalesce` (`check/gc.k`): its allocator grows the heap when needed
   and merges adjacent free chunks.
 - `gc_laws` (`check/laws/gc.law`): over graphs rules generate, in a forked child per question, on every evaluator: what's

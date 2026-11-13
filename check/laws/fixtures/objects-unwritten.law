@@ -1,0 +1,7 @@
+-- objects.law's programs read a field nothing wrote: the poisoned collector makes it show, as the sentinel
+reference clean(ops, pace)
+under test: program, op, slot, kind, maker, typed
+defaults trials = 300, size = 4
+let numerals = [0 .. 9]
+use "check/laws/objects-programs.law"
+law unwritten: all p: program(p). clean(encode(p), 32768) = accept by test

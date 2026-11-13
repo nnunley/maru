@@ -11,3 +11,18 @@ erosion -2 ir2 objects: many small definitions (object instructions, form compil
 erosion +1 asm-arm64.l: arm64-bind-plan refuses vshl and vshr when the diagram lacks immh:immb, one more condition in its dispatch over operand kinds (CC 71), as arm64-bind's was
 erosion +1 check/objects.k: its main asserts each object form in one function, CC over 10, now nil, tagged longs and boxed? too
 verbosity -1 nil, boxed? and their checks: forms none of the verbose patterns flag
+erosion +1 check/kernel/objects.k: its main asserts every constructor and type in one function, CC over 10
+erosion +2 check/objects-run.k: the law's driver dispatches by type and field in typed Maru, which has no selectors: field-cases, new_of, make_of and main over CC 10
+verbosity -1 check/objects-run.k and check/laws/objects-model.l: forms none of the verbose patterns flag
+erosion -2 kernel-lists.k: many small definitions (car, cdr, arrays, the printer's parts) dilute the share held by callables over CC 10
+erosion -1 kernel task 2b: small definitions (k_boxLong, k_isLong, the mode's forms, the driver's immediate) dilute the share held by callables over CC 10
+erosion +2 check/kernel/longs.k: its main asserts boxed? case by case in one function, and the law's driver's main its guards, CC over 10
+verbosity -1 boxed? and the wide-literal check: forms none of the verbose patterns flag
+erosion -1 check/objects-run.k: main's four field dispatches moved into op_set, op_look, op_get and op_put
+verbosity +1 check/objects-run.k: show_oop's early returns written as nested ifs, which native code needs
+erosion +4 kernel-reader.k: readExpr, readChar and readNumber keep eval3's switches on a character (CC 35, 18 and 14); a readtable would dispatch by character instead
+verbosity -1 kernel-reader.k: forms none of the verbose patterns flag
+erosion -4 kernel-eval.k: eval3's evaluator as many small functions (environments, expand's helpers, encode's binding and arity helpers, applyExpr apart from apply) dilutes the share held by callables over CC 10
+verbosity +1 the split into two branches: boxed?'s and the wide literal's verbosity entry is ir2-object-level's, and was counted again by the kernel's
+erosion -1 kernel-lists.k: the globals printed by small functions (k_globalName, k_globalOrder) beside k_printGlobalNamespace
+erosion +1 the kernel on ir2-object-level's review: each branch's entries were measured on its own, and erosion is a share (callables over CC 10 per mille), so the entries of the two don't add exactly

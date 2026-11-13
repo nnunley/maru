@@ -1,0 +1,21 @@
+-- The kernel's objects through ir2's object level, over generated programs.  check/objects-run.k runs a program,
+-- compiled through C on a collector that fills new memory with a sentinel (gc_poison) and under ASan, and prints what
+-- each operation reads; check/laws/objects-model.l's model says what it should.  A field nothing wrote reads the
+-- sentinel, S, so a read from the wrong place, a write to the wrong field, or an object freed while reachable shows.
+reference agrees(ops, pace)
+reference clean(ops, pace)
+under test: program, op, slot, kind, maker, typed, pace
+defaults trials = 300, size = 6
+let numerals = [0 .. 9]
+use "check/laws/objects-programs.law"
+
+-- a collection on every allocation, at an awkward prime, and seldom
+fact pace(1)
+fact pace(7)
+fact pace(32768)
+
+law agree: all p: program(p), e: pace(e). agrees(encode(p), e) = accept by test classify raw when ops_using(encode(p), 1) > 0, made when ops_using(encode(p), 2) > 0, written when ops_using(encode(p), 3) + ops_using(encode(p), 6) > 0, read when ops_using(encode(p), 4) + ops_using(encode(p), 5) > 0, collected when ops_using(encode(p), 8) > 0, made_read when made_reads(encode(p)) > 0 cover 15% made_read
+-- a kernel constructor writes every field of what it makes: none reads the sentinel, at any pace (built, as the driver
+-- reads it: build in slot 0, then look at its fields 0 to 3)
+let built = (t) -> [[2, 0, t, 3, 3], [4, 0, 0], [4, 0, 1], [4, 0, 2], [4, 0, 3]]
+law initialised: all t: maker(t), e: pace(e). clean(built(t), e) = accept by exhaustion

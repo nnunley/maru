@@ -1,0 +1,18 @@
+; the kernel's reader fixture (check/kernel/reader.k): every datum is dumped, and compared with ./eval3 -b boot2.l
+; integers: decimal, negative, hexadecimal, and the edges of 64 bits
+0 42 -7 0x1F -0x10 9223372036854775807 -9223372036854775808 4611686018427387904
+; doubles
+1.0 2.5 -0.125 4.0e18 -2.5e-3 1e3 12.
+; strings, with every escape: named, \u, \x with one and two digits, octal with one to three, and a quoted delimiter
+"plain" "" "\a\b\f\n\r\t\v" "AJ" "\x41\x4" "\101\7\60" "\"\\\'\(" "tab	inside"
+; characters
+?a ?Z ?0 ?\n ?\t ?\x41 ?\101 ?\\ ?\" ?(
+; symbols
+foo x1 a-b + - * <= -x a.b |bar| :key
+; lists, dotted, quoted, quasiquoted and unquoted, bracketed and braced
+() (1 2 3) (1 . 2) (a b . c) 'a '(1 2) `(a ,b ,@c) ''x [1 2] {a b}
+; nested 200 deep
+((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((deep))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+; eval3 crashes on an empty [] or {} (newPairFrom reads the source of nil); the kernel reads them as (bracket) and
+; (brace), and they come last so the expected output is eval3's for all before them
+[] {}
