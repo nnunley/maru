@@ -16,7 +16,9 @@ When a run ends, `check/parallel.l` writes `results` in its directory (`/tmp/mar
 named (neither `CHECKS=` nor `--quick`); then one line per case, in the order they finished. The tree is taken again
 after the last case, and if the code changed in between no file is written, and the run says so on standard error: a
 result is evidence about the code it ran against. The file is written whole and renamed into place, so a run stopped
-early leaves none. `check/results.l` writes and reads it.
+early leaves none. `check/results.l` writes and reads it. Then the run records it in the plans' ledgers
+(`notes/plan/record-run.l`, `doc/evidence-plan.md`), unless `MARU_RECORD=0`; the nested runs `check_results` and
+`check_tmp` make set it.
 
 ## Checks
 

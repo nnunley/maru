@@ -1,8 +1,5 @@
 #!/bin/sh
-# notes/plan/record [full]: appends what the checks answer about this code to the evidence, and shows the plan.
-events=$(mktemp)
-# MARU_PLAN names the plan (notes/plan/NAME.john), tree-matching if unset; each has its own evidence file
-case "${MARU_PLAN:-tree-matching}" in tree-matching) ledger=notes/plan/evidence.john ;; *) ledger=notes/plan/$MARU_PLAN-evidence.john ;; esac
-./eval notes/plan/observe.l "$@" > "$events" && cat "$events" >> "$ledger"
-rm -f "$events"
+# notes/plan/record [full]: asks the plan's checks about this code, appends the answers to its ledger, and shows the plan.
+# MARU_PLAN names the plan (notes/plan/NAME.john, its ledger NAME.answers), tree-matching if unset
+./eval notes/plan/observe.l "$@" || exit 1
 exec ./eval notes/plan/next.l

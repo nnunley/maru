@@ -51,11 +51,11 @@
       (let ((names ""))
 	(set *cases-ran* 1)
 	(list-do c (john-instances 'Case) (set names (concat-strings names " " (symbol->string c))))
-	(probe-run "cases" 1800 (concat-strings "nice make check CHECKS='" names "'"))
+	(probe-run "cases" 1800 (concat-strings "MARU_RECORD=0 make check CHECKS='" names "'"))
 	(probe-collect-shown "cases")))
   (probe-evidence (or (probe-case-shown? self)
 		      (let ((name (symbol->string self)))
-			(probe-run name 600 (concat-strings "nice make check CHECKS='" name "'"))))))
+			(probe-run name 600 (concat-strings "MARU_RECORD=0 make check CHECKS='" name "'"))))))
 
 ;;; ---- a command whose exit status is the answer; what a test suite shows counts for the cases it ran
 

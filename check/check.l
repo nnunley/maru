@@ -309,13 +309,13 @@
 ;; code changed under it; and a run of parallel.l writes one, in a directory inside this case's own
 (check "check_results"
   (unit-assert (equal (last (run "check_results" "./eval check/results-test.l")) "results ok"))
-  (run "check_results_inner" (concat-strings "MARU_CHECK_TMP=" tmp "/inner ./eval check/parallel.l check_tmp"))
+  (run "check_results_inner" (concat-strings "MARU_RECORD=0 MARU_CHECK_TMP=" tmp "/inner ./eval check/parallel.l check_tmp"))
   (let ((lines (lines (contents-of-file-named (concat-strings tmp "/inner/results"))))
 	(tree (car (run "check_results_tree" "notes/plan/tree-hash"))))
     (unit-assert (equal lines (list (concat-string "tree " tree) "complete no" "check_tmp passed")))))
 (check "check_tmp"
   (list-do unsafe '("/" "" "/tmp/" "/Users" "/tmp/a b" "/tmp/x/../..")
-    (unit-assert (fails-saying "check_tmp" (concat-strings "MARU_CHECK_TMP='" unsafe "' ./eval check/parallel.l lines")
+    (unit-assert (fails-saying "check_tmp" (concat-strings "MARU_RECORD=0 MARU_CHECK_TMP='" unsafe "' ./eval check/parallel.l lines")
 			       "must be a plain path under /tmp/"))))
 ;; non-local exit through stubs Maru writes, on every evaluator this host has, in each instruction set it runs
 (define-function native-evaluators ()
@@ -515,6 +515,8 @@
   (unit-assert (equal (last (run "plan_evidence" "./eval check/plan-evidence.l")) "plan evidence ok"))
   ;; the plan as it stands replays and plans, running no check
   (unit-assert (= 0 (run-status 120 "exec </dev/null >/dev/null 2>&1; exec ./eval notes/plan/next.l"))))
+
+(check "plan_record" (unit-assert (equal (last (run "plan_record" "./eval check/plan-record.l")) "plan record ok")))
 
 
 ;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.

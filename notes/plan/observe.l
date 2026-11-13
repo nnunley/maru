@@ -1,5 +1,7 @@
-;;; ./eval notes/plan/observe.l [full]: asks the plan's checks and prints their answers as events of evidence, all of them
-;;; or, if the code changed under them, none: that's an error.  What it's doing goes to stderr.
+;;; ./eval notes/plan/observe.l [full]: asks the plan's checks, each answer a step of the plan (Check observed Answer),
+;;; and appends the steps to its ledger, all of them or, if the code changed under them, none: that's an error.  A case
+;;; whose answer for this code the ledger already holds (make check records them) isn't asked again.  What it's doing
+;;; goes to stderr.
 (define full-record (and *arguments* (= "full" (car *arguments*))))
 (or (not *arguments*) full-record (error "the one argument is full, not " (car *arguments*)))
 (set *arguments* ())
@@ -19,12 +21,16 @@
     (or (= <john-variant> (type-of answer))
 	(error check " answered " (john-text answer) ", which isn't Evidence"))
     answer))
-(define events ())
+(define from (<john-world>-time *john-world*))
+(define-function answered-now? (check)	; a case make check has answered about this code
+  (let* ((e (plan-ask check 'evidence)) (tree (and (= <john-variant> (type-of e)) (assq 'tree (<john-variant>-fields e)))))
+    (and (john-isa? (john-object-class check) 'Case) tree (= plan-tree (cdr tree)))))
 (list-do check (john-instances 'Check)
-  (when (or full-record (plan-yes? check 'routine))
-    (let ((answer (event-text (plan-answer check))))
-      (progress (concat-strings (symbol->string check) ": " answer "\n"))
-      (push events (concat-strings (symbol->string check) " do observed " answer ".")))))
+  (when (and (or full-record (plan-yes? check 'routine)) (not (answered-now? check)))
+    (let ((answer (plan-answer check)))
+      (progress (concat-strings (symbol->string check) ": " (event-text answer) "\n"))
+      (john-do check 'observed (list answer)))))
 (or (= plan-tree (plan-tree-now))
     (error "the code changed during this run, so none of its answers are recorded"))
-(list-do e (list-reverse! events) (println e))
+(plan-append "notes/plan" plan-name from)
+(println plan-evidence-file ": " (long->string (- (<john-world>-time *john-world*) from)) " answers recorded")

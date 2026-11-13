@@ -6,6 +6,9 @@
 ;;;   (plan-ask object message)   what it answers in the current world; plan-yes? whether that's yes
 ;;;   (plan-replay dir name)      ((now . form) ...): each ledger form as the plan's actions write it now, and as it is
 ;;;   (plan-ledger-drift dir name) () if the ledger is what the plan's actions write now, else which line isn't
+;;;   (plan-write-forms path forms) the ledger rewritten whole, one form a line, renamed into place
+;;;   (ledger-dedupe forms)       forms less each world the same as its check's world before (a union merge's repeats)
+;;;   (plan-append dir name from) the worlds after time from appended to DIR/NAME.answers, deduplicated
 (require "john-serialize.l")
 (define-function plan-file-lines (path)	; a file's lines, or () if there is no file
   (and (= 0 ((subr "access" "si>i") path 4))
@@ -62,3 +65,28 @@
 			     (symbol->string (cadr (cadr (cddr bad))))
 			     (if (cadr bad) " writes what the line doesn't hold" " takes no step now")
 			     "; ./eval notes/plan/replay.l write rewrites the ledger"))))
+;; ---- writing a ledger
+(define-function plan-write-forms (path forms)
+  (let* ((partial (concat-string path ".partial")) (f ((subr "fopen" "ss>p") partial "w")))
+    (or (and f (!= 0 f)) (error path ": can't be written"))
+    (list-do form forms ((subr "fputs" "sp>i") (concat-string (john-ledger-line form) "\n") f))
+    ((subr "fclose" "p>i") f)
+    (or (= 0 ((subr "rename" "ss>i") partial path)) (error path ": can't be written"))))
+;; a world the same as the one before it about the same check changes nothing: drop it.  An answer that goes back to an
+;; earlier one stays, since the latest answer is the check's state
+(define-function ledger-dedupe (forms)
+  (let ((before (equal-hash-table)) (out ()))
+    (list-do f forms
+      (if (= 'world (john-ledger-shape f))
+	  (let ((actor (car (cadr f))))
+	    (or (equal f (hash-at before actor ()))
+		(let () (hash-at-put before actor f) (push out f))))
+	(or (member? f out) (push out f))))
+    (list-reverse! out)))
+(define-function plan-ledger-forms (dir name)
+  (let ((ledger (plan-ledger-path dir name)))
+    (and (= 0 ((subr "access" "si>i") ledger 4)) (read ledger))))
+(define-function plan-append (dir name from)
+  (let* ((old (plan-ledger-forms dir name))
+	 (merged (ledger-dedupe (concat-list old (john-serialize-worlds from *john-world*)))))
+    (or (equal merged old) (plan-write-forms (plan-ledger-path dir name) merged))))

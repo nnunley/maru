@@ -164,3 +164,4 @@
 (world (conditional_right observed (value tested (tree "55a0e20670e5") (trials 100))) ((conditional_right evidence (value tested (tree "55a0e20670e5") (trials 100))) (conditional_right last-good (value tested (tree "55a0e20670e5") (trials 100)))))
 (world (minus_left observed (value tested (tree "55a0e20670e5") (trials 100))) ((minus_left evidence (value tested (tree "55a0e20670e5") (trials 100))) (minus_left last-good (value tested (tree "55a0e20670e5") (trials 100)))))
 (world (comment_blank observed (value tested (tree "55a0e20670e5") (trials 100))) ((comment_blank evidence (value tested (tree "55a0e20670e5") (trials 100))) (comment_blank last-good (value tested (tree "55a0e20670e5") (trials 100)))))
+(world (tree_lists observed (value passed (tree "d3a191b985da"))) ((tree_lists evidence (value passed (tree "d3a191b985da"))) (tree_lists last-good (value passed (tree "d3a191b985da")))))

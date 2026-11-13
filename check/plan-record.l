@@ -1,0 +1,70 @@
+;; R-run-records, R-ledger-dedupe, R-retired: what make check ran becomes worlds of each plan's chain (notes/plan/record-run.l)
+(require "check/temp.l")
+(require "notes/plan/plan-load.l")
+(define ok 1)
+(define-function expect (what good) (or good (let () (println "FAIL " what) (set ok ()))))
+(define system (subr "system" "s>i"))
+(define dir (concat-string check-tmp "/plans"))
+(define results (concat-string check-tmp "/results"))
+(define-function write-file (path text)
+  (let ((f ((subr "fopen" "ss>p") path "w"))) ((subr "fputs" "sp>i") text f) ((subr "fclose" "p>i") f)))
+(define-function final (l) (while (cdr l) (set l (cdr l))) (car l))
+(define-function ledger (name) (plan-file-lines (concat-strings dir "/" name ".answers")))
+(define-function record (text . env)	; a results file, then record-run over the plans in dir
+  (write-file results text)
+  (system (concat-strings (if env (car env) "") " ./eval notes/plan/record-run.l " results " " dir " >/dev/null 2>&1")))
+(define evidence "set Evidence = untested | passed(tree) | failed(tree).\ngroup Good passed.\ncreate Code tree.\n")
+(define observed "action Check observed Answer consequence its evidence = Answer and its last-good = Answer if Answer is Good.\n")
+(system (concat-strings "rm -rf " dir " && mkdir -p " dir " && cp check/plan/x.john check/plan/x.answers " dir "/"))
+(write-file (concat-string dir "/w.john")
+	    (concat-strings evidence "group Check Case Measure.\ncreate Case evidence last-good.\ncreate Measure evidence last-good.\n"
+			    "make Case one untested untested.\nmake Measure WholeSuite untested untested.\n" observed))
+(write-file (concat-string dir "/n.john")
+	    (concat-strings evidence "group Check Case.\ncreate Case evidence last-good.\nmake Case zed untested untested.\n" observed))
+(define x-before (ledger "x"))
+
+(record "tree ttt\ncomplete no\none passed\nother failed\nstranger passed\n")
+(expect "a world for each case the plan declares, none for one it doesn't"
+	(= (+ 2 (list-length x-before)) (list-length (ledger "x"))))
+(expect "the new worlds are observed steps, in the results' order"
+	(= "(world (other observed (value failed" (string-copy (final (ledger "x")) 0 36)))
+(expect "a plan with no ledger gets one" (= 1 (list-length (ledger "w"))))
+(expect "a plan declaring none of the cases gets nothing" (not (ledger "n")))
+(define x-once (ledger "x"))
+(record "tree ttt\ncomplete no\none passed\nother failed\nstranger passed\n")
+(expect "recording the same results twice leaves the ledger as after once" (equal (ledger "x") x-once))
+
+(record "tree bbb\ncomplete yes\none passed\nother passed\n")
+(expect "a complete run that all passed: WholeSuite passed too" (= 3 (list-length (ledger "w"))))
+(record "tree ccc\ncomplete yes\none failed\nother passed\n")
+(expect "a complete run with a failure: no WholeSuite" (= 4 (list-length (ledger "w"))))
+
+;; two lanes on one prefix each record the same answer; the union merge holds both lines, and one stays
+(define w-now (ledger "w"))
+(write-file (concat-string dir "/w.answers")
+	    (let ((s "")) (list-do l (concat-list w-now (list (final w-now))) (set s (concat-strings s l "\n"))) s))
+(record "tree ccc\ncomplete no\n")
+(expect "a line the same as its check's line before is dropped" (equal (ledger "w") w-now))
+(record "tree aaa\ncomplete no\none passed\n")
+(record "tree aaa\ncomplete no\none failed\n")
+(record "tree aaa\ncomplete no\none passed\n")
+(expect "an answer going back to one it had before is kept: the latest decides"
+	(= (+ 3 (list-length w-now)) (list-length (ledger "w"))))
+
+;; a retired name's lines go once its retirement is MARU_RETIRE_AFTER commits old; here it isn't committed at all
+(define gone "(world (gone observed (value passed (tree \"aaa\"))) ((gone evidence (value passed (tree \"aaa\"))) (gone last-good (value passed (tree \"aaa\")))))")
+(write-file (concat-string dir "/x.answers") (let ((s "")) (list-do l (concat-list x-once (list gone)) (set s (concat-strings s l "\n"))) s))
+(system (concat-strings "echo 'retired gone.' >> " dir "/x.john"))
+(record "tree aaa\ncomplete no\n")
+(expect "a retired name's lines stay while the retirement is younger than MARU_RETIRE_AFTER" (member? gone (ledger "x")))
+(record "tree aaa\ncomplete no\n" "MARU_RETIRE_AFTER=0")
+(expect "and go once it's as old" (and (not (member? gone (ledger "x"))) (equal (ledger "x") x-once)))
+
+(define x-now (ledger "x"))
+(record "tree ddd\ncomplete yes\none passed\nother passed\n" "MARU_RECORD=0")
+(expect "MARU_RECORD=0 records nothing" (equal (ledger "x") x-now))
+(system (concat-strings "rm -f " results))
+(expect "no results file: nothing recorded, and it says so"
+	(= 0 (system (concat-strings "./eval notes/plan/record-run.l " results " " dir " | grep -q 'no results: nothing recorded'"))))
+(expect "and the ledgers as they were" (equal (ledger "x") x-now))
+(if ok (println "plan record ok") (exit 1))

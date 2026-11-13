@@ -6,8 +6,13 @@ Development is driven by JOHN plans (`doc/rfc/draft-ndn-maru-john-development-00
 dbjr documents can be fetched), `render` Nile, Gezira and KSWorld drawn in a window. `MARU_PLAN=NAME` picks one;
 `tree-matching` if unset.
 
-`./eval notes/plan/observe.l [full]` asks a plan's checks (cases, measures, and every tree grammar compiled live on each
-evaluator, reading its language); `notes/plan/record [full]` records the answers; `./eval notes/plan/next.l` shows
+`make check` (and `make check-quick`) records what it ran: when the run ends `check/parallel.l` runs
+`notes/plan/record-run.l` on its results file, and each case a plan declares becomes a step of that plan, `C observed
+passed(tree: T)` or `failed`, with `WholeSuite` passed too when the run was complete and nothing failed. `MARU_RECORD=0`
+records nothing (the probes' own `make check`s set it), and a ledger that can't be written is reported without changing
+the run's outcome. `./eval notes/plan/observe.l [full]` asks what `make check` doesn't (measures, and every tree grammar
+compiled live on each evaluator, reading its language), leaving out a case whose answer for this code the ledger
+already holds, and `notes/plan/record [full]` records its answers; `./eval notes/plan/next.l` shows
 what's done and the next step, running nothing. A law's check answers its verdict, with what backs it, and only tested
 or proved counts. Planning says `using build`, so under `sat` the evidence is constant. `notes/plan/LOOP.md` holds the
 loop's rules and notes.
@@ -46,6 +51,12 @@ old writes: `./eval notes/plan/replay.l` (`MARU_PLAN` picks the plan) says wheth
 write now, naming the first line that isn't, and `./eval notes/plan/replay.l write` takes each recorded step again and
 rewrites it.
 
+A ledger is deduplicated whenever it's written: a world the same as its check's world before it changes nothing and is
+dropped, as when one results file is recorded twice or two lanes record the same answer and a union merge keeps both. An
+answer that goes back to an earlier one stays, since the latest answer is the check's state. When recording, the lines of
+a name retired at least `MARU_RETIRE_AFTER` commits ago (20, counted on this branch from the first commit whose plan
+holds `retired NAME.`) are dropped; until then they're skipped and kept.
+
 A ledger line naming an object the plan doesn't declare fails, naming the ledger and the line. A check dropped or renamed
 is declared `retired NAME.` in its plan, and its lines are skipped and kept (`render.john` retires `ksworld_render`,
 `ksworld_text`, `nile_threads` and `nile_tsan`, planned under names no case has).
@@ -61,3 +72,9 @@ is declared `retired NAME.` in its plan, and its lines are skipped and kept (`re
   plan retires it. The fixture's ledger is what its actions write now, a line missing a write `observed` makes is
   named, and every plan's ledger replays to itself. Every `make Case NAME` in every plan names a case `check/check.l` has. `next.l` runs on the plan as it
   stands.
+- `plan_record` (`check/plan-record.l`): `record-run.l` over a copy of the fixture plans: a world for each case a plan
+  declares and none for one it doesn't, in the results' order; a plan with no ledger gets one, a plan declaring none of
+  the cases nothing; the same results twice leave the ledger as after once; `WholeSuite` passed for a complete run with
+  no failure, not with one; two lanes' same answer kept once, an answer going back to an earlier one kept; a retired
+  name's lines kept while the retirement is younger than `MARU_RETIRE_AFTER` and dropped once it's as old;
+  `MARU_RECORD=0` and a missing results file record nothing.

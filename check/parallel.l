@@ -33,6 +33,9 @@
 		 names)))
 ;; what the evidence is made from: complete only when every case was asked for
 (results-write check-tmp tree-before (tree-hash-now) (not *requested*) (list-reverse! *jobs-outcomes*))
+;; and recorded in each plan's ledger (notes/plan/record-run.l, which MARU_RECORD=0 stops); a ledger that can't be written
+;; is reported, and the run's outcome is the cases'
+(or (= 0 ((subr "system" "s>i") "./eval notes/plan/record-run.l")) (println "evidence not recorded"))
 (if failed
     (let ()
       (println "failed: " failed)
