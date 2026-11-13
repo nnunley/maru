@@ -6,6 +6,7 @@
 ;;;   (plan-ask object message)   what it answers in the current world; plan-yes? whether that's yes
 ;;;   (plan-replay dir name)      ((now . form) ...): each ledger form as the plan's actions write it now, and as it is
 ;;;   (plan-ledger-drift dir name) () if the ledger is what the plan's actions write now, else which line isn't
+;;;   (plan-replay-write dir name) the ledger rewritten so, unless a line takes no step now
 ;;;   (plan-write-forms path forms) the ledger rewritten whole, one form a line, renamed into place
 ;;;   (ledger-dedupe forms)       forms less each world the same as its check's world before (a union merge's repeats)
 ;;;   (plan-append dir name from [forms]) forms, then the worlds after time from, appended to DIR/NAME.answers, deduplicated
@@ -64,8 +65,9 @@
       (or bad (equal (car e) (cdr e)) (set bad (cons n e))))
     (and bad (concat-strings (plan-ledger-path dir name) ": ledger " (long->string (car bad)) ": "
 			     (symbol->string (cadr (cadr (cddr bad))))
-			     (if (cadr bad) " writes what the line doesn't hold" " takes no step now")
-			     "; ./eval notes/plan/replay.l write rewrites the ledger"))))
+			     (if (cadr bad)
+				 " writes what the line doesn't hold; ./eval notes/plan/replay.l write rewrites the ledger"
+			       " takes no step now: the plan's rules refuse it; change the plan, or retire the check")))))
 ;; ---- writing a ledger
 (define-function plan-write-forms (path forms)
   (let* ((partial (concat-string path ".partial")) (f ((subr "fopen" "ss>p") partial "w")))
@@ -82,7 +84,7 @@
 	  (let ((actor (car (cadr f))))
 	    (or (equal f (hash-at before actor ()))
 		(let () (hash-at-put before actor f) (push out f))))
-	(or (member? f out) (push out f))))
+	(let ((seen ())) (list-do g out (and (equal f g) (set seen 1))) (or seen (push out f)))))	; by structure: forms read
     (list-reverse! out)))
 (define-function plan-ledger-forms (dir name)
   (let ((ledger (plan-ledger-path dir name)))
@@ -91,3 +93,9 @@
   (let* ((old (plan-ledger-forms dir name))
 	 (merged (ledger-dedupe (concat-list old (concat-list (car forms) (john-serialize-worlds from *john-world*))))))
     (or (equal merged old) (plan-write-forms (plan-ledger-path dir name) merged))))
+;; the ledger rewritten as the plan's actions write it now; refused, leaving it as it is, if a line takes no step
+(define-function plan-replay-write (dir name)
+  (let ((forms (map car (plan-replay dir name))))
+    (list-do f forms (or f (error (plan-ledger-path dir name) ": a line takes no step now, so the ledger isn't rewritten")))
+    (plan-write-forms (plan-ledger-path dir name) forms)
+    forms))

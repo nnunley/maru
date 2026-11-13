@@ -83,9 +83,9 @@ checkout; a file the run wrote before reading it, and any file outside the check
 |---|---|---|---|
 | `MARU_CHECK_ALL` | flag | unset | set by `make check-all`: every case runs, every record is rewritten |
 | `MARU_INPUTS` | path | unset | set by the runner for each case; unset, nothing is logged |
-| records file | path | `/tmp/maru-check/<checkout>/inputs` | beside `times` and `results`; `MARU_CHECK_TMP` moves the directory |
+| records file | path | `/tmp/maru-check/<checkout>.inputs` | beside the run's directory, which each run empties at its start; with `MARU_CHECK_TMP`, that path with `.inputs` added |
 
-The records live with the checkout's other run files, not in the repository: they describe this checkout's last runs,
+The records live beside the checkout's run directory, not in it (a run removes that directory first), and not in the repository: they describe this checkout's last runs,
 and a fresh checkout, with none, runs everything.
 
 **Resolution precedence** for whether a case runs (highest first):
@@ -256,7 +256,7 @@ would rerun all of them.
 
 An evaluator appends to whatever file `MARU_INPUTS` names; the variable comes from the runner or the user, who could
 already write that file. The records decide which cases run: someone able to write
-`/tmp/maru-check/<checkout>/inputs` can make a selected run skip a case. That directory is the user's own, and the full
+`/tmp/maru-check/<checkout>.inputs` can make a selected run skip a case. That directory is the user's own, and the full
 run before a merge ignores the records' say over what runs, so a planted record is caught there as a case whose outcome
 changed.
 

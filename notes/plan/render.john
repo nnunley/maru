@@ -23,7 +23,7 @@ qualify Law observe is it law-verdict.
 qualify Check routine if 1 = 1.
 qualify Measure routine if its cadence = "routine".
 
-make Measure WholeSuite untested untested "nice make check" "full".
+make Measure WholeSuite untested untested "MARU_RECORD=0 make check" "full".
 make Measure Erosion untested untested "./eval notes/plan/erosion-hotspots.l" "full".
 
 ; the Nile runtime in typed Maru, task by task

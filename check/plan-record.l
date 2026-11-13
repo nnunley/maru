@@ -60,6 +60,8 @@
 (record "tree aaa\ncomplete no\n" "MARU_RETIRE_AFTER=0")
 (expect "and go once it's as old" (and (not (member? gone (ledger "x"))) (equal (ledger "x") x-once)))
 
+(expect "a make line equal to an earlier one is dropped, as read from a file"
+	(= 1 (list-length (ledger-dedupe (list (list 'make 'Case 'extra 'untested "a") (list 'make 'Case 'extra 'untested "a"))))))
 (define x-now (ledger "x"))
 (record "tree ddd\ncomplete yes\none passed\nother passed\n" "MARU_RECORD=0")
 (expect "MARU_RECORD=0 records nothing" (equal (ledger "x") x-now))

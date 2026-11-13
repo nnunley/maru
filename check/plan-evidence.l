@@ -79,6 +79,15 @@ qualify Law holds if its evidence is Good and its evidence tree = Now tree.
 (list-do plan (plan-names "notes/plan")
   (or (= 0 (system (concat-strings "MARU_PLAN=" plan " ./eval notes/plan/replay.l >/dev/null 2>&1")))
       (expect (concat-strings "plan " plan "'s ledger is what its actions write now") ())))
+;; a ledger with a line its plan's rules refuse now isn't rewritten: the write would lose it
+(system (concat-strings "cp check/plan/x.john " scratch "/v.john && echo 'rule Check observed is Answer is Good.' >> " scratch "/v.john"))
+(ledger "v" x-lines)
+(expect "a refused step is named, and says what to do"
+	(equal (plan-ledger-drift scratch "v")
+	       (concat-string scratch "/v.answers: ledger 3: observed takes no step now: the plan's rules refuse it; change the plan, or retire the check")))
+(expect "and rewriting refuses, leaving the ledger as it was"
+	(and (= 'refused (try (let () (plan-replay-write scratch "v") 'written) (lambda (c) 'refused)))
+	     (equal (plan-file-lines (concat-string scratch "/v.answers")) x-lines)))
 ;; every case a plan names is a case check/check.l has
 (let ((known (case-names)))
   (list-do plan (plan-names "notes/plan")

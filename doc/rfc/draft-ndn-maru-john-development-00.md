@@ -140,7 +140,7 @@ check_results
 After `make check` writes a results file, and unless `MARU_RECORD` is `0`, every plan's ledger MUST gain one world
 for each `Case` C the plan declares that the run passed or failed, and none for any other case: the world the step
 `C observed passed(tree: "T")` (or `failed`) makes, with the writes the plan's `observed` action gives it, so
-`(world (C observed (value passed (tree "T"))) ((C evidence (value passed (tree "T")))))`. A run with `complete` true
+`(world (C observed (value passed (tree "T"))) ((C evidence (value passed (tree "T"))) (C last-good (value passed (tree "T")))))`. A run with `complete` true
 and every outcome passed MUST also add the world of `WholeSuite observed passed(tree: "T")` to every plan that declares
 the measure `WholeSuite`. Worlds are appended in the order the run's outcomes finished. [R-run-records]
 Measures, grammars and laws are not cases of `check/check.l`; `notes/plan/record` still asks them, and MUST NOT run a
@@ -156,8 +156,9 @@ Lanes append to the same ledgers on different branches. A branch is a world spro
 commit (Warth's worlds, 2011, §2.2), which is safe when nothing the branch wrote depended on what it read: recording an
 answer reads no earlier answer, so lanes' worlds commute. A union merge keeps each side's lines in their order, so
 times relative to others of the same lane stay right; between lanes, which ran at once, no order was ever defined. So
-no quality a plan defines MAY depend on the order of two answers recorded by different lanes; the states below read the
-set of answers.
+no quality a plan defines MAY depend on the order of two answers recorded by different lanes about the same tree. The
+states below read a check's latest answer and its last good one: lanes answer about their own trees, and after a merge
+every answer is about another tree until a run here, so the merge's order doesn't show in any state.
 
 ```maru-check @R-ledger-union
 plan_evidence
@@ -199,10 +200,11 @@ john_session
 plan_evidence
 ```
 
-Recording MUST drop a world whose action and writes equal those of a world earlier in the ledger, and a `make` line
-equal to an earlier one, keeping the first; nothing else is dropped but what retirement drops. [R-ledger-dedupe]
-The same answer about the same code, recorded on two branches, is one event, and Elephant's journal is "virtual": what
-is never referred to need not be kept. A later world moves to an earlier time, and the order of the rest stays.
+Recording MUST drop a world equal to the world before it about the same check, and a `make` line equal to an earlier
+one, keeping the first; nothing else is dropped but what retirement drops. [R-ledger-dedupe]
+Such a world changes no property: the same answer about the same code, recorded twice or on two branches, is one event,
+and Elephant's journal is "virtual": what is never referred to need not be kept. An answer that returns to an earlier
+one is kept, since the latest answer is the check's state.
 
 ```maru-check @R-ledger-dedupe
 plan_record
@@ -304,15 +306,16 @@ Every plan MUST minimize erosion. Recording the plan's `Measure` `Erosion` runs 
 `lines` check's files, which prints every callable over CC 10, not only the ten heaviest, since a partial total would
 understate erosion. For each, the ledger gains a line
 `(make Hotspot H_TREE_FILE_LINE "callable" "file" LINE CC MASS "T" no)`, with FILE's non-alphanumerics as `_` and MASS
-CC x sqrt(SLOC) rounded to a whole number, after the measure's own world. A `make` moves no time, so each hotspot is a
+CC x sqrt(forms) rounded to a whole number (erosion.l's mass), after the measure's own world. A `make` moves no time, so each hotspot is a
 fact of world 0, `planned` no. A plan qualifies `Hotspot current` as its tree being the
 current tree's, MUST declare `action Team simplify Hotspot consequence Hotspot planned = yes.`, allowed only for a
 current hotspot not yet planned, and MUST carry
 `heuristic Team deliver W minimize total (select all Hotspot by which planned = no and which current = yes) by which mass.`
 with W its erosion weight. [R-erosion-minimized]
 So `simplify` competes with `build` on the frontier: a step that simplifies a hotspot of mass M scores W x M more than
-one that doesn't. With the default weights a hotspot of mass 1000 weighs as a failing check, and the largest in the
-tree (`john-eval.l:518`, CC 37 over 37 lines, about 225 at the time of writing) sits between a failing check and an aging one. Hotspots of older code don't
+one that doesn't. With the default weights a hotspot of mass 1000 weighs as a failing check; at the time of writing
+(November 2026) the four largest (`kscript.l`'s `ks-eval` about 4900, then three of the assemblers' between 1100 and
+1500) weigh more than one, so simplifying them ranks above fixing a failing check. Hotspots of older code don't
 count: erosion is about the code as it stands. That a step really lowered erosion is shown by the `erosion` case and
 `check/erosion`'s ledger, as now.
 
@@ -472,8 +475,8 @@ what appending and deduplicating give. A CBOR encoding beside the text remains o
 older code would hold a ledger to about two lines a check, but would cut the history `at time` and `did` read. Reading
 is cheap enough that every event is kept until size is shown to matter.
 
-**Why not facts in world 0, with no time?** The states read only the set of answers, but history queries (`regressed`
-through `at time`, `observed-within`) need the order a lane recorded them in, which only worlds keep.
+**Why not facts in world 0, with no time?** A state reads the latest answer, which only an order gives, and history
+queries (`at time`, `observed-within`, `was`) need the order a lane recorded them in, which only worlds keep.
 
 **Why not have `make check` run `notes/plan/record`?** `record` asks every check, measures and grammars included, so
 the suite's cases would run twice. Recording from the results file runs nothing.
