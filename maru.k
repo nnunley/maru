@@ -78,10 +78,10 @@
        (maru->ir-type (cdr decl) ir)))
 
 (define-method maru-compile <undefined> (ir)	(ir-nop))
-(define-method maru-compile <long>   	(ir)	(ir-lit self IR-INT))
+(define-method maru-compile <long>   	(ir)	(ir-lit self (ir-integer-type self)))	; a define takes its type from it
 (define-method maru-compile <double> 	(ir)	(ir-lit self IR-DOUBLE))
 (define-method maru-compile <string> 	(ir)	(ir-lit self IR-STRING))
-(define-method maru-compile <symbol> 	(ir)	(ir-get-var self))
+(define-method maru-compile <symbol> 	(ir)	(if (= 'nil self) (ir-object-nil) (ir-get-var self)))	; nil: the object level's constant
 (define-method maru-compile <extern> 	(ir)	(ir-extern self.name))
 
 (define-function maru-compile-define (exp ir)
@@ -154,12 +154,12 @@
 (define-function maru-compile-set-object-slot (exp ir)
   (ir-set-object-slot (ir-object ir (cadr exp)) (caddr exp) (maru-compile (cadddr exp) ir) (maru-compile (car (cddddr exp)) ir)))
 
-;; (new <name>) makes an object of a type define-object declared (compile-begin turns new into object-new, before boot's
+;; (new <name>), or (new <name> extra-bytes), makes an object of a type define-object declared (compile-begin turns new into object-new, before boot's
 ;; new can expand it); any other new is a call
 (define-function maru-compile-new (exp ir)
   (let ((type (cdr (assq (cadr exp) (<ir>-struct-types ir)))))
-    (if (and type (ir-object-type? type) (not (cddr exp)))
-	(ir-object-new type)
+    (if (and type (ir-object-type? type) (not (cdddr exp)))
+	(if (cddr exp) (ir-object-new type (maru-compile (caddr exp) ir)) (ir-object-new type))
       (maru-compile-operator (cons 'new (cdr exp)) ir))))
 
 ;; the ids object-type needs: <undefined>'s and <long>'s, declared in the unit
@@ -172,6 +172,9 @@
 
 (define-function maru-compile-object-type (exp ir)
   (ir-object-type-of (maru-object-type-ids exp ir) (maru-compile (cadr exp) ir)))
+
+(define-function maru-compile-boxed (exp ir)		; (boxed? x)
+  (ir-object-boxed (maru-compile (cadr exp) ir)))
 
 (define-function maru-compile-object-is (exp ir)	; (object-is <name> x)
   (ir-eq (list (maru-compile-object-type (list 'object-type (caddr exp)) ir)
@@ -229,6 +232,7 @@
     (object-new	. ,maru-compile-new)
     (object-type	. ,maru-compile-object-type)
     (object-is	. ,maru-compile-object-is)
+    (boxed?	. ,maru-compile-boxed)
     (object-get	. ,maru-compile-object-get)
     (object-put	. ,maru-compile-object-put)
     (object-slot	. ,maru-compile-object-slot)

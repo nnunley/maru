@@ -57,3 +57,10 @@
   (set spare p)
   (set spare 0)
   (return (cast spare long)))
+;; an integer literal wider than an int is a long, so a cast keeps all its bits (2^62 + 5, and INT64_MAX)
+(define-function wide-literal long ((which long))
+  (if which (return (cast 9223372036854775807 long)))
+  (return (cast 4611686018427387909 long)))
+;; so is a global whose type comes from its initial value
+(define wide-global 4611686018427387909)
+(define-function wide-global-value long () (return (cast wide-global long)))

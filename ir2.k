@@ -337,7 +337,9 @@
   (array-do insn (<ir>-program ir)
     (ir-check-type insn ir ())))
 
-(define-method ir-check-type <long>   (ir val?)	IR-INT)
+;; an integer value is an int, or a long when an int can't hold it (natively, a wider one was cut to 32 bits)
+(define-function ir-integer-type (n)	(if (and (<= -2147483648 n) (<= n 2147483647)) IR-INT IR-LONG))
+(define-method ir-check-type <long>   (ir val?)	(ir-integer-type self))
 (define-method ir-check-type <double> (ir val?)	IR-DOUBLE)
 (define-method ir-check-type <string> (ir val?)	IR-STRING)
 
@@ -589,12 +591,17 @@
 
 ;; new: an object in its type's family, its id in the word before it, from the unit's gc_malloc (gc_malloc_atomic for
 ;; an atom)
-(define-class <ir-object-new> <ir-object-insn> ())	(define-function ir-object-new (otype)	(new <ir-object-new> (list otype) ()))
+;; (new <T> extra): extra bytes past its fields, a variable-sized object (an <_array>'s slots)
+(define-class <ir-object-new> <ir-object-insn> ())	(define-function ir-object-new (otype . extra)	(new <ir-object-new> (list otype) extra))
 
 (define-method ir-check-type <ir-object-new> (ir val?)	(let* ((otype (car self.parameters))
 							       (alloc (if (<ir-object-type>-atom otype) 'gc_malloc_atomic 'gc_malloc)))
 							  (ir-object-lower self (ir-let '(%new) (list IR-OOP)
-											(list (ir-cast IR-OOP (ir-call (ir-get-var alloc) (list (ir-sizeof otype)))))
+											(list (ir-cast IR-OOP (ir-call (ir-get-var alloc)
+														       (list (if self.operands
+																 (ir-add (list (ir-cast IR-LONG (ir-sizeof otype))
+																	       (ir-cast IR-LONG (car self.operands))))
+															       (ir-sizeof otype))))))
 											(list (ir-set-indir (ir-cast (ir-pointer-to IR-LONG) (ir-get-var '%new))
 													    (ir-lit -1)
 													    (ir-lit (<ir-object-type>-id otype) IR-LONG))
@@ -616,12 +623,34 @@
 						      (ir-indir (ir-cast (ir-pointer-to IR-LONG) (x)) (ir-lit -1))))))
 		     ir val?)))
 
+;; nil: the object level's constant, <undefined>'s object.  Natively and through C it is the zero word (the user's
+;; option A, 2026-11-12); a back end without addresses lowers it to a singleton Null Object instead (colaswp 4.2's
+;; vtblnil), which a (cast 0 oop) couldn't tell from the number 0
+(define-class <ir-object-nil> <ir-object-insn> ())	(define-function ir-object-nil () (new <ir-object-nil> () ()))
+(define-method ir-check-type <ir-object-nil> (ir val?)
+  (ir-object-lower self (ir-cast IR-OOP (ir-lit 0 IR-LONG)) ir val?))
+
+;; boxed?: whether a word has a body, being neither nil nor an odd word (a tagged <long>), as colaswp's bind tells nil and
+;; a tagged integer from an object before reading the word before it (RN-2006-001-a, 4.2)
+(define-class <ir-object-boxed> <ir-object-insn> ())	(define-function ir-object-boxed (value)
+							  (new <ir-object-boxed> () (list value)))
+
+(define-method ir-check-type <ir-object-boxed> (ir val?)
+  (let ((x (lambda () (ir-cast IR-LONG (ir-get-var '%boxed)))))
+    (ir-object-lower self (ir-let '(%boxed) (list IR-OOP) (list (car self.operands))
+				  (list (ir-if (ir-eq (list (x) (ir-lit 0 IR-LONG)))
+					       (ir-lit 0)
+					       (ir-eq (list (ir-bitand (list (x) (ir-lit 1 IR-LONG))) (ir-lit 0 IR-LONG))))))
+		     ir val?)))
+
 ;; get and put: a field, once the object's type is checked as eval.l's get and put check it, calling the unit's
 ;; type_check_fail with the expected and the actual id when it isn't the type's; parameters: the type, the field, and
 ;; object-type's ids
 ;; the access runs only when the type is right: on a mismatch type_check_fail is called and, should it return (a
 ;; handler that recovers), the answer is 0 of the field's type with the object untouched
-(define-function ir-object-checked (otype ids access)	; access: the field's instruction, given the object
+;; An odd word is a tagged <long> (object-type's second id): get of its bits answers its value, and put, as there is no
+;; field to write, fails the type check
+(define-function ir-object-checked (otype ids access putting)	; access: the field's instruction, given the object
   (let* ((field (cadr (<ir-insn>-parameters access)))
 	 (m     (or (cdr (assq field (<ir-struct-type>-members otype)))
 		    (error "no such field: "field" in "(<ir-type>-name otype))))
@@ -629,13 +658,22 @@
 	 (value (car (<ir-insn>-operands access))))
     (and (ir-struct-type? ftype) (error "get or put of a struct-valued field: "field" in "(<ir-type>-name otype)))
     (set-car (<ir-insn>-operands access) (ir-get-var '%checked))
-    (ir-let '(%checked) (list IR-OOP) (list value)
-	    (list (ir-if (ir-eq (list (ir-object-type-of ids (ir-get-var '%checked)) (ir-lit (<ir-object-type>-id otype) IR-LONG)))
-			 access
-			 (ir-let () () ()
-				 (list (ir-call (ir-get-var 'type_check_fail)
-						(list (ir-lit (<ir-object-type>-id otype) IR-LONG) (ir-object-type-of ids (ir-get-var '%checked))))
-				       (ir-cast ftype (ir-lit 0 IR-LONG)))))))))
+    (let* ((fail (lambda ()
+		   (ir-let () () ()
+			   (list (ir-call (ir-get-var 'type_check_fail)
+					  (list (ir-lit (<ir-object-type>-id otype) IR-LONG) (ir-object-type-of ids (ir-get-var '%checked))))
+				 (ir-cast ftype (ir-lit 0 IR-LONG))))))
+	   (checked (ir-if (ir-eq (list (ir-object-type-of ids (ir-get-var '%checked)) (ir-lit (<ir-object-type>-id otype) IR-LONG)))
+			   access
+			   (fail))))
+      (ir-let '(%checked) (list IR-OOP) (list value)
+	      (list (if (= (<ir-object-type>-id otype) (cadr ids))
+			(ir-if (ir-bitand (list (ir-cast IR-LONG (ir-get-var '%checked)) (ir-lit 1 IR-LONG)))
+			       (if putting
+				   (fail)
+				 (ir-cast ftype (ir-shr (list (ir-cast IR-LONG (ir-get-var '%checked)) (ir-lit 1 IR-LONG)))))
+			       checked)
+		      checked))))))
 
 (define-class <ir-object-get> <ir-object-insn> ())	(define-function ir-object-get (otype field ids value)
 							  (new <ir-object-get> (list otype field ids) (list value)))
@@ -643,7 +681,7 @@
 (define-method ir-check-type <ir-object-get> (ir val?)
   (let ((otype (car self.parameters)))
     (ir-object-lower self (ir-object-checked otype (caddr self.parameters)
-					     (ir-object-slot otype (cadr self.parameters) (car self.operands)))
+					     (ir-object-slot otype (cadr self.parameters) (car self.operands)) ())
 		     ir 1)))	; its type check is an effect: never "no effect", even as a statement
 
 (define-class <ir-object-put> <ir-object-insn> ())	(define-function ir-object-put (otype field ids value init)
@@ -652,7 +690,7 @@
 (define-method ir-check-type <ir-object-put> (ir val?)
   (let ((otype (car self.parameters)))
     (ir-object-lower self (ir-object-checked otype (caddr self.parameters)
-					     (ir-set-object-slot otype (cadr self.parameters) (car self.operands) (cadr self.operands)))
+					     (ir-set-object-slot otype (cadr self.parameters) (car self.operands) (cadr self.operands)) 't)
 		     ir 1)))	; its type check is an effect: never "no effect", even as a statement
 ;
 

@@ -31,6 +31,7 @@
     (return l)))
 
 (define-object <late> 20 ((x long)))
+(define-object <slots> 21 ())
 
 ;; object-type: nil is <undefined>, an odd word is <long>, anything else the id in the word before it
 
@@ -39,7 +40,7 @@
 
 ;; the operand is evaluated once
 (define (calls long) 0)
-(define-function next oop () (set calls (+ calls 1)) (return (make-pair (cast 0 oop) (cast 0 oop))))
+(define-function next oop () (set calls (+ calls 1)) (return (make-pair nil nil)))
 (define-function once long ()
   (let (((t long) (object-type (next))))
     (return (+ calls (* 0 t)))))
@@ -58,5 +59,23 @@
 
 ;; on a mismatch whose type_check_fail returns (a handler that recovers), get answers 0 of the field's type and put
 ;; writes nothing: neither touches the object
-(define-function get-of-nil long () (return (cast (get <pair> tail (cast 0 oop)) long)))
-(define-function put-on-nil long () (put <pair> tail (cast 0 oop) (cast 5 oop)) (return 1))
+(define-function get-of-nil long () (return (cast (get <pair> tail nil) long)))
+(define-function put-on-nil long () (put <pair> tail nil (cast 5 oop)) (return 1))
+
+;; nil, the object level's constant: the zero word, natively and through C, of type oop, <undefined>'s object
+(define-function nil-word long () (return (cast nil long)))
+(define-function nil-type long () (return (object-type nil)))
+(define-function nil-is-zero long ((x oop)) (if (= x nil) (return 1)) (return 0))
+
+;; an odd word is a tagged <long>: get of its bits answers its value, put to it fails the type check (there is no body),
+;; and boxed? tells it, and nil, from an object
+(define-function untag long ((x oop)) (return (get <long> bits x)))
+(define-function put-odd long ((x oop)) (put <long> bits x 7) (return 0))
+(define-function is-boxed long ((x oop)) (if (boxed? x) (return 1)) (return 0))
+
+;; (new <T> extra) makes an object extra bytes longer than its fields: a variable-sized object, as eval3's _newOops
+(define-function make-slots oop ((n long))
+  (let (((s oop) (new <slots> (* n (sizeof oop)))))
+    (set (indir (cast s long *) (- n 1)) n)
+    (return s)))
+(define-function slots-size long ((s oop)) (return (gc_size s)))	; the bytes the collector gave it

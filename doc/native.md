@@ -9,7 +9,7 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   runs `maru.k`) compiles a unit through `native-gen.k`, the generator `maru.k` drives in place of `ir-gen-c.k`, to
   architecture-neutral intents on ir2's frame slots; `native-arm64.g` lowers them by tree matching to arm64 forms, with
   `abi.spec`'s registers; `native-link.l` encodes them into a code region; and each function is called by address
-  through `subr`. So far: parameters, literals, add, subtract, negate, return; `if` (with or without a value), `while`, `and`,
+  through `subr`. So far: parameters, literals (an integer literal an `int` can't hold is a `long`, `ir-integer-type`, so a cast or a global it initialises keeps all 64 bits: it was cut to 32; beside an `int` operand, though, ir2 still narrows it to an `int`: in a comparison C keeps it whole and native code cuts it, and in arithmetic both compute the `int` sum: issue #33), add, subtract, negate, return; `if` (with or without a value), `while`, `and`,
   `or`, `not` and every comparison (integers signed, pointers unsigned), on slots of 1, 2, 4 and 8 bytes; `* / %`, the
   bitwise operations and shifts (C's signed results), integer and pointer casts, struct fields through a pointer or an
   indexed element, indexing and `addressof`, each place reached through its address in a register. A conditional
