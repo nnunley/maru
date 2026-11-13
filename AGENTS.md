@@ -75,6 +75,15 @@ Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 Any change in the source line count needs an entry in `check/lines`, and any change in erosion or verbosity one in
 `check/erosion`; see [doc/measures.md](doc/measures.md).
 
+## Plans and feedback
+
+Development is driven by the JOHN plans in `notes/plan/` ([doc/evidence-plan.md](doc/evidence-plan.md)): `make check`
+records what it ran in their ledgers, which are committed with the code they're about, and `./eval notes/plan/next.l
+[--lane NAME]` gives the next steps. Feedback on the work (a review, a ruling, a correction) becomes a change to a plan:
+a capability, a check that shows it, a `builds-on`, a qualification or a weight, committed with the feedback quoted in
+the commit message. Feedback that can't be written as a change to a plan goes back to whoever gave it, and isn't acted
+on outside the plan.
+
 ## Documentation
 
 Each functional unit keeps its documentation in `doc/<unit>.md`: what it does, its checks and what each asserts,

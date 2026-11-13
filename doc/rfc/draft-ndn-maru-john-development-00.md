@@ -1,7 +1,7 @@
 # draft-ndn-maru-john-development-00: Development Driven by JOHN Plans
 
 **Status:** DRAFT
-**Corpus:** red (spec-first: the checks named below are the acceptance criteria)
+**Corpus:** green
 **Category:** Standards-Track
 **Authors:** Norman Nunley, Jr <nnunley@gmail.com>
 

@@ -1,41 +1,40 @@
-# The stage 1 evidence loop
+# The evidence loop
 
-Goal: `notes/plan/tree-matching.john`'s goal is reached, which is stage 1 of
-`doc/rfc/draft-ndn-maru-typed-tree-matching-00.md`. Background on approach and pitfalls, not a task list:
-`doc/plans/2026-11-03-tree-matching-stage-1.md`. Its Global Constraints do bind, but its tasks predate the current design: where they differ, the RFC wins.
+How development is driven by the plans is `doc/rfc/draft-ndn-maru-john-development-00.md`, and how the pieces work is
+`doc/evidence-plan.md`; where this file differs from them, they win. `tree-matching.john` is stage 1 of
+`doc/rfc/draft-ndn-maru-typed-tree-matching-00.md` (background, not a task list: `doc/plans/2026-11-03-tree-matching-stage-1.md`).
 
-The plan says what each `Capability` is (`what`, `where`), what it builds on (`builds-on`) and what would show it works (`shown-by`). A `Check` is anything the system can be asked: a `Case` in `check/check.l`, a `Measure` (a program's exit status), or a `Grammar` (compiled live on each evaluator, reading its language). John objects ask through messages `notes/plan/probes.l` defines.
+The plan says what each `Capability` is (`what`, `where`), what it builds on (`builds-on`) and what would show it works (`shown-by`). A `Check` is anything the system can be asked: a `Case` in `check/check.l`, a `Measure` (a program's exit status), a `Grammar` (compiled live on each evaluator, reading its language) or a `Law`. John objects ask through messages `notes/plan/probes.l` defines.
 
 Each iteration, with fresh eyes:
 
-1. `notes/plan/record` asks the checks (`observe.l`), appends what they answered to `evidence.john`, and prints what's done, what isn't and why, and the next step. `./eval notes/plan/next.l` prints that without running anything.
-2. Take the next step, and as much as naturally goes with it. Read the failing check's log in `/tmp/maru-plan/`.
-3. Change the code until that check passes, keeping earlier ones green.
-4. Record again. Add `check/lines` entries as needed: `make check CHECKS=lines` names the delta.
-5. Commit, code and `notes/plan/evidence.john` together, with a prose message saying what changed and why.
+1. `./eval notes/plan/next.l [--lane NAME]` prints what's done in the plan, what isn't and why, and the frontier: every step the plans allow, scored, your lane's first. It runs nothing.
+2. Take the top step of your lane, and as much as naturally goes with it: a `build` or a `simplify`. Read a failing check's log in `/tmp/maru-plan/` or `/tmp/maru-check/`.
+3. Change the code until the step's checks pass, keeping earlier ones green. `make check` records what it ran in each plan's ledger; `notes/plan/record` asks what it doesn't (measures, grammars, laws), `notes/plan/record full` everything, `./eval notes/plan/observe.l NAME…` just the checks named.
+4. Add `check/lines` and `check/erosion` entries as needed: `make check CHECKS="lines erosion"` names the delta.
+5. Commit, code and the ledgers (`notes/plan/NAME.answers`) together, with a prose message saying what changed and why; feedback that changed a plan is quoted in it (AGENTS.md).
 6. Report: what's green now, what you learned, and anything the next iteration should know. Add that to the end of this file too.
 
-An answer counts only for the code it ran against, named by `notes/plan/tree-hash` (tracked files and untracked source files, here and in the submodules, without the evidence and docs). Change the code and every result is stale until recorded again, so a capability is `done` only with evidence about the code as it stands.
+An answer counts for the code it ran against, named by `notes/plan/tree-hash` (tracked files and untracked source files, here and in the submodules, without the ledgers and docs). Answers about older code don't block anything: they make a capability `aging`, which ranks below a regression or a failure, and a capability is `proven` only with answers about the code as it stands.
 
-`notes/plan/record full` also runs `WholeSuite`, whose run counts as evidence for every case it passes.
-
-Probes run only from `observe.l`. The plan's rules read `evidence`, never `observe`, so replaying evidence and planning run nothing.
+Probes run only from `observe.l`. The plan's rules read `evidence`, never `observe`, so loading the ledger and planning run nothing.
 
 ## Stop and report, without working around it
 
 - A check looks wrong, or could only pass by changing it. The checks and the expected values were fixed before the code. Never
-  weaken, delete or edit a `check/tpeg-*` file or `tree-matching.john`; report what you think is wrong and why.
-- The evidence seems to say a decision in the RFC is wrong: arguments on the input, whole-list matching, data separate from
-  state, two parser types, memos on the stream, one grammar object with a swapped input. Report it; don't reopen it.
+  weaken, delete or edit a check to make it pass; report what you think is wrong and why. Dropping or renaming one is a plan
+  change (`retired NAME.`), made for a reason someone gave.
+- The evidence seems to say a decision in an RFC is wrong. Report it; don't reopen it.
 - `TextMatchingSpeed` fails and you can't see how to fix it without changing what's specified.
 - Something outside the plan's Global Constraints has to change.
 
 ## Rules
 
-- Never edit `notes/plan/evidence.john` by hand; only `record` writes it.
-- Be a good neighbour: other agents share this machine. Use `nice`, and a `timeout` on anything that might loop, since an evaluator
-  with no tail calls can hang or overflow silently. Never kill a process you didn't start, and never use a broad `pkill`.
-- Work only in `.worktrees/tpeg-trees`, on branch `tpeg-trees`. Don't push, and don't merge to `main`.
+- Never edit a ledger by hand; `make check`, `record` and `notes/plan/replay.l write` write them.
+- Be a good neighbour: other agents share this machine. Bound heavy runs, one full suite at a time, and put a `timeout` on anything
+  that might loop, since an evaluator with no tail calls can hang or overflow silently. Never kill a process you didn't start, and
+  never use a broad `pkill`.
+- Work in a worktree under `.worktrees/`, on its own branch; merging follows AGENTS.md.
 - Commits carry no attribution lines.
 
 ## Notes from iterations
