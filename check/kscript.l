@@ -110,6 +110,48 @@ for i in [0...10] by 5 total := total + i
 	'(3 1 (3 1 2) (1 2 3)))
 
 (expect "a long range, made without recursion" (array-length (ks-run "[1...20000]")) 20000)
+;; an object's [k] is its slot k, as a.k is: KSCompiler>>get compiles both to ksAt:, so a stream answers as itself, not
+;; its value (check/ksworld.l maps one named by its key)
+(let ((box (box-of "n <- 5\n")))
+  (expect "an object's [k], its field k: the stream itself"
+	  (let ((at (ks-eval (car (kscript-parse "this[\"n\"]")) () box)))
+	    (list (and (ks-stream? at) 't) (= at (ks-eval (car (kscript-parse "this.n")) () box))))
+	  '(t t))
+  ;; @n in a function's body is n's value: KSQuoteTranslator>>trans reads each step's currentValue there
+  (expect "a function's @chain: its read, and the value it ends at"
+	  (let ((fn (ks-read-chains (car (kscript-parse "() -> @n")) ())))
+	    (list fn (ks-apply (ks-eval fn () box) () () box)))
+	  '((fn () (chain-value (stream-ref n))) 5)))
+;; a chain's end as KSNewEventStream>>findForGet: finds it: the root's value, then v ksAt: key for each key, a slot not
+;; unwrapped, so after the first key v is a stream and the next key is its own or its home object's.  a's value holds
+;; b, whose value holds c (2), and c (1) beside b: @a.b ends at b, and @a.b.c at the c beside b
+(let* ((x (ks-new-object 'KSBox 1 () () () 0)) (y (ks-new-object 'KSBox 1 () () () 0)) (box (ks-new-object 'KSBox 1 () () () 0)))
+  (ks-set-slot y 'c (ks-make-stream y "exprE" "" 2))
+  (ks-set-slot x 'b (ks-make-stream x "exprE" "" y))
+  (ks-set-slot x 'c (ks-make-stream x "exprE" "" 1))
+  (ks-set-slot box 'a (ks-make-stream box "exprE" "" x))
+  (expect "a two-step chain ends at the key's slot in the root's value"
+	  (= (ks-chain-end (car (kscript-parse "@a.b")) box) (ks-slot x 'b)) 't)
+  (expect "a three-step chain ends at the last key on the object holding the one before it"
+	  (= (ks-chain-end (car (kscript-parse "@a.b.c")) box) (ks-slot x 'c)) 't))
+;; a send to a reference in a stream's expression: a combinator's on the stream, any other to its value, as
+;; KSObject>>eventStream falls back to exprE; in KScript 2 code a chain from a name is a reference (a fieldRef), and in a
+;; function's body reads its value at each step (KSCompiler>>fieldRef): deviation-demo's slider1.bounds.center()
+(let* ((box (box-of "b <- P(10, 20).extent(P(30, 40))\n"))
+       (run (lambda (text v2) (ks-stream-curr (ks-eval (ks-read-chains (car (kscript-parse text)) v2) () box)))))
+  (expect "a stream of a rectangle, its center and width"
+	  (list (run "this.b.center().y()" 't) (run "@b.center().y()" ()) (ks-apply (run "() -> this.b.width()" 't) () () box))
+	  '(40 40 30))
+  (expect "a combinator's receiver, the stream itself"
+	  (ks-read-chains (car (kscript-parse "this.b.mapE((r) -> r.width())")) 't)
+	  '(send (field this b) mapE (fn (r) (send r width))))
+  ;; the combinators are KSNewEventStream's four-argument selectors, its 20, run here or not
+  (expect "every combinator KSNewEventStream defines, frpIf and timerEDuration among them"
+	  (list (list-length *ks-combinators*) (and (memq 'frpIf *ks-combinators*) (memq 'timerEDuration *ks-combinators*) 't))
+	  '(20 t))
+  (expect "a combinator kscript.l doesn't run yet still acts on the stream"
+	  (ks-read-chains (car (kscript-parse "@b.frpIf(1, 2)")) ())
+	  '(send (stream-ref b) frpIf 1 2)))
 (expect "an element of an array is set by its index"
 	(let ((box (box-of "a := [1, 2, 3]\na[1] := 9\n"))) (array->list (ks-val box 'a))) '(1 9 3))
 

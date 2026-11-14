@@ -10,3 +10,5 @@ verbosity -1 check/gezira-vector.k: forms none of the verbose patterns flag
 erosion -2 ir2 objects: many small definitions (object instructions, form compilers) dilute the share held by callables over CC 10
 erosion +1 asm-arm64.l: arm64-bind-plan refuses vshl and vshr when the diagram lacks immh:immb, one more condition in its dispatch over operand kinds (CC 71), as arm64-bind's was
 verbosity -1 the JOHN development plan's code (john-serialize.l, was, choices and total, the results file, the frontier and hotspots), its forms rarely flagged or cloned, dilutes the verbose share; erosion is unmoved
+erosion -1 an index as a dependency (kscript.l): the field's case moved into ks-collect-slot-dep, shared with index, and ks-collect-deps sheds its mass
+verbosity -1 review of an object's [k]: chains read once, by ks-read-chains, and ks-chain-end walks a chain of any length
