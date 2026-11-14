@@ -3,6 +3,7 @@
 
 (require "ksworld-pp.l")
 (require "text-parser.l")
+(require "recover.l")
 (set text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
 
 (define-function ks-indent (self)
@@ -797,16 +798,19 @@
 (define-function ks-evaluator-new ()
   (new <ks-evaluator> () -1))
 
+;; a stream's code, read once.  Code that doesn't read leaves the stream marked :__unreadable__, holding the condition, and
+;; with no code, as a setter has none, so the sort reaching it as another's dependency, awake or dormant, passes over it
+;; rather than stopping the evaluation
 (define-function ks-stream-ast (s)
   (or (ks-attr s ':__ast__)
       (let ((code (ks-attr s ':__code__))
 	    (type (ks-attr s ':__type__)))
-	(when (and code (not (= type "setter")))
-	  (let ((ast (car (kscript-parse code))))
-	    (ks-set-attr s ':__ast__ ast)
-	    ast)))))
+	(when (and code (not (= type "setter")) (not (ks-attr s ':__unreadable__)))
+	  (try (let ((ast (car (kscript-parse code))))
+		 (ks-set-attr s ':__ast__ ast)
+		 ast)
+	       (lambda (c) (ks-set-attr s ':__unreadable__ c) ()))))))
 
-;; Collect synchronous stream dependencies of AST; lag (') and delayE break cycles (section 3.2).
 (define-function ks-collect-deps (ast home acc triggers?)
   (cond
     ((symbol? ast)

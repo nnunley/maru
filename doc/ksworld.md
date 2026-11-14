@@ -20,7 +20,8 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
-  tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
+  tick, each stream on its own, then reports what ran, fired and failed, and why. A stream whose code doesn't read is reported and
+  passed over, even where another depends on it (`check/ksworld/unreadable.pp`). Our fixture `check/ksworld/tiny.pp`
   counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
@@ -54,7 +55,7 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   glyph's left bearing). An emphasis other than bold and italic is an error.
 - `ksworld_sources` (`check/ksworld-sources.l`, plan `doc/plans/2026-11-07-ksworld-keys.md`): KSWorld's own code runs from its
   sources (`ksworld/*.st`): `st-fileout.g` reads Squeak's file-out (each class's definition, its instance and class sides),
-  `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
+  `kscript.g` its KScript methods (with `+=`, `-=`, `#'symbols'` or `#"symbols"`, `instanceof` and stream expressions), and `squeak.g` (after `test-pepsi.l`'s
   grammar) its Smalltalk ones to the same trees, so neither is transliterated by hand; `ksworld-source.l` makes each a method
   of its class. A selector is named as KSCompiler named it (`at:put:` is `_at_put`; a KScript method with parameters is its
   keyword selector, and KScript's `rec.abc(a, b)` reaches `abc:with:`), `self` is `this`, an instance variable a field of it,
