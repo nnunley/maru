@@ -26,6 +26,8 @@
 (define gezira-stop-entry (gezira-entry "gezira_stop" "l"))
 (define gezira-fill-entry (gezira-entry "gezira_fill" "lliippi>i"))
 (define gezira-fill-image-entry (gezira-entry "gezira_fill_image" "lliippiliii>i"))
+(define gezira-fill-clipped-entry (gezira-entry "gezira_fill_clipped" "lliippipi>i"))
+(define gezira-fill-image-clipped-entry (gezira-entry "gezira_fill_image_clipped" "lliippiliiipi>i"))
 (define gezira-downsample-entry (gezira-entry "gezira_downsample" "llii>l"))
 (define gezira-premultiply-entry (gezira-entry "gezira_premultiply" "li"))
 
@@ -64,6 +66,30 @@
 		       ((= 'image (car paint))
 			(gezira-fill-image-entry self.init self.image self.width self.height params floats count
 						 (cadr paint) (caddr paint) (cadddr paint) (cadr (cddddr paint))))
+		       (else (error "gezira-maru: no paint " paint)))))
+    (if (not (= 0 status)) (error "gezira-maru: the runtime reports status " status))
+    status))
+
+;; the stages (gezira.l's gezira-fill-clipped) as gezira_fill_clipped takes them: ten floats each, the matrix then the
+;; rectangle, outermost first
+(define-function gezira-stage-floats (stages)
+  (let ((out (data (* 40 (max 1 (list-length stages))))) (i 0))
+    (list-do st stages
+      (let ((m (car st)))
+	(list-do v (concat-list (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m))
+				(cdr st))
+	  (set-float-at out i (* 1.0 v))
+	  (set i (+ i 1)))))
+    out))
+(define-method gezira-fill-clipped <gezira-maru> (m stages width height paint floats count)
+  (if (not (= width self.width)) (error "gezira-maru: a path is clipped to the image's width, " self.width))
+  (if (not (= height self.height)) (error "gezira-maru: a path is clipped to the image's height, " self.height))
+  (let* ((params (gezira-params m paint)) (sf (gezira-stage-floats stages)) (n (list-length stages))
+	 (status (cond ((= 'uniform (car paint))
+			(gezira-fill-clipped-entry self.init self.image self.width self.height params floats count sf n))
+		       ((= 'image (car paint))
+			(gezira-fill-image-clipped-entry self.init self.image self.width self.height params floats count
+							 (cadr paint) (caddr paint) (cadddr paint) (cadr (cddddr paint)) sf n))
 		       (else (error "gezira-maru: no paint " paint)))))
     (if (not (= 0 status)) (error "gezira-maru: the runtime reports status " status))
     status))

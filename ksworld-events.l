@@ -33,13 +33,18 @@
 	 (<= 0 (<ks-point>-x p)) (< (<ks-point>-x p) (<ks-point>-x extent))
 	 (<= 0 (<ks-point>-y p)) (< (<ks-point>-y p) (<ks-point>-y extent)))))
 
-;; the topmost box under a document point that listens for presses
+;; the topmost box under a document point that listens for presses.  As KSBox>>receive: does, a clipping box passes
+;; a point on to what it holds only if the point is inside it, so a press lands only where the render draws
+(define-function ks-box-at (box m point found)
+  (when (and (ks-object? box) (not (ks-slot-false? box 'visible)))
+    (let* ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation))))
+	   (inside (ks-inside? box (ks-apply-matrix (ks-invert here) point))))
+      (and inside (ks-stream? (ks-slot box 'buttonDown)) (set-car found box))
+      (or (and (= 't (ks-val box 'clipping)) (not inside))
+	  (list-do part '(backgroundParts contents parts)
+	    (list-do child (ks-items (ks-val box part)) (ks-box-at child here point found)))))))
 (define-function ksworld-box-at (root point)
-  (let ((found ()))
-    (list-do bm (ks-boxes-in root)
-      (and (ks-stream? (ks-slot (car bm) 'buttonDown)) (ks-inside? (car bm) (ks-apply-matrix (ks-invert (cdr bm)) point))
-	   (set found (car bm))))
-    found))
+  (let ((found (list ()))) (ks-box-at root ks-identity point found) (car found)))
 (define-function ks-local-point (root box point)
   (let ((found ()))
     (list-do bm (ks-boxes-in root) (and (= box (car bm)) (set found (ks-apply-matrix (ks-invert (cdr bm)) point))))

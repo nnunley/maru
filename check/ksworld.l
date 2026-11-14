@@ -25,6 +25,11 @@
   (let ((fs ())) (for (i 0 count) (push fs (float-at floats i)))
     (push self.paths (list (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m))
 			   (list width height) paint (list-reverse! fs)))))
+;; and inside clipping stages, each stage (matrix . rectangle) recorded after the path, as the matrices are
+(define-method gezira-fill-clipped <gezira-recording> (m stages width height paint floats count)
+  (gezira-fill-path self m width height paint floats count)
+  (let ((p (car self.paths)) (m6 (lambda (m) (list (<ks-matrix>-a m) (<ks-matrix>-b m) (<ks-matrix>-c m) (<ks-matrix>-d m) (<ks-matrix>-e m) (<ks-matrix>-f m)))))
+    (set-car self.paths (concat-list p (list (map (lambda (st) (cons (m6 (car st)) (cdr st))) stages))))))
 (define-function drawn (doc width height)
   (let ((g (new <gezira-recording> ())))
     (ksworld-render (car (ksworld-load doc)) g width height)
@@ -104,6 +109,22 @@
   (expect "given as the shape holds it: transforming it is Gezira's"
 	  (cadddr path)
 	  '(0.0 0.0 0.0 0.0 10.0 0.0 10.0 0.0 10.0 0.0 10.0 20.0 10.0 20.0 10.0 20.0 0.0 20.0 0.0 20.0 0.0 20.0 0.0 0.0)))
+
+;; a box whose clipping is on draws what it holds only inside its bounds, as KSBox>>drawOn: clips by drawingBounds: here
+;; a 30@20 box at 100@50 holding a square scaled past its bottom edge, and one inside it.  Gezira clips (gezira.l's
+;; gezira-fill-clipped): each path goes in the box's own coordinates, inside one stage, the box's matrix and its shape's
+;; drawingBounds, which reach a border's width past its extent
+(let* ((paths (drawn "check/ksworld/clip.pp" 200 150)) (stage '(((1.0 0.0 0.0 1.0 100.0 50.0) -1.0 -1.0 31.0 21.0))))
+  (expect "what crosses the clip: in the box's coordinates, inside its stage"
+	  (list (car (car paths)) (car (cddddr (car paths)))) (list '(2.0 0.0 0.0 2.0 5.0 7.0) stage))
+  (expect "what lies inside the clip: the same"
+	  (list (car (cadr paths)) (car (cddddr (cadr paths)))) (list '(1.0 0.0 0.0 1.0 5.0 0.0) stage)))
+;; a press lands only where the render draws: the square past the box's bottom edge listens, and KSBox>>receive: passes a
+;; point on through a clipping box only if the box holds it.  A glyph (a box with a font) doesn't clip, as KSBox>>drawOn:
+(let* ((root (car (ksworld-load "check/ksworld/clip.pp"))) (square (ks-items (ks-val root 'contents))))
+  (expect "a press on the square inside the box lands on it" (ksworld-box-at root (ks-point 110.0 60.0)) (car square))
+  (expect "a press on the square below the box, where nothing is drawn, lands nowhere" (ksworld-box-at root (ks-point 110.0 75.0)) ())
+  (expect "a clipping box clips, a clipping glyph doesn't" (list (ks-clips? root) (ks-clips? (caddr square))) '(t ())))
 
 ;; a collection a document saved with nil and false elements keeps them, each in its place
 (expect "nil and false elements are elements, of a Maru array" (array->list (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))

@@ -74,10 +74,46 @@
 	((and (ks-object? fill) (ks-instance? fill 'GeziraFillImage)) (ksworld-image-paint fill m gezira))
 	(else (error "ksworld-render: can't paint with " fill))))
 
+;; a box whose clipping is on draws itself and what it holds only inside its bounds, as KSBox>>drawOn: clips its canvas
+;; by its drawingBounds after its transformation.  As GeziraCanvas keeps its clips interleaved with its transforms, the
+;; render keeps the clipping boxes drawing now as stages (gezira.l's gezira-fill-clipped), outermost first: each the
+;; matrix from its box's coordinates to the stage outside it, and its rectangle in its own.  A matrix the render passes
+;; down takes a path into the innermost stage's coordinates, so a rotated box clips in its own.
+(define *ksworld-stages* ())
+
+(set gezira-staged-matrix	; the matrix that places a path in the image: the stages' matrices, outermost first, then its own
+     (lambda (m stages)
+       (let ((r ())) (list-do st stages (set r (if r (ks-compose r (car st)) (car st)))) (if r (ks-compose r m) m))))
+(define-function ksworld-image-matrix (m) (gezira-staged-matrix m *ksworld-stages*))
+
+;; every fill: Gezira's own, inside the clipping stages when there are any
+(define-function ksworld-fill (gezira m width height paint floats count)
+  (if *ksworld-stages*
+      (gezira-fill-clipped gezira m *ksworld-stages* width height paint floats count)
+    (gezira-fill-path gezira m width height paint floats count)))
+
+;; whether a box clips what it holds: KSBox>>drawOn: clips by drawingBounds if clipping is on and the box isn't a glyph
+;; (isGlyph, a box with a font)
+(define-function ks-clips? (box)
+  (and (= 't (ks-val box 'clipping))
+       (let ((font (ks-val box 'font))) (or (not font) (= 'undefined font)))))
+
+;; a clipping box's rectangle in its own coordinates, (left top right bottom): KSBox>>drawingBounds, its shape's
+;; drawingBounds, which takes in a border outside the extent.  Every shape with elements saves it; one that doesn't is
+;; computed as KSShape>>computeBounds does for a shape without elements, offset extent: extent
+(define-function ks-clip-rect (box)
+  (let ((shape (ks-val box 'shape)))
+    (and (ks-object? shape)
+	 (let ((r (ks-slot shape 'drawingBounds)) (o (ks-slot shape 'offset)) (e (ks-slot shape 'extent)))
+	   (cond ((ks-rect? r) (list (<ks-rect>-left r) (<ks-rect>-top r) (<ks-rect>-right r) (<ks-rect>-bottom r)))
+		 (else (let ((x (if (ks-point? o) (<ks-point>-x o) 0)) (y (if (ks-point? o) (<ks-point>-y o) 0)))
+			 (list x y (+ x (if (ks-point? e) (<ks-point>-x e) 0)) (+ y (if (ks-point? e) (<ks-point>-y e) 0))))))))))
+
 (define-function ksworld-render-path (path m gezira width height)
   (let ((floats (ks-slot (ks-slot path 'floats) 'data)))
     (and floats
-	 (gezira-fill-path gezira m width height (ksworld-paint (ks-slot path 'myFill) m gezira) floats (ks-slot (ks-slot path 'floats) 'count)))))
+	 (ksworld-fill gezira m width height (ksworld-paint (ks-slot path 'myFill) (ksworld-image-matrix m) gezira)
+		       floats (ks-slot (ks-slot path 'floats) 'count)))))
 
 ;; a text box's selection, while it shows, as rectangles in its layout's selection colour, under the text
 (define-function ksworld-render-selection (box m gezira width height)
@@ -91,13 +127,22 @@
 	      (let ((x0 (car corners)) (y0 (cadr corners)) (x1 (caddr corners)) (y1 (cadddr corners)))
 		(list-do v (list x0 y0 x0 y0 x1 y1) (set-float-at floats i (* 1.0 v)) (set i (+ i 1))))
 	      (set corners (cddr corners)))
-	    (gezira-fill-path gezira m width height
-			      (list 'uniform (<ks-color>-a c) (<ks-color>-r c) (<ks-color>-g c) (<ks-color>-b c)) floats 24)))))))
+	    (ksworld-fill gezira m width height
+			  (list 'uniform (<ks-color>-a c) (<ks-color>-r c) (<ks-color>-g c) (<ks-color>-b c)) floats 24)))))))
 
+(define ksworld-render-box-contents)
 (define-function ksworld-render-box (box m gezira width height)
   (when (and (ks-object? box) (not (ks-slot-false? box 'visible)))
     (let* ((here (ks-compose m (ks-matrix-of (ks-val box 'transformation))))
-	   (shape (ks-val box 'shape)))
+	   (outer *ksworld-stages*) (rect (and (ks-clips? box) (ks-clip-rect box))))
+      (if (not rect)
+	  (ksworld-render-box-contents box here gezira width height)
+	(set *ksworld-stages* (concat-list outer (list (cons here rect))))	; a stage, and what it holds drawn in its coordinates
+	(ksworld-render-box-contents box ks-identity gezira width height))
+      (set *ksworld-stages* outer))))
+
+(define-function ksworld-render-box-contents (box here gezira width height)
+  (let ((shape (ks-val box 'shape)))
       (when (ks-object? shape)
 	(let ((sm (ks-compose here (ks-matrix-of (ks-slot shape 'transform)))))
 	  (list-do element (ks-items (ks-slot shape 'elements))
@@ -108,11 +153,12 @@
 	(list-do g (ks-text-glyphs box)
 	  (let ((floats (ks-glyph-floats g)))
 	    (and (< 0 (ks-glyph-count g))
-		 (gezira-fill-path gezira (ks-compose here (ks-glyph-matrix g)) width height (<ks-glyph>-paint g)
-				   floats (ks-glyph-count g))))))
+		 (ksworld-fill gezira (ks-compose here (ks-glyph-matrix g)) width height (<ks-glyph>-paint g)
+			       floats (ks-glyph-count g))))))
       (list-do part '(backgroundParts contents parts)
 	(list-do child (ks-items (ks-val box part))
-	  (ksworld-render-box child here gezira width height))))))
+	  (ksworld-render-box child here gezira width height)))))
 
 (define-function ksworld-render (box gezira width height)
+  (set *ksworld-stages* ())	; none left by a render an error stopped
   (ksworld-render-box box ks-identity gezira width height))
