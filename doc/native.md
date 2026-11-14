@@ -39,8 +39,7 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   spill after seven longs, 8-byte pieces at slots 4 past a multiple of 8), `stack.k` (ints past the eighth argument,
   from C too), `frame.k` (a frame of 9760 bytes), `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
   (as `maru_gc` asks them) and `check/gc.k` pass natively, and the refusals fail naming what they refuse. Results are
-  held to each program's own assertions and stated outputs, never to `ir-gen-c.k`'s. A struct of floats is passed in
-  general registers, not as the AAPCS64's homogeneous aggregate. Children (`check/native-child.l`) write to the check's
+  held to each program's own assertions and stated outputs, never to `ir-gen-c.k`'s. Children (`check/native-child.l`) write to the check's
   own directory, have 120 s, and leave by `_exit`, an error too (exit would move the loader's shared input).
 - `native_ir2_x64`: the same programs lowered to x86-64 by `native-x64.g` (System V, `native-x64.l`'s actions: slots
   RSP-relative, R11 holding the callee, AL a variadic call's vector count, floats through `fscratch` by MOVQ and MOVD,
