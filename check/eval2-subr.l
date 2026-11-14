@@ -30,4 +30,12 @@
   (expect (byte-at p 3) 0xab)
   ((subr "free" "p") p))
 
+;; A subr keeps its own copy of its name: the string it was made from may be collected.
+(let ((f (subr (concat-string "str" "len") "s>l")) (gc (subr "GC_gcollect" "")) (i 0))
+  (while (< i 21)
+    (let ((j 0) (junk ())) (while (< j 5000) (set junk (cons (concat-string "xxxxxxxx" "yyyyyyyy") junk)) (set j (+ j 1))))
+    (gc)
+    (set i (+ i 1)))
+  (expect (subr-name f) "strlen"))
+
 (if (= 0 failures) (println "subr ok"))
