@@ -21,7 +21,9 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads
   every stream's code (a setter's is a printout of the value the document already holds) and runs the evaluator tick by
   tick, each stream on its own, then reports what ran, fired and failed, and why. Our fixture `check/ksworld/tiny.pp`
-  counts a timer's ticks and names the send nothing answers. With `MARU_DBJR` naming a copy of the dbjr documents laid out
+  counts a timer's ticks and names the send nothing answers; `check/ksworld/text.pp` sets a box's text from a stream with
+  `textContents`, the Smalltalk method `ksworld/` doesn't keep (`KSBox>>textContentsOpt` is its KScript form): its letters
+  replaced by the string's, in the font its first letter had. With `MARU_DBJR` naming a copy of the dbjr documents laid out
   as tinlizzie.org/dbjr (`make check` fetches one into a fresh `mktemp -d` directory, removed after, unless `MARU_DBJR` is
   already set; third-party, so never in this tree) it runs `KSWorld.ks`:
   520 objects, 346 streams (281 setters), every stream's code read, and nothing it names missing: `KSTextLayout`'s
