@@ -119,6 +119,11 @@
 (let ((dir (env-var "MARU_DBJR")))	; laid out as tinlizzie.org/dbjr: notes/plan/fetch-dbjr DIR makes one
   (if (not dir)
       (println "KSWorld.ks: skipped, MARU_DBJR names no dbjr documents")
+    ;; first, with nothing yet on the font path: the front page's DejaVu Sans is found in the copy's fonts/
+    (let ((front (concat-string dir "/Front page Onward Full v8.ks/index.pp")))
+      (if (not (= 0 ((subr "access" "si>i") front 4)))
+	  (expect "MARU_DBJR holds the front page" front ())	; named but missing is a failure, not a skip
+	(expect "the front page finds its fonts beside it" (at (ksworld-run front 3) 'failures) ())))
     (let ((doc (concat-string dir "/KSWorld.ks/index.pp")))
       (if (not (= 0 ((subr "access" "si>i") doc 4)))
 	  (expect "MARU_DBJR holds KSWorld.ks" doc ())	; named but missing is a failure, not a skip
