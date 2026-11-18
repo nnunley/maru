@@ -9,7 +9,8 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   through `subr` in `eval3` and `eval2` alike.
 - `eval2_subr` (`check/eval2-subr.l`): every evaluator calls C through `subr`,
   by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil; `>v` calls a void function, its result nil), variadic
-  calls and raw byte access. On `eval` a function `subr` made by name survives a saved image: it keeps a copy of its name and
+  calls and raw byte access. Every evaluator's `subr` keeps a copy of its name, so `subr-name` answers it after the string
+  it was made from is collected. On `eval` a function `subr` made by name survives a saved image: it keeps a copy of its name and
   its signature's text, which the image holds and loading reads again.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
