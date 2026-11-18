@@ -23,18 +23,22 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   (`source-lift.g`, [Sources](source.md)), one inside a `(let () ...)` on its own, nested lambdas counted in it; verbosity the share
   of forms a verbose pattern flags or a clone covers, each counted once, a clone being a list of at least 12 atoms met twice once
   its definition's variables are renamed to one placeholder, keyed by a 61-bit hash of its renamed form. Each file is read by
-  its own reader (`erosion-read-file`): a `.g` file by tpeg, to one `(grammar-define …)` form; a script `tpeg-repl.l`
+  its own reader (`erosion-read-file`): a `.g` file by tpeg, to one `(grammar-define …)` form, or, with no header,
+  `(grammar-eval (rule …) ())`: in a file grammars add up, as `test-pepsi.l`'s blocks do, so a headerless file's rules
+  (`peg.g`'s, for `<peg>`) join the grammar running when it's loaded; a script `tpeg-repl.l`
   reads (`#!./eval tpeg-repl.l`) by it, its forms and blocks where `tpeg-repl.l --forms`, run in a child process, says they
   lie (`erosion-spans.g`), and not the input a block takes, which only running it finds; any other by Maru's. Measuring a script runs it again, and a script that fails as it runs stops the check rather
   than be measured in part; a file it reads with `tpeg-read-file` is measured as a file of its own (`check/tpeg-cases.l`).
   And `maru-forms.g` (`maru-forms.l`) walks each top-level form once, each list entered once and decided by its
   head, for its complexity (one for each decision, each cond clause but an else, each `and` or `or` operand past the first; a
   template's decisions belong to the code it makes; cond clauses testing one variable against distinct constants, `(= x 1)`,
-  `(= x 'k)`, are one lookup, a decision once), its forms, the verbose patterns in it (each ending its list, so a longer list
+  `(= x 'k)`, are one lookup, a decision once, up to the first clause that tests something else), its forms, the verbose patterns in it (each ending its list, so a longer list
   goes on to the general case) and the variables it binds. `tpeg-forms.g`, its child, walks a grammar's form: each rule is a
   callable, each node of its tree a form, and a decision each repetition and predicate and, in a choice, each alternative
   tried in turn after the first, those led by distinct literals (a string's first character, an object, a list pattern's
-  literal head) tried at once as one lookup on the next element, a decision if it has two keys or more. An action, a predicate's expression and a
+  literal head) tried at once as one lookup on the next element, a decision if it has two keys or more, up to the
+  first alternative led by no literal: that one may match anything, so it runs before any key after it is tested, and
+  those are tried in turn. A script's spans file is written under `MARU_CHECK_TMP`, which the runner empties, when it is set. An action, a predicate's expression and a
   call's arguments are Maru, walked as code; an object literal is data. The lookups are ours: the paper scores Python
   only and says nothing of how a switch or a dispatch counts, and a choice made on the next element is one decision in
   how it runs, as a jump table makes it (Warth's optimizer, `doc/plans/2026-11-10-erosion-by-reflection.md`). Nine files that don't read whole (they change language partway, or

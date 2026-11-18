@@ -26,8 +26,13 @@
 ;; a script tpeg-repl.l reads: its forms and blocks, each read by tpeg's sexpression rule from where tpeg-repl.l --forms says
 ;; it lies.  The input a block takes is found only by running the script, so a child process runs it.
 (define erosion-getpid (subr "getpid" ">i"))
+(define-function erosion-scratch ()	; the check's own directory, MARU_CHECK_TMP, which the runner empties; /tmp if none
+  (let ((p ((subr "getenv" "s>p") "MARU_CHECK_TMP")) (chars ()) (i 0))
+    (if (and p (!= 0 p))
+	(let () (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1))) (list->string (list-reverse! chars)))
+      "/tmp")))
 (define-function erosion-read-script (path text)
-  (let ((spans (concat-strings "/tmp/maru-erosion-" (long->string (erosion-getpid)) ".forms"))
+  (let ((spans (concat-strings (erosion-scratch) "/maru-erosion-" (long->string (erosion-getpid)) ".forms"))
 	(forms ()))
     (let* ((status ((subr "system" "s>i") (concat-strings "./eval tpeg-repl.l --forms '" path "' > " spans " 2>&1")))
 	   (out (contents-of-file-named spans)))
@@ -41,12 +46,13 @@
     (list-reverse! forms)))
 
 ;; a file's forms, read by its own reader: a .g file's grammar as tpeg reads it, one (grammar-define name parent fields
-;; rule...) form; a script tpeg-repl.l reads, as it reads it; any other file's as Maru's reader reads them
+;; rule...) form, or (grammar-eval (rule...) ()) for a file with no header, whose rules join the running grammar; a script tpeg-repl.l reads, as it reads it; any other file's as Maru's reader reads them
 (define *erosion-script-line* "#!./eval tpeg-repl.l")
 (define-function erosion-read-file (path)
   (let ((text (contents-of-file-named path)))
     (cond ((= ".g" (string-copy path (max 0 (- (string-length path) 2)) 2))
-	   (let ((spec (tpeg-parse-whole-file path))) (list `(grammar-define ,@(caar spec) ,@(cdr spec)))))
+	   (let ((spec (tpeg-parse-whole-file path)))	; with no header, rules for the grammar it's loaded into, as a block's
+	     (list (if (caar spec) `(grammar-define ,@(caar spec) ,@(cdr spec)) `(grammar-eval ,(cdr spec) ())))))
 	  ((and (<= (string-length *erosion-script-line*) (string-length text))
 		(= *erosion-script-line* (string-copy text 0 (string-length *erosion-script-line*))))
 	   (erosion-read-script path text))

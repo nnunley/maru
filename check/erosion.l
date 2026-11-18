@@ -130,6 +130,17 @@
 (expect "an object literal is data, no form inside it" (grammar-forms "a = '(1 2) ;") '(2))
 (expect "a call's arguments are Maru forms" (grammar-forms "a = {b (f 1)} ;") '(3))
 
+;; a grammar file needs no header: in a file grammars add up, as test-pepsi.l's blocks do, so a headerless one's rules are
+;; rules for the grammar running when it's loaded (peg.g's, for <peg>), each a callable, none taken for a name or a parent
+(expect "a headerless grammar's every rule is a callable"
+	(map (lambda (c) (<callable>-name c)) (<erosion-metrics>-callables (erosion-of (list (cons "h.g" (read-grammar "a = \"x\" ;\nb = a ;\nc = b | a ;\n"))))))
+	'(a b c))
+;; keys after an alternative or a clause tried in turn can't join the lookup: that one runs first
+(expect "keys after an alternative tried in turn are tried in turn too" (grammar-cc "a = \"x\" | b | \"y\" | \"z\" ;") '(4))
+(expect "a key met again doesn't close the lookup: on any other element it fails at once" (grammar-cc "a = 'x b | 'x c | 'y | 'z ;") '(3))
+(expect "a cond's constant after another test is a test of its own"
+	(cc-of "(define-function f (x) (cond ((= x 1) a) ((g x) b) ((= x 2) c)))") 4)
+
 ;; a script tpeg-repl.l reads (#!./eval tpeg-repl.l) is read by it: its Maru forms and its blocks, not the input a block takes
 (define-function read-script (text)
   (let ((path (concat-strings fixtures "/f" (long->string (set fixture-count (+ fixture-count 1))) ".l")))

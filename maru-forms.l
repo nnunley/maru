@@ -26,12 +26,13 @@
 (define-function forms-any-member? (xs ys)	; keys are made afresh, so compared by equal
   (let ((hit ())) (list-do x xs (list-do y ys (and (equal x y) (set hit 't)))) hit))
 ;; A lookup on the next element: of the choices, each a list of the keys it's led by, or () for none, those led by keys not
-;; met before are tried at once.  Answers (keys tried-in-turn): how many keys, and how many choices are tried one by one
-;; (led by a key met before, or by none).
+;; met before are tried at once, until the first choice led by no key: that one may match anything, so it runs before any
+;; key after it is tested, and those are tried in turn too.  Answers (keys tried-in-turn): how many keys, and how many choices are tried one by one.
 (define-function forms-lookup (key-lists)
-  (let ((keys ()) (in-turn 0))
+  (let ((keys ()) (in-turn 0) (open 't))
     (list-do kl key-lists
-      (if (and kl (not (forms-any-member? kl keys)))
+      (or kl (set open ()))	; one led by no key may match anything, so it runs before any later key is tested
+      (if (and open kl (not (forms-any-member? kl keys)))
 	  (set keys (concat-list kl keys))
 	(set in-turn (+ in-turn 1))))
     (list (list-length keys) in-turn)))
