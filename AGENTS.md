@@ -8,9 +8,16 @@ adds only `maruby.l`; his other changes are in the history, not the code.
 `ac07e5e` is Piumarta's own commit `e8356c4` (less `.hg_archival.txt`); his
 history behind it (from 2010-10-30) and his 2013 commits after it (to
 2013-11-12: label and goto, keyword `make`, `eval3`, the SDL2 example) are
-merged in, from attila-lendvai/maru's `piumarta` branch. A replace ref grafts
-`e8356c4` under `ac07e5e` for log and blame; fetch it with
-`git fetch origin 'refs/replace/*:refs/replace/*'`.
+merged in, from attila-lendvai/maru's `piumarta` branch. Replace refs graft
+`e8356c4` under `ac07e5e`, and Piumarta's `4c6649c` under the 2025 import of
+release 2.2 (`8addbc4`, which re-adds `tpeg.g` and 25 other files byte for
+byte), for log and blame. A clone doesn't fetch them by default; once per
+clone, run
+
+    git config --add remote.origin.fetch '+refs/replace/*:refs/replace/*'
+    git fetch origin
+
+so every later fetch keeps them current. GitHub's views and jj ignore them.
 
 The layout is flat, as upstream intended: `require` and `load` resolve
 relative to the current directory, so run everything from the repo root.
