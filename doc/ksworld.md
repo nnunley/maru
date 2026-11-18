@@ -48,7 +48,8 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   carets it kept showing among them).
   Fonts are found as a browser finds them: a family falls through to its alternatives, its generic family (`serif`,
   `sans-serif`) and a last resort (DejaVu Sans, which `fetch-dbjr` fetches), and a character a font lacks to the next
-  font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
+  font with a glyph for it. A document run from a dbjr copy finds the fonts `fetch-dbjr` put beside its directory
+  (`fonts/`), so `ksworld-run.l` alone draws the front page's DejaVu Sans. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
   `Palatino.ttc`, with its own metrics: of the front page's text boxes, those in Times New Roman and DejaVu Sans are where
   KSWorld put them, 411's tab stops among them (measured from the box's edge, the pen starting at the line's first
   glyph's left bearing). An emphasis other than bold and italic is an error.
