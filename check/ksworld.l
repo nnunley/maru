@@ -18,6 +18,12 @@
   (expect "a send nothing answers fails its stream, naming kind and selector"
 	  (at r 'failures) '(("Smalltalk: KSBox does not understand blink" . 1))))
 
+;; a stream named by a key the document holds, as deviation-demo's numbers name their cells (@tableHandler[@cellName]),
+;; is the stream itself, so mapE maps it
+(let* ((r (ksworld-run "check/ksworld/cell.pp" 4))
+       (box (array-at (at r 'table) 1)))
+  (expect "a cell's stream, named by its key, mapped" (list (ks-val box 'shown) (at r 'failures)) '(30 ())))
+
 ;; what a document draws, asked of a Gezira: here one that records each path it's asked to fill, so the walk is checked
 ;; with no Gezira built
 (define-structure <gezira-recording> (paths))
