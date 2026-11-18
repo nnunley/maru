@@ -270,17 +270,25 @@
 
 ;; KSWorld wrote a text box's contents, its letter boxes, as spans of one font (data (span :data "..." :family ... :size
 ;; ... :style ... :fill ...)); reading them gives each character a letter box, as KSBox>>beCharacter made one: its unicode,
-;; its font (the span's, shared by its letters) and its container.  Layout places them (ksworld-text.l).
+;; its font (the span's, shared by its letters) and its container.  Layout places them (ksworld-text.l).  A box in the
+;; text (KSBox>>addTextContents takes boxes as well as characters) was written among the spans as (slot :ref N), and is
+;; read back as itself, in its place: it is already a document object, with its own container and transformation.
+(define-function ks-text-data? (data)	; spans, and boxes in the text as (slot :ref N), in any order
+  (let ((text (pair? data)))
+    (list-do x data (or (and (pair? x) (member? (car x) '(span slot))) (set text ())))
+    text))
 (define-function ks-spans? (box) (and (ks-attr box ':__spans__) 't))	; the spans a document kept, until letters are made
-(define-function ks-letter-contents (box)
+(define-function ks-letter-contents (box table)
   (let ((letters ()))
     (list-do s (ks-attr box ':__spans__)
-      (let ((font (ks-new-object 'KSFont 0 (cdr s) () () 0)) (text (ks-plist-get (cdr s) ':data)))
-	(for (i 0 (string-length text))
-	  (push letters (ks-new-object 'KSBox 0 ()
-			     (list (cons 'container box) (cons 'unicode (string-at text i)) (cons 'font font)
-				   (cons 'transformation ()) (cons 'extent ()) (cons 'bounds ()))
-			     () 0)))))
+      (if (= 'slot (car s))
+	  (push letters (array-at table (string->long (or (ks-plist-get (cdr s) ':valueId) (ks-plist-get (cdr s) ':ref)))))
+	(let ((font (ks-new-object 'KSFont 0 (cdr s) () () 0)) (text (ks-plist-get (cdr s) ':data)))
+	  (for (i 0 (string-length text))
+	    (push letters (ks-new-object 'KSBox 0 ()
+			       (list (cons 'container box) (cons 'unicode (string-at text i)) (cons 'font font)
+				     (cons 'transformation ()) (cons 'extent ()) (cons 'bounds ()))
+			       () 0))))))
     (ks-set-attr box ':__spans__ ())
     (ks-set-slot box 'contents (ks-new-object 'KSContentsCollection 0 () () (list-reverse! letters) 0))))
 
@@ -351,9 +359,9 @@
 		  ((array? obj)
 		   (let ((i 0)) (list-do x data (set-array-at obj i x) (set i (+ i 1))))
 		   (list-do p indexed (set-array-at obj (- (car p) 1) (cdr p))))
-		  ((and data (pair? (car data)) (= 'span (caar data))) (ks-set-attr obj ':__spans__ data))
+		  ((ks-text-data? data) (ks-set-attr obj ':__spans__ data))
 		  ((or data indexed)
 		   (ks-set-items obj (or data (ks-by-index indexed)))))))))
     ;; Pass 3: a text box's letters, which KSWorld wrote as spans, read back into its contents as KSWorld read them
-    (array-do o table (and (ks-object? o) (ks-spans? o) (ks-letter-contents o)))
+    (array-do o table (and (ks-object? o) (ks-spans? o) (ks-letter-contents o table)))
     (list (array-at table root-id) table)))

@@ -45,7 +45,9 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   wrapping; lines ascent plus descent plus 2 apart; a centred line's width adding its first glyph's left bearing), and
   `ksworld-render.l` draws each character's outline after the box's shape: each of KSWorld.ks's five text boxes puts the
   character KSWorld left laid out (its last line's first) where KSWorld did, and the document draws 937 paths (the three
-  carets it kept showing among them).
+  carets it kept showing among them). A box in the text, which KSWorld wrote among the spans as `(slot :ref N)`, is read
+  back into the contents in its place (`check/ksworld/embedded.pp`); layout passes over it, counting it, so it stays where
+  its own transformation puts it and the letters after it don't make room for it.
   Fonts are found as a browser finds them: a family falls through to its alternatives, its generic family (`serif`,
   `sans-serif`) and a last resort (DejaVu Sans, which `fetch-dbjr` fetches), and a character a font lacks to the next
   font with a glyph for it. `truetype.l` reads a TrueType Collection's faces by full name, so Palatino Linotype is macOS's
