@@ -43,8 +43,10 @@
 	    (else (push code s))))
     (let ((ev (ks-evaluator-new)) (read ()))
       (list-do s code
-	(if (try (let () (ks-stream-ast s) 1) (lambda (c) (ksw-count failed (concat-string "unreadable: " (ksw-message c))) ()))
+	(ks-stream-ast s)
+	(if (not (ks-attr s ':__unreadable__))
 	    (push read s)
+	  (ksw-count failed (concat-string "unreadable: " (ksw-message (ks-attr s ':__unreadable__))))
 	  (set unreadable (+ unreadable 1))
 	  (push failed-streams s)))
       (set (<ks-evaluator>-streams ev) read)
