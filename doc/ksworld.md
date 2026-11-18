@@ -37,6 +37,18 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
   a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
+  A box whose `clipping` is true draws its shape, text and children only inside its extent, as `KSBox>>drawOn:` clips its
+  canvas by `drawingBounds` after `transformBy:`. Gezira clips as `GeziraCanvas` does: each clip is a stage of the
+  pipeline, a `TransformBeziers` into the clip's coordinates and a `ClipBeziers` to its rectangle, interleaved with the
+  transforms outside it (`gezira.l`'s `gezira-fill-clipped`, Nile's `gezira_fill_clipped`). Inside a clipping box the
+  paths go in the box's own coordinates, so a turned box clips in its own frame. The rectangle is `KSBox>>drawingBounds`,
+  its shape's `drawingBounds`, which takes in a border outside the extent: as the document saved it, or, for a shape
+  saved without it (an empty one), `offset extent: extent`, as `KSShape>>computeBounds` answers. A Gezira that doesn't
+  clip, as the check's recording one, is given the path placed in the image. The check's fixture `check/ksworld/clip.pp`
+  is a 30@20 clipping box at 100@50 holding a square scaled past its bottom edge and a square inside it; both go in the
+  box's coordinates inside one stage, the box's matrix and its shape's bounds, (-1 -1 31 21). A glyph (a box with a font, `isGlyph`) doesn't clip, as
+  `drawOn:` skips it. Presses follow the clip: `KSBox>>receive:` passes a point on through a clipping box only if the
+  box holds it, so `ksworld-box-at` finds the overhanging square at 110@60, inside the box, and nothing at 110@75, below it.
   `truetype.l` reads a TrueType font (tables by offset, `cmap` format 4, simple and composite glyphs) to a glyph's
   quadratic Béziers in whole font units, a straight segment as start, start, end and an implied point rounded down, as
   KSWorld wrote its own: each character box KSWorld.ks kept (Times New Roman, plain and bold, a face's style being bits,

@@ -22,7 +22,9 @@ Nile's compiler on Maru, its runtime in typed Maru, Gezira, and the runtime's la
   rest white, on 1 and 4 workers (`nile/runtimes/maru/test/gezira-image.k`).
 - `gezira_maru` (`check/check.l`, `check/gezira-maru.l`): the Gezira library `build/gezira.dylib` (make builds it from
   `gezira/nile/gezira.nl` and the runtime) through `gezira-maru.l`'s `<gezira-maru>` selectors renders the `gezira_image`
-  rectangle with a matrix, on 1 and 4 workers. `gezira_scene` (`check/gezira-scene.l`) draws `check/ksworld/scene.pp`
+  rectangle with a matrix, on 1 and 4 workers, and inside clipping stages (`gezira_fill_clipped`, a `TransformBeziers`
+  and a `ClipBeziers` per stage): in a stage at (10, 20) only the 20 by 15 its rectangle holds, and in a stage turned a
+  quarter only what its own rectangle holds; a stage counted but not given is refused, and nothing drawn. `gezira_scene` (`check/gezira-scene.l`) draws `check/ksworld/scene.pp`
   the same way.
 - `nile_laws` (`check/laws/runtime.law`, `check/laws/runtime.l`): through the batch driver `nile/runtimes/maru/test/law-runtime.k`,
   built with text-layout.nl's module, every law by exhaustion over lengths 0, 1, 2, 3, 5, 60 to 62, 121 to 123, 244 and 245
