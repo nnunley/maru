@@ -1,0 +1,27 @@
+a
+<<<<<<< conflict 1 of 2
++++++++ lsvwuuum 90725a19 "one"
+b-one
+------- kyspwnsp 77789aaf "base"
+b
++++++++ ysyqqsvv 2707a20e "two"
+b-two
+------- kyspwnsp 77789aaf "base"
+b
++++++++ ltsypwlm 8cffb44e "three"
+b-three
+>>>>>>> conflict 1 of 2 ends
+c
+<<<<<<< conflict 2 of 2
++++++++ lsvwuuum 90725a19 "one"
+d-one
+------- kyspwnsp 77789aaf "base"
+d
++++++++ ysyqqsvv 2707a20e "two"
+d-two
+------- kyspwnsp 77789aaf "base"
+d
++++++++ ltsypwlm 8cffb44e "three"
+d-three
+>>>>>>> conflict 2 of 2 ends
+e

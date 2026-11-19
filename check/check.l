@@ -1213,6 +1213,9 @@
 (define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
 			 "test-repl.l" "test.l"
 			 "check/tpeg-broken.g"))
+;; a change's moves attributed to its edits and to share (erosion-attribute.l, doc/rfc/draft-ndn-erosion-attribution-00.md)
+(check "erosion_attribution"
+  (unit-assert (equal (last (run "erosion_attribution" '("./eval" "check/erosion-attribution.l"))) "erosion attribution ok")))
 (check "erosion"
   (unit-assert (equal (last (run "erosion_fixtures" '("./eval" "check/erosion.l"))) "erosion ok"))
   (let ((files (select (lambda (f) (not (ends-with? f "Makefile"))) (counted-files '(".l" ".k" ".g"))))

@@ -1,0 +1,27 @@
+a
+<<<<<<< conflict 1 of 2
+%%%%%%% diff from: kyspwnsp 77789aaf "base"
+\\\\\\\        to: lsvwuuum 90725a19 "one"
+-b
++b-one
+%%%%%%% diff from: kyspwnsp 77789aaf "base"
+\\\\\\\        to: ysyqqsvv 2707a20e "two"
+-b
++b-two
++++++++ ltsypwlm 8cffb44e "three"
+b-three
+>>>>>>> conflict 1 of 2 ends
+c
+<<<<<<< conflict 2 of 2
+%%%%%%% diff from: kyspwnsp 77789aaf "base"
+\\\\\\\        to: lsvwuuum 90725a19 "one"
+-d
++d-one
+%%%%%%% diff from: kyspwnsp 77789aaf "base"
+\\\\\\\        to: ysyqqsvv 2707a20e "two"
+-d
++d-two
++++++++ ltsypwlm 8cffb44e "three"
+d-three
+>>>>>>> conflict 2 of 2 ends
+e

@@ -1,0 +1,7 @@
+diff --git a/f.l b/f.l
+index 702198856b..d7fda67ec5 100644
+--- a/f.l
++++ b/f.l
+@@ -1,1 +1,1 @@
+-(define f 1)
++(define f 2)

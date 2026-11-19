@@ -1,0 +1,10 @@
+a
+<<<<<<< conflict 1 of 1
+%%%%%%% diff from: vrqksnlt 1f769a2f "base"
+\\\\\\\        to: nkzqsnom 2af2415a "one"
+-b
++B1
++++++++ xxkslomr 1fa76d66 "two"
+B2
+>>>>>>> conflict 1 of 1 ends
+c
