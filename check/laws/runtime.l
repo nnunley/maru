@@ -8,13 +8,9 @@
 ;;; The generators (rt_input, rt_pairs, rt_glyphs) are pure Maru from (n, s), so a law's values are reproducible
 ;;; from its numbers and the seed, and the expected values are the laws' own, from the source's rules.
 
-(define-function rt_env (name)
-  (let ((p ((subr "getenv" "s>p") name)) (chars ()) (i 0))
-    (or (and p (!= 0 p)) (error name " is not set"))
-    (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1)))
-    (list->string (list-reverse! chars))))
-
 (require "spawn.l")
+(define-function rt_env (name) (or (spawn-getenv name) (error name " is not set")))	; spawn.l reads the environment
+
 (define-function rt_run_program (argv in out err)	; the driver run to its end, or an error naming it
   (or (= 0 (program-status argv in out err)) (error "runtime: nonzero exit running " argv)))
 (define fopen (subr "fopen" "ss>p"))

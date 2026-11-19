@@ -2,9 +2,7 @@
 ;;; conflicts; the fixtures in check/erosion-attribution/ are git's and jj's own output.
 (require "erosion-attribute.l")
 (require "recover.l")
-(define ok 1)
-(define-function expect (what got want)
-  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(require "check/erosion-common.l")	; ok, expect, ifs
 (define-function fixture (name) (contents-of-file-named (concat-string "check/erosion-attribution/" name)))
 
 ;; a unified diff: git's, with its extended headers
@@ -54,7 +52,6 @@
 (expect "both styles give the same sides" (conflict-sides (fixture "conflict-diff.txt")) (conflict-sides (fixture "conflict-snapshot.txt")))
 
 ;; ---- attribution: a change's moves, to its edits and to share
-(define-function ifs (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "(if a b) "))) s))
 (define-function defn (name body) (concat-strings "(define-function " name " ()\n  " body ")\n"))
 (define-function select-current (triples) (let ((out ())) (list-do t triples (and (cadddr t) (push out t))) (list-reverse! out)))
 (define-function attribution-of (triples . ledger)	; triples: (path old-path base current), texts or () for none

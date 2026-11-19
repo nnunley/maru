@@ -39,10 +39,7 @@
   (and (not (= 'submodule (<file-diff>-status fd)))
        (measured-file? (concat-string prefix (or (<file-diff>-new-path fd) (<file-diff>-old-path fd))))))
 (define-function untracked (dir prefix)	; new files git doesn't ignore, as changes that add them
-  (let ((out ()))
-    (list-do f (text-lines (or (vcs-output dir '("git" "ls-files" "-o" "--exclude-standard")) ""))
-      (and (measured-file? (concat-string prefix f)) (push out f)))
-    (list-reverse! out)))
+  (select (lambda (f) (measured-file? (concat-string prefix f))) (text-lines (or (vcs-output dir '("git" "ls-files" "-o" "--exclude-standard")) ""))))
 (define-function added-change (root path)
   (let ((text (current-text root path)))
     (make <change> path: path old-path: path base-text: () current-text: text added: (let ((n (list-length (text-lines text))) (out ())) (for (i 1 (+ n 1)) (push out i)) (list-reverse! out)) removed: ())))
@@ -73,11 +70,7 @@
     out))
 
 ;; ---- the command's lines: the report for the working copy against rev
-(define-function string-search-text (text sub)
-  (let ((i 0) (n (- (string-length text) (string-length sub))) (hit ()))
-    (while (and (not hit) (<= i n)) (and (= sub (string-copy text i (string-length sub))) (set hit 't)) (incr i))
-    hit))
-(define-function conflicted? (text) (and text (or (= 0 (string-compare text "<<<<<<< conflict " 0 17)) (string-search-text text "\n<<<<<<< conflict "))))
+(define-function conflicted? (text) (and text (or (= 0 (string-compare text "<<<<<<< conflict " 0 17)) (string-find text "\n<<<<<<< conflict "))))
 (define-function tree-now-of (root)	; the whole tree measured now, conflicted files left out (their markers aren't Maru)
   (let ((sources ()))
     (list-do f (measured-files root)

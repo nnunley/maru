@@ -7,6 +7,13 @@
 (define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
 			 "test-repl.l" "test.l" "check/tpeg-broken.g"))
 
+;; the elements of list pred holds for, in order
+(define-function select (pred list) (let ((out ())) (list-do x list (and (pred x) (push out x))) (list-reverse! out)))
+;; where sub first occurs in str, or ()
+(define-function string-find (str sub)
+  (let ((i 0) (n (- (string-length str) (string-length sub))))
+    (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
+    (and (<= i n) i)))
 (define-function ends-with? (s suffix)
   (and (<= (string-length suffix) (string-length s)) (= suffix (string-copy s (- (string-length s) (string-length suffix)) (string-length suffix)))))
 (define-function text-lines (text)	; its lines, each without its newline
@@ -23,18 +30,15 @@
     (list-do l (text-lines (cdr (program-result '("git" "check-attr" "--stdin" "derived" "unused") dir listed)))
       (or (ends-with? l ": unspecified") (push marked (let ((i 0)) (while (not (= ?: (string-at l i))) (incr i)) (string-copy l 0 i)))))
     ((subr "unlink" "s>i") listed)
-    (let ((out ())) (list-do n names (or (member? n marked) (push out n))) (list-reverse! out))))
+    (select (lambda (n) (not (member? n marked))) names)))
 (define-function counted-in (root d suffixes)	; the counted files under d, paths from root
   (let* ((dir (if (= d ".") root (concat-strings root "/" d)))
-	 (named (let ((out ()))
-		  (list-do f (text-lines (cdr (program-result '("git" "ls-files" "-co" "--exclude-standard" "--" "." ":!notes") dir)))
-		    (and (named-with? f suffixes) (push out f)))
-		  (list-reverse! out))))
+	 (named (select (lambda (f) (named-with? f suffixes))
+			(text-lines (cdr (program-result '("git" "ls-files" "-co" "--exclude-standard" "--" "." ":!notes") dir))))))
     (map (lambda (f) (if (= d ".") f (concat-strings d "/" f))) (and named (unmarked dir named)))))
 (define-function counted-files-in (root suffixes)
   (concat-list (counted-in root "." suffixes) (concat-list (counted-in root "nile" suffixes) (counted-in root "gezira" suffixes))))
 (define-function counted-files (suffixes) (counted-files-in "." suffixes))
 (define-function measured-file? (path)	; a file erosion measures: .l, .k or .g, and one it can read whole
   (and (or (ends-with? path ".l") (ends-with? path ".k") (ends-with? path ".g")) (not (member? path erosion-unread))))
-(define-function measured-files (root)
-  (let ((out ())) (list-do f (counted-files-in root '(".l" ".k" ".g")) (and (measured-file? f) (push out f))) (list-reverse! out)))
+(define-function measured-files (root) (select measured-file? (counted-files-in root '(".l" ".k" ".g"))))

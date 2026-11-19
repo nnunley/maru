@@ -3,9 +3,7 @@
 (require "erosion-vcs.l")	; erosion.l, and the attribution report
 (require "recover.l")
 (require "check/temp.l")
-(define ok 1)
-(define-function expect (what got want)
-  (or (equal got want) (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(require "check/erosion-common.l")	; ok, expect, ifs
 (define fixtures (concat-strings check-tmp "/erosion-fixtures"))
 (make-directory fixtures)
 (define fixture-count 0)
@@ -54,7 +52,6 @@
 (expect "an if longer than a pattern is no pattern" (flagged "(if c 't () x)") ())
 
 ;; erosion: the share of mass, CC x sqrt(forms), in callables of CC over 10
-(define-function ifs (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "(if a b) "))) s))
 (define-function eroded (text) (<erosion-metrics>-erosion (metrics-of (list text))))
 (expect "a callable of CC 10 erodes nothing" (eroded (concat-strings "(define-function f () " (ifs 9) ")")) 0)
 (expect "one of CC 11 is all the mass" (eroded (concat-strings "(define-function f () " (ifs 10) ")")) 1000)
@@ -173,7 +170,7 @@
 (let* ((ledger (concat-strings fixtures "/mismatch.ledger"))
        (_ (contents-to-file-named "erosion 999 not this tree\nverbosity 0 nor this\n" ledger))
        (out (text-lines (cdr (program-result (list "./eval" "erosion-run.l" "--ledger" ledger "--attribute" "HEAD" "spawn.l") ()))))
-       (mismatch (let ((i 0) (at ())) (list-do l out (and (string-search-text l "accounts for erosion 999") (set at i)) (incr i)) at)))
+       (mismatch (let ((i 0) (at ())) (list-do l out (and (string-find l "accounts for erosion 999") (set at i)) (incr i)) at)))
   (expect "the mismatch, then the report against HEAD"
 	  (and mismatch (side-at out (+ mismatch 1))) "attribution against HEAD:"))
 

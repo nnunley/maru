@@ -27,11 +27,8 @@
 (define-function last (list) (while (cdr list) (set list (cdr list))) (car list))
 (define-function after (line list) (while (and list (not (= line (car list)))) (set list (cdr list))) (cdr list))
 (define-function until-blank (list) (let ((out ())) (while (and list (< 0 (string-length (car list)))) (push out (car list)) (set list (cdr list))) (list-reverse! out)))
-(define-function select (pred list) (let ((out ())) (list-do x list (and (pred x) (push out x))) (list-reverse! out)))
-(define-function string-find (str sub)
-  (let ((i 0) (n (- (string-length str) (string-length sub))))
-    (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
-    (and (<= i n) i)))
+;; select, string-find, text-lines and the files the checks count (erosion-files.l, which the attribution report shares)
+(require "erosion-files.l")
 
 ;; What a check runs: a <command> (spawn.l), or a program and its arguments as a list, started directly, never
 ;; through a shell (doc/plans/2026-11-11-check-without-shell.md).
@@ -341,17 +338,11 @@
 ;; what a grammar can't do stops its definition, saying why
 (check "tree_text_refuses" (on-each-evaluator "tree_text_refuses" ("tpeg-repl.l" "check/tpeg-refuses.l")))
 ;; cmd's output says word
-(define-function output-has (text word)
-  (let ((i 0) (n (- (string-length text) (string-length word))) (found ()))
-    (while (and (not found) (<= i n))
-      (and (= word (string-copy text i (string-length word))) (set found 1))
-      (incr i))
-    found))
 ;; cmd exits with an error, and its output says word
 (define-function fails-saying (name cmd word)
   (let ((out (concat-strings tmp "/" name ".out")))
     (and (not (= 0 (command-status (command-in cmd 60 out out))))
-	 (output-has (contents-of-file-named out) word))))
+	 (string-find (contents-of-file-named out) word))))
 ;; the runner removes its directory, so it refuses one it couldn't safely remove, before removing anything
 (check "check_tmp"
   (list-do unsafe '("/" "" "/tmp/" "/Users" "/tmp/a b" "/tmp/x/../..")
@@ -1141,8 +1132,6 @@
 
 ;;; ---------------------------------------------------------------- budget
 
-;; the files counted, here and in the nile and gezira submodules (erosion-files.l, which the attribution report shares)
-(require "erosion-files.l")
 (define-function newlines (text) (let ((n 0)) (for (i 0 (string-length text)) (and (= ?\n (string-at text i)) (incr n))) n))
 
 ;; Derived code and code outside the stack (marked derived or unused in

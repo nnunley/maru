@@ -52,11 +52,7 @@
 ;; a script tpeg-repl.l reads: its forms and blocks, each read by tpeg's sexpression rule from where tpeg-repl.l --forms says
 ;; it lies.  The input a block takes is found only by running the script, so a child process runs it.
 (define erosion-getpid (subr "getpid" ">i"))
-(define-function erosion-scratch ()	; the check's own directory, MARU_CHECK_TMP, which the runner empties; /tmp if none
-  (let ((p ((subr "getenv" "s>p") "MARU_CHECK_TMP")) (chars ()) (i 0))
-    (if (and p (!= 0 p))
-	(let () (while (< 0 (byte-at p i)) (push chars (byte-at p i)) (set i (+ i 1))) (list->string (list-reverse! chars)))
-      "/tmp")))
+(define-function erosion-scratch () (or (spawn-getenv "MARU_CHECK_TMP") "/tmp"))	; the check's own directory, which the runner empties
 (define-function erosion-read-script (path text)
   (let ((spans (concat-strings (erosion-scratch) "/maru-erosion-" (long->string (erosion-getpid)) ".forms"))
 	(forms ()))

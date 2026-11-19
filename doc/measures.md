@@ -53,3 +53,24 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   2026-11-11; it was 41 when first measured, from 102 when it read text through a grammar:
   `doc/plans/2026-11-10-erosion-by-reflection.md`'s Baseline). Memoized invokers make the walks slower, not faster: over
   the 41 grammar files the walks call a rule 38,174 times and find a memo 8 times.
+
+- `erosion_attribution` (`check/erosion-attribution.l`, `erosion-attribute.l`, `erosion-vcs.l`, `erosion-files.l`, `diff.g`,
+  `doc/rfc/draft-ndn-erosion-attribution-00.md`, `doc/plans/2026-11-19-erosion-attribution.md`): how a change moved
+  erosion and verbosity, callable by callable. `diff.g`, one grammar, reads the change: git's unified diff (and `jj diff
+  --git`'s) through its `diff` rule, and jj's conflict markers through `conflicted`, a hunk's lines and a diff side's one
+  rule, jj's six markers one parametric rule, `marker :c`. Only the changed measured files are measured at the base (`git
+  show` or `jj file show`); untracked ones are added, and `nile` and `gezira` are followed into, from the commit the
+  superproject records at the base. Callables match by file and name across renames; one is edited when an added or
+  removed line falls within its lines. Each metric's move splits into the edited callables' part, over the tree's whole,
+  and the share, the rest, so the two sum; the base's values are its ledger's when that ledger holds (its erosion equals
+  the base rebuilt from the changed files, exact for erosion), else the rebuilt ones, said so. A changed file's current
+  callables are the whole tree's, so a copy of code in an untouched file is the edit's clone. A conflicted file is
+  attributed side by side. The report: each metric's base, now, whole, edited and share; each callable that moved, edited
+  first, by mass moved; and drafted `check/erosion` entries naming the edits that moved most. `make erosion-report
+  [REV=…]` prints it (`./eval erosion-attribute-run.l [REV]`, `HEAD`, or `@-` under jj); when the erosion check's ledger
+  doesn't match, it prints it after its own lines (`erosion-run.l --attribute`), from the metrics already measured. It
+  writes nothing. The fixtures are git's and jj's own output: statuses, ranges, omitted counts, a content line of pluses,
+  no newline at the end, renames, a path git quotes, a submodule; conflicts of three sides in both marker styles; a
+  callable crossing 10, added and removed lines alone, a deleted file, a rename and edit, clones in the file and from an
+  untouched one, a ledger that does and doesn't hold, the report's exact lines, conflicted sides, and git and jj
+  repositories made in the check with a submodule and an untracked file.

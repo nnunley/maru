@@ -73,14 +73,18 @@
   (let ((a argv) (i (car files)) (o (cadr files)) (e (caddr files)))
     (command-status (make <command> argv: a in: i out: o err: e))))
 (define spawn-outputs 0)
-(define-function program-output (argv)	; argv run to its end: what it wrote, both streams, through a file of its own
+(define-function exists? (path) (= 0 ((subr "access" "si>i") path 0)))	; F_OK is 0 everywhere
+;; argv run in dir (or here) to its end, its input from in (if given): (status . its standard output), its errors in the
+;; same file when err is same, else in err, through a file of its own removed after
+(define-function spawn-capture (argv dir in err)
   (let ((path (concat-strings "/tmp/maru-spawn-" (long->string ((subr "getpid" ">i"))) "-"
 			      (long->string (set spawn-outputs (+ spawn-outputs 1))))))
-    (program-status argv () path path)
-    (let ((text (or (contents-of-file-named path) "")))
-      ((subr "unlink" "s>i") path)
-      text)))
-(define-function exists? (path) (= 0 ((subr "access" "si>i") path 0)))	; F_OK is 0 everywhere
+    (let* ((a argv) (d dir) (i in) (e (if (= err 'same) path err))
+	   (status (command-status (make <command> argv: a dir: d in: i out: path err: e)))
+	   (text (if (exists? path) (or (contents-of-file-named path) "") "")))	; a child that never ran wrote none
+      (and (exists? path) ((subr "unlink" "s>i") path))
+      (cons status text))))
+(define-function program-output (argv) (cdr (spawn-capture argv () () 'same)))	; what argv wrote, both streams
 (define-function make-directory (path) (program-status (list "mkdir" "-p" path)))
 (define-function remove-tree (path) (program-status (list "rm" "-rf" path)))
 (define spawn-darwin 'unknown)
@@ -106,11 +110,4 @@
 	(set start (+ i 1))))
     found))
 (define-function find-program (name) (find-program-in name (or (spawn-getenv "PATH") "")))	; as on PATH
-(define-function program-result (argv dir . in)	; (status . standard output) of argv run in dir (or here), its errors discarded
-  (let ((path (concat-strings "/tmp/maru-spawn-" (long->string ((subr "getpid" ">i"))) "-"
-			      (long->string (set spawn-outputs (+ spawn-outputs 1))))))
-    (let* ((a argv) (d dir) (i (car in))
-	   (status (command-status (make <command> argv: a dir: d in: i out: path err: "/dev/null")))
-	   (text (if (exists? path) (or (contents-of-file-named path) "") "")))	; a child that never ran wrote none
-      (and (exists? path) ((subr "unlink" "s>i") path))
-      (cons status text))))
+(define-function program-result (argv dir . in) (spawn-capture argv dir (car in) "/dev/null"))	; (status . output), errors dropped
