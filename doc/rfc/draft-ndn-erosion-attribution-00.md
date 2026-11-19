@@ -8,8 +8,8 @@
 ## Abstract
 
 This document specifies a report that says how a change moved Maru's erosion and verbosity, callable by callable. It
-reads the change as a diff (git's unified format, which `jj diff --git` also writes, and jj's conflict markers for a
-change with several sides), measures only the files the change touched, before and after, and separates what the
+reads the change as a diff with one grammar (git's unified format, which `jj diff --git` also writes, and jj's
+conflict markers for a change with several sides), measures only the files the change touched, before and after, and separates what the
 change's edits did from what the shift in the tree's total did. It is written for the model developing Maru and for
 whoever reviews its work: the report is advisory, and a gate built on it comes later.
 
@@ -95,7 +95,9 @@ ENUM SideKind:
 
 RECORD Side:
     kind        : SideKind
-    label       : String           -- the change id, commit id and description jj writes
+    label       : String | (String, String)   -- the change id, commit id and description jj writes; (from, to) for a
+                                              -- diff side
+    -- a diff side's lines, like a Hunk's, are each ("-" | "+" | " ", text); a snapshot's or a base's are text
     lines       : List of String
 
 RECORD Conflict:
@@ -133,7 +135,13 @@ for the moment of the edit.
 
 ### Behavior
 
-**Reading a change.** `diff.g`, a tpeg grammar, reads a unified diff with git's extended headers into `FileDiff`s:
+**One grammar for both forms.** `diff.g`, a tpeg grammar, reads both: a unified diff is the two-sided case, one side
+written as a diff, and a jj conflict is the n-sided case, each side written as a diff or as a snapshot. A hunk's lines
+and a diff side's lines are read by one rule, and jj's six markers by one parametric rule, `marker :c`, seven of the
+character it is given. The grammar has two entry rules: `diff`, for a change, and `conflicted`, for a file's text.
+[R-one-grammar]
+
+**Reading a change.** `diff.g`'s `diff` reads a unified diff with git's extended headers into `FileDiff`s:
 `diff --git a/P b/Q`, then any of `index`, `old mode`/`new mode`, `new file mode`, `deleted file mode`,
 `similarity index`, `rename from`, `rename to`, `copy from`, `copy to`, `Binary files … differ`, then `--- `/`+++ `
 and hunks. A hunk header MAY omit a count, which is then 1; a line `\ No newline at end of file` belongs to the line
@@ -141,11 +149,13 @@ before it and counts on neither side. [R-diff-read]
 
 The same grammar reads `jj diff --git`'s output, which is git's format. [R-jj-git]
 
-**Reading conflicts.** `jj-conflict.g` reads jj's conflict markers (jj 0.45) into `Conflict`s: `<<<<<<< conflict N of
+**Reading conflicts.** `diff.g`'s `conflicted` reads jj's conflict markers (jj 0.45) into `Conflict`s: `<<<<<<< conflict N of
 M`, then sides, then `>>>>>>> conflict N of M ends`. A side is a diff side (`%%%%%%% diff from: LABEL` and
 `\\\\\\\        to: LABEL`, then `-`, `+` and ` ` lines), a snapshot side (`+++++++ LABEL`, then lines as they are), or
-a base (`------- LABEL`). The lines outside every conflict are common to all sides. A file MAY hold several conflicts,
-and a conflict MAY have more than two sides. [R-conflict-read]
+a base (`------- LABEL`). Inside a conflict a side's line stops before any marker, since a content line such as
+`+++++++ text` is a marker there though a diff's line elsewhere. A diff side's label is its `from` and its `to`, so
+attribution knows the revision it was written against. The lines outside every conflict are common to all sides. A file
+MAY hold several conflicts, and a conflict MAY have more than two sides. [R-conflict-read]
 
 **What is measured.** The change is the base against the working copy, staged and unstaged edits alike (`git diff
 --unified=0 REV`, or `jj diff --git -r REV`); a measured file git doesn't track but doesn't ignore, which the erosion
@@ -230,6 +240,10 @@ Programs (`git`, `jj`) are started with fixed arguments and the base given as on
 The requirements above are held by the fixtures of one check, which reads fixed diffs and conflicts from
 `check/erosion-attribution/` rather than a live repository:
 
+```maru-check @R-one-grammar
+erosion_attribution
+```
+
 ```maru-check @R-diff-read
 erosion_attribution
 ```
@@ -305,23 +319,32 @@ ext-header    = ( %s"index " / %s"old mode " / %s"new mode " / %s"new file mode 
                 / %s"Binary files " ) rest LF
 old-new       = %s"--- " side-path LF %s"+++ " side-path LF
 side-path     = %s"/dev/null" / ( ( %s"a/" / %s"b/" ) path )
-hunk          = %s"@@ -" range SP "+" range SP %s"@@" rest LF *hunk-line
+hunk          = %s"@@ -" range SP "+" range SP %s"@@" rest LF *body-line
 range         = number [ "," number ]
-hunk-line     = ( SP / "-" / "+" ) rest LF / %s"\ No newline at end of file" LF
-conflicts     = *( common-line / conflict )
-conflict      = %s"<<<<<<< conflict " number %s" of " number LF 1*side %s">>>>>>> conflict " number %s" of " number %s" ends" LF
+body-line     = ( SP / "-" / "+" ) rest LF / %s"\ No newline at end of file" LF
+conflicted    = *( common-line / conflict )
+conflict      = open-marker %s" conflict " number %s" of " number LF 1*side
+                close-marker %s" conflict " number %s" of " number %s" ends" LF
 side          = diff-side / snapshot-side / base-side
-diff-side     = %s"%%%%%%% diff from: " rest LF %s"\\\\\\\        to: " rest LF *hunk-line
-snapshot-side = %s"+++++++ " rest LF *common-line
-base-side     = %s"------- " rest LF *common-line
+diff-side     = diff-marker %s" diff from: " rest LF to-marker %s"        to: " rest LF *body-line
+snapshot-side = snapshot-marker SP rest LF *common-line
+base-side     = base-marker SP rest LF *common-line
 common-line   = rest LF
+open-marker   = 7"<"
+close-marker  = 7">"
+diff-marker   = 7"%"
+to-marker     = 7"\"
+snapshot-marker = 7"+"
+base-marker   = 7"-"
 path          = 1*( %x21-7E )
 number        = 1*DIGIT
 rest          = *( %x20-7E / %x80-FF )
 ```
 
-The grammar fixes what the readers accept; `diff.g` and `jj-conflict.g` are tpeg grammars for the same language, and
-a line that ends no rule above (a conflict marker of another jj version) is `E_DIFF_UNREAD`.
+The ABNF spells each marker as seven of its character; `diff.g` writes the six as one parametric rule, `marker :c`,
+applied to each character (`{marker ?<}` …). Inside a conflict, a `body-line` or `common-line` is one that begins no
+marker. The grammar fixes what the reader accepts; a line that ends no rule above (a conflict marker of another jj
+version) is `E_DIFF_UNREAD`.
 
 ## Out of Scope
 
@@ -359,7 +382,7 @@ the current one, so measuring an untrusted revision runs its scripts. The report
 
 Nothing existing changes, except that a failing erosion check prints more. At the time of writing (November 2026), jj's
 conflict markers are those of jj 0.45.1; jj's documented marker styles ("diff" and "snapshot") are both read. A later
-jj that changes its markers is `E_DIFF_UNREAD` until `jj-conflict.g` follows it.
+jj that changes its markers is `E_DIFF_UNREAD` until `diff.g`'s `conflicted` follows it.
 
 ## References
 
