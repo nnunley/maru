@@ -83,3 +83,108 @@
 	      (list-do l (side-text-lines side) (set s (concat-strings s l "\n"))))))
 	(push out (cons name s))))
     (list-reverse! out)))
+
+;; ---- measuring a change's files, each text written under the scratch directory at its own relative path
+
+(define-structure <change> (path old-path base-text current-text added removed))	; added, removed: line numbers
+(define-structure <move> (path name edited cc-before cc-after forms-before forms-after flagged-before flagged-after))
+(define-structure <attribution> (erosion verbosity moves rebuilt))	; each metric (base now whole edited share), per mille
+
+(define-function attribution-scratch ()	; MARU_CHECK_TMP's attribution/, else one of this process's own under /tmp
+  (concat-strings (if (= "/tmp" (erosion-scratch)) (concat-strings "/tmp/maru-attribution-" (long->string (erosion-getpid)))
+		    (erosion-scratch))
+		  "/attribution"))
+(define-function scratch-write (side path text)	; text written at side/path under the scratch directory; its file's path
+  (let* ((file (concat-strings (attribution-scratch) "/" side "/" path)) (slash (string-length file)))
+    (while (not (= ?/ (string-at file (- slash 1)))) (set slash (- slash 1)))
+    (make-directory (string-copy file 0 slash))
+    (contents-to-file-named text file)
+    file))
+(define-function measure-texts (pairs)	; erosion-of over ((path . text) ...), each read by erosion-read-file
+  (erosion-of (map (lambda (p) (cons (car p) (erosion-read-file (scratch-write "now" (car p) (cdr p))))) pairs)))
+(define-function measure-one (side path text)	; one file's metrics, or () for no text
+  (and text (erosion-of (list (cons path (erosion-read-file (scratch-write side path text)))))))
+
+;; a change from two texts: git's line diff of them (--no-index), read by diff.g, gives its added and removed lines
+(define-function hunk-lines (hs start count)	; the numbers a list of hunks' sides cover
+  (let ((out ()))
+    (list-do h hs (for (i 0 (count h)) (push out (+ i (start h)))))
+    (list-reverse! out)))
+(define-function text-change (path old-path base current)
+  (let* ((a (if base (scratch-write "base" old-path base) "/dev/null"))
+	 (b (if current (scratch-write "now" path current) "/dev/null"))
+	 (fd (car (read-diff (program-output (list "git" "diff" "--no-index" "--unified=0" "--no-color" a b)))))
+	 (hs (and fd (<file-diff>-hunks fd))))
+    (make <change> path: path old-path: old-path base-text: base current-text: current
+	  added: (hunk-lines hs (lambda (h) (<hunk>-new-start h)) (lambda (h) (<hunk>-new-count h)))
+	  removed: (hunk-lines hs (lambda (h) (<hunk>-old-start h)) (lambda (h) (<hunk>-old-count h))))))
+
+;; ---- matching and edits
+
+(define-function callables-of-metrics (m) (if m (<erosion-metrics>-callables m) ()))
+(define-function take-named (name cs)	; the first callable of that name in cs, and cs without it
+  (let ((hit ()) (rest ()))
+    (list-do c cs (if (and (not hit) (= name (<callable>-name c))) (set hit c) (push rest c)))
+    (cons hit (list-reverse! rest))))
+(define-function match-callables (before after)	; ((b . a) ...): same name, in order; () where one side has none
+  (let ((pairs ()))
+    (list-do b before
+      (let ((t (take-named (<callable>-name b) after))) (push pairs (cons b (car t))) (set after (cdr t))))
+    (list-do a after (push pairs (cons () a)))
+    (list-reverse! pairs)))
+(define-function touched? (c lines)	; a line of lines within c's
+  (let ((hit ())) (and c (<callable>-line c) (list-do l lines (and (<= (<callable>-line c) l) (<= l (<callable>-last c)) (set hit 't)))) hit))
+(define-function pair-edited? (p ch)
+  (or (not (car p)) (not (cdr p)) (touched? (car p) (<change>-removed ch)) (touched? (cdr p) (<change>-added ch))))
+(define-function cc-of (c) (and c (<callable>-cc c)))
+(define-function forms-of (c) (and c (<callable>-forms c)))
+(define-function flagged-of (c) (if c (<callable>-flagged c) 0))
+(define-function pair-move (path p edited)
+  (make <move> path: path name: (<callable>-name (or (cdr p) (car p))) edited: edited
+	cc-before: (cc-of (car p)) cc-after: (cc-of (cdr p)) forms-before: (forms-of (car p)) forms-after: (forms-of (cdr p))
+	flagged-before: (flagged-of (car p)) flagged-after: (flagged-of (cdr p))))
+(define-function move-moved? (m)
+  (or (<move>-edited m) (not (equal (<move>-cc-before m) (<move>-cc-after m))) (not (equal (<move>-forms-before m) (<move>-forms-after m)))
+      (not (= (<move>-flagged-before m) (<move>-flagged-after m)))))
+
+;; ---- attribution
+
+(define-structure <side-totals> (masses forms flagged))	; a side's (eroded . total) mass, forms and flagged forms
+(define-function totals-of (ms)	; summed over metrics, () among them for a file that isn't there
+  (let ((e 0.0) (t 0.0) (n 0) (f 0))
+    (list-do m ms (when m (let ((ma (erosion-masses (<erosion-metrics>-callables m))))
+			    (set e (+ e (car ma))) (set t (+ t (cdr ma)))
+			    (set n (+ n (<erosion-metrics>-forms m))) (set f (+ f (<erosion-metrics>-flagged m))))))
+    (make <side-totals> masses: (cons e t) forms: n flagged: f)))
+(define-function per-mille-of (num den) (if (= 0 den) 0 (/ (* 1000 num) den)))
+(define-function rebuilt-base (now cur base)	; the tree at the base: now, less the changed files as they are, plus as they were
+  (let ((ma (cons (+ (- (car (<side-totals>-masses now)) (car (<side-totals>-masses cur))) (car (<side-totals>-masses base)))
+		  (+ (- (cdr (<side-totals>-masses now)) (cdr (<side-totals>-masses cur))) (cdr (<side-totals>-masses base))))))
+    (cons (erosion-per-mille ma)
+	  (per-mille-of (+ (- (<side-totals>-flagged now) (<side-totals>-flagged cur)) (<side-totals>-flagged base))
+			(+ (- (<side-totals>-forms now) (<side-totals>-forms cur)) (<side-totals>-forms base))))))
+(define-function eroded-mass (c) (if (and c (< 10 (<callable>-cc c))) (erosion-mass c) 0.0))
+(define-function metric-split (base now edited)	; (base now whole edited share): share the rest, so they sum
+  (list base now (- now base) edited (- (- now base) edited)))
+(define-function attribution-of-totals (now cur base tree-now ledger de df moves)
+  (let* ((rebuilt (rebuilt-base now cur base))
+	 (holds (and ledger (= (car ledger) (car rebuilt))))
+	 (b (if holds ledger rebuilt))
+	 (total (cdr (<side-totals>-masses now))))
+    (make <attribution>
+	  erosion: (metric-split (car b) (<erosion-metrics>-erosion tree-now) (if (< 0.0 total) (double->long (/ (* 1000.0 de) total)) 0))
+	  verbosity: (metric-split (cdr b) (<erosion-metrics>-verbosity tree-now) (per-mille-of df (<side-totals>-forms now)))
+	  moves: moves rebuilt: (not holds))))
+(define-function attribute (changes tree-now base-ledger)
+  (let ((pairs ()) (moves ()) (befores ()) (afters ()) (de 0.0) (df 0))
+    (list-do ch changes
+      (let ((b (measure-one "base" (<change>-old-path ch) (<change>-base-text ch)))
+	    (a (measure-one "now" (<change>-path ch) (<change>-current-text ch))))
+	(push befores b) (push afters a)
+	(list-do p (match-callables (callables-of-metrics b) (callables-of-metrics a))
+	  (let ((m (pair-move (<change>-path ch) p (pair-edited? p ch))))
+	    (when (<move>-edited m)
+	      (set de (+ de (- (eroded-mass (cdr p)) (eroded-mass (car p)))))
+	      (set df (+ df (- (flagged-of (cdr p)) (flagged-of (car p))))))
+	    (and (move-moved? m) (push moves m))))))
+    (attribution-of-totals (totals-of (list tree-now)) (totals-of afters) (totals-of befores) tree-now base-ledger de df (list-reverse! moves))))

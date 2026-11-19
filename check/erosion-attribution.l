@@ -53,4 +53,39 @@
 	'(("nkzqsnom 2af2415a \"one\"" . "a\nB1\nc\n") ("xxkslomr 1fa76d66 \"two\"" . "a\nB2\nc\n")))
 (expect "both styles give the same sides" (conflict-sides (fixture "conflict-diff.txt")) (conflict-sides (fixture "conflict-snapshot.txt")))
 
+;; ---- attribution: a change's moves, to its edits and to share
+(define-function ifs (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "(if a b) "))) s))
+(define-function defn (name body) (concat-strings "(define-function " name " ()\n  " body ")\n"))
+(define-function select-current (triples) (let ((out ())) (list-do t triples (and (cadddr t) (push out t))) (list-reverse! out)))
+(define-function attribution-of (triples . ledger)	; triples: (path old-path base current), texts or () for none
+  (let ((changes (map (lambda (t) (text-change (car t) (cadr t) (caddr t) (cadddr t))) triples)))
+    (attribute changes (measure-texts (map (lambda (t) (cons (car t) (cadddr t))) (select-current triples))) (car ledger))))
+(define-function move-named (a name) (let ((hit ())) (list-do m (<attribution>-moves a) (and (= name (<move>-name m)) (set hit m))) hit))
+(define-function sums? (metric) (= (caddr metric) (+ (cadddr metric) (car (cddddr metric)))))
+
+(define crossing (attribution-of (list (list "a.l" "a.l" (concat-string (defn "f" (ifs 9)) (defn "k" "1")) (concat-string (defn "f" (ifs 10)) (defn "k" "1"))))))
+(expect "an edited callable crossing 10" (let ((m (move-named crossing 'f))) (list (<move>-edited m) (<move>-cc-before m) (<move>-cc-after m))) '(t 10 11))
+(expect "edited + share = whole, for both metrics" (list (sums? (<attribution>-erosion crossing)) (sums? (<attribution>-verbosity crossing))) '(t t))
+(expect "the move is all edited" (let ((e (<attribution>-erosion crossing))) (list (> (caddr e) 0) (= (caddr e) (cadddr e)))) '(t t))
+(expect "a callable below an edit isn't edited" (let ((m (move-named crossing 'k))) (and m (<move>-edited m))) ())
+(expect "a line added alone marks its callable edited"
+	(<move>-edited (move-named (attribution-of (list (list "i.l" "i.l" "(define-function f ()\n  1)\n" "(define-function f ()\n  (g)\n  1)\n"))) 'f)) 't)
+(expect "a line removed alone marks its callable edited"
+	(<move>-edited (move-named (attribution-of (list (list "i.l" "i.l" "(define-function f ()\n  (g)\n  1)\n" "(define-function f ()\n  1)\n"))) 'f)) 't)
+(define deleted (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "1")) (list "z.l" "z.l" (defn "z" (ifs 12)) ()))))
+(expect "a deleted file's eroded callable: removed, edited, the move negative"
+	(let ((m (move-named deleted 'z))) (list (<move>-edited m) (<move>-cc-before m) (<move>-cc-after m) (< (caddr (<attribution>-erosion deleted)) 0)))
+	'(t 13 () t))
+(define renamed (attribution-of (list (list "e.l" "d.l" (concat-string (defn "d" "1") (defn "e" "2")) (concat-string (defn "d" "1") (defn "e" (ifs 2)))))))
+(expect "rename and edit: one move, under the new path" (map (lambda (m) (list (<move>-path m) (<move>-name m) (<move>-edited m))) (<attribution>-moves renamed))
+	'(("e.l" e t)))
+(define body "(h (+ a 1) (+ a 2) (+ a 3) (+ a 4) 9 8)")
+(define clone (attribution-of (list (list "c.l" "c.l" (defn "g" body) (concat-string (defn "g" body) (defn "h" body))))))
+(expect "an unedited callable whose clone partner was added moves share, and is named"
+	(let ((g (move-named clone 'g))) (list (<move>-edited g) (< (<move>-flagged-before g) (<move>-flagged-after g)) (<move>-edited (move-named clone 'h))))
+	'(() t t))
+(expect "a ledger that doesn't hold is rebuilt from, and says so"
+	(<attribution>-rebuilt (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "2"))) '(999 . 0))) 't)
+(expect "a ledger that holds is used" (<attribution>-rebuilt (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "2"))) '(0 . 0))) ())
+
 (println (if ok "erosion attribution ok" "erosion attribution FAILED"))
