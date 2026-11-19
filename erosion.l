@@ -17,12 +17,37 @@
 (tpeg-load "erosion-ledger.g")
 (tpeg-load "erosion-spans.g")
 
-(define-structure <callable> (name path line cc forms))	; a definition, where it starts, its complexity and forms
+(define-structure <callable> (name path line last cc forms flagged))	; a definition, its first and last line, its complexity,
+										; its forms, and its forms a verbose pattern or clone covers
 (define-structure <verbose-finding> (rule form))		; a form a verbose pattern flags
 (define-structure <erosion-metrics> (erosion verbosity callables forms flagged findings))	; per mille; counts of forms
 (define-method do-print <callable> () (print "<" self.name " " self.path ":" self.line " CC " self.cc ", " self.forms " forms>"))
 (define sqrt (subr "sqrt" "d>d"))
 (define-function erosion-mass (c) (* (<callable>-cc c) (sqrt (* 1.0 (<callable>-forms c)))))
+
+;; a grammar's rules carry no lines, so each grammar form's rule spans, (first . last) in rule order, are found in its
+;; text by tpeg's own rules: its header if it has one, then each definition, the parser's position noted around it
+(define *erosion-rule-lines* (identity-hash-table))
+(define-function erosion-line-at (text pos) (let ((n 1)) (for (i 0 pos) (and (= ?\n (string-at text i)) (incr n))) n))
+(define-function erosion-rule-spans (text start)	; start: the grammar's first character, after a block's {
+  (let ((p (text-parser-for-on <tpeg> text)) (spans ()) (going 't))
+    (set (<text-parser>-position p) start)
+    (let ((before (<text-parser>-position p)))
+      (or ($parser_decl p) (set (<text-parser>-position p) before)))
+    (while going
+      ($space p)
+      (let ((from (<text-parser>-position p)))
+	(if ($definition p)
+	    (push spans (cons (erosion-line-at text from) (erosion-line-at text (- (<text-parser>-position p) 1))))
+	  (set going ()))))
+    (list-reverse! spans)))
+
+;; a script's grammar block: its rules' lines, from the text after its opening brace
+(define-function erosion-block-lines (text start form)
+  (when (and (pair? form) (memq (car form) '(grammar-define grammar-extend grammar-eval)))
+    (let ((brace start))
+      (while (and (< brace (string-length text)) (not (= ?{ (string-at text brace)))) (incr brace))
+      (hash-at-put *erosion-rule-lines* form (erosion-rule-spans text (+ brace 1))))))
 
 ;; a script tpeg-repl.l reads: its forms and blocks, each read by tpeg's sexpression rule from where tpeg-repl.l --forms says
 ;; it lies.  The input a block takes is found only by running the script, so a child process runs it.
@@ -43,7 +68,9 @@
 	(when start
 	  (let ((p (text-parser-for-on <tpeg> text)))
 	    (set (<text-parser>-position p) start)
-	    (and ($sexpression p) (push forms (<text-parser>-result p)))))))
+	    (when ($sexpression p)
+	      (erosion-block-lines text start (<text-parser>-result p))
+	      (push forms (<text-parser>-result p)))))))
     (list-reverse! forms)))
 
 ;; a file's forms, read by its own reader: a .g file's grammar as tpeg reads it, one (grammar-define name parent fields
@@ -52,8 +79,10 @@
 (define-function erosion-read-file (path)
   (let ((text (contents-of-file-named path)))
     (cond ((= ".g" (string-copy path (max 0 (- (string-length path) 2)) 2))
-	   (let ((spec (tpeg-parse-whole-file path)))	; with no header, rules for the grammar it's loaded into, as a block's
-	     (list (if (caar spec) `(grammar-define ,@(caar spec) ,@(cdr spec)) `(grammar-eval ,(cdr spec) ())))))
+	   (let* ((spec (tpeg-parse-whole-file path))	; with no header, rules for the grammar it's loaded into, as a block's
+		  (form (if (caar spec) `(grammar-define ,@(caar spec) ,@(cdr spec)) `(grammar-eval ,(cdr spec) ()))))
+	     (hash-at-put *erosion-rule-lines* form (erosion-rule-spans text 0))
+	     (list form)))
 	  ((and (<= (string-length *erosion-script-line*) (string-length text))
 		(= *erosion-script-line* (string-copy text 0 (string-length *erosion-script-line*))))
 	   (erosion-read-script path text))
@@ -125,45 +154,71 @@
 (define-function erosion-matches? (m sums)
   (and (= (<erosion-metrics>-erosion m) (car sums)) (= (<erosion-metrics>-verbosity m) (cdr sums)) 't))
 ;; the metrics over sources, ((path . forms) ...)
+;; callables' mass, (eroded . total): eroded the mass of those of CC over 10; erosion is their share, per mille, rounded down
+(define-function erosion-masses (callables)
+  (let ((total 0.0) (eroded 0.0))
+    (list-do c callables
+      (set total (+ total (erosion-mass c)))
+      (and (< 10 (<callable>-cc c)) (set eroded (+ eroded (erosion-mass c)))))
+    (cons eroded total)))
+(define-function erosion-per-mille (masses) (if (< 0.0 (cdr masses)) (double->long (/ (* 1000.0 (car masses)) (cdr masses))) 0))
+;; a grammar form's rules as callables, each (rule . <callable>), with the lines erosion-rule-spans found for them
+(define-function erosion-rule-callables (path form)
+  (let ((spans (hash-at *erosion-rule-lines* form)) (out ()))	; each rule's lines, in rule order
+    (list-do rule (erosion-grammar-rules form)
+      (let ((r (or (hash-at *forms-rule-answers* rule) (maru-forms-walk-by $rule rule (identity-hash-table) (identity-hash-table))))
+	    (span (car spans)))
+	(set spans (cdr spans))
+	(push out (cons rule (make <callable> name: (car rule) path: path line: (car span) last: (cdr span) cc: (+ 1 (car r)) forms: (cadr r))))))
+    (list-reverse! out)))
+;; a file's definitions as callables, each (form . <callable>): a definition inside a let walked on its own, a top-level
+;; form's walk reused from walked
+(define-function erosion-definition-callables (path forms walked)
+  (let ((out ()))
+    (list-do d (forms-definitions path forms)
+      (unless (= 'type (<definition>-kind d))
+	(let* ((form (source-form d))
+	       (s (<definition>-source d))
+	       (r (or (hash-at walked form) (maru-forms-walk form (identity-hash-table) (identity-hash-table)))))
+	  (push out (cons form (make <callable> name: (<definition>-name d) path: path line: (erosion-line form)
+				     last: (if s (<source>-last s) (erosion-line form)) cc: (+ 1 (car r)) forms: (cadr r)))))))
+    (list-reverse! out)))
+;; one file's walk: each top-level form's answer added to forms, its clone candidates to occurrences (counted by key in
+;; seen), its verbose findings to flags, and its callables to owned, each (form . <callable>)
+(define-structure <erosion-walk> (forms tops occurrences owned flags seen))
+(define-function erosion-candidate (w x key atoms)	; a list of at least 12 atoms is a clone candidate, counted by its key
+  (when (<= 12 atoms)
+    (hash-at-put (<erosion-walk>-seen w) key (+ 1 (hash-at (<erosion-walk>-seen w) key 0)))
+    (set (<erosion-walk>-occurrences w) (cons (cons key x) (<erosion-walk>-occurrences w)))))
+(define-function erosion-walk-source (src w)
+  (let ((walked (identity-hash-table)))	; each top-level form's walk, which a definition that is one reuses
+    (set *forms-rule-answers* (identity-hash-table))	; and each grammar rule's, which its callable reuses
+    (list-do form (cdr src)
+      (let* ((binders (identity-hash-table)) (r (maru-forms-walk form binders (<erosion-walk>-flags w))))
+	(and (pair? form) (hash-at-put walked form r))
+	(set (<erosion-walk>-forms w) (+ (<erosion-walk>-forms w) (cadr r)))
+	(set (<erosion-walk>-tops w) (cons form (<erosion-walk>-tops w)))
+	(erosion-scan form binders (lambda (x key atoms) (erosion-candidate w x key atoms)))))
+    (list-do form (cdr src) (list-do o (erosion-rule-callables (car src) form) (set (<erosion-walk>-owned w) (cons o (<erosion-walk>-owned w)))))
+    (list-do o (erosion-definition-callables (car src) (cdr src) walked) (set (<erosion-walk>-owned w) (cons o (<erosion-walk>-owned w))))))
+;; what a verbose pattern flags or a clone covers, (covered-table . findings): a candidate met twice or more is a clone
+(define-function erosion-coverage (w)
+  (let ((covered (identity-hash-table)) (findings ()))
+    (hash-do (<erosion-walk>-flags w) (lambda (x rule) (hash-at-put covered x 't) (push findings (make <verbose-finding> rule: rule form: x))))
+    (list-do o (<erosion-walk>-occurrences w) (and (< 1 (hash-at (<erosion-walk>-seen w) (car o))) (hash-at-put covered (cdr o) 't)))
+    (cons covered (list-reverse! findings))))
 (define-function erosion-of (sources)
-  (let ((callables ()) (forms 0) (flags (identity-hash-table)) (seen (identity-hash-table)) (occurrences ()) (tops ()))
-    (list-do src sources
-      (let ((walked (identity-hash-table)))	; each top-level form's walk, which a definition that is one reuses
-	(set *forms-rule-answers* (identity-hash-table))	; and each grammar rule's, which its callable reuses
-	(list-do form (cdr src)
-	  (let* ((binders (identity-hash-table)) (r (maru-forms-walk form binders flags)))
-	    (and (pair? form) (hash-at-put walked form r))
-	    (set forms (+ forms (cadr r)))
-	    (push tops form)
-	    (erosion-scan form binders
-			(lambda (x key atoms)
-			  (when (<= 12 atoms)
-			    (hash-at-put seen key (+ 1 (hash-at seen key 0)))
-			    (push occurrences (cons key x)))))))
-	(list-do form (cdr src)
-	  (list-do rule (erosion-grammar-rules form)
-	    (let ((r (or (hash-at *forms-rule-answers* rule) (maru-forms-walk-by $rule rule (identity-hash-table) (identity-hash-table)))))
-	      (push callables (make <callable> name: (car rule) path: (car src) line: (erosion-line rule)
-				    cc: (+ 1 (car r)) forms: (cadr r))))))
-	(list-do d (forms-definitions (car src) (cdr src))	; a definition inside a let is walked on its own
-	  (unless (= 'type (<definition>-kind d))
-	    (let* ((form (source-form d))
-		   (r (or (hash-at walked form) (maru-forms-walk form (identity-hash-table) (identity-hash-table)))))
-	      (push callables (make <callable> name: (<definition>-name d) path: (car src) line: (erosion-line form)
-				    cc: (+ 1 (car r)) forms: (cadr r))))))))
-    (let ((covered (identity-hash-table)) (flagged 0) (findings ()))
-      (hash-do flags (lambda (x rule) (hash-at-put covered x 't) (push findings (make <verbose-finding> rule: rule form: x))))
-      (list-do o occurrences (and (< 1 (hash-at seen (car o))) (hash-at-put covered (cdr o) 't)))
-      (list-do form tops (set flagged (+ flagged (erosion-covered-forms form covered))))
-      (set callables (list-reverse! callables))
-      (let ((total 0.0) (eroded 0.0))
-	(list-do c callables
-	  (set total (+ total (erosion-mass c)))
-	  (and (< 10 (<callable>-cc c)) (set eroded (+ eroded (erosion-mass c)))))
-	(make <erosion-metrics>
-	      erosion: (if (< 0.0 total) (double->long (/ (* 1000.0 eroded) total)) 0)
-	      verbosity: (if (< 0 forms) (/ (* 1000 flagged) forms) 0)
-	      callables: callables forms: forms flagged: flagged findings: (list-reverse! findings))))))
+  (let ((w (make <erosion-walk> forms: 0 flags: (identity-hash-table) seen: (identity-hash-table))) (callables ()) (flagged 0))
+    (list-do src sources (erosion-walk-source src w))
+    (let* ((coverage (erosion-coverage w)) (covered (car coverage)) (forms (<erosion-walk>-forms w)))
+      (list-do form (<erosion-walk>-tops w) (set flagged (+ flagged (erosion-covered-forms form covered))))
+      (list-do o (<erosion-walk>-owned w)	; each callable's own covered forms: a flagged form belongs to the callable whose form holds it
+	(set (<callable>-flagged (cdr o)) (erosion-covered-forms (car o) covered))
+	(push callables (cdr o)))
+      (make <erosion-metrics>
+	    erosion: (erosion-per-mille (erosion-masses callables))
+	    verbosity: (if (< 0 forms) (/ (* 1000 flagged) forms) 0)
+	    callables: callables forms: forms flagged: flagged findings: (cdr coverage)))))
 ;; check/erosion's ledger, read by erosion-ledger.g to entries; answers each metric's sum, (erosion . verbosity)
 (define-function erosion-ledger (text)
   (let ((e 0) (v 0))

@@ -24,9 +24,10 @@ ext_header	= ( "index " -> 'index | "new file mode " -> 'new | "deleted file mod
 		  | "copy from " -> 'copy-from | "copy to " -> 'copy-to | "Binary files " -> 'binary ):k
 		  rest:v eol						-> (cons k v) ;
 old_new		= "--- " side_path:o eol "+++ " side_path:n eol		-> (cons o n) ;
-side_path	= "/dev/null" (!"\n" .)*				-> ()
-		| quoted:p (!"\n" .)*					-> (diff-strip-side p)
-		| (!"\n" !"\t" .)* $:p (!"\n" .)*			-> (diff-strip-side p) ;
+side_path	= "/dev/null" rest					-> ()
+		| quoted:p rest						-> (diff-strip-side p)
+		| plain_path:p rest					-> (diff-strip-side p) ;
+plain_path	= (!"\n" !"\t" .)* $:p					-> p ;	# up to a tab, which git adds after a path with a space
 quoted		= "\"" qchar*:cs "\""					-> (list->string cs) ;
 qchar		= "\\" ([0-7] [0-7] [0-7]) @$#8:n			-> n
 		| "\\n" -> 10 | "\\t" -> 9 | "\\\"" -> 34 | "\\\\" -> 92
@@ -42,7 +43,10 @@ conflicted	= (conflict | plain_line)*:xs				-> xs ;
 plain_line	= &. !{marker ?<} rest:s eol				-> s ;
 conflict	= {marker ?<} " conflict " number:i " of " number:m eol side+:ss
 		  {marker ?>} " conflict " number " of " number " ends" eol	-> (diff-conflict i m ss) ;
-side		= {marker ?%} " diff from: " rest:f eol {marker ?\} "        to: " rest:t eol (!any_marker body_line)*:ls
-								-> (diff-side 'diff (cons f t) ls)
-		| {marker ?+} " " rest:l eol (!any_marker &. rest:s eol -> s)*:ls	-> (diff-side 'snapshot l ls)
-		| {marker ?-} " " rest:l eol (!any_marker &. rest:s eol -> s)*:ls	-> (diff-side 'base l ls) ;
+side		= diff_side | snapshot_side | base_side ;
+diff_side	= {marker ?%} " diff from: " rest:f eol {marker ?\} "        to: " rest:t eol side_body*:ls
+								-> (diff-side 'diff (cons f t) ls) ;
+snapshot_side	= {marker ?+} " " rest:l eol side_line*:ls			-> (diff-side 'snapshot l ls) ;
+base_side	= {marker ?-} " " rest:l eol side_line*:ls			-> (diff-side 'base l ls) ;
+side_body	= !any_marker body_line ;			# inside a conflict a line stops before any marker
+side_line	= !any_marker &. rest:s eol				-> s ;

@@ -160,6 +160,15 @@
 	     (<erosion-metrics>-callables (erosion-of (list (cons "s.l" (read-script "#!./eval tpeg-repl.l\n(define-function f (x) x)\n{\n  <s2> : <text-parser> ()\n  w = [a-z]+ ;\n}\n"))))))
 	'(w f))
 
+;; each callable's first and last line, and the forms a verbose pattern or clone covers in it (for attribution)
+(expect "a definition's first and last line"
+	(map (lambda (c) (list (<callable>-line c) (<callable>-last c))) (callables-of "(define-function f ()\n  1)\n\n(define-function g () 2)\n"))
+	'((1 2) (4 4)))
+(expect "a rule's lines" (map (lambda (c) (list (<callable>-line c) (<callable>-last c))) (grammar-callables "a = \"x\"\n  | \"y\" ;\nb = a ;"))
+	'((2 3) (4 4)))
+(expect "a callable's flagged forms" (map (lambda (c) (<callable>-flagged c)) (callables-of "(define-function f (x) (not (not x)))\n(define-function g () 1)"))
+	'(2 0))
+
 ;; the ratchet: a metric that moved without an entry doesn't match its ledger, and does with one
 (define m (make <erosion-metrics> erosion: 400 verbosity: 75))
 (expect "the ratchet holds each metric to its ledger"
