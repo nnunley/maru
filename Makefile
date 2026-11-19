@@ -76,6 +76,10 @@ check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l 
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	$(call with-dbjr,./eval check/parallel.l $(CHECKS))
 
+# how the working copy's change against REV (HEAD, or @- under jj) moved erosion and verbosity, callable by callable
+erosion-report : eval tpeg.l osdefs.k .force
+	./eval erosion-attribute-run.l $(REV)
+
 check-sweep : eval eval2 eval3 .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/sweep.l $(SEEDS)

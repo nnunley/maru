@@ -122,4 +122,45 @@
 (expect "the side that adds an eroded callable shows it edited; the other doesn't"
 	(map (lambda (s) (let ((z (move-named (cdr s) 'z))) (and z (<move>-edited z)))) sides) '(t ()))
 
+;; ---- git and jj, on repositories made here: a superproject with a submodule, edits in both and an untracked file
+(require "erosion-vcs.l")
+(define scratch (concat-string (attribution-scratch) "/repos"))
+(remove-tree scratch)
+(define-function git-in (dir . args) (program-result (concat-list (list "git" "-c" "user.email=t@t" "-c" "user.name=t" "-c" "protocol.file.allow=always") args) dir))
+(define-function write-in (dir name text) (contents-to-file-named text (concat-strings dir "/" name)))
+(define-function new-repo (name files)	; a repository holding files, ((name . text) ...), committed
+  (let ((dir (concat-strings scratch "/" name)))
+    (make-directory dir)
+    (git-in dir "init" "-q" ".")
+    (list-do f files (write-in dir (car f) (cdr f)))
+    (git-in dir "add" "-A") (git-in dir "commit" "-qm" "base")
+    dir))
+(define sub (new-repo "sub" (list (cons "x.l" "(define-function x () 1)\n"))))
+(define super (new-repo "super" (list (cons "a.l" "(define-function a () 1)\n"))))
+(git-in super "submodule" "add" "-q" sub "nile")
+(git-in super "commit" "-qm" "submodule")
+(write-in super "a.l" "(define-function a () 1)\n(define-function b () 2)\n")
+(write-in super "nile/x.l" "(define-function x () 2)\n")
+(write-in super "u.l" "(define-function u () 3)\n")
+(define changes (vcs-changes super "HEAD"))
+(expect "the superproject's file, the untracked one, and the submodule's, prefixed"
+	(map (lambda (c) (<change>-path c)) changes) '("a.l" "u.l" "nile/x.l"))
+(expect "an untracked file has no base; a submodule's base is its recorded commit's"
+	(map (lambda (c) (<change>-base-text c)) changes) '("(define-function a () 1)\n" () "(define-function x () 1)\n"))
+(expect "the lines a change added" (<change>-added (car changes)) '(2))
+(expect "a revision that doesn't exist" (vcs-revision? super "nosuch") ())
+(expect "a clean repository: no change" (attribution-command-lines (new-repo "clean" (list (cons "c.l" "(define c 1)\n"))) "HEAD")
+	'("no change against HEAD"))
+(expect "the command refuses a revision that doesn't exist"
+	(let ((r (program-result '("./eval" "erosion-attribute-run.l" "nosuch") ()))) (list (car r) (cdr r))) '(256 "erosion: no revision nosuch\n"))
+(if (find-program "jj")
+    (let ((dir (concat-strings scratch "/jj")))
+      (make-directory dir)
+      (program-result '("jj" "git" "init" "--colocate" ".") dir)
+      (write-in dir "j.l" "(define-function j () 1)\n")
+      (program-result '("jj" "describe" "-m" "base") dir) (program-result '("jj" "new") dir)
+      (write-in dir "j.l" "(define-function j () 2)\n")
+      (expect "jj's change" (map (lambda (c) (<change>-path c)) (vcs-changes dir "@-")) '("j.l")))
+  (println "no jj on PATH: its changes not checked"))
+
 (println (if ok "erosion attribution ok" "erosion attribution FAILED"))

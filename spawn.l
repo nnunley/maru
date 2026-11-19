@@ -106,3 +106,11 @@
 	(set start (+ i 1))))
     found))
 (define-function find-program (name) (find-program-in name (or (spawn-getenv "PATH") "")))	; as on PATH
+(define-function program-result (argv dir . in)	; (status . standard output) of argv run in dir (or here), its errors discarded
+  (let ((path (concat-strings "/tmp/maru-spawn-" (long->string ((subr "getpid" ">i"))) "-"
+			      (long->string (set spawn-outputs (+ spawn-outputs 1))))))
+    (let* ((a argv) (d dir) (i (car in))
+	   (status (command-status (make <command> argv: a dir: d in: i out: path err: "/dev/null")))
+	   (text (if (exists? path) (or (contents-of-file-named path) "") "")))	; a child that never ran wrote none
+      (and (exists? path) ((subr "unlink" "s>i") path))
+      (cons status text))))

@@ -1141,24 +1141,8 @@
 
 ;;; ---------------------------------------------------------------- budget
 
-;; The files counted, here and in the nile and gezira submodules: tracked or new but not ignored, outside notes/, named with
-;; one of suffixes (".l" ...) or Makefile, and marked neither derived nor unused in .gitattributes.  Paths from the root.
-(define-function ends-with? (s suffix)
-  (and (<= (string-length suffix) (string-length s)) (= suffix (string-copy s (- (string-length s) (string-length suffix)) (string-length suffix)))))
-(define-function counted-files (suffixes)
-  (let ((out ()))
-    (list-do d '("." "nile" "gezira")
-      (let* ((named (select (lambda (f) (or (ends-with? f "Makefile") (let ((hit ())) (list-do x suffixes (and (ends-with? f x) (set hit 't))) hit)))
-			    (run (concat-strings "files-" d) (in-dir d '("git" "ls-files" "-co" "--exclude-standard" "--" "." ":!notes")))))
-	     (listed (concat-strings tmp "/files-" d ".txt"))
-	     (marked ()))
-	(contents-to-file-named (join-lines named) listed)
-	;; check-attr says, for each file and each attribute, path: attribute: value
-	(list-do l (run (concat-strings "attrs-" d) (let ((i listed) (dd d)) (make <command> argv: '("git" "check-attr" "--stdin" "derived" "unused") in: i dir: dd)))
-	  (or (ends-with? l ": unspecified") (push marked (string-copy l 0 (string-find l ": ")))))
-	(list-do f named
-	  (or (member? f marked) (push out (if (= d ".") f (concat-strings d "/" f)))))))
-    (list-reverse! out)))
+;; the files counted, here and in the nile and gezira submodules (erosion-files.l, which the attribution report shares)
+(require "erosion-files.l")
 (define-function newlines (text) (let ((n 0)) (for (i 0 (string-length text)) (and (= ?\n (string-at text i)) (incr n))) n))
 
 ;; Derived code and code outside the stack (marked derived or unused in
@@ -1210,9 +1194,6 @@
 ;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
 ;; still fail to read.
-(define erosion-unread '("compile.l" "gen-asm-x86.k" "maruby.l" "net/structure-diagram.k" "test-pepsi.l" "test-recursion.l"
-			 "test-repl.l" "test.l"
-			 "check/tpeg-broken.g"))
 ;; a change's moves attributed to its edits and to share (erosion-attribute.l, doc/rfc/draft-ndn-erosion-attribution-00.md)
 (check "erosion_attribution"
   (unit-assert (equal (last (run "erosion_attribution" '("./eval" "check/erosion-attribution.l"))) "erosion attribution ok")))
