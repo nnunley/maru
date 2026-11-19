@@ -90,10 +90,10 @@
       (list-do s (attribute-conflicted (<change>-path c) (<change>-base-text c) (<change>-current-text c))
 	(set out (concat-list out (cons (concat-strings "side " (car s) " of " (<change>-path c) ":") (attribution-report (cdr s)))))))
     out))
-(define-function attribution-command-lines (root rev)
+(define-function attribution-command-lines (root rev . tree)	; tree: the tree measured now, if it already has been
   (let* ((changes (vcs-changes root rev)) (plain ()) (sides ()))
     (list-do c changes (if (conflicted? (<change>-current-text c)) (push sides c) (push plain c)))
     (if (not changes)
 	(list (concat-string "no change against " rev))
-      (concat-list (attribution-report (attribute (list-reverse! plain) (tree-now-of root) (vcs-ledger-at root rev)))
+      (concat-list (attribution-report (attribute (list-reverse! plain) (or (car tree) (tree-now-of root)) (vcs-ledger-at root rev)))
 		   (conflicted-lines sides)))))

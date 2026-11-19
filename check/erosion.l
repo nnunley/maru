@@ -1,6 +1,6 @@
 ;;; erosion.l's metrics (SlopCodeBench's erosion and verbosity, counted in forms: doc/plans/2026-11-10-erosion-by-reflection.md)
 ;;; on small sources whose answers are worked out by hand, each read by Maru's own reader from a file in the check's directory.
-(require "erosion.l")
+(require "erosion-vcs.l")	; erosion.l, and the attribution report
 (require "recover.l")
 (require "check/temp.l")
 (define ok 1)
@@ -168,6 +168,14 @@
 	'((2 3) (4 4)))
 (expect "a callable's flagged forms" (map (lambda (c) (<callable>-flagged c)) (callables-of "(define-function f (x) (not (not x)))\n(define-function g () 1)"))
 	'(2 0))
+
+;; a ledger that doesn't match is followed by the report for the working copy's change, so the failure names its cause
+(let* ((ledger (concat-strings fixtures "/mismatch.ledger"))
+       (_ (contents-to-file-named "erosion 999 not this tree\nverbosity 0 nor this\n" ledger))
+       (out (text-lines (cdr (program-result (list "./eval" "erosion-run.l" "--ledger" ledger "--attribute" "HEAD" "spawn.l") ()))))
+       (mismatch (let ((i 0) (at ())) (list-do l out (and (string-search-text l "accounts for erosion 999") (set at i)) (incr i)) at)))
+  (expect "the mismatch, then the report against HEAD"
+	  (and mismatch (side-at out (+ mismatch 1))) "attribution against HEAD:"))
 
 ;; the ratchet: a metric that moved without an entry doesn't match its ledger, and does with one
 (define m (make <erosion-metrics> erosion: 400 verbosity: 75))

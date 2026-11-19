@@ -1204,13 +1204,17 @@
     (list-do f files (or (member? f erosion-unread) (push measured f)))
     ;; a CPU limit, as law files have, not a wall clock: four cases at once mustn't fail it by contention
     (let* ((path (concat-strings tmp "/erosion.out"))
-	   (status (run-cpu-status 300 (let ((a (concat-list (concat-list '("./eval" "erosion-run.l" "--ledger" "check/erosion" "--unread") erosion-unread)
+	   ;; a ledger that doesn't match is followed by the report for the working copy's change, which names its cause
+	   (base (if (exists? ".jj") "@-" "HEAD"))
+	   (status (run-cpu-status 300 (let ((a (concat-list (concat-list (list "./eval" "erosion-run.l" "--ledger" "check/erosion" "--attribute" base "--unread")
+									  erosion-unread)
 							     (cons "--" (list-reverse! measured)))))
 					 (make <command> argv: a out: path err: path))))
 	   (out (lines (contents-of-file-named path))))
       (or (= 0 status) (error "FAIL erosion: exit status " status ": " (last out)))
       (list-do l out (println l))
-      (or (equal (last out) "erosion matches its ledger") (error "FAIL erosion: " (car out) " per mille, but " (last out))))))
+      (or (member? "erosion matches its ledger" out)
+	  (error "FAIL erosion: " (car out) " per mille, but " (car (select (lambda (l) (string-find l "accounts for erosion")) out)))))))
 
 (let ((missing (unmatched *selected* *ran*)))
   (and missing (error "FAIL no check named: " missing)))

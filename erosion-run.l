@@ -1,14 +1,18 @@
 ;;; erosion-run.l -- ./eval erosion-run.l [--ledger FILE] [--unread FILE... --] FILE... measures the files (erosion.l) and prints
 ;;; their erosion and verbosity, per mille, then the ten callables of greatest mass.  With --ledger, each metric must equal
-;;; the sum of the ledger's entries (erosion-ledger), and the last line says whether they do.
+;;; the sum of the ledger's entries (erosion-ledger), and a line says whether they do.  With --attribute REV as well, a
+;;; ledger that doesn't match is followed by the report for the working copy's change against REV
+;;; (doc/rfc/draft-ndn-erosion-attribution-00.md), from the metrics already measured.
 ;;; Each file is read by its own reader (erosion-read-file): a .g file by tpeg, a script tpeg-repl.l reads by it, any other
 ;;; by Maru's.  A file after --unread is one it can't read whole, as a file that changes language partway (test-pepsi.l)
 ;;; or is broken on purpose (check/tpeg-broken.g) can't: it's not measured, and it must still fail to read, so the list
 ;;; doesn't outlive its reason.
-(require "erosion.l")
+(require "erosion-vcs.l")
 (require "recover.l")
 (define ledger ())
 (when (and *arguments* (= "--ledger" (car *arguments*))) (next-argument) (set ledger (next-argument)))
+(define attribute-against ())
+(when (and *arguments* (= "--attribute" (car *arguments*))) (next-argument) (set attribute-against (next-argument)))
 (define unread ())
 (when (and *arguments* (= "--unread" (car *arguments*)))
   (next-argument)
@@ -37,7 +41,10 @@
   (list-do c ranked (println "  " c))
   (when ledger
     (let ((sums (erosion-ledger (contents-of-file-named ledger))))
-      (println (if (erosion-matches? m sums)
-		   "erosion matches its ledger"
-		 (concat-strings ledger " accounts for erosion " (long->string (car sums)) " verbosity " (long->string (cdr sums))
-				 "; add an entry for each that moved, saying why"))))))
+      (if (erosion-matches? m sums)
+	  (println "erosion matches its ledger")
+	(println ledger " accounts for erosion " (long->string (car sums)) " verbosity " (long->string (cdr sums))
+		 "; add an entry for each that moved, saying why")
+	(when attribute-against	; the failure names its cause
+	  (println "attribution against " attribute-against ":")
+	  (list-do l (attribution-command-lines "." attribute-against m) (println "  " l)))))))
