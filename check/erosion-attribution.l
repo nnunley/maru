@@ -89,6 +89,15 @@
 (expect "a ledger that holds is used" (<attribution>-rebuilt (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "2"))) '(0 . 0))) ())
 
 (define-function select-moves (lines) (let ((out ())) (list-do l lines (and (< 7 (string-length l)) (= "edited " (string-copy l 0 7)) (push out l))) (list-reverse! out)))
+;; a function copied from a file the change didn't touch is a clone the edit made: the current side's callables are the
+;; whole tree's, whose clones span files
+(define copied
+  (let ((ch (text-change "b.l" "b.l" (defn "m" "1") (concat-string (defn "m" "1") (defn "h" body)))))
+    (attribute (list ch) (measure-texts (list (cons "a.l" (defn "g" body)) (cons "b.l" (<change>-current-text ch)))) ())))
+(expect "a copy from an untouched file: its flagged forms are the edit's"
+	(let ((h (move-named copied 'h))) (list (<move>-edited h) (< 0 (<move>-flagged-after h)) (< 0 (cadddr (<attribution>-verbosity copied)))))
+	'(t t t))
+
 ;; ---- the report: worked out by hand for crossing's change (f: CC 10 over 10 forms to CC 11 over 11; k: CC 1, 1 form):
 ;; erosion now 11 sqrt 11 / (11 sqrt 11 + 1) = 973 per mille, all of it f's edit; no ledger, so the base is rebuilt: 0
 (define ledger-before (contents-of-file-named "check/erosion"))
@@ -103,5 +112,14 @@
 (expect "a callable added or removed shows none on that side"
 	(car (select-moves (attribution-report deleted))) "edited z.l z: CC 13 -> none, forms 13 -> none, flagged 0 -> none")
 (expect "the report writes no file" (contents-of-file-named "check/erosion") ledger-before)
+
+;; ---- a conflicted file, side by side: each side attributed against the conflict's base as a change of its own
+(define conflicted-text (concat-strings "(define-function k () 1)\n<<<<<<< conflict 1 of 1\n%%%%%%% diff from: kyspwnsp 77789aaf \"base\"\n"
+					"\\\\\\\\\\\\\\        to: lsvwuuum 90725a19 \"one\"\n+(define-function z () " (ifs 12) ")\n"
+					"+++++++ ltsypwlm 8cffb44e \"two\"\n>>>>>>> conflict 1 of 1 ends\n"))
+(define sides (attribute-conflicted "k.l" "(define-function k () 1)\n" conflicted-text))
+(expect "one attribution per side, labelled as jj labels them" (map car sides) '("lsvwuuum 90725a19 \"one\"" "ltsypwlm 8cffb44e \"two\""))
+(expect "the side that adds an eroded callable shows it edited; the other doesn't"
+	(map (lambda (s) (let ((z (move-named (cdr s) 'z))) (and z (<move>-edited z)))) sides) '(t ()))
 
 (println (if ok "erosion attribution ok" "erosion attribution FAILED"))

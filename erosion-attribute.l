@@ -134,6 +134,11 @@
     (list-reverse! pairs)))
 (define-function touched? (c lines)	; a line of lines within c's
   (let ((hit ())) (and c (<callable>-line c) (list-do l lines (and (<= (<callable>-line c) l) (<= l (<callable>-last c)) (set hit 't)))) hit))
+;; a changed file's current callables as the whole tree has them, whose clones span files; measured alone if it isn't there
+(define-function tree-callables (tree-now path alone)
+  (let ((out ()))
+    (list-do c (<erosion-metrics>-callables tree-now) (and (= path (<callable>-path c)) (push out c)))
+    (if out (list-reverse! out) (callables-of-metrics alone))))
 (define-function pair-edited? (p ch)
   (or (not (car p)) (not (cdr p)) (touched? (car p) (<change>-removed ch)) (touched? (cdr p) (<change>-added ch))))
 (define-function cc-of (c) (and c (<callable>-cc c)))
@@ -181,7 +186,7 @@
       (let ((b (measure-one "base" (<change>-old-path ch) (<change>-base-text ch)))
 	    (a (measure-one "now" (<change>-path ch) (<change>-current-text ch))))
 	(push befores b) (push afters a)
-	(list-do p (match-callables (callables-of-metrics b) (callables-of-metrics a))
+	(list-do p (match-callables (callables-of-metrics b) (tree-callables tree-now (<change>-path ch) a))
 	  (let ((m (pair-move (<change>-path ch) p (pair-edited? p ch))))
 	    (when (<move>-edited m)
 	      (set de (+ de (- (eroded-mass (cdr p)) (eroded-mass (car p)))))
@@ -238,3 +243,10 @@
   (concat-list (list (metric-line "erosion" (<attribution>-erosion a)) (metric-line "verbosity" (<attribution>-verbosity a)))
 	       (concat-list (if (<attribution>-rebuilt a) '("the base's values rebuilt from the changed files: no ledger at the base holds") ())
 			    (concat-list (map move-line (moves-in-order a)) (cons "ledger:" (attribution-ledger-entries a))))))
+
+;; a conflicted file, side by side: each side's whole file attributed against the conflict's base as a change of its own,
+;; with the side's file as its tree (the working copy's file holds markers): ((label . <attribution>) ...)
+(define-function attribute-side (path base-text side)
+  (cons (car side) (attribute (list (text-change path path base-text (cdr side))) (measure-texts (list (cons path (cdr side)))) ())))
+(define-function attribute-conflicted (path base-text text)
+  (map (lambda (side) (attribute-side path base-text side)) (conflict-sides text)))
