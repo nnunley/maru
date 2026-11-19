@@ -41,8 +41,10 @@ when, and only when, they appear in all capitals, as shown here.
 - **measured file** — a `.l`, `.k` or `.g` file the erosion check measures (`doc/measures.md`'s set, less its unread
   files).
 - **callable** — a definition the erosion check scores: a Maru definition, or a grammar rule (`tpeg-forms.g`).
-- **edited callable** — a callable whose lines a hunk of the change overlaps, on the side it belongs to, or one the
-  change adds or removes.
+- **edited callable** — a callable whose lines a hunk's added or removed lines overlap, on the side it belongs to, or
+  one the change adds or removes.
+- **ledger value** — a metric's value as the ledger at a revision states it: the sum of `check/erosion`'s entries for
+  that metric, as `erosion-ledger.g` reads the file at that revision.
 - **edited move** — the part of a metric's move that the edited callables' own numbers account for.
 - **share move** — the rest of a metric's move: what changing the tree's total, and clones gained or lost by callables
   the change did not edit, account for.
@@ -55,8 +57,9 @@ the attribution of each metric's move to edits and to share, and the report. It 
 `doc/measures.md` and `erosion.l` own, nor the ledger's format (`erosion-ledger.g`), nor any gate: a gate that fails a
 change is a later document's.
 
-**Measure what changed, once.** Only measured files the change touches are measured at the base; the rest of the tree
-counts the same on both sides, so the report never measures the whole tree twice.
+**Measure what changed, once.** Only measured files the change touches are measured at the base. The base's whole-tree
+values are its ledger values, which the erosion check held that revision to, so the report never measures the whole
+tree twice.
 
 **Attribution adds up.** For each metric, the edited move and the share move sum to the whole move. A report whose
 parts don't sum is wrong, not approximate.
@@ -144,47 +147,68 @@ M`, then sides, then `>>>>>>> conflict N of M ends`. A side is a diff side (`%%%
 a base (`------- LABEL`). The lines outside every conflict are common to all sides. A file MAY hold several conflicts,
 and a conflict MAY have more than two sides. [R-conflict-read]
 
-**What is measured.** For each `FileDiff` whose old or new path is a measured file, the base's version (`git show
-REV:P`, or `jj file show -r REV P`) and the current version are each read by `erosion-read-file`'s reader for the
-file (`doc/measures.md`) and walked as the erosion check walks them. A file the change adds has no base version; a
-file it deletes has no current one. No other file is read at the base. [R-measure-changed]
+**What is measured.** The change is the base against the working copy, staged and unstaged edits alike (`git diff
+--unified=0 REV`, or `jj diff --git -r REV`); a measured file git doesn't track but doesn't ignore, which the erosion
+check measures, is a file the change adds. For each `FileDiff` whose old or new path is a measured file, the base's
+version (`git show REV:P`, or `jj file show -r REV P`), written under the check's scratch directory (`MARU_CHECK_TMP`,
+else `/tmp/maru-attribution-PID/`) at the same relative path, and the current version are each read by
+`erosion-read-file`'s reader for the file (`doc/measures.md`) and walked as the erosion check walks them. A base
+tpeg-repl script runs from the repository's root, so what it `require`s is the working tree's, not the base's. A file
+the change adds has no base version; a file it deletes has no current one. No other file is read at the base.
+[R-measure-changed]
+
+**Submodules.** A `Subproject commit` line for `nile` or `gezira` is followed into the submodule: the submodule's own
+change is the commit the superproject records at the base against the submodule's working copy, read and measured as
+above with paths prefixed by the submodule's directory. jj, which doesn't track a submodule's contents, is answered
+by git inside it. [R-submodules]
 
 **Matching.** A base callable and a current callable are the same callable when they have the same name in the same
 file, where a renamed file's old path matches its new one. Two callables of one name in one file match in the order
 they appear. A callable with no match was added or removed by the change, and is an edited callable. [R-match]
 
-**Edited callables.** A current callable is edited when a hunk's new-side lines, `new_start` through `new_start +
-new_count - 1`, overlap its lines; a base callable is edited when a hunk's old-side lines overlap its lines (a pure
-deletion, `new_count` 0, overlaps by its `old_start`). A grammar rule, whose tree carries no lines, is edited when a
-hunk overlaps the line range its definition spans in the file's text. [R-edited]
+**Edited callables.** Only a hunk's added and removed lines count, never its context lines: a current callable is
+edited when an added line falls within its lines, and a base callable when a removed line does (with `--unified=0`,
+`new_start` through `new_start + new_count - 1` and `old_start` through `old_start + old_count - 1`). A grammar rule,
+whose tree carries no lines, is edited when such a line falls within the line range its definition spans in the file's
+text. [R-edited]
+
+**Who owns a flagged form.** A form a verbose pattern or a clone covers belongs to the innermost callable around it: a
+grammar rule owns what its own tree holds, a definition inside a top-level `let` owns what it holds. A flagged form
+inside no callable belongs to none, and moves share.
 
 **Attribution.** Let a metric be a ratio `part / whole`: erosion is eroded mass over all mass, verbosity flagged forms
-over all forms (`doc/measures.md`). The whole move is the metric's current value less its base value, each per mille
-as the erosion check computes it; the current value is the tree's, and the base value is the current tree's with each
-changed file's current numbers replaced by its base numbers. The edited move is the edited callables' part after less
-their part before, over the current whole. The share move is the whole move less the edited move. [R-attribution-sums]
+over all forms (`doc/measures.md`). The whole move is the metric's current value, the whole tree measured now, less its
+base value, the base's ledger value; when the base's ledger doesn't match its tree (a work-in-progress revision), the
+base value is rebuilt from the current tree with each changed file's numbers replaced by its base numbers, and the
+report says so, since clones between a changed and an unchanged file make that rebuilding approximate for verbosity.
+The edited move is the edited callables' part after less their part before, over the current whole. The share move is
+the whole move less the edited move. [R-attribution-sums]
 
 ```
 FUNCTION attribute(metric, base_files, current_files, tree_now) -> (whole, edited, share):
-    -- Step 1: the tree at the base, from the tree now and the changed files only
-    tree_base = tree_now - totals(current_files) + totals(base_files)
-    whole = per_mille(metric, tree_now) - per_mille(metric, tree_base)
+    -- Step 1: the base's value is its ledger's; rebuilt from the changed files only if that ledger doesn't hold
+    base_value = ledger_value(metric, REV)
+    IF base_value doesn't match REV's tree:
+        base_value = per_mille(metric, tree_now - totals(current_files) + totals(base_files))   -- said in the report
+    whole = per_mille(metric, tree_now) - base_value
     -- Step 2: what the edited callables' own numbers did, over the current whole
     edited = 1000 * (part(metric, edited_callables(current_files)) - part(metric, edited_callables(base_files)))
              / whole_of(metric, tree_now)
-    -- Step 3: the rest is share, by definition, so the parts sum
+    -- Step 3: the rest is share, by definition, so the parts sum; the edited part truncated as the check truncates
+    edited = truncate(edited)
     share = whole - edited
     RETURN (whole, edited, share)
 
 -- Behavior:
---   - edited + share = whole, exactly, before any rounding for display
+--   - edited + share = whole, exactly, in the integers check/erosion's entries use
 --   - a callable the change did not edit, whose flagged forms moved because a clone partner was added or removed
 --     elsewhere, moves share, and the report names it
 ```
 
 **Conflicted files.** A measured file holding conflict markers is measured once per side: each side's version is the
-common lines with that side's lines in each conflict, a diff side applied to the base's lines. Each side is attributed
-against the base as a change of its own, and the report gives each side's moves under its label. [R-conflict-sides]
+common lines with that side's lines in each conflict, a diff side applied to the lines of the revision its `diff from:`
+names. Each side is attributed against the conflict's base, the revision jj names as the one the sides diverge from,
+as a change of its own, and the report gives each side's moves under its label. [R-conflict-sides]
 
 **The report.** The report prints, in order: a line per metric giving the base value, the current value, the whole
 move, the edited move and the share move; then a line per callable whose numbers moved, edited ones first, each with
@@ -219,6 +243,10 @@ erosion_attribution
 ```
 
 ```maru-check @R-measure-changed
+erosion_attribution
+```
+
+```maru-check @R-submodules
 erosion_attribution
 ```
 
