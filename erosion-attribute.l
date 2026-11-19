@@ -142,10 +142,10 @@
 (define-function pair-move (path p edited)
   (make <move> path: path name: (<callable>-name (or (cdr p) (car p))) edited: edited
 	cc-before: (cc-of (car p)) cc-after: (cc-of (cdr p)) forms-before: (forms-of (car p)) forms-after: (forms-of (cdr p))
-	flagged-before: (flagged-of (car p)) flagged-after: (flagged-of (cdr p))))
+	flagged-before: (and (car p) (<callable>-flagged (car p))) flagged-after: (and (cdr p) (<callable>-flagged (cdr p)))))
 (define-function move-moved? (m)
   (or (<move>-edited m) (not (equal (<move>-cc-before m) (<move>-cc-after m))) (not (equal (<move>-forms-before m) (<move>-forms-after m)))
-      (not (= (<move>-flagged-before m) (<move>-flagged-after m)))))
+      (not (equal (<move>-flagged-before m) (<move>-flagged-after m)))))
 
 ;; ---- attribution
 
@@ -188,3 +188,53 @@
 	      (set df (+ df (- (flagged-of (cdr p)) (flagged-of (car p))))))
 	    (and (move-moved? m) (push moves m))))))
     (attribution-of-totals (totals-of (list tree-now)) (totals-of afters) (totals-of befores) tree-now base-ledger de df (list-reverse! moves))))
+
+;; ---- the report
+
+(define-function signed (n) (if (< 0 n) (concat-string "+" (long->string n)) (long->string n)))
+(define-function side-text (x) (if x (long->string x) "none"))
+(define-function metric-line (name m)	; m: (base now whole edited share)
+  (concat-strings name " " (long->string (car m)) " -> " (long->string (cadr m)) ": whole " (signed (caddr m))
+		  ", edited " (signed (cadddr m)) ", share " (signed (car (cddddr m)))))
+(define-function move-mass (cc forms) (if (and cc forms) (* cc (sqrt (* 1.0 forms))) 0.0))
+(define-function mass-moved (m)	; how much of the tree's complexity mass a move moved
+  (let ((d (- (move-mass (<move>-cc-after m) (<move>-forms-after m)) (move-mass (<move>-cc-before m) (<move>-forms-before m)))))
+    (if (< d 0.0) (- 0.0 d) d)))
+(define-function crossed-10? (m)
+  (let ((b (<move>-cc-before m)) (a (<move>-cc-after m))) (and b a (not (= (< 10 b) (< 10 a))))))
+(define-function move-line (m)
+  (concat-strings (if (<move>-edited m) "edited " "share ") (<move>-path m) " " (symbol->string (<move>-name m))
+		  ": CC " (side-text (<move>-cc-before m)) " -> " (side-text (<move>-cc-after m)) (if (crossed-10? m) " (crossed 10)" "")
+		  ", forms " (side-text (<move>-forms-before m)) " -> " (side-text (<move>-forms-after m))
+		  ", flagged " (side-text (<move>-flagged-before m)) " -> " (side-text (<move>-flagged-after m))))
+(define-function insert-by-mass (m sorted)
+  (if (or (not sorted) (< (mass-moved (car sorted)) (mass-moved m))) (cons m sorted) (cons (car sorted) (insert-by-mass m (cdr sorted)))))
+(define-function sort-by-mass (ms)	; insertion, most mass first
+  (let ((out ()))
+    (list-do m ms (set out (insert-by-mass m out)))
+    out))
+(define-function moves-in-order (a)	; edited first, each group by mass moved, most first
+  (let ((edited ()) (share ()))
+    (list-do m (<attribution>-moves a) (if (<move>-edited m) (push edited m) (push share m)))
+    (concat-list (sort-by-mass edited) (sort-by-mass share))))
+(define-function move-named-in-entry (m metric)	; f (CC 9 to 12), or f (flagged 0 to 2)
+  (let ((b (if (= metric 'erosion) (<move>-cc-before m) (<move>-flagged-before m)))
+	(a (if (= metric 'erosion) (<move>-cc-after m) (<move>-flagged-after m))))
+    (concat-strings (symbol->string (<move>-name m))
+		    (if (and b a (not (= b a))) (concat-strings (if (= metric 'erosion) " (CC " " (flagged ") (long->string b) " to " (long->string a) ")") ""))))
+(define-function entry-for (metric m moves)	; check/erosion's line for a metric that moved, naming the edits most moved
+  (let ((names "") (n 0))
+    (list-do mv moves
+      (when (and (<move>-edited mv) (< n 3))
+	(set names (concat-strings names (if (= 0 n) "" ", ") (move-named-in-entry mv metric)))
+	(incr n)))
+    (concat-strings (symbol->string metric) " " (signed (caddr m)) " edits: " (if (= 0 n) "none" names) "; share " (signed (car (cddddr m))))))
+(define-function attribution-ledger-entries (a)
+  (let ((moves (moves-in-order a)) (out ()))
+    (and (not (= 0 (caddr (<attribution>-erosion a)))) (push out (entry-for 'erosion (<attribution>-erosion a) moves)))
+    (and (not (= 0 (caddr (<attribution>-verbosity a)))) (push out (entry-for 'verbosity (<attribution>-verbosity a) moves)))
+    (list-reverse! out)))
+(define-function attribution-report (a)	; lines: the metrics, then each move, then the drafted ledger entries
+  (concat-list (list (metric-line "erosion" (<attribution>-erosion a)) (metric-line "verbosity" (<attribution>-verbosity a)))
+	       (concat-list (if (<attribution>-rebuilt a) '("the base's values rebuilt from the changed files: no ledger at the base holds") ())
+			    (concat-list (map move-line (moves-in-order a)) (cons "ledger:" (attribution-ledger-entries a))))))

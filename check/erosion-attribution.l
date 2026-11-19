@@ -88,4 +88,20 @@
 	(<attribution>-rebuilt (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "2"))) '(999 . 0))) 't)
 (expect "a ledger that holds is used" (<attribution>-rebuilt (attribution-of (list (list "a.l" "a.l" (defn "f" "1") (defn "f" "2"))) '(0 . 0))) ())
 
+(define-function select-moves (lines) (let ((out ())) (list-do l lines (and (< 7 (string-length l)) (= "edited " (string-copy l 0 7)) (push out l))) (list-reverse! out)))
+;; ---- the report: worked out by hand for crossing's change (f: CC 10 over 10 forms to CC 11 over 11; k: CC 1, 1 form):
+;; erosion now 11 sqrt 11 / (11 sqrt 11 + 1) = 973 per mille, all of it f's edit; no ledger, so the base is rebuilt: 0
+(define ledger-before (contents-of-file-named "check/erosion"))
+(expect "the report" (attribution-report crossing)
+	'("erosion 0 -> 973: whole +973, edited +973, share 0"
+	  "verbosity 0 -> 0: whole 0, edited 0, share 0"
+	  "the base's values rebuilt from the changed files: no ledger at the base holds"
+	  "edited a.l f: CC 10 -> 11 (crossed 10), forms 10 -> 11, flagged 0 -> 0"
+	  "ledger:"
+	  "erosion +973 edits: f (CC 10 to 11); share 0"))
+(expect "a drafted entry reads as the ledger's, to its whole move" (erosion-ledger (concat-string (car (attribution-ledger-entries crossing)) "\n")) '(973 . 0))
+(expect "a callable added or removed shows none on that side"
+	(car (select-moves (attribution-report deleted))) "edited z.l z: CC 13 -> none, forms 13 -> none, flagged 0 -> none")
+(expect "the report writes no file" (contents-of-file-named "check/erosion") ledger-before)
+
 (println (if ok "erosion attribution ok" "erosion attribution FAILED"))
