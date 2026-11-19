@@ -1,189 +1,181 @@
-# Nile loaded natively on eval
+# Nile loaded natively, around the kernel
 
 ## Intent
 
-Untyped Maru (`eval` with `boot.l`) loads a compiled Nile program and runs its kernels as native code in its own
-process. The Nile program's kernels are composed into pipelines in Maru Lisp, and the records untyped Maru holds are
-Maru objects, read by field. A Nile program is a library that describes itself, and loading it is discovery, not a
-binding written by hand. No code image is involved: the library is an ordinary shared object (`.dylib`, `.so`).
+Untyped Maru loads a Nile program and runs its kernels as native code in its own process. Kernels are composed into
+pipelines in Maru Lisp, and the records Maru holds (a process, a kernel's parameters, an image) are Maru objects, read
+by field.
 
-## What happens today
+The grounded kernel (`doc/kernel.md`, the evaluator in typed Maru on the object level) is where this lands. Once the
+kernel is the running evaluator, typed and untyped Maru share one object model, one heap and one set of type ids.
+Nile's runtime and Gezira are then more typed Maru, compiled in the same process, and no bridge between two worlds is
+needed. Today's evaluators can't do that, so this plan does now only what carries over to the kernel unchanged, and
+builds nothing the kernel will make unnecessary.
 
-- `gezira/nile/gezira.nl` goes through `nile-to-maru-compiler.sh` to typed Maru (`build/gezira.k`). Then `ir-gen-c.k` and
-  `maru.k` on `eval2` turn it into C, and `cc` builds `build/gezira.dylib` (Makefile, `build/gezira.$(SO)`).
-- `gezira-maru.l` opens the library with `dlopen` and states each entry point's signature by hand, eleven
-  `gezira-entry` calls. Nothing checks those strings against the code. A wrong one is a wrong call at run time.
-- The entry points are fixed in `nile/runtimes/maru/gezira-api.k`: `gezira_fill`, `gezira_fill_clipped`,
-  `gezira_fill_image`, and so on. Each one builds its pipeline (TransformBeziers, ClipBeziers, Rasterize, a
-  composite) in typed code. So untyped Maru can't compose kernels, and a new pipeline means a new entry point in C's
-  terms.
-- Handles are longs: an init process, an image address. Untyped Maru can't read a process or a kernel's state.
-- `check/library-mode.l` already opens a library built from typed Maru with no `main`, and calls its exports. It too
-  states their signatures by hand.
+## Where things stand
 
-Pieces this plan relies on, checked in the tree:
-- `eval` exports its collector: `GC_malloc`, `GC_malloc_atomic`, `GC_add_root` and others are global symbols (`nm -gU
-  eval`). Libraries link with `-undefined dynamic_lookup -flat_namespace` (`SOCFLAGS`), so a library's `GC_malloc`
-  resolves to the evaluator's own.
-- `subr` passes and answers `float` and `double` (`f`, `d`), besides `i`, `l`, `p` and `s`, so kernel constructors that
-  take floats can be called.
-- The collector is single-threaded, stop-the-world, non-moving mark and sweep (`gc.c`). An object doesn't move, so a
-  native pointer to it stays valid while the object is reachable. Only one thread may allocate.
-- Typed Maru declares Maru objects (`define-object`, `new`, fields by name; `doc/ir2-objects.md`) and allocates them
-  through the unit's `gc_malloc`. An `atom` object holds no references the collector traces.
-- `maru.k` keeps what a unit exports, with types (`*maru-exports*`, `*maru-types*`, `*maru-structs*`).
+- **The library path.** `gezira.nl` goes through Nile's Maru back end to typed Maru (`build/gezira.k`, 341K). Then
+  `ir-gen-c.k` and `maru.k` on `eval2` turn it into C (11.6 s for the runtime and Gezira together, measured
+  2026-11-19), and `cc` builds `build/gezira.dylib`. `gezira-maru.l` opens it with `dlopen` and states eleven
+  signatures by hand.
+  - `gezira-api.k` fixes the pipelines (`gezira_fill`, `gezira_fill_image`, `gezira_fill_clipped` and the
+    image-clipped one) in typed code. Untyped Maru can't compose kernels.
+  - Handles are longs, so Maru can't read a process.
+- **The native path has a bug.** `native.l` compiling the same unit on `eval2` ran past 84 CPU-minutes without
+  finishing. The researchers' tools compiled units like this quickly, and the C back end takes 11.6 s on the same
+  front end, so this is a defect, not a cost. What is known:
+  - A C-level sample (`sample`, 10 s, a minute into the runtime alone) puts about 73% of the time in the collector:
+    `GC_mark`, `GC_default_mark_function`, `GC_sweep` and `GC_malloc`. Interpretation is about 16%. `memset` and
+    `set-string-at` are also visible.
+  - The runtime without `nile-builtins.k` gets through the front end in 3.6 s of CPU, then stops on a reference into
+    the missing builtins. With `nile-builtins.k` (41K, with the largest functions: Zip, DupZip, SortBy), the runtime
+    doesn't finish in 10 minutes.
+  - The collector paces itself by the live object count (`GC_collectAndPace`), which keeps marking proportional to
+    allocation unless a few very large objects dominate the live heap.
+  - Candidates, not yet tested:
+    - `asm-table.l` keeps one tagged word per code byte in one growing array, which is marked whole on every
+      collection.
+    - `native-link.l`'s `native-form-text` builds text by repeated `concat-string`, which is quadratic.
+    - Something per function in `native-gen.k` or the arm64 lowering may be superlinear in the function's size.
+- **The kernel** boots `boot2.l` and runs `repl.l` and `test-repl.l` as `eval3` does, with the 55 primitives those
+  files use, measured. It has no `subr` (no FFI), no byte, int32 or float accessors, and no undo log. Its 13 built-in
+  types and their ids are its own. RecoverableErrors, Interrupts, KernelCollector and Utf8Text are next in
+  `notes/plan/kernel.john`.
+- `maru.k` and `native.l` run on `boot2.l` (on `eval2`), the boot file the kernel already loads. `code-region.l` reaches
+  `mmap`, `dlsym` and `pthread_jit_write_protect_np` through `subr`.
+- `eval`'s collector is single-threaded, stop-the-world and non-moving (`gc.c`), and so is `maru-gc.k`'s, which the
+  kernel uses. An object doesn't move, and only one thread may allocate.
 
 ## Goals
 
-- `eval` loads a Nile program's library by name and gets a callable for each export, with its signature taken from the
-  library, never written by hand.
-- Kernel constructors, `pipe`, `feed`, `sync`, `startup` and `shutdown` are callable from untyped Maru. A pipeline such
-  as `gezira-library.l`'s (TransformBeziers, ClipBeziers, Rasterize, a composite) is built in Maru Lisp.
-- The records untyped Maru holds (a process, a kernel's parameters, an image) are Maru objects of their own types, read
-  by field like any `define-structure`.
-- `gezira-maru.l`'s hand-written signatures and `gezira-api.k`'s fixed pipelines go away. The clipping stages
-  `ksworld-render.l` builds become pipelines composed in Maru.
-- The same pixels as today: `gezira_image`, `gezira_maru`, `gezira_scene` and `ksworld_pixels` keep their assertions.
+- The native path compiles the Nile runtime and Gezira in time comparable to the C back end.
+- Nile's kernel constructors, `pipe`, `feed`, `sync`, `startup` and `shutdown` are callable from Maru, and pipelines
+  (including the clipping stages `ksworld-render.l` builds) are composed in Maru Lisp. `gezira-api.k`'s fixed pipelines
+  go away.
+- The records Maru holds are Maru objects of their own types (`define-object`), read by field.
+- On the kernel, a Nile program is compiled in-process and called without any signature written by hand.
+- The same pixels throughout: `gezira_image`, `gezira_maru`, `gezira_scene` and `ksworld_pixels` keep their
+  assertions.
 
 ## Non-goals
 
-- Code images. `native-image.l` stays for what it does, but Nile doesn't go through it.
-- Compiling on `eval`. `maru.k` keeps running on `eval2`, as a build step, the way make builds `build/gezira.dylib`
-  now.
-- A new Nile compiler or new runtime semantics. The 2016 Gezira source and the runtime in `nile/runtimes/maru` are
-  used as they are.
+- Self-describing libraries and a loader that rebuilds types and signatures from them (the first draft of this plan).
+  They bridge the C evaluator to typed code, and the kernel removes that gap.
+- Making the C evaluators compile typed Maru in-process. `eval` keeps using the library path until the kernel replaces
+  it.
+- New Nile semantics. The 2016 Gezira source and the runtime in `nile/runtimes/maru` are used as they are.
 
 ## Anti-goals
 
-- A second statement of any signature or layout. If untyped Maru repeats what the library already says, the plan has
-  failed even if the pixels are right.
-- Worker threads allocating in Maru's heap or reading objects the collector may free. The collector isn't
-  thread-safe, and a race there is a corrupted heap, not a wrong pixel.
-- C written by hand. The description, the loader and the bridge are Maru and typed Maru (`maru-runtime-in-maru-languages`).
+- Treating the native path's time as a performance target. It's a bug, and it's found before anything depends on it.
+- Worker threads allocating in Maru's heap, or reading an object the collector may free.
+- C written by hand (`maru-runtime-in-maru-languages`).
 
 ## Approaches
 
-1. **A library that describes itself, built as today (chosen).** Compile with `ir-gen-c.k`, link with `cc`, and add
-   one exported symbol holding the unit's description: its exports' names and types, and its object types' names and
-   fields, as Maru form text. A loader in untyped Maru reads the text and defines everything from it.
-   - Cost: `cc` stays in the build.
-   - What it buys: discovery lands now. Discovery doesn't depend on who writes the library, so the linker can change
-     later without touching the loader.
-2. **Maru writes the shared object itself.** `native-gen.k` produces the code, and `exe.l`, which already writes
-   Mach-O and ELF executables, is extended to write `MH_DYLIB` and `ET_DYN`, carrying the same description.
-   - What it buys: no toolchain at all.
-   - Cost: it is a linker project in its own right (exports, relocation, dyld's binding of the evaluator's symbols).
-   - It comes after 1, as its last step, and the loader stays as it is.
-3. **Bindings generated as Maru source at build time** (a `gezira-bindings.l` written by make).
-   - Ruled out: the description then lives in a second file that can drift from the library it describes. A library
-     that carries its own description can't be out of step with itself.
+1. **Around the kernel (chosen).**
+   - Fix the native path first.
+   - On today's library path, do only what carries over: Nile's records as objects, pipelines composed in Maru, and
+     the threads rule.
+   - Then move Nile onto the kernel, where compiling in-process removes the bridging.
+2. **Self-describing libraries for `eval` (the first draft).** Ruled out: a description string, a loader and type ids
+   bound at load exist only because the C evaluator and typed code are separate worlds. The kernel joins them.
+3. **Wait for the kernel entirely.** Ruled out: the objects, the pipelines in Maru and the threads rule don't depend on
+   the kernel. Doing them now on the library path tests them against the pixel checks we already have, and the kernel
+   inherits them unchanged.
 
-## The design
+## Part A: now, on today's evaluators
 
-### The description
+### A1. The native path's bug
 
-- Every unit compiled in library mode exports `maru_unit_description`, a function answering a C string. The string is
-  a Maru form:
-  ```
-  (unit gezira
-    (export gezira_TransformBeziers (nile_Process * nile_Process * float float float float float float))
-    ...
-    (object <nile-process> atom ((...)))
-    ...)
-  ```
-- `ir-gen-c.k` writes it from what `maru.k` already holds at `compile-end`, so it can't disagree with the code it
-  sits beside.
-- Types are named in `maru.k`'s terms, not as `subr` letters. The loader maps them to letters (`int` to `i`, `long` and
-  `T *` to `l` or `p`, `float` to `f`, `double` to `d`, `char *` to `s`). A type with no letter (a struct passed by
-  value) refuses the export, naming it, when the library loads, not when it is called.
+- Find it with `superpowers:systematic-debugging`. Reduce a builtin (Zip or SortBy) to the smallest function that
+  shows the growth, then time it at two sizes to establish the curve.
+- Profile at Maru's level. `eval2`'s `-p` profiler is commented out (`eval2.c:3269`, `3617`) while `eval`'s works.
+  Restoring it in `eval2` is part of the step, since it is the tool that names the Maru function.
+- The fix goes in Maru (`native-gen.k`, `native.l`, `asm-*.l` or `native-link.l`), never in the collector's pacing to
+  hide it.
+- Check `native_nile`: `native.l` compiles the Nile runtime and `build/gezira.k` in one unit on `eval2` within a bound
+  set from the C back end's time (a small multiple of it, set once the curve is known), on the check's own budget.
+  `native_ir2`'s programs still pass.
 
-### The loader: `native-library.l`, untyped Maru
+### A2. Pipelines composed in Maru
 
-- `(native-library "build/gezira")` adds the platform's suffix, then calls `dlopen`, `dlsym "maru_unit_description"`
-  and `read`.
-- For each export it defines a global of that name holding a `subr` with the derived signature.
-- For each object type it defines a Maru type and its field accessors (below), and it gives the library the type's id.
-- A missing symbol, a description that won't read, or a type with no letter is an error naming the library and the
-  export. Nothing is defined in part.
-- It runs on `eval`, `eval2` and `eval3`, as `gezira-maru.l` does now.
+- The runtime's entry points (kernel constructors, `pipe`, `feed`, `sync`, `startup`, `shutdown`) and Gezira's kernel
+  constructors are exported from the library. `gezira-api.k` keeps only what isn't a pipeline: the image's helpers
+  (`gezira_image_new`, `gezira_pixel`, `downsample`, `premultiply`).
+- `gezira-maru.l` composes each pipeline `gezira.l`'s selectors need, the clipping stages included. Its signatures stay
+  hand-written, in that one place, until Part B removes them.
+- `gezira_maru`, `gezira_scene` and `ksworld_pixels` keep their assertions. Lines and erosion get ledger entries.
 
-### Objects
+### A3. Nile's records as Maru objects
 
-- A record untyped Maru holds is declared in the runtime with `define-object`, and the library allocates it with
-  `new`. `new` goes through `gc_malloc`, which resolves to the evaluator's `GC_malloc`, so the object is in Maru's
-  heap, typed, and freed when unreachable.
-- Nile's fields are ints, floats and pointers into Nile's own heap, never Maru references, so these objects are `atom`.
-  The collector doesn't trace them.
-- **Type ids are the host's.** A library can't fix an id: `<long>`, `<pair>` and the rest are whatever the evaluator
-  booted with, and `define-structure` assigns ids as it runs. So a library's object type takes its id from a global the
-  loader sets before the first call. The library declares the type by name, the loader makes the type in the
-  evaluator, then it writes the id into the library's global (exported, found by `dlsym`).
-  - This is a change to `define-object`, whose id is evaluated when the form is read. Library mode makes the id a
-    load-time global.
-- **Fields from untyped Maru.** For each field the loader defines an accessor (`<nile-process>-workers`). The accessor
-  reads the field at its offset and width from the description, using `byte_bounds`'s raw access, and refuses an object
-  of another type. Whether reading a float field needs a new primitive is the builder's to find out. Any new primitive
-  is written in a Maru language.
+- The process handle, a kernel's parameters and the image become `define-object`s in the runtime, allocated with `new`
+  through the unit's `gc_malloc`. In a library opened by `eval`, that resolves to `eval`'s exported `GC_malloc`
+  (`SOCFLAGS` links with `dynamic_lookup`).
+- Their fields are ints, floats and pointers into Nile's own heap, never Maru references, so they are `atom`.
+- **Ids on today's evaluators.** A library can't fix a host's type ids, so each object type's id is a global that
+  `gezira-maru.l` sets once, beside its signatures, from the type it defines. This is the one bridge Part A keeps, and
+  Part B deletes it.
+- Untyped Maru reads fields through accessors `gezira-maru.l` defines. A float field may need a primitive. If so, it is
+  written in a Maru language.
+- **Threads.** Only the evaluator's thread allocates Maru objects: constructors, `pipe` and `startup` are called from
+  Maru. Workers never call `gc_malloc`. Stream buffers, the scheduler's queues and every field the workers write stay
+  in Nile's heap (the memory `nile_startup` is given). A worker reads a Maru object only while Maru keeps it reachable,
+  and the handle's object holds the Nile process, never the reverse. `feed` keeps its argument reachable until
+  `sync`.
+- Check: the A2 checks pass with a collection on every allocation (`GC_collect_every`), which shows the objects
+  survive and nothing is freed under a worker.
 
-### Threads and the heap
+## Part B: on the kernel
 
-- Only the thread that runs the evaluator allocates Maru objects: a kernel constructor, `pipe` and `startup` are
-  called from Maru, on that thread. Workers never call `gc_malloc`.
-- Stream buffers, the scheduler's queues and every per-process field the workers write stay in Nile's own heap (the
-  memory `nile_startup` is given, from `malloc` as now). A worker may read a Maru object only while untyped Maru keeps
-  it reachable. The handle's object holds the Nile process, never the other way round, so dropping the handle while the
-  pipeline runs is the one way to break this. `sync` before the handle goes is the rule, and the loader's `feed` keeps
-  its argument reachable until `sync`.
+B builds on the kernel's BootsAndRepl (done) and comes after RecoverableErrors and Interrupts, already planned. A
+library load that fails, or a Nile error, should unwind to the REPL, not kill it. B doesn't wait for KernelCollector:
+`maru-gc.k`'s collector suffices.
 
-### What goes away
+### B1. The kernel runs `maru.k` and `native.l`
 
-- `gezira-maru.l`'s eleven `gezira-entry` calls and its `define-structure <gezira-maru>`: the library defines both.
-- `gezira-api.k`'s pipelines: `gezira_fill`, `gezira_fill_image`, `gezira_fill_clipped` and the image-clipped one.
-  Their composition moves into Maru Lisp. The image helpers (`gezira_image_new`, `gezira_pixel`, `downsample`,
-  `premultiply`) stay as exports, since they aren't pipelines.
-- `check/library-mode.l`'s hand-written signatures.
+- Measure the primitives they use as the Primitives capability measured `boot2.l`'s: a counting run plus a read of
+  the source. The kernel gains exactly those, `subr` (the FFI) presumably among them, since `code-region.l` needs
+  `mmap` and the JIT write protection.
+- Check: the kernel compiles `check/native/add.k` in-process and runs it, giving `native_ir2`'s Task 1 answer.
 
-## Steps (each a checkpoint commit, each with its check first)
+### B2. Compiled code called as the kernel's own
 
-1. **Discovery.** `ir-gen-c.k` library mode writes `maru_unit_description`, and `native-library.l` reads it.
-   `library_mode` is rewritten to use no signature of its own and still answers 7, 42 and 5. New cases: a library whose
-   description names a type with no `subr` letter is refused at load, naming the export; a missing symbol is refused
-   too.
-2. **Nile from eval.** `text-layout.nl` is built as a library, and untyped Maru builds MakeWords and InsertLineBreaks
-   into a pipeline, feeds the four glyphs and reads (0,0) (3,0) (6,0) (0,1), on 1 and 8 workers: `nile_text_layout`'s
-   answer, from `eval`.
-3. **Objects.** The process handle and a kernel's parameters become `define-object` atoms with ids bound at load.
-   Untyped Maru reads a field by name, and a field of another type's object is refused. Under `MARU_GC_EVERY=1` (or
-   the evaluator's `GC_collect_every`), the step-2 pipeline still answers the same, which shows the objects survive
-   collection.
-4. **Gezira.** `gezira.l`'s selectors are implemented on the loaded library, with pipelines composed in Maru, including
-   the clipping stages. `gezira_maru`, `gezira_scene` and `ksworld_pixels` keep their assertions, and
-   `gezira-api.k`'s pipelines are deleted. Lines and erosion get their ledger entries.
-5. **No toolchain (approach 2).** `native-gen.k` and `exe.l` write the shared object with the same description. Every
-   check above passes against it, and `cc` leaves the Nile build.
+- A compiled unit's functions become `<subr>`s whose `imp` is the native entry. The calling convention comes from the
+  compiler's own types (`*maru-exports*`), held in the same process, so no signature text exists anywhere.
+- A unit's `define-object` types are the kernel's types: the ids are the kernel's own, assigned as the unit is
+  compiled, so nothing is bound at load. A3's id globals and A2's hand-written signatures are deleted.
+
+### B3. Nile on the kernel
+
+- `text-layout.nl`, compiled in-process on the kernel, lays its four glyphs out as `nile_text_layout` does: (0,0)
+  (3,0) (6,0) (0,1), on 1 and 8 workers, with a pipeline composed in Maru.
+- Then Gezira: `gezira.l`'s selectors on the kernel give `gezira_maru`'s and `gezira_scene`'s pixels.
+
+### B4. Keeping compiled units
+
+- With A1 fixed, compiling Gezira should take seconds, but not at every start-up. A compiled unit is kept as a shared
+  library written by Maru itself (`exe.l`, extended to `MH_DYLIB` and `ET_DYN`), so `cc` leaves the build.
+- The library carries the unit's declarations (exports and object types), written and read by the kernel alone. It is
+  a cache's index, one program talking to itself, not a bridge. It is reused only while its source is unchanged.
+- Check: the second run loads the kept library without compiling, and gives the same pixels.
 
 ## Checks and docs
 
-- New check `nile_eval` (steps 2 and 3) in `doc/nile.md`. `library_mode` gets its description in `doc/ir2.md`, which
-  today says it isn't described yet.
-- `native-library.l` is a unit's piece: `doc/nile.md` for Nile's use, with the loader described where `library_mode`
-  is.
-- `notes/plan/render.john` gains the capabilities NileDiscovery, NileFromEval, NileObjects and GeziraComposed, each
-  with its check, so the plan's frontier sees them.
+- `native_nile` (A1) in `doc/native.md`. A2 and A3 change what `gezira_maru` asserts, in `doc/nile.md`. B's checks are
+  in `doc/kernel.md`, and `exe.l`'s shared objects in `doc/assemblers.md`.
+- `notes/plan/render.john` gains NativeNileCompiles, PipelinesInMaru and NileObjects. `notes/plan/kernel.john` gains
+  KernelCompiles, KernelCallsCompiled, NileOnKernel and KeptUnits, with their `builds-on`.
 
 ## Left to the builder
 
-- The description's exact form, provided it reads with Maru's `read` and names types in `maru.k`'s terms.
-- How `ir-gen-c.k` emits a long string literal.
-- Whether float fields need a primitive.
-- The accessor names.
+- Accessor names, and how A2 exports the runtime's entry points.
+- The `native_nile` bound, once A1 has the curve.
+- Whether a float field needs a primitive.
 
 ## Open
 
-- **Process state as Maru objects.** This design keeps what the workers write in Nile's heap and makes the handles and
-  parameters Maru objects, because the collector is single-threaded. Making a running process's own state a Maru
-  object would need either the collector to stop the workers (a safepoint in the scheduler) or the objects to be
-  rooted and never freed while scheduled. Both are larger than this plan. The question is whether handles and
-  parameters are enough for now.
-- A probe is running: `native-gen.k` compiling the Nile runtime and `build/gezira.k` in one unit on `eval2`. Whatever it
-  refuses is work for step 5.
+- **A running process's own state as Maru objects.** The plan makes handles and parameters objects, and keeps what
+  workers write in Nile's heap, because both collectors are single-threaded. Putting a running process's state in
+  Maru's heap would need the collector to stop the workers (a safepoint in Nile's scheduler) or those objects pinned
+  while scheduled. Left until B3 works.
