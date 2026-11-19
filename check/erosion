@@ -16,3 +16,4 @@ verbosity -1 the same: argument lists are forms the verbose patterns pass
 erosion -1 no shell in the checks: system() command strings replaced by spawn.l's small helpers
 erosion -9 erosion attribution (make erosion-report against the branch's base drafted this): erosion-of split under CC 10 (19 to 5), check.l's counted-files (CC 10) moved into erosion-files.l in small functions; edits -2, share -7 (the new code's mass)
 verbosity -2 erosion attribution: copies the report found removed (getenv, the output capture, select, string-find, expect and ifs, each defined once now); edits 0, share -2
+erosion -1 review: attribute split into two passes (measure-change, attribute-measured), smaller callables

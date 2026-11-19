@@ -20,7 +20,8 @@
 (define-structure <callable> (name path line last cc forms flagged))	; a definition, its first and last line, its complexity,
 										; its forms, and its forms a verbose pattern or clone covers
 (define-structure <verbose-finding> (rule form))		; a form a verbose pattern flags
-(define-structure <erosion-metrics> (erosion verbosity callables forms flagged findings))	; per mille; counts of forms
+(define-structure <erosion-metrics> (erosion verbosity callables forms flagged findings seen))	; per mille; counts of forms;
+										; seen: each clone key's count
 (define-method do-print <callable> () (print "<" self.name " " self.path ":" self.line " CC " self.cc ", " self.forms " forms>"))
 (define sqrt (subr "sqrt" "d>d"))
 (define-function erosion-mass (c) (* (<callable>-cc c) (sqrt (* 1.0 (<callable>-forms c)))))
@@ -181,7 +182,7 @@
     (list-reverse! out)))
 ;; one file's walk: each top-level form's answer added to forms, its clone candidates to occurrences (counted by key in
 ;; seen), its verbose findings to flags, and its callables to owned, each (form . <callable>)
-(define-structure <erosion-walk> (forms tops occurrences owned flags seen))
+(define-structure <erosion-walk> (forms tops occurrences owned flags seen elsewhere))	; elsewhere: a key's count outside these sources
 (define-function erosion-candidate (w x key atoms)	; a list of at least 12 atoms is a clone candidate, counted by its key
   (when (<= 12 atoms)
     (hash-at-put (<erosion-walk>-seen w) key (+ 1 (hash-at (<erosion-walk>-seen w) key 0)))
@@ -201,10 +202,13 @@
 (define-function erosion-coverage (w)
   (let ((covered (identity-hash-table)) (findings ()))
     (hash-do (<erosion-walk>-flags w) (lambda (x rule) (hash-at-put covered x 't) (push findings (make <verbose-finding> rule: rule form: x))))
-    (list-do o (<erosion-walk>-occurrences w) (and (< 1 (hash-at (<erosion-walk>-seen w) (car o))) (hash-at-put covered (cdr o) 't)))
+    (list-do o (<erosion-walk>-occurrences w)
+      (and (< 1 (+ (hash-at (<erosion-walk>-seen w) (car o)) ((<erosion-walk>-elsewhere w) (car o)))) (hash-at-put covered (cdr o) 't)))
     (cons covered (list-reverse! findings))))
-(define-function erosion-of (sources)
-  (let ((w (make <erosion-walk> forms: 0 flags: (identity-hash-table) seen: (identity-hash-table))) (callables ()) (flagged 0))
+(define-function erosion-of (sources . elsewhere)	; elsewhere: a clone key's count in the rest of a tree, these sources not in it
+  (let ((w (let ((e (or (car elsewhere) (lambda (key) 0))))
+	     (make <erosion-walk> forms: 0 flags: (identity-hash-table) seen: (identity-hash-table) elsewhere: e)))
+	(callables ()) (flagged 0))
     (list-do src sources (erosion-walk-source src w))
     (let* ((coverage (erosion-coverage w)) (covered (car coverage)) (forms (<erosion-walk>-forms w)))
       (list-do form (<erosion-walk>-tops w) (set flagged (+ flagged (erosion-covered-forms form covered))))
@@ -214,7 +218,7 @@
       (make <erosion-metrics>
 	    erosion: (erosion-per-mille (erosion-masses callables))
 	    verbosity: (if (< 0 forms) (/ (* 1000 flagged) forms) 0)
-	    callables: callables forms: forms flagged: flagged findings: (cdr coverage)))))
+	    callables: callables forms: forms flagged: flagged findings: (cdr coverage) seen: (<erosion-walk>-seen w)))))
 ;; check/erosion's ledger, read by erosion-ledger.g to entries; answers each metric's sum, (erosion . verbosity)
 (define-function erosion-ledger (text)
   (let ((e 0) (v 0))

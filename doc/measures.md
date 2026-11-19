@@ -64,7 +64,10 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   removed line falls within its lines. Each metric's move splits into the edited callables' part, over the tree's whole,
   and the share, the rest, so the two sum; the base's values are its ledger's when that ledger holds (its erosion equals
   the base rebuilt from the changed files, exact for erosion), else the rebuilt ones, said so. A changed file's current
-  callables are the whole tree's, so a copy of code in an untouched file is the edit's clone. A conflicted file is
+  callables are the whole tree's, so a copy of code in an untouched file is the edit's clone; its base callables count
+  clones across the tree as it was (clone keys' counts add up file by file: the tree's now, less the changed files' now,
+  plus their counts at the base), so a clone that was already there isn't. A changed file the check doesn't count
+  (`notes/`, derived, unused) isn't attributed, and one that doesn't read is reported as unmeasured. A conflicted file is
   attributed side by side. The report: each metric's base, now, whole, edited and share; each callable that moved, edited
   first, by mass moved; and drafted `check/erosion` entries naming the edits that moved most. `make erosion-report
   [REV=…]` prints it (`./eval erosion-attribute-run.l [REV]`, `HEAD`, or `@-` under jj); when the erosion check's ledger

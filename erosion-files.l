@@ -41,4 +41,12 @@
 (define-function counted-files (suffixes) (counted-files-in "." suffixes))
 (define-function measured-file? (path)	; a file erosion measures: .l, .k or .g, and one it can read whole
   (and (or (ends-with? path ".l") (ends-with? path ".k") (ends-with? path ".g")) (not (member? path erosion-unread))))
+;; one path, measured or not, as measured-files would count it: its repository (the superproject, nile or gezira) asked
+;; whether it is derived or unused, and notes/ left out
+(define-function starts-with? (s prefix) (and (<= (string-length prefix) (string-length s)) (= prefix (string-copy s 0 (string-length prefix)))))
+(define-function counted-path? (root path)
+  (let* ((sub (cond ((starts-with? path "nile/") "nile") ((starts-with? path "gezira/") "gezira")))
+	 (name (if sub (string-copy path (+ 1 (string-length sub)) (- (string-length path) (+ 1 (string-length sub)))) path)))
+    (and (measured-file? path) (not (starts-with? name "notes/"))
+	 (unmarked (if sub (concat-strings root "/" sub) root) (list name)) 't)))
 (define-function measured-files (root) (select measured-file? (counted-files-in root '(".l" ".k" ".g"))))

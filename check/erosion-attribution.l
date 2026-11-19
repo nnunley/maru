@@ -95,6 +95,17 @@
 	(let ((h (move-named copied 'h))) (list (<move>-edited h) (< 0 (<move>-flagged-after h)) (< 0 (cadddr (<attribution>-verbosity copied)))))
 	'(t t t))
 
+;; a clone that was there before, its partner in an untouched file, isn't the edit's: the base side counts clones across
+;; the whole tree as it was, as the current side counts them across the tree now
+(define kept
+  (let ((ch (text-change "a.l" "a.l" (concat-strings "(define-function f ()\n  (k)\n  " body ")\n")
+			 (concat-strings "(define-function f ()\n  (k 2)\n  " body ")\n"))))
+    (attribute (list ch) (measure-texts (list (cons "a.l" (<change>-current-text ch)) (cons "b.l" (defn "g" body)))) ())))
+(expect "a clone already there: its flagged forms unchanged, none of it the edit's"
+	(let ((f (move-named kept 'f))) (list (= (<move>-flagged-before f) (<move>-flagged-after f)) (< 0 (<move>-flagged-after f))
+					      (cadddr (<attribution>-verbosity kept))))
+	'(t t 0))
+
 ;; ---- the report: worked out by hand for crossing's change (f: CC 10 over 10 forms to CC 11 over 11; k: CC 1, 1 form):
 ;; erosion now 11 sqrt 11 / (11 sqrt 11 + 1) = 973 per mille, all of it f's edit; no ledger, so the base is rebuilt: 0
 (define ledger-before (contents-of-file-named "check/erosion"))
@@ -133,12 +144,16 @@
     (git-in dir "add" "-A") (git-in dir "commit" "-qm" "base")
     dir))
 (define sub (new-repo "sub" (list (cons "x.l" "(define-function x () 1)\n"))))
-(define super (new-repo "super" (list (cons "a.l" "(define-function a () 1)\n"))))
+(define super (new-repo "super" (list (cons "a.l" "(define-function a () 1)\n") (cons "gen.l" "(define g 1)\n") (cons ".gitattributes" "gen.l derived\n"))))
 (git-in super "submodule" "add" "-q" sub "nile")
 (git-in super "commit" "-qm" "submodule")
 (write-in super "a.l" "(define-function a () 1)\n(define-function b () 2)\n")
 (write-in super "nile/x.l" "(define-function x () 2)\n")
 (write-in super "u.l" "(define-function u () 3)\n")
+(write-in super "gen.l" "(define g 2)\n")	; marked derived: not measured, so not attributed
+(make-directory (concat-string super "/notes"))
+(write-in super "notes/n.l" "(define n 1)\n")	; under notes/: not measured
+(git-in super "config" "diff.submodule" "log")	; a setting that changes git diff's submodule lines
 (define changes (vcs-changes super "HEAD"))
 (expect "the superproject's file, the untracked one, and the submodule's, prefixed"
 	(map (lambda (c) (<change>-path c)) changes) '("a.l" "u.l" "nile/x.l"))
@@ -146,6 +161,10 @@
 	(map (lambda (c) (<change>-base-text c)) changes) '("(define-function a () 1)\n" () "(define-function x () 1)\n"))
 (expect "the lines a change added" (<change>-added (car changes)) '(2))
 (expect "a revision that doesn't exist" (vcs-revision? super "nosuch") ())
+(write-in super "bad.g" "<b> : <text-parser> ()\nr = \"x\"\n")	; a grammar that stops reading partway
+(expect "a changed file that doesn't read is reported as unmeasured, not a crash"
+	(and (select (lambda (l) (string-find l "unmeasured bad.g")) (attribution-command-lines super "HEAD")) 't) 't)
+((subr "unlink" "s>i") (concat-string super "/bad.g"))
 (expect "a clean repository: no change" (attribution-command-lines (new-repo "clean" (list (cons "c.l" "(define c 1)\n"))) "HEAD")
 	'("no change against HEAD"))
 (expect "the command refuses a revision that doesn't exist"

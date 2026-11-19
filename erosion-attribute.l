@@ -2,6 +2,7 @@
 ;;; (doc/rfc/draft-ndn-erosion-attribution-00.md).  diff.g reads the change, git's unified diff or jj's conflict markers,
 ;;; into the records below.
 (require "erosion.l")
+(require "recover.l")
 
 (define-structure <hunk> (old-start old-count new-start new-count lines))	; lines: (- text), (+ text), (" " text)
 (define-structure <file-diff> (old-path new-path status hunks submodule))	; status: modified added deleted renamed submodule
@@ -88,7 +89,8 @@
 
 (define-structure <change> (path old-path base-text current-text added removed))	; added, removed: line numbers
 (define-structure <move> (path name edited cc-before cc-after forms-before forms-after flagged-before flagged-after))
-(define-structure <attribution> (erosion verbosity moves rebuilt))	; each metric (base now whole edited share), per mille
+(define-structure <attribution> (erosion verbosity moves rebuilt unmeasured))	; each metric (base now whole edited share),
+										; per mille; unmeasured: changed files that don't read
 
 (define-function attribution-scratch ()	; MARU_CHECK_TMP's attribution/, else one of this process's own under /tmp
   (concat-strings (if (= "/tmp" (erosion-scratch)) (concat-strings "/tmp/maru-attribution-" (long->string (erosion-getpid)))
@@ -102,8 +104,20 @@
     file))
 (define-function measure-texts (pairs)	; erosion-of over ((path . text) ...), each read by erosion-read-file
   (erosion-of (map (lambda (p) (cons (car p) (erosion-read-file (scratch-write "now" (car p) (cdr p))))) pairs)))
-(define-function measure-one (side path text)	; one file's metrics, or () for no text
-  (and text (erosion-of (list (cons path (erosion-read-file (scratch-write side path text)))))))
+(define-function readable-forms (file)	; (t . its forms) as erosion-read-file reads it, or () if it doesn't read
+  (try-call (lambda () (cons 't (erosion-read-file file))) (lambda (c) ())))
+(define-function measure-one (side path text . elsewhere)	; one file's metrics, () for no text, unread if it doesn't read
+  (and text (let ((forms (readable-forms (scratch-write side path text))))
+	      (if forms (erosion-of (list (cons path (cdr forms))) (car elsewhere)) 'unread))))
+;; a clone key's count in the tree at the base outside one changed file: the tree's count now, less every changed file's now,
+;; plus every other changed file's at the base (counts add up file by file)
+(define-function key-count (m key) (if (and m (not (= m 'unread))) (hash-at (<erosion-metrics>-seen m) key 0) 0))
+(define-function base-elsewhere (tree-now afters befores this)
+  (lambda (key)
+    (let ((n (key-count tree-now key)))
+      (list-do a afters (set n (- n (key-count a key))))
+      (list-do b befores (or (= b this) (set n (+ n (key-count b key)))))
+      n)))
 
 ;; a change from two texts: git's line diff of them (--no-index), read by diff.g, gives its added and removed lines
 (define-function hunk-lines (hs start count)	; the numbers a list of hunks' sides cover
@@ -180,20 +194,33 @@
 	  erosion: (metric-split (car b) (<erosion-metrics>-erosion tree-now) (if (< 0.0 total) (double->long (/ (* 1000.0 de) total)) 0))
 	  verbosity: (metric-split (cdr b) (<erosion-metrics>-verbosity tree-now) (per-mille-of df (<side-totals>-forms now)))
 	  moves: moves rebuilt: (not holds))))
-(define-function attribute (changes tree-now base-ledger)
-  (let ((pairs ()) (moves ()) (befores ()) (afters ()) (de 0.0) (df 0))
-    (list-do ch changes
-      (let ((b (measure-one "base" (<change>-old-path ch) (<change>-base-text ch)))
-	    (a (measure-one "now" (<change>-path ch) (<change>-current-text ch))))
-	(push befores b) (push afters a)
-	(list-do p (match-callables (callables-of-metrics b) (tree-callables tree-now (<change>-path ch) a))
-	  (let ((m (pair-move (<change>-path ch) p (pair-edited? p ch))))
-	    (when (<move>-edited m)
+(define-structure <measured> (change before after))	; a change's base and current metrics, each () where absent
+(define-function measure-change (ch)	; first pass: each side alone; unread if either doesn't read
+  (let ((b (measure-one "base" (<change>-old-path ch) (<change>-base-text ch)))
+	(a (measure-one "now" (<change>-path ch) (<change>-current-text ch))))
+    (if (or (= b 'unread) (= a 'unread)) 'unread (make <measured> change: ch before: b after: a))))
+(define-function attribute-measured (measured tree-now base-ledger)	; second pass: each base with the base tree's clones
+  (let ((afters (map (lambda (m) (<measured>-after m)) measured)) (befores (map (lambda (m) (<measured>-before m)) measured))
+	(moves ()) (de 0.0) (df 0) (rebased ()))
+    (list-do m measured
+      (let* ((ch (<measured>-change m))
+	     (b (measure-one "base" (<change>-old-path ch) (<change>-base-text ch) (base-elsewhere tree-now afters befores (<measured>-before m)))))
+	(push rebased b)
+	(list-do p (match-callables (callables-of-metrics b) (tree-callables tree-now (<change>-path ch) (<measured>-after m)))
+	  (let ((mv (pair-move (<change>-path ch) p (pair-edited? p ch))))
+	    (when (<move>-edited mv)
 	      (set de (+ de (- (eroded-mass (cdr p)) (eroded-mass (car p)))))
 	      (set df (+ df (- (flagged-of (cdr p)) (flagged-of (car p))))))
-	    (and (move-moved? m) (push moves m))))))
-    (attribution-of-totals (totals-of (list tree-now)) (totals-of afters) (totals-of befores) tree-now base-ledger de df (list-reverse! moves))))
-
+	    (and (move-moved? mv) (push moves mv))))))
+    (attribution-of-totals (totals-of (list tree-now)) (totals-of afters) (totals-of rebased) tree-now base-ledger de df (list-reverse! moves))))
+(define-function attribute (changes tree-now base-ledger)
+  (let ((measured ()) (unmeasured ()))
+    (list-do ch changes
+      (let ((m (measure-change ch)))
+	(if (= m 'unread) (push unmeasured (<change>-path ch)) (push measured m))))	; left out of both sides, so the parts sum
+    (let ((a (attribute-measured (list-reverse! measured) tree-now base-ledger)))
+      (set (<attribution>-unmeasured a) (list-reverse! unmeasured))
+      a)))
 ;; ---- the report
 
 (define-function signed (n) (if (< 0 n) (concat-string "+" (long->string n)) (long->string n)))
@@ -242,7 +269,8 @@
 (define-function attribution-report (a)	; lines: the metrics, then each move, then the drafted ledger entries
   (concat-list (list (metric-line "erosion" (<attribution>-erosion a)) (metric-line "verbosity" (<attribution>-verbosity a)))
 	       (concat-list (if (<attribution>-rebuilt a) '("the base's values rebuilt from the changed files: no ledger at the base holds") ())
-			    (concat-list (map move-line (moves-in-order a)) (cons "ledger:" (attribution-ledger-entries a))))))
+			    (concat-list (map (lambda (p) (concat-strings "unmeasured " p ": it doesn't read")) (<attribution>-unmeasured a))
+					 (concat-list (map move-line (moves-in-order a)) (cons "ledger:" (attribution-ledger-entries a)))))))
 
 ;; a conflicted file, side by side: each side's whole file attributed against the conflict's base as a change of its own,
 ;; with the side's file as its tree (the working copy's file holds markers): ((label . <attribution>) ...)

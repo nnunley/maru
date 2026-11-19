@@ -17,7 +17,7 @@
 (define-function vcs-diff (root rev)
   (if (= 'jj (vcs-kind root))
       (vcs-output root (list "jj" "diff" "--git" "--context" "0" "--from" rev "--to" "@"))
-    (vcs-output root (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" rev "--"))))
+    (vcs-output root (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" "--submodule=short" rev "--"))))
 (define-function vcs-show (root rev path)	; a file's text at a revision, or ()
   (if (= 'jj (vcs-kind root))
       (vcs-output root (list "jj" "file" "show" "-r" rev path))
@@ -35,18 +35,18 @@
     (make <change> path: (concat-string prefix (or now was)) old-path: (concat-string prefix (or was now))
 	  base-text: (and was (show was)) current-text: (and now (current-text root (concat-string prefix now)))
 	  added: (hunk-numbers hs 'new) removed: (hunk-numbers hs 'old))))
-(define-function measured-change? (fd prefix)
+(define-function measured-change? (root fd prefix)	; a file the erosion check measures, as it counts them
   (and (not (= 'submodule (<file-diff>-status fd)))
-       (measured-file? (concat-string prefix (or (<file-diff>-new-path fd) (<file-diff>-old-path fd))))))
-(define-function untracked (dir prefix)	; new files git doesn't ignore, as changes that add them
-  (select (lambda (f) (measured-file? (concat-string prefix f))) (text-lines (or (vcs-output dir '("git" "ls-files" "-o" "--exclude-standard")) ""))))
+       (counted-path? root (concat-string prefix (or (<file-diff>-new-path fd) (<file-diff>-old-path fd))))))
+(define-function untracked (root dir prefix)	; new files git doesn't ignore, as changes that add them
+  (select (lambda (f) (counted-path? root (concat-string prefix f))) (text-lines (or (vcs-output dir '("git" "ls-files" "-o" "--exclude-standard")) ""))))
 (define-function added-change (root path)
   (let ((text (current-text root path)))
     (make <change> path: path old-path: path base-text: () current-text: text added: (let ((n (list-length (text-lines text))) (out ())) (for (i 1 (+ n 1)) (push out i)) (list-reverse! out)) removed: ())))
 (define-function changes-from (root dir prefix text show)	; a diff's measured changes, then untracked files, under prefix
   (let ((out ()))
-    (list-do fd (if text (read-diff text) ()) (and (measured-change? fd prefix) (push out (diff-change root prefix fd show))))
-    (list-do f (untracked dir prefix) (push out (added-change root (concat-string prefix f))))
+    (list-do fd (if text (read-diff text) ()) (and (measured-change? root fd prefix) (push out (diff-change root prefix fd show))))
+    (list-do f (untracked root dir prefix) (push out (added-change root (concat-string prefix f))))
     (list-reverse! out)))
 
 ;; submodules: each path .gitmodules names, its commit as recorded at the base, against its working copy, by git inside it
@@ -61,7 +61,7 @@
     (and out (< 54 (string-length out)) (string-copy out 14 40))))	; "160000 commit " is 14 characters
 (define-function submodule-changes (root commit path)
   (let ((old (recorded-commit root commit path)) (dir (concat-strings root "/" path)) (prefix (concat-string path "/")))
-    (and old (changes-from root dir prefix (vcs-output dir (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" old "--"))
+    (and old (changes-from root dir prefix (vcs-output dir (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" "--submodule=short" old "--"))
 			   (lambda (p) (vcs-output dir (list "git" "show" (concat-strings old ":" p))))))))
 (define-function vcs-changes (root rev)	; the superproject's changes, its untracked files', then each submodule's
   (let ((commit (vcs-commit root rev)) (out ()))
@@ -75,7 +75,8 @@
   (let ((sources ()))
     (list-do f (measured-files root)
       (let ((text (current-text root f)))
-	(or (not text) (conflicted? text) (push sources (cons f (erosion-read-file (concat-strings root "/" f)))))))
+	(or (not text) (conflicted? text)
+	    (let ((forms (readable-forms (concat-strings root "/" f)))) (and forms (push sources (cons f (cdr forms))))))))
     (erosion-of (list-reverse! sources))))
 (define-function conflicted-lines (changes)	; each conflicted file's sides, each side's report under its label
   (let ((out ()))
