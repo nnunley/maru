@@ -131,6 +131,30 @@
 		 1)))))
       (error "rule " *tp-rule* " has a list pattern, which needs a grammar on <source-parser>")))
 
+;; A choice dispatches on the head of the element in front of it.  An alternative whose first step enters a list
+;; that starts with a literal symbol, `( 'add …), has that symbol for its key; the choice reads the element's head
+;; once and tries only the alternatives keyed by it and those with no key, in their order.  in-same is identity on a
+;; symbol, so an alternative passed over could not have matched; a head that isn't a symbol tries them all.  Without
+;; this each alternative entered the element only to fail on its first literal: a lowering grammar's intent paid a
+;; hash lookup per alternative.
+(define-function tp-first-symbol (pe)
+  (cond ((= (car pe) 'match-all)	(and (cdr pe) (tp-first-symbol (cadr pe))))
+	((= (car pe) 'match-object)	(and (symbol? (cadr pe)) (cadr pe)))))
+(define-function tp-head-key (pe)
+  (cond ((= (car pe) 'match-all)	(and (cdr pe) (tp-head-key (cadr pe))))
+	((= (car pe) 'assign-result)	(tp-head-key (caddr pe)))
+	((= (car pe) 'match-list)	(tp-first-symbol (cadr pe)))))
+(define-function tp-choice (exps pe-fn)
+  (let ((keyed 0))
+    (list-do e exps (and (tp-head-key e) (set keyed (+ keyed 1))))
+    (if (or (< keyed 2) (not (tp-source?)))
+	`(or ,@(map pe-fn exps))
+      `(let ((_h_ (source-parser-head self)))
+	 (or ,@(map (lambda (e)
+		      (let ((k (tp-head-key e)))
+			(if k `(and (or (not _h_) (= _h_ ',k)) ,(pe-fn e)) (pe-fn e))))
+		    exps))))))
+
 (define value-pe)
 (define effect-pe)
 
@@ -144,7 +168,7 @@
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$ name) self))))
     (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$ name)))
     (match-require	(exp alt)	`(or ,(value-pe exp) (,(tp-op 'expected) self ,alt)))
-    (match-first	exps		`(or ,@(map value-pe exps)))
+    (match-first	exps		(tp-choice exps value-pe))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(mapN1 effect-pe value-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(let ((_list_ (array)))
 					   (and ,(value-pe exp) (array-append _list_ self.result))
@@ -205,7 +229,7 @@
 					  `(,(tp-op 'invoke-rule) ',name ,(concat-symbol '$$ name) self))))
     (match-rule-in	(grammar name)	(tp-foreign-call grammar name (concat-symbol '$$ name)))
     (match-require	(exp alt)	`(or ,(effect-pe exp) (,(tp-op 'expected) self ,alt)))
-    (match-first	exps		`(or ,@(map effect-pe exps)))
+    (match-first	exps		(tp-choice exps effect-pe))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(if ,(effect-pe exp) 1 1))	; its value used, where typed code warns of none
     (match-zero-more	(exp)		`(let () (while ,(effect-pe exp)) 1))

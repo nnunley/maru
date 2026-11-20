@@ -347,3 +347,4 @@
 +1 eval2's -p profiler restored from Piumarta's commented copy: a count kept odd in a function's profile word (eval2 boxes longs), its source read from the pair
 +12 eval2 -P: the profiler counts every function on the stack, once a sample (a bit of each count marks it counted), so a count is a function's time with what it called
 +92 eval2's and eval3's global cache an open-addressing table, at most half full and growing, filled from the global namespace alone, where one slot per hash let globals in use evict each other and every miss searched them all; global_lookup holds it to 500 of 3000 globals
++51 a choice of list patterns dispatches on the element's head symbol (compile-tpeg.l's tp-choice, source-parser.l's source-parser-head), so an intent no longer enters its list once per alternative; tree_lists counts the entries

@@ -17,6 +17,13 @@
     (or (hash-at streams value)
 	(hash-at-put streams value (stream-of value)))))
 
+;; the symbol at the head of the element in front of the parser, when it is a list that starts with one, for a choice
+;; to try only the alternatives that name it (compile-tpeg.l's tp-choice); () otherwise
+(define-function source-parser-head (self)
+  (let ((c (<source-parser>-position self)))
+    (and (not (stream-end? c))
+	 (let ((v (stream-head c))) (and (pair? v) (symbol? (car v)) (car v))))))
+
 (define-function source-parser-for (class source)
   (let ((p (new class source () () () ())))
     (set (<source-parser>-position p) (source-parser-stream-of p source))

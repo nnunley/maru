@@ -25,7 +25,13 @@ PEG and tpeg grammars, left recursion, composition, typed tree matching and gram
   rule reads through proxy cells with fresh memos. A value entered twice reuses its stream, found in a hash table (a
   string by its text, anything else by identity, as Maru's `=`), so `tree_memo` asserts that entering four times the
   values takes less than eight times as long; a list of every value entered made it quadratic, and native-arm64.g's
-  lowering of a 4,600-intent function took 24 s, not 3. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
+  lowering of a 4,600-intent function took 24 s, not 3. A choice dispatches on the head of the element in front of it: an alternative whose first step
+  enters a list starting with a literal symbol, `` `( 'add …) ``, is tried only when the element's head is that symbol,
+  and those with no such literal always, in their order; a head that isn't a symbol tries them all, so the results are
+  the full choice's (`in-same` is identity on a symbol). `tree_lists` counts the entries: a list matched by the last of
+  eight literal alternatives is entered once for itself and once for the alternative with no literal before it, where
+  each alternative used to enter it to fail on its first literal, which cost native-arm64.g's lowering a hash lookup per
+  alternative per intent. Grammars compile in process (`tpeg-load`), and `tpeg-repl.l`
   interleaves code and grammar blocks on one input. A text grammar refuses what needs a source, by name.
 - `grammar_reflect` (`check/grammar-reflect.l`, plan `doc/plans/2026-11-09-grammar-engine.md`): a tpeg grammar keeps its
   definition (`grammar.l`): `(grammar-of type)` is its `<grammar>` (name, type, own fields, rules), each rule a

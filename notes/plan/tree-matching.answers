@@ -192,3 +192,8 @@
 (world (tree_parse_complete observed (value passed (tree "5213680534fd"))) ((tree_parse_complete evidence (value passed (tree "5213680534fd"))) (tree_parse_complete last-good (value passed (tree "5213680534fd")))))
 (world (tree_interleave observed (value passed (tree "5213680534fd"))) ((tree_interleave evidence (value passed (tree "5213680534fd"))) (tree_interleave last-good (value passed (tree "5213680534fd")))))
 (world (tree_calc observed (value passed (tree "5213680534fd"))) ((tree_calc evidence (value passed (tree "5213680534fd"))) (tree_calc last-good (value passed (tree "5213680534fd")))))
+(world (tree_lists observed (value failed (tree "8c02157129a6"))) ((tree_lists evidence (value failed (tree "8c02157129a6")))))
+(world (tree_lists observed (value failed (tree "35f0608b231b"))) ((tree_lists evidence (value failed (tree "35f0608b231b")))))
+(world (tree_lists observed (value passed (tree "d036a8a5491a"))) ((tree_lists evidence (value passed (tree "d036a8a5491a"))) (tree_lists last-good (value passed (tree "d036a8a5491a")))))
+(world (tree_lists observed (value passed (tree "64f92ae84731"))) ((tree_lists evidence (value passed (tree "64f92ae84731"))) (tree_lists last-good (value passed (tree "64f92ae84731")))))
+(world (tree_memo observed (value passed (tree "64f92ae84731"))) ((tree_memo evidence (value passed (tree "64f92ae84731"))) (tree_memo last-good (value passed (tree "64f92ae84731")))))
