@@ -26,6 +26,10 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   slower when an unrelated change moved its symbols. It also filled a miss from the whole environment, so a local
   binding could be cached as the global; the table is filled from the global namespace alone. `eval` keeps globals
   differently and has no such cache.
+- `structure_fields` (`check/structure-fields.l`): a structure's field reads and writes on an object of its type or of
+  a type defined on it, and anything else is refused, naming the type, on all three evaluators. Unless `-O` drops the
+  checks, `boot.l`'s and `boot2.l`'s accessors test the type itself inline (`%checked`) and call `%typecheck` only for
+  a derived type or a wrong one, so a read takes under 7/4 of a call where calling `%typecheck` every time took twice.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose

@@ -346,10 +346,16 @@
 
 (define-function %accessor (name)	(if (= ?_ (string-at (symbol->string name) 0)) 'long-at 'oop-at))
 
+;; self, checked as type: inline when it is of type itself, by %typecheck when of a type defined on it (or not)
+(define-function %checked (type self)
+  (if (symbol? self)
+      (list 'if (list '= type (list 'type-of self)) self (list '%typecheck type self))
+    (list 'let (list (list '_s_ self)) (%checked type '_s_))))
+
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list ',(%accessor (car fields))
-			    (list '%typecheck ',name self)
+			    (%checked ,name self)	; the type's number, read when the form expands
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 

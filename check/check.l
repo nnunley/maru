@@ -722,9 +722,16 @@
 ;; primes read uninitialised memory and are skipped.
 ;; a global is found as quickly whichever globals are in use and wherever their symbols were allocated
 ;; (check/global-lookup.l): eval2's and eval3's cache of global bindings keeps every one it found
+(define the-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))
 (check "global_lookup"	; on-each-evaluator's expected line is a tree check's, "tpeg ..."
-  (list-do e '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+  (list-do e the-evaluators
     (unit-assert (equal (last (run "global_lookup" (concat-string e " check/global-lookup.l"))) "global lookup ok"))))
+;; a structure's field reads on its type and on a type defined on it, refuses anything else, and checks the type inline
+;; (check/structure-fields.l)
+(check "structure_fields"
+  (list-do e the-evaluators
+    (unit-assert (fails-saying "structure_fields" (concat-string e " check/structure-fields.l") "type check failed"))
+    (unit-assert (output-has (contents-of-file-named (concat-strings tmp "/structure_fields.out")) "structure fields ok"))))
 ;; data-length answers what a Data was made with (check/data-length.l), on the evaluators that have it
 (check "data_length"
   (list-do e '("./eval" "./eval3")
