@@ -6,8 +6,13 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
 
 One ledger, `check/ledger` (`ledger.g`, `ledger.l`), holds every measure: each line an entry naming its measure (`lines`,
 `erosion` or `verbosity`), its change and why; an entry naming none is a `lines` entry. An entry needs a reason, but
-lines removed may go without one. A line `include: PATH` brings in the ledger at PATH, anywhere and more than once; a
-file included twice, or a cycle, is refused. `check/ledger` includes `check/lines` and `check/erosion`, the two ledgers
+lines removed may go without one. A line that starts with whitespace continues the one before it, as Python's
+indentation does; a line of whitespace only is blank. A line `include: PATH [SUMMARY [@ ID]]` brings in the ledger at
+PATH, anywhere and more than once; a file included twice, or a cycle, is refused. SUMMARY gives the file's sums in the
+entries' own form (`lines 68429`, `erosion 388, verbosity 89`) and ID its git blob id (`git hash-object`) when the
+summary was written, so the ledger reads without opening what it includes. The file is still read: with no ID the
+summary must match it; with one, the summary must match at that ID, and a file that has moved on since is counted as it
+is now, with a note from the `lines` check (`check/lines moved since its summary: lines +12, now @ ID`). `check/ledger` includes `check/lines` and `check/erosion`, the two ledgers
 before they were one, kept as they were, so a branch that still appends to either merges without conflict; new entries
 go in `check/ledger`. The includes are temporary: once no outstanding branch adds to `check/lines` or `check/erosion`
 (`git diff --name-only main...BRANCH -- check/lines check/erosion` empty for every branch and open PR), their entries

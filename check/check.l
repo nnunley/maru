@@ -1140,7 +1140,7 @@
 (check "lines"	; lines-run.l: the count against check/ledger's lines entries, read by ledger.g
   (let ((out (run "lines" '("./eval" "lines-run.l" "check/ledger") 300)))
     (or (and out (= 0 (string-compare (last out) "lines: " 0 7))) (error (last out)))
-    (println (last out))))
+    (list-do l out (println l))))	; notes first: an included ledger that moved since its summary
 
 ;; a grammar keeps its definition, to be reflected on: rules, parameters, bodies, annotations, inherited ones too, in process
 ;; and compiled to a file (grammar.l)

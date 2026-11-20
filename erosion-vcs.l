@@ -22,11 +22,14 @@
   (if (= 'jj (vcs-kind root))
       (vcs-output root (list "jj" "file" "show" "-r" rev path))
     (vcs-output root (list "git" "show" (concat-strings rev ":" path)))))
+(define-function recorded-commit (root commit path)	; the object a path names at a commit, whole, SHA-1 or SHA-256; or ()
+  (let ((out (vcs-output root (list "git" "rev-parse" "--verify" "--quiet" (concat-strings commit ":" path)))))
+    (and out (< 0 (string-length out)) (car (text-lines out)))))
 (define-function vcs-ledger-at (root rev)	; the base's ledger, (lines erosion verbosity), or (): check/ledger, its includes read
   (let ((show (lambda (p) (vcs-show root rev p))))	; at that revision too; before the ledgers were one, check/lines and
     (let ((text (or (show "check/ledger")		; check/erosion together (an old check/lines entry names no measure)
 		    (let ((l (show "check/lines")) (e (show "check/erosion"))) (and (or l e) (concat-strings (or l "") (or e "")))))))
-      (and text (ledger-sums text show)))))
+      (and text (ledger-sums text show (lambda (p) (recorded-commit root rev p)))))))	; a file's blob id at rev
 
 ;; a change for one file of a diff, its paths prefixed (a submodule's directory), its base read by show
 (define-function hunk-numbers (hs side)
@@ -59,9 +62,6 @@
       (let ((i 0)) (while (and (< i (string-length l)) (= ?\t (string-at l i))) (incr i))
 	   (and (< (+ i 7) (string-length l)) (= "path = " (string-copy l i 7)) (push out (string-copy l (+ i 7) (- (string-length l) (+ i 7)))))))
     (list-reverse! out)))
-(define-function recorded-commit (root commit path)	; the object a path names at a commit, whole, SHA-1 or SHA-256; or ()
-  (let ((out (vcs-output root (list "git" "rev-parse" "--verify" "--quiet" (concat-strings commit ":" path)))))
-    (and out (< 0 (string-length out)) (car (text-lines out)))))
 (define-function submodule-changes (root commit path)
   (let ((old (recorded-commit root commit path)) (dir (concat-strings root "/" path)) (prefix (concat-string path "/")))
     (and old (changes-from root dir prefix (vcs-output dir (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" "--submodule=short" old "--"))

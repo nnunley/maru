@@ -1,4 +1,15 @@
 include: check/lines
+  lines 68429
+  @ d29b15dc349ba13f419ec72f62afa52783974c2a
 include: check/erosion
+  erosion 388, verbosity 89
+  @ df002fcc8bfd4f143d6883278d77d9e841ac4c89
 lines +97 one ledger for every measure: ledger.g/ledger.l read check/ledger, which includes check/lines and check/erosion as they were (include: PATH, each file once); lines-run.l runs the lines check with its message shown; the report reads lines too (the base's ledger, the old pair before the merge) and drafts a lines entry; tests for includes, old-style entries and an old-ledger base
 erosion -1 one ledger (make erosion-report against HEAD): share -1, the new code's mass; edits 0
+lines +87 an include summarises its file and may give its fingerprint (include: PATH SUMMARY @ ID, the file's git blob id),
+  checked against the file: without an ID the summary must match; with one, it must match there, and a file that moved
+  on since is counted as it is with a note; a line that starts with whitespace continues the one before it; tests for
+  folds, summaries, fingerprints in the working copy and at a revision
+erosion -1 summaries and folds (make erosion-report against HEAD): share -1, the new code's mass; edits 0
+verbosity -1 summaries and folds (make erosion-report against HEAD): share -1; edits 0, the two clones the first draft
+  added (a test lookup, a temp-file path) removed before the entry

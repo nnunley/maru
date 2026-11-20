@@ -6,7 +6,9 @@
 (define ledger (if *arguments* (next-argument) "check/ledger"))
 (set *arguments* ())
 (define counted (counted-lines "."))
-(define accounted (car (ledger-sums (contents-of-file-named ledger))))
+(define read (ledger-read (contents-of-file-named ledger)))	; (sums . notes): an include's file that moved since its summary
+(list-do n (cdr read) (println "note: " n))
+(define accounted (car (car read)))
 (if (= counted accounted)
     (println "lines: " counted ", tests included; the budget of 20000 is soft")
   (println "FAIL lines: " counted " source lines, but " ledger " accounts for " accounted "; add an entry for "

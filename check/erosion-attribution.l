@@ -169,6 +169,17 @@
 					      (cons "check/erosion" "erosion 0 base\nverbosity 0 base\n"))))
 (expect "a base from before the ledgers were one: lines from check/lines, the rest from check/erosion"
 	(vcs-ledger-at old-ledgers "HEAD") '(1 0 0))
+(define-function summarised (said)	; a repository whose check/ledger summarises check/lines at its blob id
+  (let* ((name (concat-string "summarised-" (long->string said)))
+	 (dir (new-repo name (list (cons "check/lines" "1 base\n")))))
+    (write-in dir "check/ledger" (concat-strings "include: check/lines\n  lines " (long->string said) "\n  @ "
+						 (ledger-fingerprint (concat-string dir "/check/lines")) "\n"))
+    (git-in dir "add" "check/ledger") (git-in dir "commit" "-qm" "ledger")
+    dir))
+(expect "at a revision, an include's fingerprint is the file's blob id there: a right summary holds"
+	(vcs-ledger-at (summarised 1) "HEAD") '(1 0 0))
+(expect "and a summary wrong at that fingerprint is refused, not taken for a file that moved"
+	(try (vcs-ledger-at (summarised 2) "HEAD") (lambda (c) 'refused)) 'refused)
 (define super-lines (attribution-command-lines super "HEAD"))
 (expect "the report's lines: the base's ledger to the count now, and a drafted entry naming the files that moved"
 	(list (and (select (lambda (l) (starts-with? l "lines 1 -> ")) super-lines) 't)

@@ -193,7 +193,7 @@
 
 ;; a ledger may include others, include: PATH, anywhere and more than once: check/ledger includes check/lines and
 ;; check/erosion, the two ledgers before they were one, kept as they were
-(define-function reader-of (files) (lambda (path) (let ((hit ())) (list-do f files (and (= path (car f)) (set hit (cdr f)))) hit)))
+(define-function reader-of (files) (lambda (path) (let ((hit ())) (list-do f files (and (= path (car f)) (set hit (cdr f)))) hit)))	; also a fingerprint by path
 (expect "an include's entries count with the ledger's own"
 	(ledger-sums "include: check/lines\nerosion 2 b\n" (reader-of '(("check/lines" . "33 base\n-3\n")))) '(30 2 0))
 (expect "several includes, one including another"
@@ -204,6 +204,32 @@
 (expect "includes that go round are refused"
 	(try (ledger-sums "include: a\n" (reader-of '(("a" . "include: b\n") ("b" . "include: a\n")))) (lambda (c) 'refused)) 'refused)
 (expect "an include that names no file is refused" (try (ledger-sums "include: nosuch\n" (reader-of ())) (lambda (c) 'refused)) 'refused)
+;; a line that starts with whitespace continues the one before it, as Python's indentation does; one of whitespace only is blank
+(expect "a continued reason" (map (lambda (e) (<ledger-entry>-reason e)) (ledger-entries "lines 3 first\n  and more\n\tand last\nerosion 1 x\n"))
+	'("first and more and last" "x"))
+(expect "a line of whitespace only is blank" (ledger-sums "lines 3 a\n   \nlines 1 b\n") '(4 0 0))
+(expect "an indented first line continues nothing, and is refused" (try (ledger-sums "  lines 3 a\n") (lambda (c) 'refused)) 'refused)
+;; an include may summarise its file (measure number, ...) and give the file's fingerprint (@ ID, its git blob id): without one
+;; the summary must match the file; with one, a summary wrong at that fingerprint is refused, and a file that has moved on
+;; since is counted as it is now, with a note saying how far it moved
+(define a-text "lines 3 x\nerosion 1 y\n")
+(define a-moved "lines 3 x\nerosion 1 y\nlines 2 z\n")
+(expect "a summary that matches its file" (ledger-sums "include: a lines 3, erosion 1\n" (reader-of (list (cons "a" a-text)))) '(3 1 0))
+(expect "a summary that doesn't, with no fingerprint, is refused"
+	(try (ledger-sums "include: a lines 4\n" (reader-of (list (cons "a" a-text)))) (lambda (c) 'refused)) 'refused)
+(expect "a summary and fingerprint continued on indented lines, the file unmoved: no note"
+	(ledger-read "include: a\n  lines 3, erosion 1\n  @ F1\nlines 1 own\n" (reader-of (list (cons "a" a-text))) (reader-of '(("a" . "F1"))))
+	'((4 1 0)))
+(expect "a summary wrong at its own fingerprint is refused"
+	(try (ledger-read "include: a lines 9 @ F1\n" (reader-of (list (cons "a" a-text))) (reader-of '(("a" . "F1")))) (lambda (c) 'refused)) 'refused)
+(expect "a file moved on since its summary: counted as it is, and a note"
+	(ledger-read "include: a lines 3, erosion 1 @ F1\n" (reader-of (list (cons "a" a-moved))) (reader-of '(("a" . "F2"))))
+	'((5 1 0) "a moved since its summary: lines +2, now @ F2"))
+(let ((path (concat-string (erosion-scratch) "/hello.txt")))
+  (contents-to-file-named "hello\n" path)
+  (expect "a fingerprint is the file's git blob id, SHA-1 or SHA-256 as the repository uses"	; computed apart, with hashlib
+	  (and (member? (ledger-fingerprint path) '("ce013625030ba8dba906f756967f9e9ca394464a"
+						     "2cf8d83d9ee29543b34a87727421fdecb7e3f3a183d337639025de576db9ebb4")) 'yes) 'yes))
 (expect "an entry with no measure named is a lines entry, as check/lines wrote them" (ledger-sums "lines 5 base\n+2 old style\n") '(7 0 0))
 
 ;; the ledger: each metric is the sum of its entries, and an entry says why
