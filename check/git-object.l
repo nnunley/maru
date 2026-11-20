@@ -1,5 +1,9 @@
-;;; check/git-object.l -- git object ids computed in Maru (git-object.l, doc/measures.md): SHA-1 against NIST's vectors.
+;;; check/git-object.l -- git object ids computed in Maru (git-object.l, doc/measures.md): SHA-1 against NIST's vectors;
+;;; a file's blob id against git hash-object's, in SHA-1 and SHA-256 repositories and a worktree.
 (require "sha1.l")
+(require "git-object.l")
+(require "erosion-files.l")	; text-lines
+(require "recover.l")	; try
 
 (define ok 1)
 (define-function expect (what got want)
@@ -22,5 +26,44 @@
 (expect "sha1 55" (digest (a-times 55)) "c1c8bbdc22796e28c0e15163d20899b65621d65a")
 (expect "sha1 56" (digest (a-times 56)) "c2db330f6083854c99d4b5bfb6e8f29f201be699")
 (expect "sha1 64" (digest (a-times 64)) "0098ba824b5c16427bd7a1122a5a442a25ec644d")
+
+;; ---- blob ids: git is the oracle, in repositories made in the check's scratch directory
+(define scratch (concat-strings (or (spawn-getenv "MARU_CHECK_TMP") "/tmp") "/git-object-" (long->string ((subr "getpid" ">i")))))
+(remove-tree scratch)
+(make-directory scratch)
+(define-function git-in (dir . args)	; git's output there, its first line
+  (car (text-lines (cdr (program-result (concat-list (list "git" "-c" "user.email=t@t" "-c" "user.name=t") args) dir)))))
+(define-function new-repo (name format)
+  (let ((dir (concat-strings scratch "/" name))) (make-directory dir) (git-in dir "init" "-q" (concat-string "--object-format=" format) ".") dir))
+(define-function write-bytes (path bytes)	; bytes written one by one, a NUL among them if need be
+  (let ((f ((subr "fopen" "ss>p") path "wb")) (fputc (subr "fputc" "ip>i")))
+    (list-do b bytes (fputc b f))
+    ((subr "fclose" "p>i") f)))
+(define-function gits-id (dir name) (git-in dir "hash-object" "--no-filters" name))
+(define sha1-repo (new-repo "one" "sha1"))
+(define sha256-repo (new-repo "two" "sha256"))
+(contents-to-file-named "héllo → wörld\n" (concat-string sha1-repo "/text"))
+(contents-to-file-named "héllo → wörld\n" (concat-string sha256-repo "/text"))
+(expect "a file's id, SHA-1" (list (git-blob-id (concat-string sha1-repo "/text") sha1-repo) (gits-id sha1-repo "text"))
+	'("5157042005afd04924712f06029d845980ea00f9" "5157042005afd04924712f06029d845980ea00f9"))
+(expect "a file's id, SHA-256" (list (git-blob-id (concat-string sha256-repo "/text") sha256-repo) (gits-id sha256-repo "text"))
+	'("6799f2cef17ebee190dd8212caaff632212b99d0c699d3b3cb810cc759af4143" "6799f2cef17ebee190dd8212caaff632212b99d0c699d3b3cb810cc759af4143"))
+(contents-to-file-named "" (concat-string sha1-repo "/empty"))
+(expect "an empty file" (git-blob-id (concat-string sha1-repo "/empty") sha1-repo) "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391")
+(write-bytes (concat-string sha1-repo "/nul") '(97 0 98))
+(expect "a NUL inside" (git-blob-id (concat-string sha1-repo "/nul") sha1-repo) (gits-id sha1-repo "nul"))
+(git-in sha256-repo "add" "text") (git-in sha256-repo "commit" "-qm" "text")
+(define tree (concat-string scratch "/tree"))
+(git-in sha256-repo "worktree" "add" "-q" tree)
+(expect "in a worktree" (list (git-object-format tree) (git-blob-id (concat-string tree "/text") tree)) (list 'sha256 (gits-id tree "text")))
+(define moved (concat-string scratch "/moved"))
+(make-directory moved)
+(contents-to-file-named "gitdir: ../two/.git/worktrees/tree\n" (concat-string moved "/.git"))
+(expect "a relative gitdir" (git-object-format moved) 'sha256)
+(define cased (new-repo "cased" "sha1"))
+(contents-to-file-named "[core]\n\trepositoryformatversion = 1\n[Extensions]\n\tobjectFormat = sha256\n" (concat-string cased "/.git/config"))
+(expect "objectFormat in another case" (git-object-format cased) 'sha256)
+(expect "no repository" (try (git-object-format "/nonexistent") (lambda (c) 'refused)) 'refused)
+(remove-tree scratch)
 
 (println (if ok "git object ok" "git object FAILED"))

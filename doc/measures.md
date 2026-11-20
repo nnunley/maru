@@ -71,7 +71,12 @@ the ledger's sums stay the same.
 
 - `git_object` (`check/git-object.l`, `sha1.l`, `doc/plans/2026-11-20-git-blob-ids.md`): SHA-1 (FIPS 180-4) in Maru,
   beside `sha256.l` and sharing its padding (`sha-digest`), held to NIST's vectors: the empty message, `abc`, the
-  448-bit two-block message, and 55, 56 and 64 bytes, either side of where the length takes a block of its own.
+  448-bit two-block message, and 55, 56 and 64 bytes, either side of where the length takes a block of its own. And
+  `git-object.l`'s `git-blob-id`, git's id for a file (the header `blob SIZE`, a NUL, the file's bytes read by
+  `file-bytes.l`) in the repository's format (`extensions.objectformat` in its config, read by `git-repo.g`; `sha1` when
+  absent), against `git hash-object` in repositories the check makes: SHA-1 and SHA-256, text that isn't ASCII, an
+  empty file, a NUL inside, a worktree (its `gitdir:` and `commondir` followed), a relative `gitdir:`, `objectFormat` in
+  another case, and no repository at all, refused.
 - `erosion_attribution` (`check/erosion-attribution.l`, `erosion-attribute.l`, `erosion-vcs.l`, `erosion-files.l`, `diff.g`,
   `doc/rfc/draft-ndn-erosion-attribution-00.md`, `doc/plans/2026-11-19-erosion-attribution.md`): how a change moved
   erosion and verbosity, callable by callable. `diff.g`, one grammar, reads the change: git's unified diff (and `jj diff
