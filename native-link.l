@@ -28,7 +28,7 @@
 ;; identity from each label to its address (a list searched for each label and branch made a unit's assembly quadratic)
 (define-function native-table-label (k) (string->symbol (concat-string "tab." (long->string k))))
 (define-function native-assemble (isa buffer intents nslots)
-  (let ((labels (identity-hash-table)) (fixups ()))
+  (let ((isa (asm-isa isa)) (labels (identity-hash-table)) (fixups ()))	; the instruction set found once, not per form
     (list-do forms intents
       (list-do form forms
 	(if (= 'at (car form))

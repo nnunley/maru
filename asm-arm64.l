@@ -466,6 +466,32 @@
 									(arm64-shape (caddr op)))))
 	(else					(asm-intern-shape (list 'pair (car op))))))
 
+;; A number standing for op's shape (asm-table.l's key): 1 to 3 a number, a symbol, a vector; 4 on a register's, one for
+;; each of its shapes; a memory operand's from its mode, base and offset; a pair as (LSL 12) by its head, each head its
+;; own from 1024 on first sight; () for a memory operand whose parts aren't keyed below 16, which takes the chain.
+(define arm64-register-keys (identity-hash-table))
+(define arm64-pair-keys (identity-hash-table))
+(let ((by-shape (identity-hash-table)))
+  (list-do r arm64-registers
+    (let ((s (hash-at arm64-register-shapes (car r))))
+      (hash-at-put arm64-register-keys (car r)
+		   (or (hash-at by-shape s) (hash-at-put by-shape s (+ 4 (hash-count by-shape))))))))
+(define arm64-shape-key)
+(define-function arm64-mode-index (mode)	(if (= 'off mode) 0 (if (= 'pre mode) 1 2)))
+(define-function arm64-memory-key (op)	; (off|pre|post base offset)
+  (let ((b (arm64-shape-key (cadr op))) (o (arm64-shape-key (caddr op))))
+    (and b o (< b 16) (< o 16) (pair? (cddr op)) (not (cdddr op))
+	 (+ (+ 16 (* 256 (arm64-mode-index (car op)))) (+ (* 16 b) o)))))
+(define-function arm64-pair-key (op)
+  (or (hash-at arm64-pair-keys (car op))
+      (hash-at-put arm64-pair-keys (car op) (+ 1024 (hash-count arm64-pair-keys)))))
+(define-function arm64-shape-key (op)
+  (cond ((or (long? op) (double? op) (arm64-reloc? op))	1)
+	((symbol? op)				(or (hash-at arm64-register-keys op) 2))
+	((arm64-vector? op)			3)
+	((memq (car op) '(off pre post))	(arm64-memory-key op))
+	(else					(arm64-pair-key op))))
+
 (define-function arm64-accepts (k s)
   (let ((c (car k)))
     (cond ((= c 'reg)		(and (pair? s) (= 'reg (car s)) (= (arm64-reg-class (cadr k)) (cadr s))
@@ -480,4 +506,4 @@
 	  (else				1))))
 
 (asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range arm64-parse-form
-		  arm64-shape arm64-accepts 1)
+		  arm64-shape arm64-accepts 1 arm64-shape-key)

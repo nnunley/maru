@@ -26,7 +26,7 @@
 ;;;   (decode bytes pc)             => (insn . length) or ()
 ;;;   (field-range row position pc) => (lo hi step) or ()
 ;;;   (parse-form text)             => (mnemonic kinds) or ()
-;;; and, optionally, the classifier of the candidate table: (shape accepts fixed-width).
+;;; and, optionally, the classifier of the candidate table: (shape accepts fixed-width key).
 ;;;
 ;;; The candidate table.  An operand's shape is what it is, not its value: a
 ;;; register, a memory operand's form, a number.  (shape op) gives it, or () for
@@ -45,7 +45,15 @@
 ;;; by name, its rows by mnemonic, and its candidates along a chain of tables, by
 ;;; the mnemonic and then each operand's shape.  A shape is shared: equal shapes
 ;;; are one object (asm-intern-shape), so finding an instruction's candidates
-;;; makes nothing and compares nothing but identities.
+;;; makes nothing and compares nothing but identities.  The instruction set may
+;;; be given as its <asm-isa>, which a caller assembling many instructions looks
+;;; up once.
+;;;
+;;; An ISA may also give (key op), a number from 1 below 2^14 standing for op's
+;;; shape (equal keys, equal shapes), or () for an operand it doesn't key.  An
+;;; instruction of at most four operands, all keyed, finds its candidates in two
+;;; lookups, by its mnemonic and then by its operands' keys taken together;
+;;; any other takes the chain.
 
 (require "hash.l")
 
@@ -67,7 +75,7 @@
 ;; candidates the root of its chain (asm-cached-rows); without one, shape and
 ;; candidates are ().
 (define-structure <asm-isa> (name rows encode decode field-range parse-form by-mnemonic
-			     shape accepts fixed-width candidates))
+			     shape accepts fixed-width candidates key keyed))
 
 (define *asm-isas* (identity-hash-table))	; name => <asm-isa>
 
@@ -78,12 +86,15 @@
     (hash-at-put *asm-isas* name
 		 (new <asm-isa> name rows encode decode field-range parse-form by
 		      (car classifier) (cadr classifier) (caddr classifier)
-		      (and classifier (asm-node 'unbuilt))))))
+		      (and classifier (asm-node 'unbuilt))
+		      (cadddr classifier) (identity-hash-table)))))
 
 (define-function asm-rows-for (i mnemonic)	(hash-at (<asm-isa>-by-mnemonic i) mnemonic))
 
-(define-function asm-isa (isa)
-  (or (hash-at *asm-isas* isa) (error "asm: unknown instruction set " isa)))
+(define-function asm-isa (isa)	; isa a name, or its <asm-isa>
+  (if (= <asm-isa> (type-of isa))
+      isa
+    (or (hash-at *asm-isas* isa) (error "asm: unknown instruction set " isa))))
 
 (define-function asm-buffer (origin)	(cons origin (array)))
 (define-function asm-buffer-origin (b)	(car b))
@@ -179,7 +190,7 @@
 ;; The candidates for insn, found by its mnemonic and then its operands' shapes,
 ;; each a step along the chain; built when first reached, and kept.  An operand
 ;; the classifier does not know gives every row of the mnemonic.
-(define-function asm-cached-rows (i insn)
+(define-function asm-chained-rows (i insn)
   (let ((shape (<asm-isa>-shape i))
 	(node (asm-node-child (<asm-isa>-candidates i) (car insn) 'unbuilt))
 	(ops (cdr insn)))
@@ -190,6 +201,30 @@
     (cond ((not node)			(asm-rows-for i (car insn)))
 	  ((= 'unbuilt (car node))	(set-car node (asm-build-candidates i (car insn) (asm-shapes shape (cdr insn)))))
 	  (else				(car node)))))
+
+;; The key of ops taken together, from their keys under key: a leading 1 and then
+;; 14 bits for each, so instructions with different numbers of operands differ;
+;; () when one is unkeyed, or past four.
+(define-function asm-keys (key ops)
+  (let ((k 1) (n 0))
+    (while (and ops k)
+      (let ((o (key (car ops))))
+	(set k (and o (< n 4) (+ (* k 16384) o))))
+      (set n (+ n 1))
+      (set ops (cdr ops)))
+    k))
+
+;; The candidates for insn: by its mnemonic and its operands' key when the ISA
+;; keys them all, else along the chain.
+(define-function asm-cached-rows (i insn)
+  (let* ((key (<asm-isa>-key i))
+	 (k (and key (asm-keys key (cdr insn)))))
+    (if (not k)
+	(asm-chained-rows i insn)
+      (let ((by-key (or (hash-at (<asm-isa>-keyed i) (car insn))
+			(hash-at-put (<asm-isa>-keyed i) (car insn) (identity-hash-table)))))
+	(or (hash-at by-key k)
+	    (hash-at-put by-key k (asm-chained-rows i insn)))))))
 
 ;; The rows that may encode insn, in file order: every row of its mnemonic when
 ;; the ISA has no classifier, or the mnemonic's candidates for its shapes.

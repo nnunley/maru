@@ -96,6 +96,31 @@
 	(set refused-ok (+ refused-ok 1))
       (fail "not refused" insn))))
 
+;; Assembling a unit takes the instruction set once (native-assemble): given the <asm-isa> itself, an instruction never
+;; looks the set up by name.  Finding an instruction's candidates takes one lookup by its mnemonic, one by its shapes'
+;; key, and one for each register it names, where a step along a chain for each operand, and a memory operand's shape
+;; made afresh, took several times that.
+(define lookups 0)
+(define by-name 0)
+(define hash-at-uncounted hash-at)
+(define-function counted-hash-at (table key . default)
+  (set lookups (+ lookups 1))
+  (and (= table *asm-isas*) (set by-name (+ by-name 1)))
+  (apply hash-at-uncounted (cons table (cons key default))))
+(define-function registers-in (op)
+  (cond ((symbol? op) 1) ((pair? op) (+ (registers-in (car op)) (registers-in (cdr op)))) (else 0)))
+(define over-bound 0)
+(set hash-at counted-hash-at)
+(list-do insn stream
+  (asm-attempt entry (asm-buffer start) insn)
+  (set lookups 0)
+  (asm-candidate-rows entry insn)
+  (and (<asm-isa>-key entry) (< (+ 2 (registers-in (cdr insn))) lookups) (set over-bound (+ over-bound 1))))
+(set hash-at hash-at-uncounted)
+(and (< 0 by-name) (fail "the instruction set looked up by name, times:" by-name))
+(and (< 0 over-bound) (fail "candidates found in more lookups than the mnemonic, the key and the registers, instructions:"
+			     over-bound))
+
 (println "asm table " isa ": " checked " instructions, " refusals " refused, " refused-ok "/" (list-length isa-refused)
 	 " of the required refusals, " table-encodes " encodes by the table, " scan-encodes " by the full scan, "
 	 failures " failures")

@@ -11,3 +11,5 @@ erosion -2 ir2 objects: many small definitions (object instructions, form compil
 erosion +1 asm-arm64.l: arm64-bind-plan refuses vshl and vshr when the diagram lacks immh:immb, one more condition in its dispatch over operand kinds (CC 71), as arm64-bind's was
 verbosity -1 the JOHN development plan's code (john-serialize.l, was, choices and total, the results file, the frontier and hotspots), its forms rarely flagged or cloned, dilutes the verbose share; erosion is unmoved
 erosion -1 compile-tpeg.l's tp-choice and its two small key finders, source-parser.l's source-parser-head: short callables dilute the share over CC 10
+erosion -1 asm-arm64.l's shape key in four short callables (arm64-shape-key, arm64-memory-key, arm64-pair-key, arm64-mode-index) and asm-table.l's asm-keys and asm-cached-rows: short callables dilute the share over CC 10
+verbosity -1 the same: the key's forms neither flagged nor cloned dilute the verbose share
