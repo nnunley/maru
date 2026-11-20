@@ -22,3 +22,6 @@ lines +156 git blob ids computed in Maru, so the ledger reads with no git proces
   git hash-object, and to a ledger read with git off PATH; check/exe.l and check/git-object.l share their helpers
 erosion -1 git blob ids (make erosion-report against 397fda4): share -1, the new code's mass; edits 0, sha256 split
   into sha-digest (CC 8 to 1)
+lines +16 review: a config value read as git reads it (quoted or a word; whitespace, a comment or a CR after it
+  skipped, git-repo.g's value), and a format other than sha1 or sha256 refused, not taken for sha1; tests for each
+erosion -1 review (make erosion-report against b171284): share -1, the new code's mass; edits 0

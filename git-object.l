@@ -31,6 +31,7 @@
       (cond ((not x))
 	    ((= 'section (car x)) (set section (git-lower (cdr x))))
 	    ((and (= section "extensions") (= "objectformat" (git-lower (car x)))) (set format (string->symbol (git-lower (cdr x)))))))
+    (or (member? format '(sha1 sha256)) (error "git-object: " root "'s object format is " format ", neither sha1 nor sha256"))
     format))
 (define-function git-blob-id (path root)
   (let* ((file (file-bytes path)) (size (cdr file)) (header (concat-string "blob " (long->string size))) (bytes (array)))

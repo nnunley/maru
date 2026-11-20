@@ -53,6 +53,18 @@
 (define cased (new-repo "cased" "sha1"))
 (contents-to-file-named "[core]\n\trepositoryformatversion = 1\n[Extensions]\n\tobjectFormat = sha256\n" (concat-string cased "/.git/config"))
 (expect "objectFormat in another case" (git-object-format cased) 'sha256)
+;; the value as git reads it: whitespace, a comment, quotes and CRLF around it; anything but sha1 or sha256 refused
+(define-function format-written (name value)	; a SHA-1 repository whose config is rewritten with value
+  (let ((dir (new-repo name "sha1")))
+    (contents-to-file-named (concat-strings "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tobjectformat =" value)
+			    (concat-string dir "/.git/config"))
+    (git-object-format dir)))
+(expect "the value with a comment, CRLF, quotes, a trailing space"
+	(list (format-written "comment" " sha256 ; a comment\n") (format-written "crlf" " sha256\r\n")
+	      (format-written "quoted" " \"sha256\"\n") (format-written "trailing" " sha256 \n"))
+	'(sha256 sha256 sha256 sha256))
+(expect "a format git doesn't know is refused, not taken for sha1"
+	(try (format-written "misspelt" " sha265\n") (lambda (c) 'refused)) 'refused)
 (expect "no repository" (try (git-object-format "/nonexistent") (lambda (c) 'refused)) 'refused)
 ;; ---- the ledger reads with no git process: its fingerprints are computed here
 (define-function ledger-read-with (env)	; check/ledger-read.l's output, run with env
