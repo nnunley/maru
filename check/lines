@@ -350,3 +350,4 @@
 +51 a choice of list patterns dispatches on the element's head symbol (compile-tpeg.l's tp-choice, source-parser.l's source-parser-head), so an intent no longer enters its list once per alternative; tree_lists counts the entries
 +21 native-link.l's table entries and labels in hash.l tables, where a list searched for each made native-symbols and native-assemble quadratic; native_image holds both to four times the size in less than eight times the time
 +86 an instruction's candidate rows found by its mnemonic and one key for its operands' shapes (asm-table.l's asm-keys, asm-arm64.l's arm64-shape-key), not a step per operand along a chain with memory operands' shapes made afresh, and the instruction set looked up once per unit; asm_table counts the lookups
++2 global_lookup registered on its own expected line: on-each-evaluator expects a tree check's "tpeg ...", so the case could never pass

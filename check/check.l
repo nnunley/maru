@@ -722,7 +722,9 @@
 ;; primes read uninitialised memory and are skipped.
 ;; a global is found as quickly whichever globals are in use and wherever their symbols were allocated
 ;; (check/global-lookup.l): eval2's and eval3's cache of global bindings keeps every one it found
-(check "global_lookup" (on-each-evaluator "global_lookup" "check/global-lookup.l"))
+(check "global_lookup"	; on-each-evaluator's expected line is a tree check's, "tpeg ..."
+  (list-do e '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
+    (unit-assert (equal (last (run "global_lookup" (concat-string e " check/global-lookup.l"))) "global lookup ok"))))
 ;; data-length answers what a Data was made with (check/data-length.l), on the evaluators that have it
 (check "data_length"
   (list-do e '("./eval" "./eval3")
