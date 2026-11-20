@@ -56,9 +56,9 @@
       (let ((i 0)) (while (and (< i (string-length l)) (= ?\t (string-at l i))) (incr i))
 	   (and (< (+ i 7) (string-length l)) (= "path = " (string-copy l i 7)) (push out (string-copy l (+ i 7) (- (string-length l) (+ i 7)))))))
     (list-reverse! out)))
-(define-function recorded-commit (root commit path)	; "160000 commit SHA\tpath" -> SHA
-  (let ((out (vcs-output root (list "git" "ls-tree" commit path))))
-    (and out (< 54 (string-length out)) (string-copy out 14 40))))	; "160000 commit " is 14 characters
+(define-function recorded-commit (root commit path)	; the object a path names at a commit, whole, SHA-1 or SHA-256; or ()
+  (let ((out (vcs-output root (list "git" "rev-parse" "--verify" "--quiet" (concat-strings commit ":" path)))))
+    (and out (< 0 (string-length out)) (car (text-lines out)))))
 (define-function submodule-changes (root commit path)
   (let ((old (recorded-commit root commit path)) (dir (concat-strings root "/" path)) (prefix (concat-string path "/")))
     (and old (changes-from root dir prefix (vcs-output dir (list "git" "diff" "--unified=0" "--no-color" "--no-ext-diff" "--submodule=short" old "--"))

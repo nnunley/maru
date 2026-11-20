@@ -136,10 +136,10 @@
 (remove-tree scratch)
 (define-function git-in (dir . args) (program-result (concat-list (list "git" "-c" "user.email=t@t" "-c" "user.name=t" "-c" "protocol.file.allow=always") args) dir))
 (define-function write-in (dir name text) (contents-to-file-named text (concat-strings dir "/" name)))
-(define-function new-repo (name files)	; a repository holding files, ((name . text) ...), committed
+(define-function new-repo (name files . format)	; a repository holding files, ((name . text) ...), committed; format: sha1, sha256
   (let ((dir (concat-strings scratch "/" name)))
     (make-directory dir)
-    (git-in dir "init" "-q" ".")
+    (git-in dir "init" "-q" (concat-string "--object-format=" (or (car format) "sha1")) ".")
     (list-do f files (write-in dir (car f) (cdr f)))
     (git-in dir "add" "-A") (git-in dir "commit" "-qm" "base")
     dir))
@@ -161,6 +161,14 @@
 	(map (lambda (c) (<change>-base-text c)) changes) '("(define-function a () 1)\n" () "(define-function x () 1)\n"))
 (expect "the lines a change added" (<change>-added (car changes)) '(2))
 (expect "a revision that doesn't exist" (vcs-revision? super "nosuch") ())
+;; SHA-256 object names are 64 hex digits, not 40: a submodule's recorded commit is read whole
+(let* ((sub256 (new-repo "sub256" (list (cons "x.l" "(define-function x () 1)\n")) "sha256"))
+       (super256 (new-repo "super256" (list (cons "a.l" "(define-function a () 1)\n")) "sha256")))
+  (git-in super256 "submodule" "add" "-q" sub256 "nile")
+  (git-in super256 "commit" "-qm" "submodule")
+  (write-in super256 "nile/x.l" "(define-function x () 2)\n")
+  (expect "a SHA-256 repository's submodule change" (map (lambda (c) (<change>-path c)) (vcs-changes super256 "HEAD")) '("nile/x.l"))
+  (expect "its recorded commit read whole, all 64 hex digits" (string-length (recorded-commit super256 (vcs-commit super256 "HEAD") "nile")) 64))
 (write-in super "bad.g" "<b> : <text-parser> ()\nr = \"x\"\n")	; a grammar that stops reading partway
 (expect "a changed file that doesn't read is reported as unmeasured, not a crash"
 	(and (select (lambda (l) (string-find l "unmeasured bad.g")) (attribution-command-lines super "HEAD")) 't) 't)
