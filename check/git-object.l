@@ -1,0 +1,26 @@
+;;; check/git-object.l -- git object ids computed in Maru (git-object.l, doc/measures.md): SHA-1 against NIST's vectors.
+(require "sha1.l")
+
+(define ok 1)
+(define-function expect (what got want)
+  (or (equal got want)
+      (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
+(define-function bytes-of-string (s)
+  (let ((a (array)))
+    (for (i 0 (string-length s)) (array-append a (string-at s i)))
+    a))
+(define-function hex (bytes)
+  (let ((out ""))
+    (list-do b bytes (set out (concat-string out (format "%02x" b))))
+    out))
+(define-function digest (s) (hex (sha1 (bytes-of-string s) 0 (string-length s))))
+(define-function a-times (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "a"))) s))
+
+(expect "sha1 empty" (digest "") "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+(expect "sha1 abc" (digest "abc") "a9993e364706816aba3e25717850c26c9cd0d89d")
+(expect "sha1 two blocks" (digest "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq") "84983e441c3bd26ebaae4aa1f95129e5e54670f1")
+(expect "sha1 55" (digest (a-times 55)) "c1c8bbdc22796e28c0e15163d20899b65621d65a")
+(expect "sha1 56" (digest (a-times 56)) "c2db330f6083854c99d4b5bfb6e8f29f201be699")
+(expect "sha1 64" (digest (a-times 64)) "0098ba824b5c16427bd7a1122a5a442a25ec644d")
+
+(println (if ok "git object ok" "git object FAILED"))

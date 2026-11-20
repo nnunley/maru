@@ -69,6 +69,9 @@ the ledger's sums stay the same.
   `doc/plans/2026-11-10-erosion-by-reflection.md`'s Baseline). Memoized invokers make the walks slower, not faster: over
   the 41 grammar files the walks call a rule 38,174 times and find a memo 8 times.
 
+- `git_object` (`check/git-object.l`, `sha1.l`, `doc/plans/2026-11-20-git-blob-ids.md`): SHA-1 (FIPS 180-4) in Maru,
+  beside `sha256.l` and sharing its padding (`sha-digest`), held to NIST's vectors: the empty message, `abc`, the
+  448-bit two-block message, and 55, 56 and 64 bytes, either side of where the length takes a block of its own.
 - `erosion_attribution` (`check/erosion-attribution.l`, `erosion-attribute.l`, `erosion-vcs.l`, `erosion-files.l`, `diff.g`,
   `doc/rfc/draft-ndn-erosion-attribution-00.md`, `doc/plans/2026-11-19-erosion-attribution.md`): how a change moved
   erosion and verbosity, callable by callable. `diff.g`, one grammar, reads the change: git's unified diff (and `jj diff

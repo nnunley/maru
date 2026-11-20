@@ -1,5 +1,6 @@
 ;;; SHA-256 (FIPS 180-4), which exe.l signs Mach-O files with.
 ;;;   (sha256 array start length)   the digest of those bytes, as a list of 32 bytes
+;;; sha-digest is the part SHA-1 (sha1.l) shares: blocks of 64 bytes, padded with the 1 bit, zeros and the length.
 (define sha256-k
   (list->array
    '(0x428a2f98 0x71374491 0xb5c0fbcf 0xe9b5dba5 0x3956c25b 0x59f111f1 0x923f82a4 0xab1c5ed5
@@ -15,12 +16,14 @@
 (define-function sha256-xor3 (a b c) (^ (^ a b) c))
 
 ;; one 64-byte block at bytes[at], into state h, an array of eight words
-(define-function sha256-block (h bytes at w)
+(define-function sha-words (w bytes at)	; the block's 16 big-endian words into w[0..15]
   (for (i 0 16)
     (let ((j (+ at (* i 4))))
       (set-array-at w i (| (<< (array-at bytes j) 24)
 			   (| (<< (array-at bytes (+ j 1)) 16)
-			      (| (<< (array-at bytes (+ j 2)) 8) (array-at bytes (+ j 3))))))))
+			      (| (<< (array-at bytes (+ j 2)) 8) (array-at bytes (+ j 3)))))))))
+(define-function sha256-block (h bytes at w)
+  (sha-words w bytes at)
   (for (i 16 64)
     (let* ((x (array-at w (- i 15))) (y (array-at w (- i 2)))
 	   (s0 (sha256-xor3 (sha256-rotr x 7) (sha256-rotr x 18) (>> x 3)))
@@ -42,14 +45,10 @@
 	(set-array-at h i (sha256-add (array-at h i) v))
 	(set i (+ i 1))))))
 
-(define-function sha256 (bytes start length)
-  (let ((h (list->array '(0x6a09e667 0xbb67ae85 0x3c6ef372 0xa54ff53a 0x510e527f 0x9b05688c 0x1f83d9ab 0x5be0cd19)))
-	(w (array 64))
-	(at start)
-	(end (+ start length))
-	(last (array)))
+(define-function sha-digest (h block bytes start length)	; h: the starting words, block: (h bytes at w); a list of bytes
+  (let ((w (array 80)) (at start) (end (+ start length)) (last (array)))
     (while (<= (+ at 64) end)
-      (sha256-block h bytes at w)
+      (block h bytes at w)
       (set at (+ at 64)))
     ;; what's left, the 1 bit, zeros, and the length in bits, as one block or two
     (while (< at end) (array-append last (array-at bytes at)) (set at (+ at 1)))
@@ -57,9 +56,12 @@
     (while (not (= 56 (& (array-length last) 63))) (array-append last 0))
     (let ((bits (* length 8)))
       (for (i 0 8) (array-append last (& (>> bits (* 8 (- 7 i))) 255))))
-    (for (i 0 (/ (array-length last) 64)) (sha256-block h last (* i 64) w))
-    (let ((out ()))
-      (for (i 0 8)
-	(let ((word (array-at h (- 7 i))))
+    (for (i 0 (/ (array-length last) 64)) (block h last (* i 64) w))
+    (let ((out ()) (n (array-length h)))
+      (for (i 0 n)
+	(let ((word (array-at h (- (- n 1) i))))
 	  (for (j 0 4) (push out (& (>> word (* 8 j)) 255)))))
       out)))
+(define-function sha256 (bytes start length)
+  (sha-digest (list->array '(0x6a09e667 0xbb67ae85 0x3c6ef372 0xa54ff53a 0x510e527f 0x9b05688c 0x1f83d9ab 0x5be0cd19))
+	      sha256-block bytes start length))

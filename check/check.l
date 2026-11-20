@@ -1172,6 +1172,9 @@
 ;; check/ledger's erosion and verbosity entries as lines is to its lines entries: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
 ;; still fail to read.
+;; git object ids computed in Maru, for the ledger's fingerprints (git-object.l, sha1.l)
+(check "git_object"
+  (unit-assert (equal (last (run "git_object" '("./eval" "check/git-object.l"))) "git object ok")))
 ;; a change's moves attributed to its edits and to share (erosion-attribute.l, doc/rfc/draft-ndn-erosion-attribution-00.md)
 (check "erosion_attribution"
   (unit-assert (equal (last (run "erosion_attribution" '("./eval" "check/erosion-attribution.l"))) "erosion attribution ok")))
