@@ -6,7 +6,7 @@
 ;;; is counted as it is now, with a note saying how far it moved.
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
-(require "erosion-files.l")	; text-lines, and spawn.l
+(require "git-object.l")	; git-blob-id
 (define-structure <ledger-entry> (metric change reason))	; a line of check/ledger
 (define-function ledger-join (t us) (let ((s t)) (list-do u us (set s (concat-strings s " " u))) s))	; a folded line, joined
 (tpeg-load "ledger.g")
@@ -15,9 +15,7 @@
   (let ((p (text-parser-for-on <ledger> text)))
     (or ($ledger p) (error "ledger: can't read the ledger"))
     (<text-parser>-result p)))
-(define-function ledger-fingerprint (path)	; a file's git blob id, as git hash-object gives it
-  (let ((r (program-result (list "git" "hash-object" "--no-filters" path) ".")))
-    (and (= 0 (car r)) (car (text-lines (cdr r))))))
+(define-function ledger-fingerprint (path) (git-blob-id path "."))	; a file's git blob id, computed here, no git process
 
 ;; sums, (lines erosion verbosity): of entries, of a summary ((metric . n) ...), and written as a summary is
 (define-function ledger-add (sums m n)

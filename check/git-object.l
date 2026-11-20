@@ -64,6 +64,13 @@
 (contents-to-file-named "[core]\n\trepositoryformatversion = 1\n[Extensions]\n\tobjectFormat = sha256\n" (concat-string cased "/.git/config"))
 (expect "objectFormat in another case" (git-object-format cased) 'sha256)
 (expect "no repository" (try (git-object-format "/nonexistent") (lambda (c) 'refused)) 'refused)
+;; ---- the ledger reads with no git process: its fingerprints are computed here
+(define-function ledger-read-with (env)	; check/ledger-read.l's output, run with env
+  (let ((out (concat-string scratch "/ledger-read.out")))
+    (command-status (make <command> argv: '("./eval" "check/ledger-read.l") out: out err: out env: env))
+    (contents-of-file-named out)))
+(let ((without (ledger-read-with '(("PATH" . "/nonexistent")))) (with (ledger-read-with ())))
+  (expect "the ledger reads with no git on PATH, as it does with git" (list (and (string-find without "moved since") 'moved) without) (list () with)))
 (remove-tree scratch)
 
 (println (if ok "git object ok" "git object FAILED"))
