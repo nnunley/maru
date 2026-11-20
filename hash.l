@@ -15,14 +15,14 @@
 
 ;; identity, as Smalltalk's ==: a number is itself (eval2 and eval3 box them, so two 5s needn't share an address), and
 ;; of one kind only (2 isn't 2.0); anything else is where it lives (Maru's = compares strings by their text)
-(define-function hash-identical? (a b)
-  (cond ((and (long? a) (long? b))	(= a b))
-	((and (double? a) (double? b))	(= a b))
-	(else				(= (address-of a) (address-of b)))))
-(define-function hash-address (x) (>> (address-of x) 4))
+(define-function hash-identical? (a b)	; the same object first: a hit compares two addresses and no types
+  (or (= (address-of a) (address-of b))
+      (and (long? a) (long? b) (= a b))
+      (and (double? a) (double? b) (= a b))))
 ;; a number by its value (boot.l's equal-hash), anything else by where it lives
 (define-function hash-identity (x)
-  (if (or (long? x) (double? x)) (equal-hash x) (hash-address x)))
+  (let ((t (type-of x)))
+    (if (or (= <long> t) (= <double> t)) (equal-hash x) (>> (address-of x) 4))))
 
 ;; equality is Maru's equal, each type's own (boot.l): equal-hash agrees with it, numbers by value, strings by text, pairs
 ;; and arrays by their elements, and a type that defines equal defines equal-hash beside it
@@ -37,9 +37,8 @@
   (let ((table (identity-hash-table))) (set (<hash-table>-weak table) (hash-collections)) table))
 (define-function hash-table-same? (table a b) ((<hash-table>-same table) a b))
 
-(define-function hash-bucket-of (table key)
-  (let* ((n (array-length (<hash-table>-buckets table))) (r (% ((<hash-table>-hash table) key) n)))
-    (if (< r 0) (+ r n) r)))	; % keeps the sign, and negating the least long gives itself back
+(define-function hash-bucket-of (table key)	; the buckets are a power of two, so a mask takes any hash, negative too
+  (& ((<hash-table>-hash table) key) (- (array-length (<hash-table>-buckets table)) 1)))
 
 ;; every live entry indexed afresh into buckets of size n, the entries compacted, the anchor's place noted
 (define-function hash-rebuild (table n)

@@ -352,3 +352,4 @@
 +86 an instruction's candidate rows found by its mnemonic and one key for its operands' shapes (asm-table.l's asm-keys, asm-arm64.l's arm64-shape-key), not a step per operand along a chain with memory operands' shapes made afresh, and the instruction set looked up once per unit; asm_table counts the lookups
 +2 global_lookup registered on its own expected line: on-each-evaluator expects a tree check's "tpeg ...", so the case could never pass
 +43 structure accessors check their own type inline (boot.l's and boot2.l's %checked), calling %typecheck only for a derived type or a wrong one, where they called it on every read; structure_fields holds a read under 7/4 of a call and the refusal
+-1 hash.l's lookup in fewer calls: hash-identical? compares addresses first, hash-identity takes the key's type once (hash-address gone), hash-bucket-of masks the power-of-two buckets
