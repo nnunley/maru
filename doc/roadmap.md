@@ -17,6 +17,12 @@
    map, exit) are the first step, specified after the encoders
    (RFC 0001, `doc/rfc/0001-table-assemblers.md`) as part C of the 2026-10-14
    assembler design.
+   History on bare metal is the route to think about next: a content-addressed
+   store keyed by the ids `git-object.l` already computes (git's blob ids, SHA-1
+   or SHA-256), with git's object layout as the model (objects zlib-compressed,
+   which `png.irl` already inflates), so a ledger include's `@ ID` can fetch the
+   file as it was. Not yet designed
+   (`doc/plans/2026-11-20-git-blob-ids-design.md`).
 5. Nile on Maru: a Nile runtime written in typed Maru (new kernel interface,
    POSIX mutexes, arm64 and x86-64), then Gezira, then its demos in an SDL3
    window on macOS and Linux.

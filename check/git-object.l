@@ -5,18 +5,8 @@
 (require "erosion-files.l")	; text-lines
 (require "recover.l")	; try
 
-(define ok 1)
-(define-function expect (what got want)
-  (or (equal got want)
-      (let () (set ok ()) (println "FAIL " what ": got " got ", want " want))))
-(define-function bytes-of-string (s)
-  (let ((a (array)))
-    (for (i 0 (string-length s)) (array-append a (string-at s i)))
-    a))
-(define-function hex (bytes)
-  (let ((out ""))
-    (list-do b bytes (set out (concat-string out (format "%02x" b))))
-    out))
+(require "check/erosion-common.l")	; ok, expect
+(require "check/bytes.l")	; bytes-of-string, hex
 (define-function digest (s) (hex (sha1 (bytes-of-string s) 0 (string-length s))))
 (define-function a-times (n) (let ((s "")) (for (i 0 n) (set s (concat-string s "a"))) s))
 

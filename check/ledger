@@ -16,3 +16,9 @@ lines +87 an include summarises its file and may give its fingerprint (include: 
 erosion -1 summaries and folds (make erosion-report against HEAD): share -1, the new code's mass; edits 0
 verbosity -1 summaries and folds (make erosion-report against HEAD): share -1; edits 0, the two clones the first
   draft added (a test lookup, a temp-file path) removed before the entry
+lines +156 git blob ids computed in Maru, so the ledger reads with no git process: sha1.l (NIST vectors, sharing
+  sha256.l's padding, sha-digest), git-object.l's git-blob-id over a file's bytes in the repository's format, read from
+  its config by git-repo.g (worktrees followed), and ledger-fingerprint calling it; the git_object unit holds them to
+  git hash-object, and to a ledger read with git off PATH; check/exe.l and check/git-object.l share their helpers
+erosion -1 git blob ids (make erosion-report against 397fda4): share -1, the new code's mass; edits 0, sha256 split
+  into sha-digest (CC 8 to 1)
