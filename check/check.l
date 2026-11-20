@@ -720,6 +720,9 @@
 ;; maru-test.k's sieve prints the primes below 32, then its struct code sets
 ;; x = 42 and y = 666, sums them and doubles both.  The two lines after the
 ;; primes read uninitialised memory and are skipped.
+;; a global is found as quickly whichever globals are in use and wherever their symbols were allocated
+;; (check/global-lookup.l): eval2's and eval3's cache of global bindings keeps every one it found
+(check "global_lookup" (on-each-evaluator "global_lookup" "check/global-lookup.l"))
 ;; data-length answers what a Data was made with (check/data-length.l), on the evaluators that have it
 (check "data_length"
   (list-do e '("./eval" "./eval3")

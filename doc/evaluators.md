@@ -17,6 +17,15 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   handler can't allocate one. `eval2 -PN FILE` counts every function on the stack instead, each once a sample, so a count
   is the time spent in a function and in what it called: the profile that names which operation a program's time
   serves, where `-p` spreads it over the primitives doing the work.
+- `global_lookup` (`check/global-lookup.l`): a global is found in about the same time whichever globals are in use and
+  wherever their symbols were allocated. `eval2` and `eval3` cache the global bindings they have found in an
+  open-addressing table kept at most half full, which grows; a global costs one search of the global namespace, the
+  first time it is looked up, and undoing a binding clears the cache. Reading 500 of 3000 globals stays within three
+  times reading one global as often. Piumarta's cache had one slot per hash, 2003 of them: two globals in use that shared
+  a slot evicted each other, every miss searched all the globals, and imaging the Nile runtime natively ran four times
+  slower when an unrelated change moved its symbols. It also filled a miss from the whole environment, so a local
+  binding could be cached as the global; the table is filled from the global namespace alone. `eval` keeps globals
+  differently and has no such cache.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose

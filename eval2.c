@@ -447,18 +447,56 @@ static oop findVariable2(oop env, oop name)
     return nil;
 }
 
-#define GLOBAL_CACHE_SIZE 2003 // 257 // 1021 // 7919
+/* The global bindings found so far, by symbol: open addressing in a table at most half full, which doubles, so a
+   global costs one search of the namespace, the first time it is looked up, wherever its symbol was allocated.  (One
+   slot per hash let two globals in use evict each other on every lookup, each miss searching every global: a program
+   ran four times slower when an unrelated change moved its symbols.)  An entry is the global's own association, so a
+   hit is its binding; undoing a binding forgets them all (UNDO_FORGET_GLOBALS).  Only the global namespace is searched
+   to fill it, never a local binding in front of it. */
+static oop  _globalCache= 0;
+static long globalCacheSize= 1024, globalCacheCount= 0;
 
-static oop _globalCache= 0;
+static long globalSlot(oop name)
+{
+    unsigned long h= ((unsigned long)name >> 4) * 0x9E3779B97F4A7C15UL;	/* an address's low bits are its alignment */
+    long mask= globalCacheSize - 1, i= (long)(h >> 32) & mask;
+    oop *slots= (oop *)_globalCache;
+    while (nil != slots[i] && name != getHead(slots[i])) i= (i + 1) & mask;
+    return i;
+}
+
+static void growGlobalCache(void)
+{
+    oop *old= (oop *)_globalCache;
+    long i, n= globalCacheSize;
+    oop bigger= _newOops(0, sizeof(oop) * 2 * n);	/* the old table is still the root while this allocates */
+    _globalCache= bigger;
+    globalCacheSize= 2 * n;
+    for (i= 0;  i < n;  ++i)
+	if (nil != old[i]) ((oop *)_globalCache)[globalSlot(getHead(old[i]))]= old[i];
+}
+
+static oop findGlobal(oop name)
+{
+    long i= globalSlot(name);
+    oop ent= ((oop *)_globalCache)[i];
+    if (nil != ent) return ent;
+    ent= findVariable2(globalNamespace, name);
+    if (nil == ent) return nil;
+    if (2 * (globalCacheCount + 1) > globalCacheSize) {
+	growGlobalCache();
+	i= globalSlot(name);
+    }
+    ((oop *)_globalCache)[i]= ent;
+    ++globalCacheCount;
+    return ent;
+}
 
 static oop findVariable(oop env, oop name)
 {
     while (env) {
 	if (env == globalNamespace) {
-	    long hash= ((long)name) % GLOBAL_CACHE_SIZE;
-	    oop ent= ((oop *)_globalCache)[hash];
-	    if ((nil != ent) && (name == getHead(ent))) return ent;
-	    return ((oop *)_globalCache)[hash]= findVariable2(env, name);
+	    return findGlobal(name);
 	}
 	oop ass= getHead(env);
 	if (name == car(ass)) return ass;
@@ -473,10 +511,7 @@ static oop findNamespaceVariable(oop env, oop name)
     oop end= findEnvironment(cdr(env));
     while (beg != end) {
 	if (beg == globalNamespace) {
-	    long hash= ((long)name) % GLOBAL_CACHE_SIZE;
-	    oop ent= ((oop *)_globalCache)[hash];
-	    if ((nil != ent) && (name == getHead(ent))) return ent;
-	    return ((oop *)_globalCache)[hash]= findVariable2(env, name);
+	    return findGlobal(name);
 	}
 	oop ass= car(beg);
 	if (name == car(ass)) return ass;
@@ -1818,7 +1853,7 @@ static void arity3(oop args, char *name)
 
 #define subr(NAME)	oop subr_##NAME(oop args, oop env)
 #define UNDO_CONS cons
-#define UNDO_FORGET_GLOBALS()	memset((oop *)_globalCache, 0, sizeof(oop) * GLOBAL_CACHE_SIZE)
+#define UNDO_FORGET_GLOBALS()	(memset((oop *)_globalCache, 0, sizeof(oop) * globalCacheSize), globalCacheCount= 0)
 #include "undo.c"
 
 static subr(if)
@@ -3487,7 +3522,7 @@ int main(int argc, char **argv)
 
     GC_INIT();
 
-    _globalCache= _newOops(0, sizeof(oop) * GLOBAL_CACHE_SIZE);		GC_add_root(&_globalCache);
+    _globalCache= _newOops(0, sizeof(oop) * globalCacheSize);		GC_add_root(&_globalCache);
 
     GC_add_root(&symbols);
     GC_add_root(&globals);
