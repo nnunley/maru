@@ -96,17 +96,25 @@
 
 (define-function native-install (unit) (native-load-image (native-image-of unit)))
 
-;; an image as Maru text: numbers, symbols and lists are all it holds
-(define-function native-form-text (x)
+;; an image as Maru text: numbers, symbols and lists are all it holds.  The characters go into one array, made a string
+;; once, so the time is linear in the text: a string grown by concat-string is copied whole at every step, which for an
+;; image's hundred thousand bytes is hours
+(define-function native-text-append (out s)
+  (for (i 0 (string-length s)) (array-append out (string-at s i))))
+(define-function native-form-chars (x out)
   (cond ((pair? x)
-	 (let ((s "(") (first 1))
-	   (while (pair? x)
-	     (set s (concat-string s (concat-string (if first "" " ") (native-form-text (car x)))))
-	     (set first ())
-	     (set x (cdr x)))
-	   (concat-string s (if x (concat-string " . " (concat-string (native-form-text x) ")")) ")"))))
-	((= x ()) "()")
-	((long? x) (long->string x))
-	((symbol? x) (symbol->string x))
+	 (native-text-append out "(")
+	 (native-form-chars (car x) out)
+	 (set x (cdr x))
+	 (while (pair? x)
+	   (native-text-append out " ")
+	   (native-form-chars (car x) out)
+	   (set x (cdr x)))
+	 (when x (native-text-append out " . ") (native-form-chars x out))
+	 (native-text-append out ")"))
+	((= x ()) (native-text-append out "()"))
+	((long? x) (native-text-append out (long->string x)))
+	((symbol? x) (native-text-append out (symbol->string x)))
 	(else (error "native: an image holds no " x))))
+(define-function native-form-text (x) (let ((out (array))) (native-form-chars x out) (array->string out)))
 (define-function native-save (unit path) (contents-to-file-named (native-form-text (native-image-of unit)) path))

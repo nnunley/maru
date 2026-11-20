@@ -55,7 +55,9 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   `native-install` is loading the image held in memory. `add.k` and `flow.k`, saved on `eval2`, give Tasks 1 and 2's
   answers on `eval` and `eval3`; `image.k`'s global, `strlen` and string reach them through the table; and an image
   for the other instruction set, or the other system, is refused. The host is uname's whole names (arm64 or aarch64,
-  x86_64; Darwin, Linux), and any other is refused. A string literal must be ASCII.
+  x86_64; Darwin, Linux), and any other is refused. A string literal must be ASCII. An image's text is written in time
+  linear in its size: one of 100,000 bytes is written and reads back equal within the case's two minutes. Built by
+  `concat-string`, which copies the whole string at every step, the Nile runtime's 144,820 bytes took hours.
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).
