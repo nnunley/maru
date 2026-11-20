@@ -108,7 +108,7 @@
 
 ;; ---- the report: worked out by hand for crossing's change (f: CC 10 over 10 forms to CC 11 over 11; k: CC 1, 1 form):
 ;; erosion now 11 sqrt 11 / (11 sqrt 11 + 1) = 973 per mille, all of it f's edit; no ledger, so the base is rebuilt: 0
-(define ledger-before (contents-of-file-named "check/erosion"))
+(define ledger-before (contents-of-file-named "check/ledger"))
 (expect "the report" (attribution-report crossing)
 	'("erosion 0 -> 973: whole +973, edited +973, share 0"
 	  "verbosity 0 -> 0: whole 0, edited 0, share 0"
@@ -119,7 +119,7 @@
 (expect "a drafted entry reads as the ledger's, to its whole move" (erosion-ledger (concat-string (car (attribution-ledger-entries crossing)) "\n")) '(973 . 0))
 (expect "a callable added or removed shows none on that side"
 	(car (select-moves (attribution-report deleted))) "edited z.l z: CC 13 -> none, forms 13 -> none, flagged 0 -> none")
-(expect "the report writes no file" (contents-of-file-named "check/erosion") ledger-before)
+(expect "the report writes no file" (contents-of-file-named "check/ledger") ledger-before)
 
 ;; ---- a conflicted file, side by side: each side attributed against the conflict's base as a change of its own
 (define conflicted-text (concat-strings "(define-function k () 1)\n<<<<<<< conflict 1 of 1\n%%%%%%% diff from: kyspwnsp 77789aaf \"base\"\n"
@@ -135,7 +135,10 @@
 (define scratch (concat-string (attribution-scratch) "/repos"))
 (remove-tree scratch)
 (define-function git-in (dir . args) (program-result (concat-list (list "git" "-c" "user.email=t@t" "-c" "user.name=t" "-c" "protocol.file.allow=always") args) dir))
-(define-function write-in (dir name text) (contents-to-file-named text (concat-strings dir "/" name)))
+(define-function write-in (dir name text)	; name's directory made first
+  (let ((slash (string-length name))) (while (and (< 0 slash) (not (= ?/ (string-at name (- slash 1))))) (decr slash))
+       (and (< 0 slash) (make-directory (concat-strings dir "/" (string-copy name 0 slash)))))
+  (contents-to-file-named text (concat-strings dir "/" name)))
 (define-function new-repo (name files . format)	; a repository holding files, ((name . text) ...), committed; format: sha1, sha256
   (let ((dir (concat-strings scratch "/" name)))
     (make-directory dir)
@@ -144,7 +147,8 @@
     (git-in dir "add" "-A") (git-in dir "commit" "-qm" "base")
     dir))
 (define sub (new-repo "sub" (list (cons "x.l" "(define-function x () 1)\n"))))
-(define super (new-repo "super" (list (cons "a.l" "(define-function a () 1)\n") (cons "gen.l" "(define g 1)\n") (cons ".gitattributes" "gen.l derived\n"))))
+(define super (new-repo "super" (list (cons "a.l" "(define-function a () 1)\n") (cons "gen.l" "(define g 1)\n") (cons ".gitattributes" "gen.l derived\n")
+				     (cons "check/ledger" "lines 1 base\nerosion 0 base\nverbosity 0 base\n"))))
 (git-in super "submodule" "add" "-q" sub "nile")
 (git-in super "commit" "-qm" "submodule")
 (write-in super "a.l" "(define-function a () 1)\n(define-function b () 2)\n")
@@ -161,6 +165,15 @@
 	(map (lambda (c) (<change>-base-text c)) changes) '("(define-function a () 1)\n" () "(define-function x () 1)\n"))
 (expect "the lines a change added" (<change>-added (car changes)) '(2))
 (expect "a revision that doesn't exist" (vcs-revision? super "nosuch") ())
+(define old-ledgers (new-repo "old-ledgers" (list (cons "a.l" "(define-function a () 1)\n") (cons "check/lines" "1 base\n")
+					      (cons "check/erosion" "erosion 0 base\nverbosity 0 base\n"))))
+(expect "a base from before the ledgers were one: lines from check/lines, the rest from check/erosion"
+	(vcs-ledger-at old-ledgers "HEAD") '(1 0 0))
+(define super-lines (attribution-command-lines super "HEAD"))
+(expect "the report's lines: the base's ledger to the count now, and a drafted entry naming the files that moved"
+	(list (and (select (lambda (l) (starts-with? l "lines 1 -> ")) super-lines) 't)
+	      (and (select (lambda (l) (and (starts-with? l "lines +") (string-find l "a.l (+1)"))) super-lines) 't))
+	'(t t))
 ;; SHA-256 object names are 64 hex digits, not 40: a submodule's recorded commit is read whole
 (let* ((sub256 (new-repo "sub256" (list (cons "x.l" "(define-function x () 1)\n")) "sha256"))
        (super256 (new-repo "super256" (list (cons "a.l" "(define-function a () 1)\n")) "sha256")))

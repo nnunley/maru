@@ -4,7 +4,14 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
 
 ## Checks
 
-- `lines`: the source line count equals the sum of `check/lines`. Any change
+One ledger, `check/ledger` (`ledger.g`, `ledger.l`), holds every measure: each line an entry naming its measure (`lines`,
+`erosion` or `verbosity`), its change and why; an entry naming none is a `lines` entry. An entry needs a reason, but
+lines removed may go without one. A line `include: PATH` brings in the ledger at PATH, anywhere and more than once; a
+file included twice, or a cycle, is refused. `check/ledger` includes `check/lines` and `check/erosion`, the two ledgers
+before they were one, kept as they were, so a branch that still appends to either merges without conflict; new entries
+go in `check/ledger`.
+
+- `lines` (`lines-run.l`): the source line count equals the sum of the ledger's `lines` entries. Any change
   in line count needs an entry there with its delta, and an entry that adds
   lines must say why. Derived files are marked `derived` in `.gitattributes`
   and not counted, nor is `notes/` (reference copies) or anything marked
@@ -15,7 +22,7 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   the x86 assembler) over writing code out, tests included.
 - `erosion` (`check/erosion.l`, `erosion-run.l`, `doc/plans/2026-11-10-erosion-by-reflection.md`): SlopCodeBench's erosion and
   verbosity (Orlanski et al., NeurIPS 2026), per mille, counted in forms, over the `.l`, `.k` and `.g` files in the `lines` check's set,
-  held to `check/erosion`'s ledger as `lines` is to `check/lines`: each metric equals the sum of its entries (`erosion-ledger.g`), so
+  held to the ledger's `erosion` and `verbosity` entries as `lines` is to its `lines` entries: each metric equals their sum, so
   a rise or a fall is written down with its reason. A form is a list outside quoted data (a quoted datum, its `(quote ...)` too, is
   none; `()` is NIL, an atom, as in McCarthy's paper and Maru's `pair?`, though a tpeg list pattern enters it as an empty
   list, so a form is a pair; a backquote or comma is the reader's syntax, though the lists under it are forms). Erosion is the share of
@@ -69,7 +76,9 @@ The `lines` ledger and budget, and the erosion and verbosity metrics.
   plus their counts at the base), so a clone that was already there isn't. A changed file the check doesn't count
   (`notes/`, derived, unused) isn't attributed, and one that doesn't read is reported as unmeasured. A conflicted file is
   attributed side by side. The report: each metric's base, now, whole, edited and share; each callable that moved, edited
-  first, by mass moved; and drafted `check/erosion` entries naming the edits that moved most. `make erosion-report
+  first, by mass moved; the line count against the base's ledger; and drafted ledger entries naming the edits that moved
+  most (for `lines`, the changed files whose lines moved most). The base's ledger is `check/ledger` at REV, its includes
+  read at REV too, or `check/lines` and `check/erosion` there before the ledgers were one. `make erosion-report
   [REV=…]` prints it (`./eval erosion-attribute-run.l [REV]`, `HEAD`, or `@-` under jj); when the erosion check's ledger
   doesn't match, it prints it after its own lines (`erosion-run.l --attribute`), from the metrics already measured. It
   writes nothing. The fixtures are git's and jj's own output: statuses, ranges, omitted counts, a content line of pluses,

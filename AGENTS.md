@@ -72,8 +72,8 @@ direct run in a fresh or stale tree fails on a missing or old grammar.
 Typed checks are ir2 programs in `check/` (`ir2.k`, `gc.k`), as upstream's
 `maru-check.k` is.
 
-Any change in the source line count needs an entry in `check/lines`, and any change in erosion or verbosity one in
-`check/erosion`; see [doc/measures.md](doc/measures.md).
+Any change in the source line count, erosion or verbosity needs an entry in `check/ledger`, naming the measure it moves;
+see [doc/measures.md](doc/measures.md).
 
 ## Documentation
 

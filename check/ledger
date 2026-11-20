@@ -1,0 +1,4 @@
+include: check/lines
+include: check/erosion
+lines +97 one ledger for every measure: ledger.g/ledger.l read check/ledger, which includes check/lines and check/erosion as they were (include: PATH, each file once); lines-run.l runs the lines check with its message shown; the report reads lines too (the base's ledger, the old pair before the merge) and drafts a lines entry; tests for includes, old-style entries and an old-ledger base
+erosion -1 one ledger (make erosion-report against HEAD): share -1, the new code's mass; edits 0

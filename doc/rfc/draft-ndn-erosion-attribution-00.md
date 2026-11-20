@@ -44,7 +44,8 @@ when, and only when, they appear in all capitals, as shown here.
 - **edited callable** — a callable whose lines a hunk's added or removed lines overlap, on the side it belongs to, or
   one the change adds or removes.
 - **ledger value** — a metric's value as the ledger at a revision states it: the sum of `check/erosion`'s entries for
-  that metric, as `erosion-ledger.g` reads the file at that revision.
+  that metric, as `ledger.g` reads `check/ledger` at that revision (its includes read there; `check/lines` and `check/erosion` before
+  the ledgers were one).
 - **edited move** — the part of a metric's move that the edited callables' own numbers account for.
 - **share move** — the rest of a metric's move: what changing the tree's total, and clones gained or lost by callables
   the change did not edit, account for.
@@ -54,7 +55,7 @@ when, and only when, they appear in all capitals, as shown here.
 
 This document defines the reading of a change (a unified diff, and jj's conflict markers), which callables it edited,
 the attribution of each metric's move to edits and to share, and the report. It does NOT define the metrics, which
-`doc/measures.md` and `erosion.l` own, nor the ledger's format (`erosion-ledger.g`), nor any gate: a gate that fails a
+`doc/measures.md` and `erosion.l` own, nor the ledger's format (`ledger.g`), nor any gate: a gate that fails a
 change is a later document's.
 
 **Measure what changed, once.** Only measured files the change touches are measured at the base. The base's whole-tree
@@ -223,7 +224,7 @@ as a change of its own, and the report gives each side's moves under its label. 
 **The report.** The report prints, in order: a line per metric giving the base value, the current value, the whole
 move, the edited move and the share move; then a line per callable whose numbers moved, edited ones first, each with
 its path, name, complexity before and after, forms before and after, whether it crossed complexity 10, and flagged
-forms before and after; then, for each metric that moved, a drafted `check/erosion` entry naming the callables that
+forms before and after; then, for each metric that moved, a drafted `check/ledger` entry naming the callables that
 moved it most. A callable whose numbers did not move is not printed. [R-report]
 
 **Where it runs.** `make erosion-report` and `./eval erosion-attribute.l [REV]` print the report for the change
@@ -231,7 +232,7 @@ against `REV`. When the erosion check fails because the tree's metrics don't mat
 for the working copy against `HEAD` (git) or `@-` (jj) after its own lines, so the failure names its cause.
 [R-check-prints]
 
-The report never writes `check/erosion` or any other file, and its own exit status is 0 whenever it could read the
+The report never writes `check/ledger` or any other file, and its own exit status is 0 whenever it could read the
 change. [R-advisory]
 
 Programs (`git`, `jj`) are started with fixed arguments and the base given as one argument, never through a shell

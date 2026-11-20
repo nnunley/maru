@@ -9,12 +9,11 @@
 (require "spawn.l")	; a script run directly to find its forms
 (require "source.l")
 
-(define-structure <ledger-entry> (metric change reason))	; a line of check/erosion
 (define-function erosion-parse-text (grammar rule text what)	; what rule reads of all of text, or an error naming what
   (let ((p (text-parser-for-on grammar text)))
     (or (rule p) (error "erosion: can't read " what))
     (<text-parser>-result p)))
-(tpeg-load "erosion-ledger.g")
+(require "ledger.l")	; check/ledger, read by ledger.g
 (tpeg-load "erosion-spans.g")
 
 (define-structure <callable> (name path line last cc forms flagged))	; a definition, its first and last line, its complexity,
@@ -219,12 +218,5 @@
 	    erosion: (erosion-per-mille (erosion-masses callables))
 	    verbosity: (if (< 0 forms) (/ (* 1000 flagged) forms) 0)
 	    callables: callables forms: forms flagged: flagged findings: (cdr coverage) seen: (<erosion-walk>-seen w)))))
-;; check/erosion's ledger, read by erosion-ledger.g to entries; answers each metric's sum, (erosion . verbosity)
-(define-function erosion-ledger (text)
-  (let ((e 0) (v 0))
-    (list-do entry (erosion-parse-text <erosion-ledger> $ledger text "the ledger")
-      (when entry
-	(if (= 'erosion (<ledger-entry>-metric entry))
-	    (set e (+ e (<ledger-entry>-change entry)))
-	  (set v (+ v (<ledger-entry>-change entry))))))
-    (cons e v)))
+;; the ledger's erosion and verbosity, (erosion . verbosity), from check/ledger's entries (ledger.l)
+(define-function erosion-ledger (text . read) (let ((sums (apply ledger-sums (cons text read)))) (cons (cadr sums) (caddr sums))))

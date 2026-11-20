@@ -184,9 +184,31 @@
 	'(t () t ()))
 (expect "an entry may say +N" (erosion-ledger "erosion +3 why\nverbosity -2 why\n") '(3 . -2))
 
+;; one ledger, check/ledger, for every measure: lines, erosion and verbosity, each entry its metric, its change and why
+(expect "each metric's sum, lines among them" (ledger-sums "lines 10 first counted\nlines +2 why\nlines -1\nerosion 5 x\nverbosity 1 y\n")
+	'(11 5 1))
+(expect "lines removed may go without a reason; lines added may not"
+	(list (car (ledger-sums "lines 10 base\nlines -3\n")) (try (ledger-sums "lines 10 base\nlines +3\n") (lambda (c) 'refused))) '(7 refused))
+(expect "erosion reads only its own metrics from the shared ledger" (erosion-ledger "lines 9 x\nerosion 4 y\nverbosity 2 z\n") '(4 . 2))
+
+;; a ledger may include others, include: PATH, anywhere and more than once: check/ledger includes check/lines and
+;; check/erosion, the two ledgers before they were one, kept as they were
+(define-function reader-of (files) (lambda (path) (let ((hit ())) (list-do f files (and (= path (car f)) (set hit (cdr f)))) hit)))
+(expect "an include's entries count with the ledger's own"
+	(ledger-sums "include: check/lines\nerosion 2 b\n" (reader-of '(("check/lines" . "33 base\n-3\n")))) '(30 2 0))
+(expect "several includes, one including another"
+	(ledger-sums "include: a\ninclude: c\n" (reader-of '(("a" . "include: b\nlines 1 x\n") ("b" . "verbosity 4 y\n") ("c" . "erosion 2 z\n"))))
+	'(1 2 4))
+(expect "a file included twice is refused"
+	(try (ledger-sums "include: a\ninclude: a\n" (reader-of '(("a" . "lines 1 x\n")))) (lambda (c) 'refused)) 'refused)
+(expect "includes that go round are refused"
+	(try (ledger-sums "include: a\n" (reader-of '(("a" . "include: b\n") ("b" . "include: a\n")))) (lambda (c) 'refused)) 'refused)
+(expect "an include that names no file is refused" (try (ledger-sums "include: nosuch\n" (reader-of ())) (lambda (c) 'refused)) 'refused)
+(expect "an entry with no measure named is a lines entry, as check/lines wrote them" (ledger-sums "lines 5 base\n+2 old style\n") '(7 0 0))
+
 ;; the ledger: each metric is the sum of its entries, and an entry says why
 (expect "the ledger sums each metric's entries" (erosion-ledger "erosion 400 first measured\nverbosity 75 first measured\nerosion -3 split ks-eval\n") '(397 . 75))
 (expect "an entry with no reason is refused" (try (erosion-ledger "erosion 4\n") (lambda (c) 'refused)) 'refused)
-(expect "an entry naming neither is refused" (try (erosion-ledger "lines 4 why\n") (lambda (c) 'refused)) 'refused)
+(expect "an entry naming no measure is refused" (try (erosion-ledger "pages 4 why\n") (lambda (c) 'refused)) 'refused)
 
 (println (if ok "erosion ok" "erosion FAILED"))

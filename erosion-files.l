@@ -49,4 +49,12 @@
 	 (name (if sub (string-copy path (+ 1 (string-length sub)) (- (string-length path) (+ 1 (string-length sub)))) path)))
     (and (measured-file? path) (not (starts-with? name "notes/"))
 	 (unmarked (if sub (concat-strings root "/" sub) root) (list name)) 't)))
+;; the source lines the lines check counts: every counted file's newlines, from root
+(define *lines-suffixes* '(".l" ".k" ".g" ".c" ".h" ".nl" ".spec" ".osdefs" ".irl" ".dc" ".law" ".john"))
+(define-function newlines (text) (let ((n 0)) (for (i 0 (string-length text)) (and (= ?\n (string-at text i)) (incr n))) n))
+(define-function counted-lines (root)
+  (let ((sum 0))
+    (list-do f (counted-files-in root *lines-suffixes*)
+      (let ((path (concat-strings root "/" f))) (and (exists? path) (set sum (+ sum (newlines (or (contents-of-file-named path) "")))))))
+    sum))
 (define-function measured-files (root) (select measured-file? (counted-files-in root '(".l" ".k" ".g"))))

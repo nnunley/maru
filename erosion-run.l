@@ -1,6 +1,6 @@
 ;;; erosion-run.l -- ./eval erosion-run.l [--ledger FILE] [--unread FILE... --] FILE... measures the files (erosion.l) and prints
 ;;; their erosion and verbosity, per mille, then the ten callables of greatest mass.  With --ledger, each metric must equal
-;;; the sum of the ledger's entries (erosion-ledger), and a line says whether they do.  With --attribute REV as well, a
+;;; the sum of the ledger's entries (check/ledger, ledger.l), and a line says whether they do.  With --attribute REV as well, a
 ;;; ledger that doesn't match is followed by the report for the working copy's change against REV
 ;;; (doc/rfc/draft-ndn-erosion-attribution-00.md), from the metrics already measured.
 ;;; Each file is read by its own reader (erosion-read-file): a .g file by tpeg, a script tpeg-repl.l reads by it, any other

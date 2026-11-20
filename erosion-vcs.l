@@ -22,8 +22,11 @@
   (if (= 'jj (vcs-kind root))
       (vcs-output root (list "jj" "file" "show" "-r" rev path))
     (vcs-output root (list "git" "show" (concat-strings rev ":" path)))))
-(define-function vcs-ledger-at (root rev)	; the base's ledger values, (erosion . verbosity), or ()
-  (let ((text (vcs-show root rev "check/erosion"))) (and text (erosion-ledger text))))
+(define-function vcs-ledger-at (root rev)	; the base's ledger, (lines erosion verbosity), or (): check/ledger, its includes read
+  (let ((show (lambda (p) (vcs-show root rev p))))	; at that revision too; before the ledgers were one, check/lines and
+    (let ((text (or (show "check/ledger")		; check/erosion together (an old check/lines entry names no measure)
+		    (let ((l (show "check/lines")) (e (show "check/erosion"))) (and (or l e) (concat-strings (or l "") (or e "")))))))
+      (and text (ledger-sums text show)))))
 
 ;; a change for one file of a diff, its paths prefixed (a submodule's directory), its base read by show
 (define-function hunk-numbers (hs side)
@@ -84,10 +87,28 @@
       (list-do s (attribute-conflicted (<change>-path c) (<change>-base-text c) (<change>-current-text c))
 	(set out (concat-list out (cons (concat-strings "side " (car s) " of " (<change>-path c) ":") (attribution-report (cdr s)))))))
     out))
+(define-function ledger-pair (sums) (and sums (cons (cadr sums) (caddr sums))))	; (erosion . verbosity)
+;; the lines measure: the base's ledger to the count now, and a drafted entry naming the changed files whose lines moved most
+(define-function line-delta (c) (- (newlines (or (<change>-current-text c) "")) (newlines (or (<change>-base-text c) ""))))
+(define-function abs-delta (c) (let ((d (line-delta c))) (if (< d 0) (- 0 d) d)))
+(define-function insert-by-delta (c sorted)
+  (if (or (not sorted) (< (abs-delta (car sorted)) (abs-delta c))) (cons c sorted) (cons (car sorted) (insert-by-delta c (cdr sorted)))))
+(define-function sort-by-delta (cs) (let ((out ())) (list-do c cs (set out (insert-by-delta c out))) out))
+(define-function lines-report (root changes base)
+  (if (not base) ()
+    (let* ((now (counted-lines root)) (whole (- now (car base))) (named "") (n 0))
+      (list-do c (sort-by-delta changes)
+	(when (and (< n 3) (not (= 0 (line-delta c))))
+	  (set named (concat-strings named (if (= 0 n) "" ", ") (<change>-path c) " (" (signed (line-delta c)) ")"))
+	  (incr n)))
+      (cons (concat-strings "lines " (long->string (car base)) " -> " (long->string now) ": whole " (signed whole))
+	    (if (= 0 whole) () (list (concat-strings "lines " (signed whole) " edits: " (if (= 0 n) "none" named))))))))
 (define-function attribution-command-lines (root rev . tree)	; tree: the tree measured now, if it already has been
   (let* ((changes (vcs-changes root rev)) (plain ()) (sides ()))
     (list-do c changes (if (conflicted? (<change>-current-text c)) (push sides c) (push plain c)))
     (if (not changes)
 	(list (concat-string "no change against " rev))
-      (concat-list (attribution-report (attribute (list-reverse! plain) (or (car tree) (tree-now-of root)) (vcs-ledger-at root rev)))
-		   (conflicted-lines sides)))))
+      (let* ((base (vcs-ledger-at root rev)) (lines (lines-report root changes base)))
+	(concat-list (and lines (list (car lines)))	; the lines measure first, its drafted entry with the others
+		     (concat-list (attribution-report (attribute (list-reverse! plain) (or (car tree) (tree-now-of root)) (ledger-pair base)))
+				  (concat-list (cdr lines) (conflicted-lines sides))))))))

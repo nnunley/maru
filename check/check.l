@@ -1132,26 +1132,15 @@
 
 ;;; ---------------------------------------------------------------- budget
 
-(define-function newlines (text) (let ((n 0)) (for (i 0 (string-length text)) (and (= ?\n (string-at text i)) (incr n))) n))
 
 ;; Derived code and code outside the stack (marked derived or unused in
 ;; .gitattributes, here or in the nile and gezira submodules) doesn't count.
 ;; Every source line is accounted for: the count must equal the sum of the
-;; entries in check/lines, and each entry that adds lines must say why.
-(check "lines"
-  (let ((n (let ((sum 0))
-	     (list-do f (counted-files '(".l" ".k" ".g" ".c" ".h" ".nl" ".spec" ".osdefs" ".irl" ".dc" ".law" ".john"))
-	       (set sum (+ sum (newlines (file-text f)))))
-	     sum))
-	(sum 0))
-    (list-do entry (lines (contents-of-file-named "check/lines"))
-      (let ((w (words entry)))
-	(when w
-	  (set sum (+ sum (string->long (car w))))
-	  (or (cdr w) (< (string->long (car w)) 0) (error "FAIL lines: no reason given for: " entry)))))
-    (or (= n sum) (error "FAIL lines: " n " source lines, but check/lines accounts for " sum
-			 "; add an entry for " (- n sum) " saying why"))
-    (println "lines: " n ", tests included; the budget of 20000 is soft")))
+;; lines entries in check/ledger, and each entry that adds lines must say why.
+(check "lines"	; lines-run.l: the count against check/ledger's lines entries, read by ledger.g
+  (let ((out (run "lines" '("./eval" "lines-run.l" "check/ledger") 300)))
+    (or (and out (= 0 (string-compare (last out) "lines: " 0 7))) (error (last out)))
+    (println (last out))))
 
 ;; a grammar keeps its definition, to be reflected on: rules, parameters, bodies, annotations, inherited ones too, in process
 ;; and compiled to a file (grammar.l)
@@ -1180,7 +1169,7 @@
 			"source tokens ok"))))
 
 ;; erosion and verbosity (SlopCodeBench's, erosion.l) over Maru's s-expression files, the lines check's set, held to
-;; check/erosion's ledger as lines is to check/lines: each metric equals the sum of its entries, so a rise or a fall says why.
+;; check/ledger's erosion and verbosity entries as lines is to its lines entries: each metric equals the sum of its entries, so a rise or a fall says why.
 ;; The files Maru's own reader can't read whole (each changes language partway, or is broken) aren't measured, and must
 ;; still fail to read.
 ;; a change's moves attributed to its edits and to share (erosion-attribute.l, doc/rfc/draft-ndn-erosion-attribution-00.md)
@@ -1195,7 +1184,7 @@
     (let* ((path (concat-strings tmp "/erosion.out"))
 	   ;; a ledger that doesn't match is followed by the report for the working copy's change, which names its cause
 	   (base (if (exists? ".jj") "@-" "HEAD"))
-	   (status (run-cpu-status 300 (let ((a (concat-list (concat-list (list "./eval" "erosion-run.l" "--ledger" "check/erosion" "--attribute" base "--unread")
+	   (status (run-cpu-status 300 (let ((a (concat-list (concat-list (list "./eval" "erosion-run.l" "--ledger" "check/ledger" "--attribute" base "--unread")
 									  erosion-unread)
 							     (cons "--" (list-reverse! measured)))))
 					 (make <command> argv: a out: path err: path))))
