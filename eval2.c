@@ -3242,27 +3242,38 @@ static void sigint(int signo)
 
 static int profilerCount= 0;
 
-/* The running function's count goes up by one a sample.  An Expr's count is its profile word >> 1, kept odd so the
-   collector passes it over: eval2 boxes its longs, and the handler can't allocate one. */
+/* A sample counts a function once: an Expr's count is its profile word >> 2 (odd, so the collector passes it over),
+   a Subr's its profile >> 1; bit 1 of the one, bit 0 of the other, says it was counted in this sample.  -p counts the
+   function running; -P every function on the stack, so a count is the time spent in it and what it called. */
+static int opt_P= 0;
+
+static void profileCount(oop func, int counting)
+{
+    switch (getType(func))
+    {
+	case Expr: {
+	    long p= (long)get(func, Expr,profile);
+	    if (!(p & 1)) break;
+	    if (!counting)	 set(func, Expr,profile, (oop)(p & ~2L));
+	    else if (!(p & 2)) set(func, Expr,profile, (oop)(p + 4 + 2));
+	    break;
+	}
+	case Subr: {
+	    int p= get(func, Subr,profile);
+	    if (!counting)	 set(func, Subr,profile, p & ~1);
+	    else if (!(p & 1)) set(func, Subr,profile, p + 2 + 1);
+	    break;
+	}
+    }
+}
+
 static void sigvtalrm(int signo)
 {
     if (traceDepth < 1) return;
     ++profilerCount;
-    oop func= arrayAt(traceStack, traceDepth - 1);
-    switch (getType(func))
-    {
-	case Expr: {
-	    oop profile= get(func, Expr,profile);
-	    if ((long)profile & 1) {
-		set(func, Expr,profile, (oop)((long)profile + 2));
-	    }
-	    break;
-	}
-	case Subr: {
-	    set(func, Subr,profile, 1 + get(func, Subr,profile));
-	    break;
-	}
-    }
+    long i, from= opt_P ? 0 : traceDepth - 1;
+    for (i= from;  i < traceDepth;  ++i) profileCount(arrayAt(traceStack, i), 1);
+    for (i= from;  i < traceDepth;  ++i) profileCount(arrayAt(traceStack, i), 0);
 }
 
 #include <sys/time.h>
@@ -3292,13 +3303,13 @@ static void profilingDisable(int stats)
 		case Expr: {
 		    oop oprof= get(obj, Expr,profile);
 		    if ((long)oprof & 1) {
-			profile= (long)oprof >> 1;
+			profile= (long)oprof >> 2;
 			source=  getSource(cdr(get(obj, Expr,definition)));	/* eval2 keeps a form's (path . line) in its pair */
 		    }
 		    break;
 		}
 		case Subr: {
-		    profile= get(obj, Subr,profile);
+		    profile= get(obj, Subr,profile) >> 1;
 		    break;
 		}
 	    }
@@ -3615,8 +3626,9 @@ int main(int argc, char **argv)
 	else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
 	else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
 #  if !defined(WIN32) && (!LIB_GC)
-    else if (!wcsncmp(arg, L"-p", 2)) {
+    else if (!wcsncmp(arg, L"-p", 2) || !wcsncmp(arg, L"-P", 2)) {
 	opt_g= 0;
+	opt_P= (L'P' == arg[1]);
 	opt_p= wcstoul(arg + 2, 0, 0);
 	if (!opt_p) opt_p= 1000;
 	printf("profiling every %i uSec(s)\n", opt_p);

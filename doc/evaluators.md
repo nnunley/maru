@@ -14,7 +14,9 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
 - Profiling: `eval2 -pN FILE` samples the running function every N microseconds of CPU (1000 when N is left out) and
   prints the 64 most sampled, with each one's file and line, as `eval -p` does. Piumarta's `eval2` had it commented
   out. A function's count is kept as an odd word in its `profile` field, since `eval2` boxes its longs and the signal
-  handler can't allocate one.
+  handler can't allocate one. `eval2 -PN FILE` counts every function on the stack instead, each once a sample, so a count
+  is the time spent in a function and in what it called: the profile that names which operation a program's time
+  serves, where `-p` spreads it over the primitives doing the work.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose
