@@ -107,6 +107,24 @@ builds nothing the kernel will make unnecessary.
   hand-written, in that one place, until Part B removes them.
 - `gezira_maru`, `gezira_scene` and `ksworld_pixels` keep their assertions. Lines and erosion get ledger entries.
 
+### A2b. Native code the system's tools can name
+
+Code installed from an image sits in a JIT region with no symbols, so `sample`, Instruments, `perf` and `lldb` show
+bare addresses. Profiling Gezira's kernels once they run natively needs their names. An image already records each
+function's offset (`native-image-of`'s functions), so installing one can tell the tools where everything is.
+
+- **Linux:** installing an image appends a line per function, `START SIZE NAME` in hex, to `/tmp/perf-PID.map`, the map
+  `perf` reads for JIT code. The size is the distance to the next function, or to the table for the last.
+- **macOS, and `lldb` anywhere:** the GDB JIT interface. Installing an image registers an in-memory object file, a
+  minimal Mach-O (ELF on Linux) with a symbol table for the image's functions, through `__jit_debug_register_code` and
+  `__jit_debug_descriptor`. `exe.l` writes it in Maru; the two symbols are defined in a Maru language, never in C.
+  `sample` and Instruments have no public interface for JIT symbols, so on macOS they show names only through `lldb`,
+  or once units are kept as libraries (B4).
+- Unloading, where it exists, removes the entries (perf's map is append-only, so a reused address gets a new line).
+- Check: a native unit's function, installed and running, is named. On Linux (ndn.lan), `perf record` over the check's
+  child resolves samples to the function's name. On macOS, `lldb`'s `image lookup -a` on its address gives the name.
+  `native_ir2` and `native_image` still pass.
+
 ### A3. Nile's records as Maru objects
 
 - The process handle, a kernel's parameters and the image become `define-object`s in the runtime, allocated with `new`
@@ -159,12 +177,14 @@ library load that fails, or a Nile error, should unwind to the REPL, not kill it
 - The library carries the unit's declarations (exports and object types), written and read by the kernel alone. It is
   a cache's index, one program talking to itself, not a bridge. It is reused only while its source is unchanged.
 - Check: the second run loads the kept library without compiling, and gives the same pixels.
+- A kept library's symbol table names its functions to every system tool, so A2b's registration is needed only for
+  code compiled and installed in the running process.
 
 ## Checks and docs
 
-- `native_nile` (A1) in `doc/native.md`. A2 and A3 change what `gezira_maru` asserts, in `doc/nile.md`. B's checks are
+- `native_nile` (A1) and the JIT symbols check (A2b) in `doc/native.md`. A2 and A3 change what `gezira_maru` asserts, in `doc/nile.md`. B's checks are
   in `doc/kernel.md`, and `exe.l`'s shared objects in `doc/assemblers.md`.
-- `notes/plan/render.john` gains NativeNileCompiles, PipelinesInMaru and NileObjects. `notes/plan/kernel.john` gains
+- `notes/plan/render.john` gains NativeNileCompiles, PipelinesInMaru, NativeCodeNamed (A2b) and NileObjects. `notes/plan/kernel.john` gains
   KernelCompiles, KernelCallsCompiled, NileOnKernel and KeptUnits, with their `builds-on`.
 
 ## Left to the builder
