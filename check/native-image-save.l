@@ -12,4 +12,27 @@
   (let ((image (list 'native-image 'arm64 'Darwin bytes '(0) () ())))
     (contents-to-file-named (native-form-text image) path)
     (or (equal (find-and-read path) (list image)) (error "native-image-save: a long image's text reads back changed"))))
+;; Finding a table entry's slot and a label's address takes no longer however many there are: four times the string
+;; literals, or the labels, take less than eight times as long (a list searched for each made them quadratic, and
+;; the Nile runtime's image spent seconds there)
+(define clock (subr "clock" ">l"))
+(define-function strings-unit (n)	; one function reading n distinct string literals: n entries in the table
+  (let ((intents ()))
+    (for (i 0 n) (push intents (list 'string-address 's0 (concat-string "s" (long->string i)))))
+    (list (list 'f intents))))
+(define-function labels-forms (n)	; n labels, each the target of a branch
+  (let ((forms ()))
+    (for (i 0 n)
+      (let ((l (string->symbol (concat-string "L" (long->string i)))))
+	(push forms (list (list 'B (list 'label l))))
+	(push forms (list (list 'at l)))))
+    forms))
+(define-function cpu-time-of (thunk) (let ((t (clock))) (thunk) (- (clock) t)))
+(define-function grows-linearly (what n f)
+  (f n)	; warm: the grammars' and tables' first use
+  (let ((small (cpu-time-of (lambda () (f n)))) (large (cpu-time-of (lambda () (f (* 4 n))))))
+    (or (< large (* 8 (+ small 1000)))
+	(error "native-image-save: " what " for " (* 4 n) " took " large " us, for " n " " small " us"))))
+(grows-linearly "native-symbols" 200 (lambda (n) (native-symbols (strings-unit n))))
+(grows-linearly "native-assemble" 500 (lambda (n) (native-assemble (stub-isa) (asm-buffer 0) (labels-forms n) 0)))
 (println "saved")

@@ -57,7 +57,10 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   for the other instruction set, or the other system, is refused. The host is uname's whole names (arm64 or aarch64,
   x86_64; Darwin, Linux), and any other is refused. A string literal must be ASCII. An image's text is written in time
   linear in its size: one of 100,000 bytes is written and reads back equal within the case's two minutes. Built by
-  `concat-string`, which copies the whole string at every step, the Nile runtime's 144,820 bytes took hours.
+  `concat-string`, which copies the whole string at every step, the Nile runtime's 144,820 bytes took hours. Finding a table entry's slot and a label's address takes no longer however many there are
+  (`native-symbols` keys entries by `equal`, `native-assemble` labels by identity, both in `hash.l` tables): four times
+  the string literals, or the labels and branches, take less than eight times as long. Lists searched for each made them
+  worse than quadratic (800 strings took 26 times as long as 200).
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).

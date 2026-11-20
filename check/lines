@@ -348,3 +348,4 @@
 +12 eval2 -P: the profiler counts every function on the stack, once a sample (a bit of each count marks it counted), so a count is a function's time with what it called
 +92 eval2's and eval3's global cache an open-addressing table, at most half full and growing, filled from the global namespace alone, where one slot per hash let globals in use evict each other and every miss searched them all; global_lookup holds it to 500 of 3000 globals
 +51 a choice of list patterns dispatches on the element's head symbol (compile-tpeg.l's tp-choice, source-parser.l's source-parser-head), so an intent no longer enters its list once per alternative; tree_lists counts the entries
++21 native-link.l's table entries and labels in hash.l tables, where a list searched for each made native-symbols and native-assemble quadratic; native_image holds both to four times the size in less than eight times the time

@@ -24,23 +24,24 @@
 					   (else op)))
 			(cdr form))))
 ;; each intent's forms into the buffer: (at L) marks where L is, a (label L) operand is a placeholder patched to it, and
-;; the table's labels name 8-byte slots from the first 8-byte boundary after the code; answers the labels, (L . address) …
+;; the table's labels name 8-byte slots from the first 8-byte boundary after the code; answers the labels, a table by
+;; identity from each label to its address (a list searched for each label and branch made a unit's assembly quadratic)
 (define-function native-table-label (k) (string->symbol (concat-string "tab." (long->string k))))
 (define-function native-assemble (isa buffer intents nslots)
-  (let ((labels ()) (fixups ()))
+  (let ((labels (identity-hash-table)) (fixups ()))
     (list-do forms intents
       (list-do form forms
 	(if (= 'at (car form))
-	    (if (assq (cadr form) labels)
+	    (if (hash-includes? labels (cadr form))
 		(error "native: label " (cadr form) " defined twice")
-	      (push labels (cons (cadr form) (asm-buffer-pc buffer))))
+	      (hash-at-put labels (cadr form) (asm-buffer-pc buffer)))
 	  (let* ((label (native-form-label form))
 		 (reports (asm isa buffer (if label (native-form-reloc form label) form))))
 	    (and label (push fixups (cons (car reports) (cadr label))))))))
     (let ((table (align (asm-buffer-pc buffer) 8)))
-      (for (k 0 nslots) (push labels (cons (native-table-label k) (+ table (* 8 k))))))
+      (for (k 0 nslots) (hash-at-put labels (native-table-label k) (+ table (* 8 k)))))
     (list-do f fixups
-      (asm-patch isa buffer (car f) (or (cdr (assq (cdr f) labels)) (error "native: no label " (cdr f)))))
+      (asm-patch isa buffer (car f) (or (hash-at labels (cdr f)) (error "native: no label " (cdr f)))))
     labels))
 
 ;; a string literal's bytes; the table copies them out of Maru's heap
@@ -50,13 +51,11 @@
       (let ((c (string-at s i))) (if (< c 128) (push out c) (error "native: a string literal beyond ASCII: " s))))
     (list-reverse! out)))
 
-;; an entry's slot number, if the table has it
-(define-function native-entry-index (entry entries)
-  (let ((k ())) (list-do e entries (and (equal (car e) entry) (set k (cdr e)))) k))
-;; a symbol's address read from its table slot: (global NAME), (extern NAME) or (string BYTE …), each entry once;
+;; a symbol's address read from its table slot: (global NAME), (extern NAME) or (string BYTE …), each entry once, its slot
+;; found by equal in a table (hash.l) where a list searched for each made a unit's strings and externs quadratic;
 ;; answers the functions with their intents rewritten, and the table's entries in slot order
 (define-function native-symbols (functions)
-  (let ((entries ()) (n 0) (out ()))
+  (let ((slots (equal-hash-table)) (out ()))
     (list-do f functions
       (let ((intents ()))
 	(list-do i (cadr f)
@@ -65,13 +64,12 @@
 			      ((= op 'extern-address) (list 'extern (caddr i)))
 			      ((= op 'string-address) (cons 'string (native-string-bytes (caddr i)))))))
 	    (if entry
-		(let ((k (native-entry-index entry entries)))
-		  (unless k (push entries (cons entry n)) (set k n) (set n (+ n 1)))
+		(let ((k (or (cdr (hash-entry slots entry)) (hash-at-put slots entry (hash-count slots)))))
 		  (push intents (list 'label-address (cadr i) (native-table-label k)))
 		  (push intents (list 'load-at 8 (cadr i) (cadr i))))
 	      (push intents i))))
 	(push out (list (car f) (list-reverse! intents)))))
-    (let ((slots ())) (list-do e entries (push slots (car e))) (cons (list-reverse! out) slots))))
+    (cons (list-reverse! out) (array->list (hash-keys slots)))))
 
 (define-function native-image-of (unit)
   (let* ((isa (stub-isa))
@@ -91,7 +89,7 @@
       (list 'native-image isa (cdr native-host)
 	    (let ((l ())) (for (i 0 (array-length bytes)) (push l (array-at bytes i))) (list-reverse! l))
 	    (cons table entries)
-	    (let ((fs ())) (list-do f (<native-unit>-functions unit) (push fs (cons (car f) (cdr (assq (native-function-label (car f)) labels))))) fs)
+	    (let ((fs ())) (list-do f (<native-unit>-functions unit) (push fs (cons (car f) (hash-at labels (native-function-label (car f)))))) fs)
 	    (<native-unit>-globals unit)))))
 
 (define-function native-install (unit) (native-load-image (native-image-of unit)))
