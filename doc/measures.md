@@ -9,7 +9,10 @@ One ledger, `check/ledger` (`ledger.g`, `ledger.l`), holds every measure: each l
 lines removed may go without one. A line `include: PATH` brings in the ledger at PATH, anywhere and more than once; a
 file included twice, or a cycle, is refused. `check/ledger` includes `check/lines` and `check/erosion`, the two ledgers
 before they were one, kept as they were, so a branch that still appends to either merges without conflict; new entries
-go in `check/ledger`.
+go in `check/ledger`. The includes are temporary: once no outstanding branch adds to `check/lines` or `check/erosion`
+(`git diff --name-only main...BRANCH -- check/lines check/erosion` empty for every branch and open PR), their entries
+move into `check/ledger` (each old `check/lines` entry prefixed `lines`), the include lines and the two files go, and
+the ledger's sums stay the same.
 
 - `lines` (`lines-run.l`): the source line count equals the sum of the ledger's `lines` entries. Any change
   in line count needs an entry there with its delta, and an entry that adds
