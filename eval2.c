@@ -346,7 +346,7 @@ static oop newExpr(oop defn, oop env)
     oop obj= newOops(Expr);			GC_PROTECT(obj);
     set(obj, Expr,definition,  defn);
     set(obj, Expr,environment, env);
-    set(obj, Expr,profile,     newLong(0));	GC_UNPROTECT(obj);
+    set(obj, Expr,profile,     (oop)1);	/* the profiler's count, odd (sigvtalrm) */	GC_UNPROTECT(obj);
     return obj;
 }
 
@@ -2139,16 +2139,16 @@ static subr(ne)
     return newBool(!equal(lhs, rhs));
 }
 
-// #if !defined(WIN32) && (!LIB_GC)
-// static void profilingDisable(int);
-// #endif
+#if !defined(WIN32) && (!LIB_GC)
+static void profilingDisable(int);
+#endif
 
 static subr(exit)
 {
     oop n= car(args);
-// #if !defined(WIN32) && (!LIB_GC)
-//     if (opt_p) profilingDisable(1);
-// #endif
+#if !defined(WIN32) && (!LIB_GC)
+    if (opt_p) profilingDisable(1);
+#endif
     exit(isLong(n) ? getLong(n) : 0);
 }
 
@@ -3238,90 +3238,91 @@ static void sigint(int signo)
     fatal("\nInterrupt");
 }
 
-// #if !defined(WIN32) && (!LIB_GC)
+#if !defined(WIN32) && (!LIB_GC)
 
-// static int profilerCount= 0;
+static int profilerCount= 0;
 
-// static void sigvtalrm(int signo)
-// {
-//     if (traceDepth < 1) return;
-//     ++profilerCount;
-//     oop func= arrayAt(traceStack, traceDepth - 1);
-//     switch (getType(func))
-//     {
-//	case Expr: {
-//	    oop profile= get(func, Expr,profile);
-//	    if ((long)profile & 1) {
-//		set(func, Expr,profile, (oop)((long)profile + 2));
-//	    }
-//	    else printf("? %p\n", func);
-//	    break;
-//	}
-//	case Subr: {
-//	    set(func, Subr,profile, 1 + get(func, Subr,profile));
-//	    break;
-//	}
-//     }
-// }
+/* The running function's count goes up by one a sample.  An Expr's count is its profile word >> 1, kept odd so the
+   collector passes it over: eval2 boxes its longs, and the handler can't allocate one. */
+static void sigvtalrm(int signo)
+{
+    if (traceDepth < 1) return;
+    ++profilerCount;
+    oop func= arrayAt(traceStack, traceDepth - 1);
+    switch (getType(func))
+    {
+	case Expr: {
+	    oop profile= get(func, Expr,profile);
+	    if ((long)profile & 1) {
+		set(func, Expr,profile, (oop)((long)profile + 2));
+	    }
+	    break;
+	}
+	case Subr: {
+	    set(func, Subr,profile, 1 + get(func, Subr,profile));
+	    break;
+	}
+    }
+}
 
-// #include <sys/time.h>
+#include <sys/time.h>
 
-// static void profilingEnable(void)
-// {
-//     struct itimerval itv= { { 0, opt_p }, { 0, opt_p } };	/* VTALARM every opt_p mSecs */
-//     setitimer(ITIMER_VIRTUAL, &itv, 0);
-// }
+static void profilingEnable(void)
+{
+    struct itimerval itv= { { 0, opt_p }, { 0, opt_p } };	/* VTALARM every opt_p mSecs */
+    setitimer(ITIMER_VIRTUAL, &itv, 0);
+}
 
-// static void profilingDisable(int stats)
-// {
-//     struct itimerval itv= { { 0, 0 }, { 0, 0 } };
-//     setitimer(ITIMER_VIRTUAL, &itv, 0);
-//     if (stats)
-//     {
-//	struct profile { int profile;  oop object, source; } profiles[64];
-//	int nprofiles= 0;
-//	fprintf(stderr, "%i profiles\n", profilerCount);
-//	GC_gcollect();
-//	oop obj;
-//	for (obj= GC_first_object();  obj;  obj= GC_next_object(obj)) {
-//	    int profile= 0;
-//	    oop source= nil;
-//	    switch (getType(obj))
-//	    {
-//		case Expr: {
-//		    oop oprof= get(obj, Expr,profile);
-//		    if (isLong(oprof)) {
-//			profile= getLong(get(obj, Expr,profile));
-//			source=	 cddr(get(obj, Expr,defn));
-//		    }
-//		    break;
-//		}
-//		case Subr: {
-//		    profile= get(obj, Subr,profile);
-//		    break;
-//		}
-//	    }
-//	    if (profile) {
-//		int index= 0;
-//		while (index < nprofiles && profile <= profiles[index].profile) ++index;
-//		if (nprofiles < 64) ++nprofiles;
-//		int jndex;
-//		for (jndex= nprofiles - 1;  jndex > index;  --jndex) profiles[jndex] = profiles[jndex - 1];
-//		profiles[index]= (struct profile){ profile, obj, source };
-//	    }
-//	}
-//	int i;
-//	for (i= 0;  i < nprofiles;  ++i) {
-//	    fprintf(stderr, "%i\t", profiles[i].profile);
-//	    int l= fprintSource(stderr, profiles[i].source);
-//	    if (l < 20) fprintf(stderr, "%*s", 20 - l, "");
-//	    fprintf(stderr, " ");
-//	    fdumpln(stderr, profiles[i].object);
-//	}
-//     }
-// }
+static void profilingDisable(int stats)
+{
+    struct itimerval itv= { { 0, 0 }, { 0, 0 } };
+    setitimer(ITIMER_VIRTUAL, &itv, 0);
+    if (stats)
+    {
+	struct profile { int profile;  oop object, source; } profiles[64];
+	int nprofiles= 0;
+	fprintf(stderr, "%i profiles\n", profilerCount);
+	GC_gcollect();
+	oop obj;
+	for (obj= GC_first_object();  obj;  obj= GC_next_object(obj)) {
+	    int profile= 0;
+	    oop source= nil;
+	    switch (getType(obj))
+	    {
+		case Expr: {
+		    oop oprof= get(obj, Expr,profile);
+		    if ((long)oprof & 1) {
+			profile= (long)oprof >> 1;
+			source=  getSource(cdr(get(obj, Expr,definition)));	/* eval2 keeps a form's (path . line) in its pair */
+		    }
+		    break;
+		}
+		case Subr: {
+		    profile= get(obj, Subr,profile);
+		    break;
+		}
+	    }
+	    if (profile) {
+		int index= 0;
+		while (index < nprofiles && profile <= profiles[index].profile) ++index;
+		if (nprofiles < 64) ++nprofiles;
+		int jndex;
+		for (jndex= nprofiles - 1;  jndex > index;  --jndex) profiles[jndex] = profiles[jndex - 1];
+		profiles[index]= (struct profile){ profile, obj, source };
+	    }
+	}
+	int i;
+	for (i= 0;  i < nprofiles;  ++i) {
+	    fprintf(stderr, "%i\t", profiles[i].profile);
+	    int l= fprintSource(stderr, profiles[i].source);
+	    if (l < 20) fprintf(stderr, "%*s", 20 - l, "");
+	    fprintf(stderr, " ");
+	    fdumpln(stderr, profiles[i].object);
+	}
+    }
+}
 
-// #endif
+#endif
 
 static subr_ent_t subr_tab[] = {
 # define _do(NAME, OP)					\
@@ -3584,15 +3585,15 @@ int main(int argc, char **argv)
 	signal(SIGINT, sigint);
     }
 
-// #if !defined(WIN32) && (!LIB_GC)
-//   {
-//	 struct sigaction sa;
-//	 sa.sa_handler= sigvtalrm;
-//	 sigemptyset(&sa.sa_mask);
-//	 sa.sa_flags= 0;
-//	 if (sigaction(SIGVTALRM, &sa, 0)) perror("vtalrm");
-//   }
-// #endif
+#if !defined(WIN32) && (!LIB_GC)
+  {
+	 struct sigaction sa;
+	 sa.sa_handler= sigvtalrm;
+	 sigemptyset(&sa.sa_mask);
+	 sa.sa_flags= 0;
+	 if (sigaction(SIGVTALRM, &sa, 0)) perror("vtalrm");
+  }
+#endif
 
 //   {
 //	 oop func= findVariable(get(globals, Variable,value), s_main);
@@ -3613,29 +3614,29 @@ int main(int argc, char **argv)
 	else if (!wcscmp (arg, L"-b"))	{ ++opt_b; }
 	else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
 	else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
-// #  if !defined(WIN32) && (!LIB_GC)
-//     else if (!wcsncmp(arg, L"-p", 2)) {
-//	opt_g= 0;
-//	opt_p= wcstoul(arg + 2, 0, 0);
-//	if (!opt_p) opt_p= 1000;
-//	printf("profiling every %i uSec(s)\n", opt_p);
-//     }
-// #  endif
+#  if !defined(WIN32) && (!LIB_GC)
+    else if (!wcsncmp(arg, L"-p", 2)) {
+	opt_g= 0;
+	opt_p= wcstoul(arg + 2, 0, 0);
+	if (!opt_p) opt_p= 1000;
+	printf("profiling every %i uSec(s)\n", opt_p);
+    }
+#  endif
 	else {
 	    if (!opt_b) {
 		replPath(L"boot2.l");
 		opt_b= 1;
 	    }
 	    else {
-// #	      if !defined(WIN32) && (!LIB_GC)
-//	    if (opt_p) profilingEnable();
-// #	   endif
+#	      if !defined(WIN32) && (!LIB_GC)
+	    if (opt_p) profilingEnable();
+#	   endif
 		setVar(arguments, argt);
 		replPath(arg);
 		repled= 1;
-// #	   if !defined(WIN32) && (!LIB_GC)
-//	    if (opt_p) profilingDisable(0);
-// #	   endif
+#	   if !defined(WIN32) && (!LIB_GC)
+	    if (opt_p) profilingDisable(0);
+#	   endif
 	    }
 	    argt= getVar(arguments);
 	}
@@ -3657,9 +3658,9 @@ int main(int argc, char **argv)
 	printf("\nmorituri te salutant\n");
     }
 
-// #if !defined(WIN32) && (!LIB_GC)
-//   if (opt_p) profilingDisable(1);
-// #endif
+#if !defined(WIN32) && (!LIB_GC)
+  if (opt_p) profilingDisable(1);
+#endif
 
     return 0;
 }

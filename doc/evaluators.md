@@ -11,6 +11,10 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   by name or address, with typed results (`"dd>d"`; `>s` copies a `char *` into a string, `NULL` being nil; `>v` calls a void function, its result nil), variadic
   calls and raw byte access. On `eval` a function `subr` made by name survives a saved image: it keeps a copy of its name and
   its signature's text, which the image holds and loading reads again.
+- Profiling: `eval2 -pN FILE` samples the running function every N microseconds of CPU (1000 when N is left out) and
+  prints the 64 most sampled, with each one's file and line, as `eval -p` does. Piumarta's `eval2` had it commented
+  out. A function's count is kept as an odd word in its `profile` field, since `eval2` boxes its longs and the signal
+  handler can't allocate one.
 - `data_length` (`check/data-length.l`): on `eval` and `eval3`, `(data-length d)` is the length `(data n)` was made with,
   kept in the object's header, not the collector's block size (often larger), and kept across a saved image (`gc_image`).
   Reads and writes past it are refused, and so are a negative index (which would reach the header) and an index whose
