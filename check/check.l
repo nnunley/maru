@@ -1063,6 +1063,7 @@
     (run "native_sites_on" (concat-strings "./eval2 check/native-images.l " dir "/on") 300)
     (run "native_sites_off" (concat-strings "./eval2 check/native-images.l --no-sites " dir "/off") 300)
     (run "native_sites_same" (concat-strings "diff -r " dir "/on " dir "/off"))
+    (unit-assert (equal (last (run "native_sites_kept" "./eval2 check/arm64-kept-rows.l" 300)) "kept rows ok"))
     (let ((out (run "native_sites" "./eval2 check/native-sites.l" 300)))
       (list-do l out (and (= 0 (string-find l "sites ")) (println "native_sites: " l)))
       (unit-assert (equal (last out) "native sites ok")))))

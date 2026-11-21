@@ -691,6 +691,145 @@
 	  (and node (set (<arm64-memo>-answer node) answer))
 	  answer))))
 
+;;; The specialiser: a site's template composed with the encoder grammar's definitions as the rule loads (the design
+;;; doc/plans/2026-11-21-encoder-tree-grammar-design.md).  Each hole's guard runs once; a row is kept if every
+;;; operand's kind takes the hole's (a register of its class, a number, a condition, a memory operand of its mode) or
+;;; the literal, which is folded into the row's constant; what is left of a kept row is its kinds' tests and one OR of
+;;; shifted fields.  The rows are the mnemonic's in file order, so the first that fits is asm's.  A template a kind it
+;;; can't reason about would meet (vectors, bitmasks) answers (), and the site falls back to its encoder.
+(or (defined? '*arm64-sites-recorder*) (define *arm64-sites-recorder* ()))	; (f mnemonic specs kept-rows fallback), for a check
+(define-function arm64-hole-class (spec)	; a register hole's class (the letter's code), or ()
+  (let ((k (car spec))) (cond ((= k 'x) 88) ((= k 'w) 87) ((= k 'f) (if (= 'd (cadr spec)) 68 83)))))
+(define-function arm64-hole-guard (spec e)	; code answering the hole's value from e, or () where it isn't of its kind
+  (let ((k (car spec)) (class (arm64-hole-class spec)))
+    (cond (class	`(arm64-reg-value ,class 'plain ,e))	; X0-X30 and the like, not SP or ZR, as the site's shape key
+	  ((= k 'n)	`(and (long? ,e) ,e))
+	  ((= k 'c)	`(and (symbol? ,e) ,e))
+	  ((= k 'lsl)	`(and (pair? ,e) (= 'LSL (car ,e)) ,e))
+	  ((= k 'mem)
+	   (let ((shape (cadr spec)))
+	     `(and (pair? ,e) (= ',(car shape) (car ,e)) (pair? (cdr ,e)) (pair? (cddr ,e)) (not (cdddr ,e)) (long? (caddr ,e))
+		   ,(if (= 'SP (cadr shape)) `(= 'SP (cadr ,e)) `(arm64-reg-value 88 'plain (cadr ,e)))
+		   ,e))))))
+(define-function arm64-join-leaves (a b)	; two reductions in order: drop or fallback if either is
+  (cond ((= a 'fallback) a) ((= b 'fallback) b) ((= a 'drop) a) ((= b 'drop) b) (else (concat-list a b))))
+;; An operand's reduction for a row's kind info: a list of entries, (const v), (value code), (test code) or (check
+;; code), in leaf order; or drop (the row can't take it), or fallback (beyond the specialiser).  form is (lit L), or
+;; (hole SPEC code), code the hole's guarded value.
+;; dispatched by the kind's tag: a literal's leaves (an unknown kind is beyond the specialiser) and a hole's (an unknown
+;; kind can't take one)
+(define arm64-literal-leaf-table (identity-hash-table))
+(define arm64-hole-leaf-table (identity-hash-table))
+(define-function arm64-literal-leaves (info l)	; a literal's leaves for info, its values found now
+  (let ((f (hash-at arm64-literal-leaf-table (car info)))) (if f (f info l) 'fallback)))
+(define-function arm64-hole-leaves (info spec code)	; a hole's leaves for info, as code to run
+  (let ((f (hash-at arm64-hole-leaf-table (car info)))) (if f (f info spec code) 'drop)))
+(define-form define-arm64-leaves (table tags params . body)
+  `(let ((f (lambda ,params ,@body))) (list-do tag ',tags (hash-at-put ,table tag f))))
+(define-function arm64-const-leaf (v) (if v (list (list 'const v)) 'drop))
+(define-function arm64-triple? (l head) (and (pair? l) (= head (car l)) (pair? (cdr l)) (pair? (cddr l)) (not (cdddr l))))
+(define-function arm64-number-test (info spec kind code)	; a number hole's test for info, if the hole is of kind
+  (let ((w (arm64-info-width info)))
+    (if (and w (= (car spec) kind)) (list (list 'test `(arm64-number-value ',(car info) ,w ,(caddr info) ,code 0))) 'drop)))
+(define-function arm64-mem-base-leaves (info base code)	; a memory hole's base: SP, or a plain X register
+  (if (= 'SP base)
+      (arm64-literal-leaves (caddr info) 'SP)
+    (arm64-hole-leaves (caddr info) '(x) `(arm64-reg-value 88 'plain (cadr ,code)))))
+
+(define-arm64-leaves arm64-literal-leaf-table (reg) (info l)	(arm64-const-leaf (arm64-reg-value (caddr info) (cadddr info) l)))
+(define-arm64-leaves arm64-literal-leaf-table (imm simm pcrel pcpage lsl) (info l)
+  (arm64-const-leaf (arm64-number-value (car info) (arm64-info-width info) (caddr info) l 0)))
+(define-arm64-leaves arm64-literal-leaf-table (cond) (info l)	(arm64-const-leaf (arm64-cond-value l)))
+(define-arm64-leaves arm64-literal-leaf-table (invcond) (info l)	(arm64-const-leaf (arm64-invcond-value l)))
+(define-arm64-leaves arm64-literal-leaf-table (fimm) (info l)	(arm64-const-leaf (arm64-fimm-value l)))
+(define-arm64-leaves arm64-literal-leaf-table (imm0) (info l)	(if (= l 0) () 'drop))
+(define-arm64-leaves arm64-literal-leaf-table (tag) (info l)
+  (if (arm64-triple? l (cadr info))
+      (arm64-join-leaves (arm64-literal-leaves (caddr info) (cadr l)) (arm64-literal-leaves (cadddr info) (caddr l)))
+    'drop))
+(define-arm64-leaves arm64-literal-leaf-table (mreg) (info l)
+  (if (and (pair? l) (= 'reg (car l)) (= (list-length l) (cadr info)) (equal (cdddr l) (caddr info)))
+      (arm64-join-leaves (arm64-literal-leaves (cadddr info) (cadr l)) (arm64-literal-leaves (car (cddddr info)) (caddr l)))
+    'drop))
+
+(define-arm64-leaves arm64-hole-leaf-table (reg) (info spec code)
+  (if (= (caddr info) (arm64-hole-class spec)) (list (list 'value code)) 'drop))
+(define-arm64-leaves arm64-hole-leaf-table (imm simm) (info spec code)	(arm64-number-test info spec 'n code))
+(define-arm64-leaves arm64-hole-leaf-table (lsl) (info spec code)	(arm64-number-test info spec 'lsl code))
+(define-arm64-leaves arm64-hole-leaf-table (imm0) (info spec code)
+  (if (= (car spec) 'n) (list (list 'check `(= ,code 0))) 'drop))
+(define-arm64-leaves arm64-hole-leaf-table (cond) (info spec code)
+  (if (= (car spec) 'c) (list (list 'test `(arm64-cond-value ,code))) 'drop))
+(define-arm64-leaves arm64-hole-leaf-table (invcond) (info spec code)
+  (if (= (car spec) 'c) (list (list 'test `(arm64-invcond-value ,code))) 'drop))
+(define-arm64-leaves arm64-hole-leaf-table (tag) (info spec code)
+  (if (and (= (car spec) 'mem) (= (cadr info) (car (cadr spec))))
+      (arm64-join-leaves (arm64-mem-base-leaves info (cadr (cadr spec)) code) (arm64-hole-leaves (cadddr info) '(n) `(caddr ,code)))
+    'drop))
+(define-arm64-leaves arm64-hole-leaf-table (bimm lslimm) (info spec code)	(if (= (car spec) 'n) 'fallback 'drop))
+(define-function arm64-place-leaves (info leaves vals place-fn check-fn)	; info's leaves to their fields: those left
+  (let ((c (car info)))
+    (cond ((memq c '(reg cond invcond fimm))		(place-fn (cadr info) (car leaves)) (cdr leaves))
+	  ((memq c '(imm simm pcrel pcpage lsl))	(place-fn (cadr info) (car leaves)) (cdr leaves))
+	  ((= c 'imm0)	(if (and leaves (= 'check (car (car leaves)))) (let () (check-fn (cadr (car leaves))) (cdr leaves)) leaves))
+	  ((= c 'tag)	(arm64-place-leaves (cadddr info) (arm64-place-leaves (caddr info) leaves vals place-fn check-fn) vals place-fn check-fn))
+	  ((= c 'mreg)	(arm64-place-leaves (car (cddddr info)) (arm64-place-leaves (cadddr info) leaves vals place-fn check-fn) vals place-fn check-fn))
+	  (else		(error "arm64: no placing for " info)))))
+;; a kept row's code: its tests, then its word, the literal fields folded into the constant; or fallback
+(define-function arm64-row-code (row leaves)
+  (let* ((plan (arm64-row-plan row)) (vals (array (+ 1 (<arm64-plan>-t-slot plan)))) (shifts (<arm64-plan>-shifts plan))
+	 (terms ()) (binds ()) (checks ()) (n 0) (ok 1))
+    (list-do info (<arm64-plan>-infos plan)
+      (set leaves (arm64-place-leaves info leaves vals
+		    (lambda (place entry)	; place: a slot, or a field reference; entry: a leaf
+		      (let* ((kind (car entry))
+			     (x (cond ((= kind 'const) (cadr entry))
+				      ((= kind 'value) (cadr entry))
+				      (else (let ((t (concat-symbol '_t (concat-symbol (string->symbol (long->string n)) '_))))
+					      (set n (+ n 1)) (push binds (list t (cadr entry))) (push checks t) t)))))
+			(if (= kind 'const)
+			    (if (pair? place) (arm64-put-ref place x vals) (arm64-put vals place x))
+			  (if (pair? place)
+			      (let ((off 0))
+				(list-do part (cdr place)
+				  (set-array-at vals (car part) 0)
+				  (push terms `(<< (& (>> ,x ,off) ,(- (<< 1 (cdr part)) 1)) ,(array-at shifts (car part))))
+				  (set off (+ off (cdr part)))))
+			    (let () (set-array-at vals place 0) (push terms `(<< ,x ,(array-at shifts place))))))))
+		    (lambda (code) (push checks code)))))
+    (for (i 0 (<arm64-plan>-t-slot plan)) (or (array-at vals i) (set ok ())))	; a field no operand fills
+    (and ok
+	 (let ((word (arm64-plan-word row vals)))
+	   (list-do x terms (set word `(| ,word ,x)))
+	   `(let ,(list-reverse! binds) (and ,@(list-reverse! checks) (arm64-site-word-bytes ,word)))))))
+(define-function arm64-specialise (mnemonic specs)	; a site's residual code, or () to fall back to its encoder
+  (let* ((n -1)
+	 (es (map (lambda (s) (set n (+ n 1)) (concat-symbol '_e (concat-symbol (string->symbol (long->string n)) '_))) specs))
+	 (forms (map (lambda (s e) (if (arm64-site-variable? s) (list 'hole s (concat-symbol e 'h)) (list 'lit (arm64-site-literal s)))) specs es))
+	 (guards ()) (rows ()) (fallback ()))
+    (map (lambda (s e) (and (arm64-site-variable? s)
+			    (let ((g (arm64-hole-guard s e))) (if g (push guards (list (concat-symbol e 'h) g)) (set fallback 1)))))
+	 specs es)
+    (list-do row (asm-rows-for (asm-isa 'arm64) mnemonic)
+      (let ((infos (<arm64-plan>-infos (arm64-row-plan row))) (fs forms) (leaves ()))
+	(if (not (= (list-length infos) (list-length forms)))
+	    (set leaves 'drop)
+	  (list-do info infos
+	    (let ((f (car fs)))
+	      (set leaves (arm64-join-leaves leaves (if (= 'lit (car f)) (arm64-literal-leaves info (cadr f)) (arm64-hole-leaves info (cadr f) (caddr f)))))
+	      (set fs (cdr fs)))))
+	(cond ((= leaves 'fallback) (set fallback 1))
+	      ((= leaves 'drop))
+	      (else (let ((code (arm64-row-code row leaves))) (if code (push rows (cons row code)) (set fallback 1)))))))
+    (set rows (list-reverse! rows))
+    (set guards (list-reverse! guards))
+    (and *arm64-sites-recorder* (*arm64-sites-recorder* mnemonic specs (map car rows) fallback))
+    (and (not fallback)
+	 `(let ,(map (lambda (s e) (list e (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s)))) specs es)
+	    (let ,guards
+	      (or (and ,@(map car guards) (or ,@(map cdr rows)))
+		  (list ',mnemonic ,@es)))))))
+
 (define-function arm64-site-code (mnemonic specs)	; the code a site expands to
   (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))
     (cond ((not *arm64-sites*)	symbolic)
@@ -699,7 +838,8 @@
 	     (and (pair? r) (= 'error (car r)) (apply error (cdr r)))
 	     (list 'quote (cons 'data (array->list (asm-buffer-bytes b))))))
 	  (else
-	   `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic)))))))
+	   (or (arm64-specialise mnemonic specs)
+	       `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic))))))))
 
 ;; A label site: an instruction with a (label ,l) operand in an arm64-sites template, one (label EXPR) spec naming
 ;; L.  Its row is chosen as asm chooses one with an open placeholder (asm-select, (reloc) in L's place) and
