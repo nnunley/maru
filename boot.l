@@ -338,10 +338,12 @@
 
 (define-function %accessor (name)	(if (= ?_ (string-at (symbol->string name) 0)) 'long-at 'oop-at))
 
-;; self, checked as type: inline when it is of type itself, by %typecheck when of a type defined on it (or not)
+;; self, checked as type: inline when it is of type itself or of a type defined on it directly, by %typecheck further down
+;; (or not); the parser types a grammar defines are a level below <source-parser>, and read its fields on every element
 (define-function %checked (type self)
   (if (symbol? self)
-      (list 'if (list '= type (list 'type-of self)) self (list '%typecheck type self))
+      (list 'if (list '= type (list 'type-of self)) self
+	    (list 'if (list '= type (list 'array-at '%structure-bases (list 'type-of self))) self (list '%typecheck type self)))
     (list 'let (list (list '_s_ self)) (%checked type '_s_))))
 
 (define-function %make-safe-accessor (name fields offset)
