@@ -28,6 +28,10 @@
 (define-function native-arm64-far? (size at) (or (> at (* 4095 size)) (!= 0 (% at size))))
 (define-function native-arm64-w (r)	; X9 to W9
   (let ((name (symbol->string r))) (string->symbol (concat-string "W" (string-copy name 1 (- (string-length name) 1))))))
+;; an access's site: its memory operand's shape is SP's or another register's, so a site for each, chosen by the base
+(define-form native-arm64-mem-site (mnemonic reg place)
+  `(let ((_p_ ,place))
+     (if (= 'SP (cadr _p_)) (arm64-site ,mnemonic ,reg (mem (off SP 0) _p_)) (arm64-site ,mnemonic ,reg (mem (off X0 0) _p_)))))
 (define-function native-arm64-access (size base at form)	; the forms of an access, its place reached first if far
   (if (and (= base 'SP) (native-arm64-far? size at))
       `(,@(native-arm64-address at 'X15) ,(form '(off X15 0)))
@@ -35,21 +39,23 @@
 (define-function native-arm64-load (size r base at)	; sign-extending: ir2's integers are signed
   (native-arm64-access size base at
     (lambda (place)
-      (cond ((= size 8) (list 'LDR r place))
-	    ((= size 4) (list 'LDRSW r place))
-	    ((= size 2) (list 'LDRSH r place))
-	    ((= size 1) (list 'LDRSB r place))
+      (cond ((= size 8) (native-arm64-mem-site LDR (x r) place))
+	    ((= size 4) (native-arm64-mem-site LDRSW (x r) place))
+	    ((= size 2) (native-arm64-mem-site LDRSH (x r) place))
+	    ((= size 1) (native-arm64-mem-site LDRSB (x r) place))
 	    (else (error "native: no load of " size " bytes"))))))
 (define-function native-arm64-store (size r base at)
   (native-arm64-access size base at
     (lambda (place)
-      (cond ((= size 8) (list 'STR r place))
-	    ((= size 4) (list 'STR (native-arm64-w r) place))
-	    ((= size 2) (list 'STRH (native-arm64-w r) place))
-	    ((= size 1) (list 'STRB (native-arm64-w r) place))
+      (cond ((= size 8) (native-arm64-mem-site STR (x r) place))
+	    ((= size 4) (native-arm64-mem-site STR (w (native-arm64-w r)) place))
+	    ((= size 2) (native-arm64-mem-site STRH (w (native-arm64-w r)) place))
+	    ((= size 1) (native-arm64-mem-site STRB (w (native-arm64-w r)) place))
 	    (else (error "native: no store of " size " bytes"))))))
 (define-function native-arm64-address (slot r)
-  (if (< slot 4096) `((ADD ,r SP ,slot)) `(,@(arm64-constant r (- slot native-arm64-frame)) (ADD ,r X29 ,r))))
+  (if (< slot 4096)
+      (list (arm64-site ADD (x r) SP (n slot)))
+    `(,@(arm64-constant r (- slot native-arm64-frame)) ,(arm64-site ADD (x r) X29 (x r)))))
 ;; floating point: values stay as bits in slots and integer registers, and visit abi.spec's fscratch registers (D16, or
 ;; its 32-bit view S16) to be operated on; arguments and results use fargs and fresult
 (define-function native-arm64-view (r width)	; D16 at 64 bits, S16 at 32; X9 at 64, W9 at 32
@@ -96,7 +102,12 @@
   (let ((pieces (native-pieces size)))
     (if (< 2 (list-length pieces)) (error "native: a struct result of " size " bytes is more than two registers") pieces)))
 (define-function native-arm64-piece (op n r base at)	; a plain (zero-extending) load or store of 8 or 4 bytes
-  (native-arm64-access n base at (lambda (place) (list op (if (= n 8) r (native-arm64-w r)) place))))
+  (native-arm64-access n base at
+    (lambda (place)
+      (cond ((and (= op 'LDR) (= n 8))	(native-arm64-mem-site LDR (x r) place))
+	    ((= op 'LDR)		(native-arm64-mem-site LDR (w (native-arm64-w r)) place))
+	    ((= n 8)			(native-arm64-mem-site STR (x r) place))
+	    (else			(native-arm64-mem-site STR (w (native-arm64-w r)) place))))))
 (define-function native-onto (acc forms) (list-do f forms (set acc (cons f acc))) acc)	; pushed in order
 (define-function native-flatten (ll) (let ((out ())) (list-do l ll (list-do x l (push out x))) (list-reverse! out)))
 (define-function native-arm64-copy (size from to)

@@ -24,6 +24,19 @@
   (expect (concat-string "an immediate at the edge " (long->string v)) (and (as-asm (addi 'X9 'X10 v) (list 'ADD 'X9 'X10 v)) 1) 1))
 (expect "nothing varies: encoded once" (ret) '(data 192 3 95 214))
 
+;; loads and stores: near, through another register, unaligned or far (the address made in X15 first); each form, as a
+;; site emits it or as asm encodes it, gives the same bytes as the forms the access means
+(define-function encoded (forms) (map (lambda (f) (if (= 'data (car f)) f (asm-bytes f))) forms))
+(set native-arm64-frame 40000)
+(expect "a near load" (encoded (native-arm64-load 8 'X9 'SP 16)) (encoded '((LDR X9 (off SP 16)))))
+(expect "a load through a register" (encoded (native-arm64-load 4 'X9 'X10 8)) (encoded '((LDRSW X9 (off X10 8)))))
+(expect "a byte store" (encoded (native-arm64-store 1 'X9 'SP 3)) (encoded '((STRB W9 (off SP 3)))))
+(expect "an unaligned load" (encoded (native-arm64-load 8 'X9 'SP 12)) (encoded '((ADD X15 SP 12) (LDR X9 (off X15 0)))))
+(expect "a far load" (encoded (native-arm64-load 8 'X9 'SP 32768))
+	(encoded (concat-list (arm64-constant 'X15 (- 32768 40000)) '((ADD X15 X29 X15) (LDR X9 (off X15 0))))))
+(expect "a far address" (encoded (native-arm64-address 5000 'X9))
+	(encoded (concat-list (arm64-constant 'X9 (- 5000 40000)) '((ADD X9 X29 X9)))))
+
 (when loader
   (let ((lower (cdr (assq 'arm64 native-lowerings))) (sites 0) (forms 0))
     (list-do f (car (native-symbols (<native-unit>-functions (native-compile-file loader))))
