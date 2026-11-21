@@ -1035,6 +1035,12 @@
       (unit-assert (< 0 c))
       (unit-assert (< n (* 16 c))))))
 
+;; Direct list patterns (compile-tpeg.l) lower every intent of the native units and of the Nile runtime with Gezira to
+;; the same forms as the stream path does, through native-arm64.g and native-x64.g (check/tpeg-direct.l)
+(check "tpeg_direct"
+  (unit-assert (equal (last (run "tpeg_direct" (concat-strings "./eval2 check/tpeg-direct.l " (native-nile-loader (native-nile-inputs))) 900))
+		      "tpeg direct ok")))
+
 ;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
 ;; its selectors, the same rectangle as gezira_image, on one worker and four.
 ;; ir-gen-c's library mode: a unit with no main, built as a shared library and opened from untyped Maru (library-mode.l)

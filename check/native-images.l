@@ -7,14 +7,11 @@
 (define dir (pop *arguments*))
 (define loader (and *arguments* (pop *arguments*)))	; before native.l: maru.k loads any arguments left
 (require "native.l")
-(define native-image-units	; check/native.l's units by directory, but for those it requires refused
-  '(("" "maru-gc" "maru-check" "maru-label" "maru-test") ("check/" "ir2" "zero-global")
-    ("check/native/" "add" "calls" "floats" "flow" "image" "labels" "memory" "objects-get-function" "stack" "structs")))
+(load "check/native-image-units.l")
 (define count 0)
 (define-function save (unit name)
   (native-save unit (concat-string dir (concat-string "/" (concat-string name ".image"))))
   (set count (+ count 1)))
-(list-do d native-image-units
-  (list-do name (cdr d) (save (native-compile-file (concat-string (car d) (concat-string name ".k"))) name)))
+(native-image-each (lambda (path name) (save (native-compile-file path) name)))
 (and loader (save (native-compile-file loader) "gezira"))
 (println "images " count)

@@ -114,21 +114,95 @@
     (when (and (tp-source?) (caddr r) (tp-left-recursive? (car r) rules))
       (error "rule " (car r) " has parameters and is left-recursive, which would overflow the stack with no memo for its arguments"))))
 
+;; Direct patterns.  A list pattern is direct when each of its items is a literal atom, any element, or a direct rule
+;; (one of this grammar's, with no parameters, whose whole pattern is `.:v -> e`), each perhaps bound to a name.  On a
+;; list (a pair or ()) it is matched by walking the list: each element taken and its literal tested in turn, as the
+;; stream path tests them, then the names bound and the rules' actions applied, so nothing runs for a pattern that fails.  Strings
+;; and arrays, a dotted list, and a parser of a type derived from the grammar (which may redefine a direct rule) take
+;; the stream path.  *tp-direct* off compiles every list pattern to the stream path (tpeg_direct compares the two).
+(define *tp-direct* 1)
+(define *tp-rules* ())	; the grammar being compiled: its rules, (name pattern parameters)
+
+(define-function tp-direct-rule (name)	; (v e) when the rule is `.:v -> e`, else ()
+  (let ((r (assq name *tp-rules*)))
+    (and r (not (caddr r))
+	 (let ((pe (cadr r)))
+	   (and (= 'match-all (car pe)) (= 3 (list-length pe))
+		(let ((a (cadr pe)) (x (caddr pe)))
+		  (and (= 'assign-result (car a)) (equal '(match-any) (caddr a)) (= 'result-expr (car x))
+		       (list (cadr a) (cadr x)))))))))
+
+(define-function tp-direct-item (pe)	; (lit o), (any), (rule v e) or (bind name item), or () if pe isn't direct
+  (cond ((and (= 'match-object (car pe)) (not (pair? (cadr pe))))	(list 'lit (cadr pe)))
+	((equal '(match-any) pe)					'(any))
+	((and (= 'match-rule (car pe)) (not (cddr pe)))		(let ((r (tp-direct-rule (cadr pe)))) (and r (cons 'rule r))))
+	((= 'assign-result (car pe))				(let ((i (tp-direct-item (caddr pe)))) (and i (list 'bind (cadr pe) i))))))
+
+(define-function tp-direct-items (exp)	; the items of a direct pattern, or () if it isn't one; '(()) for `( )
+  (let* ((pes (if (= 'match-all (car exp)) (cdr exp) (list exp)))
+	 (items (map tp-direct-item pes)))
+    (cond ((not pes) '(()))
+	  ((not (memq () items)) items))))
+
+(define-function tp-direct-value (item e)	; item's value for element e
+  (let ((k (car item)))
+    (cond ((= k 'lit)	(list 'quote (cadr item)))
+	  ((= k 'any)	e)
+	  ((= k 'rule)	`(let ((,(cadr item) ,e)) ,(caddr item)))
+	  (else		(tp-direct-value (caddr item) e)))))
+
+(define-function tp-direct-literal (item)	; the literal item tests, or ()
+  (cond ((= 'lit (car item))	(cadr item))
+	((= 'bind (car item))	(tp-direct-literal (caddr item)))))
+
+(define-function tp-direct-rules? (items)
+  (let ((found ()))
+    (list-do i items (and i (or (= 'rule (car i)) (and (= 'bind (car i)) (= 'rule (car (caddr i))))) (set found 1)))
+    found))
+
+(define-function tp-direct-pattern (items stream value?)
+  (let ((items (if (equal items '(())) () items)) (temps ()) (walk ()) (binds ()) (n 0))
+    (list-do item items
+      (let ((e (concat-symbol '_e (concat-symbol (string->symbol (long->string n)) '_))))
+	(push temps (list e ()))
+	(push walk `(pair? _l_))
+	(push walk `(let () (set ,e (car _l_)) (set _l_ (cdr _l_)) 1))
+	(let ((lit (tp-direct-literal item))) (and lit (push walk `(in-same ,e ',lit))))	; as the stream tests it
+	(cond ((= 'bind (car item))	(push binds `(set ,(cadr item) ,(tp-direct-value (caddr item) e))))
+	      ((= 'rule (car item))	(push binds (tp-direct-value item e))))
+	(set n (+ n 1))))
+    `(let ((_l_ _v_) (_r_ 'stream) ,@(list-reverse! temps))
+       (and (or (pair? _l_) (not _l_))
+	    ,@(if (tp-direct-rules? items) `((= (type-of self) ,*tp-class*)) ())
+	    (set _r_ (if (and ,@(list-reverse! walk) (not _l_))
+			 (let () ,@(list-reverse! binds) 1)
+		       (if (and _l_ (not (pair? _l_))) 'stream ()))))
+       (if (= _r_ 'stream)
+	   ,stream
+	 (and _r_ (let ()
+		    (set self.position (stream-tail _c_))
+		    ,@(if value? '((set self.result _v_)) ())
+		    1))))))
+
 ;; A list pattern enters the current element, when in-enter holds for it, and its nested pattern must
 ;; reach the end of that element's stream. The element is the value, and the input moves past it.
 ;; The nested pattern is inline, so its bindings are the rule's, and on failure the input is restored.
+;; A direct pattern (tp-direct-items) on a list walks it instead, with car and cdr: no stream is made.
 (define-function tp-list-pattern (exp pe-fn value?)
   (if (tp-source?)
-      `(let ((_c_ self.position))
-	 (when (and (not (stream-end? _c_)) (in-enter (stream-head _c_)))
-	   (let ((_v_ (stream-head _c_)))
-	     (set self.position (source-parser-stream-of self _v_))
-	     (let ((_ok_ (and ,(pe-fn exp) (stream-end? self.position))))
-	       (set self.position _c_)
-	       (when _ok_
-		 (set self.position (stream-tail _c_))
-		 ,@(if value? '((set self.result _v_)) ())
-		 1)))))
+      (let ((stream `(let ()
+		       (set self.position (source-parser-stream-of self _v_))
+		       (let ((_ok_ (and ,(pe-fn exp) (stream-end? self.position))))
+			 (set self.position _c_)
+			 (when _ok_
+			   (set self.position (stream-tail _c_))
+			   ,@(if value? '((set self.result _v_)) ())
+			   1))))
+	    (items (and *tp-direct* (tp-direct-items exp))))
+	`(let ((_c_ self.position))
+	   (when (and (not (stream-end? _c_)) (in-enter (stream-head _c_)))
+	     (let ((_v_ (stream-head _c_)))
+	       ,(if items (tp-direct-pattern items stream value?) stream)))))
       (error "rule " *tp-rule* " has a list pattern, which needs a grammar on <source-parser>")))
 
 ;; A choice dispatches on the head of the element in front of it.  An alternative whose first step enters a list
@@ -348,6 +422,7 @@
 
 ;; The forms that define a grammar's rules on class: a selector for each rule's match and its effect, then the methods.
 (define-function tp-definition-forms (class rules)
+  (set *tp-rules* rules)
   (let ((names (map car rules)))
     (and (tp-source?) (tp-check-parameters rules))
     `(,@(map (lambda (name) (list 'define-selector (concat-symbol '$  name))) names)
