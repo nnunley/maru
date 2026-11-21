@@ -821,7 +821,7 @@
 	  ((= c 'mreg)	(arm64-place-leaves (car (cddddr info)) (arm64-place-leaves (cadddr info) leaves vals place-fn check-fn) vals place-fn check-fn))
 	  (else		(error "arm64: no placing for " info)))))
 ;; a kept row's code: its tests, then its word, the literal fields folded into the constant; or fallback
-(define-function arm64-row-code (row leaves)
+(define-function arm64-row-code (row leaves finish)	; finish: the word's code to what the site answers
   (let* ((plan (arm64-row-plan row)) (vals (array (+ 1 (<arm64-plan>-t-slot plan)))) (shifts (<arm64-plan>-shifts plan))
 	 (terms ()) (binds ()) (checks ()) (n 0) (ok 1))
     (list-do info (<arm64-plan>-infos plan)
@@ -846,30 +846,47 @@
     (and ok
 	 (let ((word (arm64-plan-word row vals)))
 	   (list-do x terms (set word `(| ,word ,x)))
-	   `(let ,(list-reverse! binds) (and ,@(list-reverse! checks) (arm64-site-word-bytes ,word)))))))
-(define-function arm64-specialise (mnemonic specs)	; a site's residual code, or () to fall back to its encoder
+	   `(let ,(list-reverse! binds) (and ,@(list-reverse! checks) ,(finish word)))))))
+(define-function arm64-rule-alternatives (pe)	; a choice rule's rows' rules, in its order
+  (cond ((not pe)			())
+	((= 'match-first (car pe))	(map (lambda (alt) (arm64-rule (cadr alt))) (cdr pe)))
+	(else				(list (arm64-rule (cadr pe))))))
+(define-function arm64-open-rules (mnemonic position)	; the rows giving position a field, widest first: asm-best-row's
+  (arm64-rule-alternatives (arm64-rule (arm64-rule-name "open" (concat-string (symbol->string mnemonic) (long->string position))))))
+;; A site's residual code, or () to fall back to its encoder.  label, for a label site, is (position code): the
+;; template has (reloc) at position, the rows are the open rule's for it, and each answers (label-data BYTES POSITION
+;; ROW INSN L), the bytes with the field zero and the report asm would give, which native-assemble places and patches.
+(define-function arm64-specialise (mnemonic specs . label)
   (let* ((n -1)
+	 (label (car label))
 	 (es (map (lambda (s) (set n (+ n 1)) (concat-symbol '_e (concat-symbol (string->symbol (long->string n)) '_))) specs))
 	 (forms (map (lambda (s e) (if (arm64-site-variable? s) (list 'hole s (concat-symbol e 'h)) (list 'lit (arm64-site-literal s)))) specs es))
+	 (symbolic (if label
+		       (let ((i -1)) (map (lambda (e) (set i (+ i 1)) (if (= i (car label)) '(list 'label _label_) e)) es))
+		     es))
 	 (guards ()) (rows ()) (fallback ()))
     (map (lambda (s e) (and (arm64-site-variable? s)
 			    (let ((g (arm64-hole-guard s e))) (if g (push guards (list (concat-symbol e 'h) g)) (set fallback 1)))))
 	 specs es)
-    (list-do rule (arm64-mnemonic-rules mnemonic)	; the grammar's rows for the mnemonic, in its order
+    (list-do rule (if label (arm64-open-rules mnemonic (car label)) (arm64-mnemonic-rules mnemonic))	; the grammar's rows, in order
       (let* ((parts (arm64-row-rule-parts rule)) (row (array-at arm64-row-vector (car parts)))
-	     (leaves (arm64-items-leaves (caddr parts) forms)))
+	     (leaves (arm64-items-leaves (caddr parts) forms))
+	     (finish (if label
+			 (lambda (w) `(list 'label-data (cdr (arm64-site-word-bytes ,w)) ,(car label) ',row (list ',mnemonic ,@es) _label_))
+		       (lambda (w) `(arm64-site-word-bytes ,w)))))
 	(cond ((= leaves 'fallback) (set fallback 1))
 	      ((= leaves 'drop))
 	      ((cadr parts) (set fallback 1))	; a row that encodes through its encoder takes the template: keep the site's
-	      (else (let ((code (arm64-row-code row leaves))) (if code (push rows (cons row code)) (set fallback 1)))))))
+	      (else (let ((code (arm64-row-code row leaves finish))) (if code (push rows (cons row code)) (set fallback 1)))))))
     (set rows (list-reverse! rows))
     (set guards (list-reverse! guards))
-    (and *arm64-sites-recorder* (*arm64-sites-recorder* mnemonic specs (map car rows) fallback))
+    (and *arm64-sites-recorder* (*arm64-sites-recorder* mnemonic specs (map car rows) fallback (and label (car label))))
     (and (not fallback)
-	 `(let ,(map (lambda (s e) (list e (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s)))) specs es)
+	 `(let (,@(map (lambda (s e) (list e (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s)))) specs es)
+		,@(if label `((_label_ ,(cadr label))) ()))
 	    (let ,guards
 	      (or (and ,@(map car guards) (or ,@(map cdr rows)))
-		  (list ',mnemonic ,@es)))))))
+		  (list ',mnemonic ,@symbolic)))))))
 
 (define-function arm64-site-code (mnemonic specs)	; the code a site expands to
   (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))
@@ -901,7 +918,9 @@
   (let* ((specs (map (lambda (s) (if (= s label) ''(reloc) s)) specs))
 	 (ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs)))
     (if *arm64-sites*
-	`(arm64-label-site-emit ',(arm64-site-new () specs) ',mnemonic (list ,@ops) ,(cadr label))
+	(or (let ((i -1) (at ())) (list-do s specs (set i (+ i 1)) (and (equal s ''(reloc)) (set at i)))
+	      (arm64-specialise mnemonic specs (list at (cadr label))))
+	    `(arm64-label-site-emit ',(arm64-site-new () specs) ',mnemonic (list ,@ops) ,(cadr label)))
       `(list ',mnemonic ,@(map (lambda (o) (if (equal o ''(reloc)) `(list 'label ,(cadr label)) o)) ops)))))
 
 ;; (arm64-sites `((MNEMONIC OPERAND …) …)): the forms of the instructions a rule always means, each a site, as a list.

@@ -7,7 +7,10 @@
 ;;; templates it hands back to the site's encoder are counted.  The last line is "kept rows ok".
 ;;;   ./eval2 check/arm64-kept-rows.l
 (define records ())
-(define *arm64-sites-recorder* (lambda (mnemonic specs kept fallback) (push records (list mnemonic specs kept fallback))))
+(define *arm64-sites-recorder*	; a label site's label position too: only rows giving it a field take a placeholder
+  (lambda (mnemonic specs kept fallback label) (push records (list mnemonic specs kept fallback label))))
+(define-function considered? (row r)	; asm-best-row skips a row with no field at an open placeholder's position
+  (let ((at (car (cddddr r)))) (or (not at) (arm64-field-range row at 0))))
 (require "native.l")
 (define missing 0)
 (define fallbacks 0)
@@ -19,6 +22,7 @@
 	   (insn (cons (car r) (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-representative s) (arm64-site-literal s))) specs))))
       (list-do row (asm-candidate-rows 'arm64 insn)
 	(cond ((memq row (caddr r)))
+	      ((not (considered? row r)))
 	      ((arm64-encode-row row (cdr insn) 0)	; it takes the instruction: dropping it can change the bytes
 	       (set missing (+ missing 1)) (println "DROPPED " (car row) " " (cadr row) " for " insn))
 	      (else (set wide (+ wide 1))))))))	; the candidate table's shapes take more than the row can encode

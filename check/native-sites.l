@@ -24,6 +24,19 @@
   (expect (concat-string "an immediate at the edge " (long->string v)) (and (as-asm (addi 'X9 'X10 v) (list 'ADD 'X9 'X10 v)) 1) 1))
 (expect "nothing varies: encoded once" (ret) '(data 192 3 95 214))
 
+;; label sites: the row asm-select chooses for the instruction with (reloc) at the label, its bytes and report, as
+;; (label-data BYTES POSITION ROW INSN L), chosen from the grammar's open rule when the template loads
+(define-function asm-label-data (insn l)	; what asm-select gives the instruction, as a label site answers it
+  (let ((found (asm-select 'arm64 insn 0 (asm-candidate-rows 'arm64 insn))))
+    (list 'label-data (cadr found) (car (cddr found)) (car found) insn l)))
+(define-function cbz (r l) (car (arm64-sites `((CBZ (x ,r) (label ,l))))))
+(define-function b (l) (car (arm64-sites `((B (label ,l))))))
+(define-function adr (r l) (car (arm64-sites `((ADR (x ,r) (label ,l))))))
+(expect "a CBZ to a label" (cbz 'X9 'L1) (asm-label-data '(CBZ X9 (reloc)) 'L1))
+(expect "a B to a label" (b 'L2) (asm-label-data '(B (reloc)) 'L2))
+(expect "an ADR of a label" (adr 'X17 'L3) (asm-label-data '(ADR X17 (reloc)) 'L3))
+(expect "SP where a CBZ's X register was declared: the symbolic form" (cbz 'SP 'L1) '(CBZ SP (label L1)))
+
 ;; loads and stores: near, through another register, unaligned or far (the address made in X15 first); each form, as a
 ;; site emits it or as asm encodes it, gives the same bytes as the forms the access means
 (define-function encoded (forms) (map (lambda (f) (if (= 'data (car f)) f (asm-bytes f))) forms))
