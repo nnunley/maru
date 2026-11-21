@@ -25,8 +25,9 @@ inner		= 'quote .					-> 'data
 		| 'cond clause*:cs				-> (forms-clauses cs)
 		| ('and | 'or) form:a form*:fs			-> (forms-operands (cons a fs))
 		| 'lambda params:p form*:fs			-> (forms-sum (cons p fs))
-		| ('define-function | 'define-form) . params:p form*:fs	-> (forms-sum (cons p fs))
+		| ('define-function | 'define-form | 'define-generic) . params:p form*:fs	-> (forms-sum (cons p fs))
 		| 'define-method . . params:p form*:fs		-> (forms-sum (cons p fs))
+		| 'define-multimethod . typed:p form*:fs	-> (forms-sum (cons p fs))
 		| ('let | 'let*) bindings:b form*:fs		-> (forms-sum (cons b fs))
 		| 'for `( var form*:fs ) form*:gs		-> (forms-decide (cons (forms-one (forms-sum fs)) gs))
 		| loop var form*:fs				-> (forms-decide fs)
@@ -36,6 +37,7 @@ nil		= .:n &-> (not n) ;
 decision	= .:op &-> (erosion-decision? op) ;
 loop		= .:op &-> (memq op '(list-do array-do string-do alist-do lists-do namespace-do)) ;
 params		= .:ps						-> (forms-params self ps) ;	# a dotted rest too
+typed		= .:ps						-> (forms-typed self ps) ;	# (type arg) ..., each a form, its arg bound
 var		= .:v						-> (forms-bind self v) ;
 bindings	= &.:x &-> (pair? x) `( binding*:bs )	-> (forms-one (forms-sum bs))
 		| nil						-> *forms-none* ;

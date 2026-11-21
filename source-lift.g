@@ -10,6 +10,8 @@ definer		= 'define-function .:n .*			-> (cons 'function n)
 		| 'define-form .:n .*				-> (cons 'form n)
 		| 'define-selector .:n .*			-> (cons 'selector n)
 		| 'define-method .:n .*				-> (cons 'method n)
+		| 'define-multimethod .:n .:ts .*		-> (cons 'method (multimethod-name n ts))
+		| 'define-generic .:n .:args .*			-> (cons 'function n)
 		| 'define-apply .:n .*				-> (cons 'apply n)
 		| ('define-structure | 'define-class) .:n .*	-> (cons 'type n)
 		| ('define | 'set) .:n `( 'lambda .* )		-> (cons 'function n) ;
