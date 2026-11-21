@@ -15,7 +15,7 @@
 ;;; expected.  A world holds the property values set in it and finds the rest in its
 ;;; parent; an action makes a child world one time step on, with every effect evaluated
 ;;; in the parent (the memos' Time1 / Time2).  satisfy searches the worlds level by level
-;;; (iterative deepening, M-2009-001's brute-force planner); an action-optimization
+;;; (breadth first, M-2009-001's brute-force planner); an action-optimization
 ;;; narrows an action's arguments and a goal-optimization the actions a world tries.
 ;;; Heuristics score a world; with max-time-ahead H the search commits, every H levels,
 ;;; to the next move toward the best-scoring world (RN-2008-003 §10), and in a

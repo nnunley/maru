@@ -102,13 +102,13 @@ native_coverage
 
 ### Lowering `ir2` to intents
 
-`native-ir2.l` walks a unit as `ir-gen-c.k` does, one method per `ir2` instruction kind, and emits intents. Each value
+`native-gen.k` walks a unit as `ir-gen-c.k` does, one method per `ir2` instruction kind, and emits intents. Each value
 lives in the frame slot `ir2` allocated for it; an operation loads its operands into scratch registers, operates, and
 stores its result. A function's parameters arrive in the calling convention's argument positions and are stored to
 their slots by `enter`; its result is moved to the result position before `leave`. `ir2`'s `label` and `goto` become
 `label` and `branch`, so `maru_label`'s computed gotos lower too.
 
-The lowering MUST be architecture-neutral: `native-ir2.l` names no register, instruction or calling convention.
+The lowering MUST be architecture-neutral: `native-gen.k` names no register, instruction or calling convention.
 [R-neutral]
 
 ```maru-check @R-neutral
@@ -181,7 +181,7 @@ native_gezira
 
 | Error | Example | Recovery |
 |---|---|---|
-| An `ir2` instruction with no lowering | a kind `native-ir2.l` has no method for | Compilation stops, naming the kind and the function. |
+| An `ir2` instruction with no lowering | a kind `native-gen.k` has no method for | Compilation stops, naming the kind and the function. |
 | An intent with no form for an architecture | an operation `asm-coverage.spec` lacks | Compilation stops, naming the intent, width and architecture. |
 | An extern not found | a misspelt C function | Installation stops, naming it; nothing is installed. |
 | A displacement that doesn't fit | a branch farther than a row's field allows | The encoder refuses it (RFC 0001); a conditional branch is lowered as the inverted test over an unconditional one, whose reach is the widest. |
