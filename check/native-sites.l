@@ -44,6 +44,6 @@
 	(list-do form fs
 	  (or (= 'at (car form)) (let () (set forms (+ forms 1)) (and (= 'data (car form)) (set sites (+ sites 1))))))))
     (println "sites " sites " of " forms " forms")
-    (expect "some forms emitted by sites" (and (< 0 sites) 1) 1)))
+    (expect "nine in ten forms emitted by sites (all but branches and labels)" (and (<= (* 90 forms) (* 100 sites)) 1) 1)))
 (or (= 0 failures) (error "native-sites: " failures " failures"))
 (println "native sites ok")

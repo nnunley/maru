@@ -35,11 +35,11 @@
 		(car scratch)))))
 
 ;; forms for the lowering grammars' actions
-(define-function arm64-constant (r v)
-  (list (list 'MOVZ r (& v 0xffff) '(LSL 0))
-	(list 'MOVK r (& (>> v 16) 0xffff) '(LSL 16))
-	(list 'MOVK r (& (>> v 32) 0xffff) '(LSL 32))
-	(list 'MOVK r (& (>> v 48) 0xffff) '(LSL 48))))
+(define-function arm64-constant (r v)	; sites (asm-arm64.l), so asm-arm64.l loads before this file
+  (list (arm64-site MOVZ (x r) (n (& v 0xffff)) '(LSL 0))
+	(arm64-site MOVK (x r) (n (& (>> v 16) 0xffff)) '(LSL 16))
+	(arm64-site MOVK (x r) (n (& (>> v 32) 0xffff)) '(LSL 32))
+	(arm64-site MOVK (x r) (n (& (>> v 48) 0xffff)) '(LSL 48))))
 ;; each two registers of each list as one instruction, first to last
 (define-function arm64-pairs (op mode step integers floats)
   (let ((out ()))
