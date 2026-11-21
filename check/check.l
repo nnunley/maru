@@ -1041,6 +1041,18 @@
   (unit-assert (equal (last (run "tpeg_direct" (concat-strings "./eval2 check/tpeg-direct.l " (native-nile-loader (native-nile-inputs))) 900))
 		      "tpeg direct ok")))
 
+;; Lowering sites (asm-arm64.l's arm64-site): every native image the same with sites as without (check/native-images.l
+;; --no-sites), and the sites' own cases (check/native-sites.l), with the share of Gezira's forms they emit
+(check "native_sites"
+  (let ((loader (native-nile-loader (native-nile-inputs))) (dir (concat-strings tmp "/native-sites")))
+    (run "native_sites_dirs" (concat-strings "rm -rf " dir " && mkdir -p " dir "/on " dir "/off"))
+    (run "native_sites_on" (concat-strings "./eval2 check/native-images.l " dir "/on " loader) 900)
+    (run "native_sites_off" (concat-strings "./eval2 check/native-images.l --no-sites " dir "/off " loader) 900)
+    (run "native_sites_same" (concat-strings "diff -r " dir "/on " dir "/off"))
+    (let ((out (run "native_sites" (concat-strings "./eval2 check/native-sites.l " loader) 900)))
+      (list-do l out (and (= 0 (string-find l "sites ")) (println "native_sites: " l)))
+      (unit-assert (equal (last out) "native sites ok")))))
+
 ;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
 ;; its selectors, the same rectangle as gezira_image, on one worker and four.
 ;; ir-gen-c's library mode: a unit with no main, built as a shared library and opened from untyped Maru (library-mode.l)

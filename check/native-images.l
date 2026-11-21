@@ -6,6 +6,7 @@
 (define no-sites (and *arguments* (equal "--no-sites" (car *arguments*)) (pop *arguments*)))
 (define dir (pop *arguments*))
 (define loader (and *arguments* (pop *arguments*)))	; before native.l: maru.k loads any arguments left
+(define *arm64-sites* (not no-sites))	; read as the lowering rules load
 (require "native.l")
 (load "check/native-image-units.l")
 (define count 0)

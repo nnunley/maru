@@ -1,7 +1,8 @@
 # Intents (native-gen.k) to arm64's forms, matched as a tree, as stub-arm64.g lowers a stub's.  Registers s0, s1 … are
 # abi.spec's scratch, an argument position its args, and the result its result; slots are offsets from SP.  A branch's
 # target is a (label L) operand and (at L) marks where L is; native-link.l patches them.  A conditional branch is a short
-# branch over B, so its reach is B's.
+# branch over B, so its reach is B's.  An instruction a rule always means is an arm64-site (asm-arm64.l): its rows are
+# chosen as the grammar loads, and it emits its bytes.
 <native-arm64> : <source-parser> ()
 program	= intent*:l !. -> l ;
 reg	= .:r -> (stub-reg 'arm64 r) ;
@@ -19,21 +20,21 @@ intent	= `( 'enter .:n .:o )		-> (native-arm64-enter n o)
 	| `( 'store-at .:size reg:b reg:r )	-> (native-arm64-store size r b 0)
 	| `( 'address .:slot reg:r )	-> (native-arm64-address slot r)
 	| `( 'constant reg:r .:v )	-> (arm64-constant r v)
-	| `( 'op 'add reg:d reg:a reg:b )	-> `((ADD ,d ,a ,b))
-	| `( 'op 'sub reg:d reg:a reg:b )	-> `((SUB ,d ,a ,b))
-	| `( 'op 'mul reg:d reg:a reg:b )	-> `((MUL ,d ,a ,b))
-	| `( 'op 'div reg:d reg:a reg:b )	-> `((SDIV ,d ,a ,b))
-	| `( 'op 'mod reg:d reg:a reg:b )	-> `((SDIV X17 ,a ,b) (MSUB ,d X17 ,b ,a))
-	| `( 'op 'and reg:d reg:a reg:b )	-> `((AND ,d ,a ,b))
-	| `( 'op 'or reg:d reg:a reg:b )	-> `((ORR ,d ,a ,b))
-	| `( 'op 'xor reg:d reg:a reg:b )	-> `((EOR ,d ,a ,b))
-	| `( 'op 'shl reg:d reg:a reg:b )	-> `((LSLV ,d ,a ,b))
-	| `( 'op 'shr reg:d reg:a reg:b )	-> `((ASRV ,d ,a ,b))
-	| `( 'op 'com reg:d reg:a .:_ )	-> `((MVN ,d ,a))
+	| `( 'op 'add reg:d reg:a reg:b )	-> (list (arm64-site ADD (x d) (x a) (x b)))
+	| `( 'op 'sub reg:d reg:a reg:b )	-> (list (arm64-site SUB (x d) (x a) (x b)))
+	| `( 'op 'mul reg:d reg:a reg:b )	-> (list (arm64-site MUL (x d) (x a) (x b)))
+	| `( 'op 'div reg:d reg:a reg:b )	-> (list (arm64-site SDIV (x d) (x a) (x b)))
+	| `( 'op 'mod reg:d reg:a reg:b )	-> (list (arm64-site SDIV X17 (x a) (x b)) (arm64-site MSUB (x d) X17 (x b) (x a)))
+	| `( 'op 'and reg:d reg:a reg:b )	-> (list (arm64-site AND (x d) (x a) (x b)))
+	| `( 'op 'or reg:d reg:a reg:b )	-> (list (arm64-site ORR (x d) (x a) (x b)))
+	| `( 'op 'xor reg:d reg:a reg:b )	-> (list (arm64-site EOR (x d) (x a) (x b)))
+	| `( 'op 'shl reg:d reg:a reg:b )	-> (list (arm64-site LSLV (x d) (x a) (x b)))
+	| `( 'op 'shr reg:d reg:a reg:b )	-> (list (arm64-site ASRV (x d) (x a) (x b)))
+	| `( 'op 'com reg:d reg:a .:_ )	-> (list (arm64-site MVN (x d) (x a)))
 	| `( 'fop .:k .:w reg:d reg:a reg:b )	-> (native-arm64-fop k w d a b)
 	| `( 'fcompare .:c .:w reg:d reg:a reg:b )	-> (native-arm64-fcompare c w d a b)
 	| `( 'convert .:from .:to reg:d reg:s )	-> (native-arm64-convert from to d s)
-	| `( 'compare .:c reg:d reg:a reg:b )	-> `((CMP ,a ,b) (CSET ,d ,(native-arm64-cond c)))
+	| `( 'compare .:c reg:d reg:a reg:b )	-> (list (arm64-site CMP (x a) (x b)) (arm64-site CSET (x d) (c (native-arm64-cond c))))
 	| `( 'label .:l )		-> `((at ,l))
 	| `( 'branch .:l )		-> `((B (label ,l)))
 	| `( 'branch-to reg:r )	-> `((BR ,r))

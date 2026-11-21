@@ -17,3 +17,4 @@ verbosity +1 %checked in boot.l and boot2.l alike, a clone between the two boots
 verbosity -1 check.l's native_nile case, cpu-hundredths and nile-inputs (factored out of nile-build): forms neither flagged nor cloned dilute the verbose share
 erosion -8 asm-arm64.l: arm64-bind-plan (CC 71, the assembler's highest) split into one binder per operand kind, dispatched by a table when the row's plan is made; it leaves the time sinks
 erosion -2 compile-tpeg.l's direct patterns in short callables (tp-direct-rule, -item, -items, -value, -literal, -rules?, -pattern): they dilute the share over CC 10
+erosion -1 asm-arm64.l's sites in short callables (arm64-site-make, -emit, -representative, -expr, -literal, -variable?, -word-bytes): they dilute the share over CC 10

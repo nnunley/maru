@@ -543,3 +543,68 @@
 
 (asm-register-isa 'arm64 arm64-rows arm64-encode arm64-decode arm64-field-range arm64-parse-form
 		  arm64-shape arm64-accepts 1 arm64-shape-key)
+
+;;; ---------------------------------------------------------------- sites
+
+;; A lowering site: an instruction a lowering rule always means, its row chosen when the rule loads rather than found
+;; again for every instruction (the kernel plan's Task 7; oecm's staged evaluation).  (arm64-site MNEMONIC SPEC …):
+;; each SPEC is a literal operand (a symbol, a number or a quoted list) or (KIND EXPR), KIND one of x (an X register),
+;; w (a W register), n (a number), f with s or d (an FP register: (f d EXPR)), mem with its shape ((mem (off SP 0)
+;; EXPR)), lsl (an (LSL n) operand) or c (a condition).  When the rule loads, a representative instruction (X0, W0, 0,
+;; S0 or D0, the shape given, (LSL 0), EQ) gives the site its candidate rows and each operand's shape key.  At run time
+;; the site answers (data b0 b1 b2 b3) from the first of those rows that takes the operands, as asm would choose it, or
+;; the symbolic form, for asm to encode or refuse, when an operand's shape isn't the declared one or no row takes it.
+;; A site with nothing variable is encoded once, as it loads.  *arm64-sites* () makes every site its symbolic form.
+(or (defined? '*arm64-sites*) (define *arm64-sites* 1))
+(define-structure <arm64-site> (rows keys numbers))	; keys: each operand's shape key, () for a literal; numbers: 1 for n
+
+(define-function arm64-site-representative (spec)
+  (let ((k (car spec)))
+    (cond ((= k 'x)	'X0)
+	  ((= k 'w)	'W0)
+	  ((= k 'n)	0)
+	  ((= k 'f)	(if (= 's (cadr spec)) 'S0 'D0))
+	  ((= k 'mem)	(cadr spec))
+	  ((= k 'lsl)	'(LSL 0))
+	  ((= k 'c)	'EQ)
+	  (else		(error "arm64-site: no operand kind " spec)))))
+(define-function arm64-site-variable? (spec) (and (pair? spec) (memq (car spec) '(x w n f mem lsl c))))
+(define-function arm64-site-literal (spec) (if (and (pair? spec) (= 'quote (car spec))) (cadr spec) spec))
+(define-function arm64-site-expr (spec)	; (x e), (f d e), (mem shape e): the operand's expression, last
+  (while (cdr spec) (set spec (cdr spec)))
+  (car spec))
+
+(define-function arm64-site-word-bytes (word)
+  (list 'data (& 255 word) (& 255 (>> word 8)) (& 255 (>> word 16)) (& 255 (>> word 24))))
+
+(define-function arm64-site-make (mnemonic specs)
+  (let* ((ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-representative s) (arm64-site-literal s))) specs))
+	 (insn (cons mnemonic ops))
+	 (rows (asm-candidate-rows 'arm64 insn)))
+    (list-do r rows
+      (list-do k (cadr r) (and (memq (car k) '(pcrel pcpage)) (error "arm64-site: a PC-relative row for " insn))))
+    (new <arm64-site> rows
+	 (map (lambda (s) (and (arm64-site-variable? s) (arm64-shape-key (arm64-site-representative s)))) specs)
+	 (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs))))
+
+(define-function arm64-site-emit (site mnemonic ops)	; ops: the operands' values
+  (let ((ok 1) (os ops) (ks (<arm64-site>-keys site)) (ns (<arm64-site>-numbers site)))
+    (while (and ok os)
+      (let ((k (car ks)))
+	(and k (not (if (car ns) (long? (car os)) (= k (arm64-shape-key (car os))))) (set ok ())))
+      (set os (cdr os)) (set ks (cdr ks)) (set ns (cdr ns)))
+    (let ((word ()) (rows (and ok (<arm64-site>-rows site))))
+      (while (and rows (not word))
+	(set word (arm64-encode-row (car rows) ops 0))
+	(set rows (cdr rows)))
+      (if word (arm64-site-word-bytes word) (cons mnemonic ops)))))
+
+(define-form arm64-site (mnemonic . specs)
+  (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))
+    (cond ((not *arm64-sites*)	symbolic)
+	  ((not (list-detect s specs (arm64-site-variable? s)))
+	   (let* ((b (asm-buffer 0)) (r (asm-attempt 'arm64 b (cons mnemonic (map arm64-site-literal specs)))))
+	     (and (pair? r) (= 'error (car r)) (apply error (cdr r)))
+	     (list 'quote (cons 'data (array->list (asm-buffer-bytes b))))))
+	  (else
+	   `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic)))))))
