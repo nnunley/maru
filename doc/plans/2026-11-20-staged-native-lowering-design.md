@@ -28,8 +28,9 @@ rediscovers what the first knew:
 The rule `(op add d a b) -> ((ADD ,d ,a ,b))` can only ever mean one row, ADD with three X registers, yet the row is
 found again for every instruction. Of 103,227 forms only 7,272 are distinct, and of 69,036 intents 11,179.
 
-Choosing the row when the grammar is built is oecm §5.1's staged evaluation: "the choice depends on meaning, so it is
-made before the encoder". The kernel plan already has it as Task 7 (`doc/plans/2026-11-12-kernel-on-eval3.md` on the
+Choosing the row when the grammar is built is staged evaluation, evaluation as a series of partial evaluations (oecm
+§3.2, claimed in §6 to recover the cost of the evaluator's indirection; `notes/sources/piumarta-2011-open-extensible-composition-models.md`
+records the claim as asserted, not shown; §5.1 is grounding, cited here before 2026-11-21 by mistake). The kernel plan already has it as Task 7 (`doc/plans/2026-11-12-kernel-on-eval3.md` on the
 kernel branch, 17ea055; Binders and LoweringSites in its `notes/plan/assembler.john`). This design does Task 7 now, on
 this branch, and adds the lowering half Task 7 left out, since lowering is 39% here.
 

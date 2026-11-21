@@ -63,12 +63,13 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   worse than quadratic (800 strings took 26 times as long as 200).
 - `native_sites` (`check/native-sites.l`, `check/native-images.l`): lowering sites. An instruction a lowering rule always
   means is a site (`asm-arm64.l`), written as a quasiquoted list of instructions, each varying operand in its kind:
-  `` (arm64-sites `((ADD (x ,d) (x ,a) (x ,b)))) `` answers the list of forms. A site's candidate rows and each operand's
-  shape key are resolved from a representative instruction as the rule loads, so at run time it binds its operands into
-  those rows and emits `(data b0 b1 b2 b3)`, falling back to the symbolic form (for `asm` to encode or refuse) when an
-  operand isn't the declared kind or no row takes it; one with nothing variable is encoded once, and a site remembers
-  its answers by its operands' values. A `(label ,l)` operand makes a label site, whose row is chosen as `asm` chooses
-  one with an open placeholder and which emits `(label-data …)`, its bytes and the report `native-assemble` patches.
+  `` (arm64-sites `((ADD (x ,d) (x ,a) (x ,b)))) `` answers the list of forms. As the rule loads, the specialiser reduces
+  the encoder grammar's rows for the mnemonic to those that can take the template (`doc/assemblers.md`), each left as
+  its operands' tests and one OR of shifted fields, or, for a row whose kinds have no value, a call of that row's
+  encoder; at run time the site emits `(data b0 b1 b2 b3)` from the first that takes the operands, falling back to the
+  symbolic form (for `asm` to encode or refuse) when an operand isn't the declared kind or no row takes it, and one
+  with nothing variable is encoded once. A `(label ,l)` operand makes a label site, specialised over the grammar's
+  rows for an open placeholder at the label (widest field first, `asm`'s choice), which emits `(label-data …)`, its bytes and the report `native-assemble` patches.
   Union kinds serve both widths in one template, `(r ,a)` an X or W register and `(f ,a)` a D or S one, and a
   `(mem ,place)` takes any `(off BASE N)`, SP or an X register. Each row tests a union's register by its own rule, so
   the row of its width is the one that takes it; a place is specialised twice, on SP (folded into the rows'

@@ -55,4 +55,7 @@ PEG and tpeg grammars, left recursion, composition, typed tree matching and gram
   action form, `intent <arm64-sites> = …`, is kept among its annotations as `(actions arm64-sites)`: `compile-tpeg.l`
   compiles each of the rule's quasiquoted actions, `` -> `… ``, as `` (arm64-sites `…) ``, so the form, a macro, sees the
   template itself as the grammar loads, and any other action is as written (`tree_lists`). native-arm64.g's `intent`
-  writes its instructions this way.
+  writes its instructions this way. A program that composes with a grammar's rules without matching with it reads them
+  as data instead: `./eval grammar-data.l FILE.g VAR` writes `(define VAR '(RULE …))`, the same parsed rules, which
+  make does for the arm64 encoder grammar (`arm64-rules-data.l`, walked by `asm-arm64.l`'s specialiser). Loading those
+  costs `native.l` about 50 ms; loading the compiled `arm64-rules.g.l` to reflect on it would cost 1.5 s.
