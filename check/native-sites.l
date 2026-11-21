@@ -1,7 +1,7 @@
 ;;; Lowering sites (asm-arm64.l's arm64-site): an instruction whose row is chosen when its rule loads emits its bytes
 ;;; as asm would, falls back to the symbolic form when an operand isn't of the kind declared or no row takes it, and is
-;;; encoded once when nothing in it varies.  With LOADER (as native_nile writes it), the share of the Nile runtime's
-;;; and Gezira's lowered forms that sites emitted is printed.  The last line is "native sites ok".
+;;; encoded once when nothing in it varies.  The share of maru-check.k's forms that sites emit (or with LOADER, as
+;;; native_nile writes it, the Nile runtime's and Gezira's) is printed.  The last line is "native sites ok".
 ;;;   ./eval2 check/native-sites.l [LOADER]
 (define loader (and *arguments* (pop *arguments*)))	; before native.l: maru.k loads any arguments left
 (require "native.l")
@@ -37,13 +37,16 @@
 (expect "a far address" (encoded (native-arm64-address 5000 'X9))
 	(encoded (concat-list (arm64-constant 'X9 (- 5000 40000)) '((ADD X9 X29 X9)))))
 
-(when loader
-  (let ((lower (cdr (assq 'arm64 native-lowerings))) (sites 0) (forms 0))
-    (list-do f (car (native-symbols (<native-unit>-functions (native-compile-file loader))))
-      (list-do fs (lower (cadr f))
-	(list-do form fs
-	  (or (= 'at (car form)) (let () (set forms (+ forms 1)) (and (= 'data (car form)) (set sites (+ sites 1))))))))
-    (println "sites " sites " of " forms " forms")
-    (expect "nine in ten forms emitted by sites (all but branches and labels)" (and (<= (* 90 forms) (* 100 sites)) 1) 1)))
+;; every form but those naming a label (branches, ADR) comes from a site: of LOADER's forms, else maru-check.k's
+(let ((lower (cdr (assq 'arm64 native-lowerings))) (sites 0) (forms 0) (others ()))
+  (list-do f (car (native-symbols (<native-unit>-functions (native-compile-file (or loader "maru-check.k")))))
+    (list-do fs (lower (cadr f))
+      (list-do form fs
+	(unless (= 'at (car form))
+	  (set forms (+ forms 1))
+	  (cond ((= 'data (car form))		(set sites (+ sites 1)))
+		((not (native-form-label form))	(push others form)))))))
+  (println "sites " sites " of " forms " forms")
+  (expect "every form without a label from a site" others ()))
 (or (= 0 failures) (error "native-sites: " failures " failures"))
 (println "native sites ok")

@@ -1,8 +1,9 @@
-;;; Direct list patterns change no lowering: every intent of check/native-images.l's units and of the Nile runtime with
-;;; Gezira (LOADER, as native_nile writes it) lowers to the same forms through native-arm64.g and native-x64.g compiled
-;;; with direct patterns (as built) and without (*tp-direct* off, recompiled here).  The last line is "tpeg direct ok".
-;;;   ./eval2 check/tpeg-direct.l LOADER
-(define loader (pop *arguments*))	; before native.l: maru.k loads any arguments left
+;;; Direct list patterns change no lowering: every intent of check/native-images.l's units, and given LOADER (as
+;;; native_nile writes it) of the Nile runtime with Gezira too, lowers to the same forms through native-arm64.g and
+;;; native-x64.g compiled with direct patterns (as built) and without (*tp-direct* off, recompiled here).  The check
+;;; leaves Gezira out, which is most of the time; native_nile compiles it.  The last line is "tpeg direct ok".
+;;;   ./eval2 check/tpeg-direct.l [LOADER]
+(define loader (and *arguments* (pop *arguments*)))	; before native.l: maru.k loads any arguments left
 (require "native.l")
 (define compile-tpeg-definitions-only 1)
 (require "compile-tpeg.l")
@@ -10,7 +11,7 @@
 
 ;; each unit's functions' intents, in order
 (define units ())
-(list-do path (concat-list (native-image-paths) (list loader))
+(list-do path (concat-list (native-image-paths) (if loader (list loader) ()))
   (push units (car (native-symbols (<native-unit>-functions (native-compile-file path))))))
 (set units (list-reverse! units))
 

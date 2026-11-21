@@ -1044,21 +1044,22 @@
       (unit-assert (< 0 c))
       (unit-assert (< n (* 16 c))))))
 
-;; Direct list patterns (compile-tpeg.l) lower every intent of the native units and of the Nile runtime with Gezira to
-;; the same forms as the stream path does, through native-arm64.g and native-x64.g (check/tpeg-direct.l)
+;; Direct list patterns (compile-tpeg.l) lower every intent of the native units to the same forms as the stream path
+;; does, through native-arm64.g and native-x64.g (check/tpeg-direct.l; given native_nile's loader by hand, Gezira's too,
+;; which the suite leaves out: it was most of the time, and native_nile compiles it)
 (check "tpeg_direct"
-  (unit-assert (equal (last (run "tpeg_direct" (concat-strings "./eval2 check/tpeg-direct.l " (native-nile-loader (native-nile-inputs))) 900))
-		      "tpeg direct ok")))
+  (unit-assert (equal (last (run "tpeg_direct" "./eval2 check/tpeg-direct.l" 300)) "tpeg direct ok")))
 
-;; Lowering sites (asm-arm64.l's arm64-site): every native image the same with sites as without (check/native-images.l
-;; --no-sites), and the sites' own cases (check/native-sites.l), with the share of Gezira's forms they emit
+;; Lowering sites (asm-arm64.l's arm64-site): every native unit's image the same with sites as without
+;; (check/native-images.l --no-sites), and the sites' own cases (check/native-sites.l), with the share of maru-check.k's
+;; forms they emit; Gezira's comparison, by hand, gives native-images.l and native-sites.l native_nile's loader
 (check "native_sites"
-  (let ((loader (native-nile-loader (native-nile-inputs))) (dir (concat-strings tmp "/native-sites")))
+  (let ((dir (concat-strings tmp "/native-sites")))
     (run "native_sites_dirs" (concat-strings "rm -rf " dir " && mkdir -p " dir "/on " dir "/off"))
-    (run "native_sites_on" (concat-strings "./eval2 check/native-images.l " dir "/on " loader) 900)
-    (run "native_sites_off" (concat-strings "./eval2 check/native-images.l --no-sites " dir "/off " loader) 900)
+    (run "native_sites_on" (concat-strings "./eval2 check/native-images.l " dir "/on") 300)
+    (run "native_sites_off" (concat-strings "./eval2 check/native-images.l --no-sites " dir "/off") 300)
     (run "native_sites_same" (concat-strings "diff -r " dir "/on " dir "/off"))
-    (let ((out (run "native_sites" (concat-strings "./eval2 check/native-sites.l " loader) 900)))
+    (let ((out (run "native_sites" "./eval2 check/native-sites.l" 300)))
       (list-do l out (and (= 0 (string-find l "sites ")) (println "native_sites: " l)))
       (unit-assert (equal (last out) "native sites ok")))))
 
