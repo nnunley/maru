@@ -9,6 +9,7 @@
 (require "source-parser.l")
 (require "text-parser.l")
 (require "abi.g.l")
+(require "hash.l")
 
 ;; the machine uname names, where osdefs.k says its field is
 (define stub-host-isa
@@ -24,7 +25,7 @@
     (list-do row stub-abi-rows
       (and (= (car row) isa) (= (cadr row) kind) (set found (caddr row))))
     found))
-(define-function stub-reg (isa r)
+(define-function stub-reg-of (isa r)
   (cond ((= r 'result) (car (abi isa 'result)))
 	((= r 'a0) (car (abi isa 'args)))
 	((= r 'a1) (cadr (abi isa 'args)))
@@ -33,6 +34,11 @@
 		     (n (- (string-at name 1) ?0)))
 		(while (< 0 n) (set scratch (cdr scratch)) (set n (- n 1)))
 		(car scratch)))))
+
+(define stub-reg-caches (identity-cache 8))	; by isa: a cache (hash.l) of each name's register, worked out once
+(define-function stub-reg (isa r)
+  (let ((c (or (cache-at stub-reg-caches isa) (cache-at-put stub-reg-caches isa (identity-cache 64)))))
+    (or (cache-at c r) (cache-at-put c r (stub-reg-of isa r)))))
 
 ;; forms for the lowering grammars' actions
 (define-function arm64-constant (r v)	; sites (asm-arm64.l), so asm-arm64.l loads before this file

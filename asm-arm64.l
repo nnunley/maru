@@ -238,6 +238,11 @@
 ;; A register's entry, (name class number kind), by its name.
 (define arm64-register-table (identity-hash-table))
 (list-do r arm64-registers (hash-at-put arm64-register-table (car r) r))
+;; a register's entry by its symbol, through a cache (hash.l): every operand of every instruction asks
+(define arm64-register-cache (identity-cache 1024))
+(define-function arm64-register-entry (op)	; op a symbol: its entry, or ()
+  (or (cache-at arm64-register-cache op)
+      (let ((r (hash-at arm64-register-table op))) (and r (cache-at-put arm64-register-cache op r)))))
 
 ;; Each operand kind binds through a binder of its own, made once when its row's plan is: a function of
 ;; (plan op vals pc) that binds op into vals and answers vals, or () if op doesn't fit.  The kind's info (arm64-kind-info)
@@ -252,7 +257,7 @@
 (define-arm64-binder (reg) p
   (let ((slot (cadr p)) (class (caddr p)) (kind (cadddr p)))
     (lambda (plan op vals pc)
-      (let ((r (and (symbol? op) (hash-at arm64-register-table op))))
+      (let ((r (and (symbol? op) (arm64-register-entry op))))
 	(and r (= (cadr r) class) (or (not (cadddr r)) (= (cadddr r) kind)) (arm64-put vals slot (caddr r)))))))
 (define-arm64-binder (vreg) p
   (let ((slot (cadr p)) (a (caddr p)))
@@ -521,9 +526,11 @@
 (define-function arm64-pair-key (op)
   (or (hash-at arm64-pair-keys (car op))
       (hash-at-put arm64-pair-keys (car op) (+ 1024 (hash-count arm64-pair-keys)))))
+(define arm64-symbol-keys (identity-cache 1024))	; a symbol's shape key, through a cache (hash.l)
 (define-function arm64-shape-key (op)
   (cond ((or (long? op) (double? op) (arm64-reloc? op))	1)
-	((symbol? op)				(or (hash-at arm64-register-keys op) 2))
+	((symbol? op)				(or (cache-at arm64-symbol-keys op)
+						    (cache-at-put arm64-symbol-keys op (or (hash-at arm64-register-keys op) 2))))
 	((arm64-vector? op)			3)
 	((memq (car op) '(off pre post))	(arm64-memory-key op))
 	(else					(arm64-pair-key op))))

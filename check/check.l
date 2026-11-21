@@ -390,11 +390,13 @@
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (equal (last (run "weak_table" (concat-strings evaluator " check/weak.l"))) "weak ok"))
     (unit-assert (law-file-holds "weak_table" evaluator "check/laws/weak.l" "check/laws/weak.law"))))
-;; hash.l's tables against an association list, on every evaluator, and an identity table across a saved image (only eval
+;; hash.l's tables against an association list, and its identity caches (check/identity-cache.l), on every evaluator,
+;; and an identity table across a saved image (only eval
 ;; saves images), where every object has moved: it rehashes itself before answering
 (check "hash_table"
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
-    (unit-assert (law-file-holds "hash_table" evaluator "check/laws/hash.l" "check/laws/hash.law")))
+    (unit-assert (law-file-holds "hash_table" evaluator "check/laws/hash.l" "check/laws/hash.law"))
+    (unit-assert (equal (last (run "identity_cache" (concat-strings evaluator " check/identity-cache.l"))) "identity cache ok")))
   (let ((image (concat-strings tmp "/hash-image")))
     (run "hash_image_save" (concat-strings "./eval check/hash-image-save.l " image))
     (unit-assert (equal (run "hash_image_load" (concat-strings "./eval -l " image " check/hash-image-read.l"))

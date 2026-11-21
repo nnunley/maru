@@ -124,3 +124,13 @@
     (array-do e (<hash-table>-entries table) (and e (or (car e) (not weak)) (fn (car e) (cdr e))))))
 (define-function hash-keys (table)
   (let ((out (array 0))) (hash-do table (lambda (k v) (array-append out k))) out))
+
+;; An identity cache: an array of slots indexed by a key's address, each the last (key . value) put there.  A lookup is a
+;; few primitives where a table's takes a dozen calls; a key sharing a slot with another replaces it, so a miss (or a
+;; value of ()) is the caller's to work out again, and it never answers another key's value.  A moved object (a saved
+;; image) misses until put again.  Its keys are objects, such as symbols: a number has no address of its own.
+(define-function identity-cache (size) (array size))	; size a power of two
+(define-function cache-slot (cache key) (& (>> (address-of key) 4) (- (array-length cache) 1)))
+(define-function cache-at (cache key)
+  (let ((e (array-at cache (cache-slot cache key)))) (and e (= (address-of (car e)) (address-of key)) (cdr e))))
+(define-function cache-at-put (cache key value) (set-array-at cache (cache-slot cache key) (cons key value)) value)
