@@ -27,17 +27,24 @@
 ;; the table's labels name 8-byte slots from the first 8-byte boundary after the code; answers the labels, a table by
 ;; identity from each label to its address (a list searched for each label and branch made a unit's assembly quadratic)
 (define-function native-table-label (k) (string->symbol (concat-string "tab." (long->string k))))
+(define-function native-place-form (isa buffer labels form)	; form into the buffer: a fixup (report . label), or ()
+  (cond
+    ((= 'data (car form))	; a site's bytes (asm-arm64.l's arm64-site), 0..255 as it made them: placed as they are
+     (list-do b (cdr form) (array-append (asm-buffer-bytes buffer) b)))
+    ((= 'at (car form))
+     (if (hash-includes? labels (cadr form))
+	 (error "native: label " (cadr form) " defined twice")
+       (hash-at-put labels (cadr form) (asm-buffer-pc buffer)))
+     ())
+    (else
+     (let* ((label (native-form-label form))
+	    (reports (asm isa buffer (if label (native-form-reloc form label) form))))
+       (and label (cons (car reports) (cadr label)))))))
 (define-function native-assemble (isa buffer intents nslots)
   (let ((isa (asm-isa isa)) (labels (identity-hash-table)) (fixups ()))	; the instruction set found once, not per form
     (list-do forms intents
       (list-do form forms
-	(if (= 'at (car form))
-	    (if (hash-includes? labels (cadr form))
-		(error "native: label " (cadr form) " defined twice")
-	      (hash-at-put labels (cadr form) (asm-buffer-pc buffer)))
-	  (let* ((label (native-form-label form))
-		 (reports (asm isa buffer (if label (native-form-reloc form label) form))))
-	    (and label (push fixups (cons (car reports) (cadr label))))))))
+	(let ((f (native-place-form isa buffer labels form))) (and f (push fixups f)))))
     (let ((table (align (asm-buffer-pc buffer) 8)))
       (for (k 0 nslots) (hash-at-put labels (native-table-label k) (+ table (* 8 k)))))
     (list-do f fixups

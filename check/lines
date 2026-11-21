@@ -362,3 +362,4 @@
 +24 native.l's loads, stores, pieces and addresses are sites (native-arm64-mem-site picks SP's or another register's memory shape); native-sites.l's cases hold near, register-based, unaligned and far accesses to the bytes the access means
 +16 the remaining intents' instructions are sites: stub.l's arm64-constant, the frame (enter, leave, return), calls (LDR, BLR, the variadic STR), float moves, operations, comparisons and conversions (native-arm64-fsite, a site for each width); native_sites asks nine in ten forms of sites
 +4 boot.l's and boot2.l's %checked test a type defined directly on the accessor's type inline too (array-at %structure-bases), before calling %typecheck: a grammar's parser type is a level below <source-parser> and reads its fields on every element
++7 native-link.l: native-place-form places one form, a site's (data ...) bytes appended as they are rather than through asm's validation and dispatch; native-assemble keeps its complexity under 10
