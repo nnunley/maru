@@ -30,3 +30,4 @@ erosion +1 asm-arm64.l's arm64-specialise and arm64-row-code compose a template 
 verbosity -1 the specialiser's tables and short callables: forms neither flagged nor cloned dilute the verbose share
 erosion -1 the specialiser's reductions as tables by a pattern item's and an operand rule's head, in short callables
 erosion +1 arm64-hole-guard's and arm64-site-code's added branches (union kinds, the place split), with the memory guard and the place split extracted into their own functions
+erosion +1 the deletions take some 50 low-complexity forms out of the total, raising the share inside the complex callables that stay

@@ -612,29 +612,15 @@
 ;; A lowering site: an instruction a lowering rule always means, its row chosen when the rule loads rather than found
 ;; again for every instruction (the kernel plan's Task 7; oecm's staged evaluation).  Rules write them as arm64-sites
 ;; templates (below); inside, a site's specs are each a literal operand (a symbol, a number or a quoted list) or (KIND
-;; EXPR), KIND one of x (an X register), w (a W register), n (a number), f with s or d (an FP register: (f d EXPR)), mem
-;; with its shape ((mem (off SP 0) EXPR)), lsl (an (LSL n) operand) or c (a condition).  When the rule loads, a
-;; representative instruction (X0, W0, 0,
-;; S0 or D0, the shape given, (LSL 0), EQ) gives the site its candidate rows and each operand's shape key.  At run time
-;; the site answers (data b0 b1 b2 b3) from the first of those rows that takes the operands, as asm would choose it, or
-;; the symbolic form, for asm to encode or refuse, when an operand's shape isn't the declared one or no row takes it.
-;; A site with nothing variable is encoded once, as it loads.  *arm64-sites* () makes every site its symbolic form.
+;; EXPR), KIND one of x (an X register), w (a W register), r (either), n (a number), f (an FP register, (f d EXPR) or
+;; (f s EXPR) of one width), mem with its shape ((mem (off SP 0) EXPR)) or without, lsl (an (LSL n) operand) or c (a
+;; condition).  When the rule loads, the specialiser (below) reduces the encoder grammar's rows for the mnemonic to the
+;; ones that can take the template; at run time the site answers (data b0 b1 b2 b3) from the first of them that takes
+;; the operands, as asm would choose it, or the symbolic form, for asm to encode or refuse, when an operand isn't of
+;; the declared kind or no row takes it.  A site with nothing variable is encoded once, as it loads.  *arm64-sites* ()
+;; makes every site its symbolic form.
 (or (defined? '*arm64-sites*) (define *arm64-sites* 1))
-(define-structure <arm64-site> (rows keys numbers memo))	; keys: each operand's shape key, () for a literal;
-;; numbers: 1 for n; memo: the site's answers by its operands' values (arm64-memo)
-(define-structure <arm64-memo> (symbols numbers answer))
 
-(define-function arm64-site-representative (spec)
-  (let ((k (car spec)))
-    (cond ((= k 'x)	'X0)
-	  ((= k 'w)	'W0)
-	  ((= k 'r)	'X0)	; a union's first member
-	  ((= k 'n)	0)
-	  ((= k 'f)	(if (and (cddr spec) (= 's (cadr spec))) 'S0 'D0))
-	  ((= k 'mem)	(cadr spec))
-	  ((= k 'lsl)	'(LSL 0))
-	  ((= k 'c)	'EQ)
-	  (else		(error "arm64-site: no operand kind " spec)))))
 (define-function arm64-site-variable? (spec) (and (pair? spec) (memq (car spec) '(x w r n f mem lsl c))))
 (define-function arm64-site-literal (spec) (if (and (pair? spec) (= 'quote (car spec))) (cadr spec) spec))
 (define-function arm64-site-expr (spec)	; (x e), (f d e), (mem shape e): the operand's expression, last
@@ -643,68 +629,14 @@
 
 (define-function arm64-site-word-bytes (word)
   (list 'data (& 255 word) (& 255 (>> word 8)) (& 255 (>> word 16)) (& 255 (>> word 24))))
-(define-function arm64-site-new (rows specs)
-  (new <arm64-site> rows
-       (map (lambda (s) (and (arm64-site-variable? s) (arm64-shape-key (arm64-site-representative s)))) specs)
-       (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs)
-       (new <arm64-memo> () () ())))
-
-(define-function arm64-site-make (mnemonic specs)
-  (let* ((ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-representative s) (arm64-site-literal s))) specs))
-	 (insn (cons mnemonic ops))
-	 (rows (asm-candidate-rows 'arm64 insn)))
-    (list-do r rows
-      (list-do k (cadr r) (and (memq (car k) '(pcrel pcpage)) (error "arm64-site: a PC-relative row for " insn))))
-    (arm64-site-new rows specs)))
-
-;; A site's answer depends on its operands' values alone, and lowering names the same few registers, slots and constant
-;; pieces again and again, so a site remembers its answers in a trie: a step for each varying operand, a symbol (a
-;; register or condition) through an identity cache, a number through a cache by value, an (off BASE N) as its base and
-;; then N.  The step is a multimethod on the node and the key: an operand of any other shape, or no node, takes its
-;; default, (), and a step whose slot another key took is answered afresh.
-(define-generic arm64-memo-step (node key) ())	; node's child for key, made if new
-(define-multimethod arm64-memo-step ((<arm64-memo> node) (<symbol> key))
-  (let ((c (or (<arm64-memo>-symbols node) (set (<arm64-memo>-symbols node) (identity-cache 32)))))
-    (or (cache-at c key) (cache-at-put c key (new <arm64-memo> () () ())))))
-(define-multimethod arm64-memo-step ((<arm64-memo> node) (<long> key))
-  (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 1024))))
-	 (i (& (^ key (>> key 3)) 1023)) (e (array-at a i)))	; offsets are multiples of 8: their low bits mixed in
-    (if (and e (= (car e) key)) (cdr e) (cdr (set-array-at a i (cons key (new <arm64-memo> () () ())))))))
-(define-multimethod arm64-memo-step ((<arm64-memo> node) (<pair> key))	; (off BASE N): BASE, then N
-  (and (= 'off (car key)) (pair? (cdr key)) (pair? (cddr key)) (not (cdddr key))
-       (arm64-memo-step (arm64-memo-step node (cadr key)) (caddr key))))
-(define-function arm64-memo-node (site ops)	; the trie's node for ops, or ()
-  (let ((node (<arm64-site>-memo site)) (ks (<arm64-site>-keys site)))
-    (while (and node ops)
-      (and (car ks) (set node (arm64-memo-step node (car ops))))
-      (set ops (cdr ops)) (set ks (cdr ks)))
-    node))
-(define-function arm64-site-encode (site mnemonic ops)
-  (let ((ok 1) (os ops) (ks (<arm64-site>-keys site)) (ns (<arm64-site>-numbers site)))
-    (while (and ok os)
-      (let ((k (car ks)))
-	(and k (not (if (car ns) (long? (car os)) (= k (arm64-shape-key (car os))))) (set ok ())))
-      (set os (cdr os)) (set ks (cdr ks)) (set ns (cdr ns)))
-    (let ((word ()) (rows (and ok (<arm64-site>-rows site))))
-      (while (and rows (not word))
-	(set word (arm64-encode-row (car rows) ops 0))
-	(set rows (cdr rows)))
-      (if word (arm64-site-word-bytes word) (cons mnemonic ops)))))
-
-(define-function arm64-site-emit (site mnemonic ops)	; ops: the operands' values
-  (let ((node (arm64-memo-node site ops)))
-    (or (and node (<arm64-memo>-answer node))
-	(let ((answer (arm64-site-encode site mnemonic ops)))
-	  (and node (set (<arm64-memo>-answer node) answer))
-	  answer))))
 
 ;;; The specialiser: a site's template composed with the encoder grammar's definitions as the rule loads (the design
 ;;; doc/plans/2026-11-21-encoder-tree-grammar-design.md).  Each hole's guard runs once; a row is kept if every
 ;;; operand's kind takes the hole's (a register of its class, a number, a condition, a memory operand of its mode) or
 ;;; the literal, which is folded into the row's constant; what is left of a kept row is its kinds' tests and one OR of
-;;; shifted fields.  The rows are the mnemonic's in file order, so the first that fits is asm's.  A template a kind it
-;;; can't reason about would meet (vectors, bitmasks) answers (), and the site falls back to its encoder.
-(or (defined? '*arm64-sites-recorder*) (define *arm64-sites-recorder* ()))	; (f mnemonic specs kept-rows fallback), for a check
+;;; shifted fields.  The rows are the mnemonic's in file order, so the first that fits is asm's.  A row whose kinds it
+;;; can't reason about (vectors, bitmasks) is kept as a call of that row's encoder (arm64-escape-code).
+(or (defined? '*arm64-sites-recorder*) (define *arm64-sites-recorder* ()))	; (f mnemonic specs kept-rows escaped label), for a check
 (define-function arm64-hole-classes (spec)	; a register hole's classes (the letters' codes), or ()
   (let ((k (car spec)))
     (cond ((= k 'x) '(88)) ((= k 'w) '(87)) ((= k 'r) '(88 87))
@@ -866,9 +798,14 @@
 	(else				(list (arm64-rule (cadr pe))))))
 (define-function arm64-open-rules (mnemonic position)	; the rows giving position a field, widest first: asm-best-row's
   (arm64-rule-alternatives (arm64-rule (arm64-rule-name "open" (concat-string (symbol->string mnemonic) (long->string position))))))
-;; A site's residual code, or () to fall back to its encoder.  label, for a label site, is (position code): the
-;; template has (reloc) at position, the rows are the open rule's for it, and each answers (label-data BYTES POSITION
-;; ROW INSN L), the bytes with the field zero and the report asm would give, which native-assemble places and patches.
+;; A row the specialiser can't reduce (an escape row, whose kinds have no value, or a kind beyond it) is kept in its
+;; place as a call of that row's encoder on the operands: the row is still fixed as the template loads, and the first
+;; row that takes the operands is still asm's.  finish: the word's code to what the site answers.
+(define-function arm64-escape-code (row es finish)
+  `(let ((_w_ (arm64-encode-row ',row (list ,@es) 0))) (and _w_ ,(finish '_w_))))
+;; A site's residual code.  label, for a label site, is (position code): the template has (reloc) at position, the rows
+;; are the open rule's for it, and each answers (label-data BYTES POSITION ROW INSN L), the bytes with the field zero
+;; and the report asm would give, which native-assemble places and patches.
 (define-function arm64-specialise (mnemonic specs . label)
   (let* ((n -1)
 	 (label (car label))
@@ -877,29 +814,26 @@
 	 (symbolic (if label
 		       (let ((i -1)) (map (lambda (e) (set i (+ i 1)) (if (= i (car label)) '(list 'label _label_) e)) es))
 		     es))
-	 (guards ()) (rows ()) (fallback ()))
-    (map (lambda (s e) (and (arm64-site-variable? s)
-			    (let ((g (arm64-hole-guard s e))) (if g (push guards (list (concat-symbol e 'h) g)) (set fallback 1)))))
-	 specs es)
+	 (guards ()) (rows ()) (escaped 0))
+    (map (lambda (s e) (and (arm64-site-variable? s) (push guards (list (concat-symbol e 'h) (arm64-hole-guard s e))))) specs es)
     (list-do rule (if label (arm64-open-rules mnemonic (car label)) (arm64-mnemonic-rules mnemonic))	; the grammar's rows, in order
       (let* ((parts (arm64-row-rule-parts rule)) (row (array-at arm64-row-vector (car parts)))
 	     (leaves (arm64-items-leaves (caddr parts) forms))
 	     (finish (if label
 			 (lambda (w) `(list 'label-data (cdr (arm64-site-word-bytes ,w)) ,(car label) ',row (list ',mnemonic ,@es) _label_))
-		       (lambda (w) `(arm64-site-word-bytes ,w)))))
-	(cond ((= leaves 'fallback) (set fallback 1))
-	      ((= leaves 'drop))
-	      ((cadr parts) (set fallback 1))	; a row that encodes through its encoder takes the template: keep the site's
-	      (else (let ((code (arm64-row-code row leaves finish))) (if code (push rows (cons row code)) (set fallback 1)))))))
+		       (lambda (w) `(arm64-site-word-bytes ,w))))
+	     (code (and (not (memq leaves '(drop fallback))) (not (cadr parts)) (arm64-row-code row leaves finish))))
+	(cond ((= leaves 'drop))
+	      (code	(push rows (cons row code)))
+	      (else	(set escaped (+ escaped 1)) (push rows (cons row (arm64-escape-code row es finish)))))))
     (set rows (list-reverse! rows))
     (set guards (list-reverse! guards))
-    (and *arm64-sites-recorder* (*arm64-sites-recorder* mnemonic specs (map car rows) fallback (and label (car label))))
-    (and (not fallback)
-	 `(let (,@(map (lambda (s e) (list e (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s)))) specs es)
-		,@(if label `((_label_ ,(cadr label))) ()))
-	    (let ,guards
-	      (or (and ,@(map car guards) (or ,@(map cdr rows)))
-		  (list ',mnemonic ,@symbolic)))))))
+    (and *arm64-sites-recorder* (*arm64-sites-recorder* mnemonic specs (map car rows) escaped (and label (car label))))
+    `(let (,@(map (lambda (s e) (list e (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s)))) specs es)
+	   ,@(if label `((_label_ ,(cadr label))) ()))
+       (let ,guards
+	 (or (and ,@(map car guards) (or ,@(map cdr rows)))
+	     (list ',mnemonic ,@symbolic))))))
 
 (define-function arm64-place-spec (specs) (list-detect s specs (and (pair? s) (= 'mem (car s)) (not (cddr s)))))
 ;; (mem ,place): specialised twice, on SP (a literal, folded into the rows' constants) and on an X register (its guard
@@ -917,33 +851,20 @@
 	     (and (pair? r) (= 'error (car r)) (apply error (cdr r)))
 	     (list 'quote (cons 'data (array->list (asm-buffer-bytes b))))))
 	  ((arm64-place-spec specs)	(arm64-place-code mnemonic specs arm64-site-code))
-	  (else
-	   (or (arm64-specialise mnemonic specs)
-	       `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic))))))))
+	  (else				(arm64-specialise mnemonic specs)))))
 
 ;; A label site: an instruction with a (label ,l) operand in an arm64-sites template, one (label EXPR) spec naming
-;; L.  Its row is chosen as asm chooses one with an open placeholder (asm-select, (reloc) in L's place) and
-;; remembered by its other operands, as a site's answer is; it emits (label-data BYTES POSITION ROW INSN L), the bytes
-;; with the field zero and the report asm would give, which native-assemble places and patches as it did asm's.  An
-;; instruction asm refuses stays the symbolic form, for asm to refuse with its message.
-(define-function arm64-label-site-encode (mnemonic ops)	; (bytes position row insn), or none
-  (let* ((insn (cons mnemonic ops)) (found (asm-select 'arm64 insn 0 (asm-candidate-rows 'arm64 insn))))
-    (if found (list (cadr found) (car (cddr found)) (car found) insn) 'none)))
-(define-function arm64-label-site-emit (site mnemonic ops label)	; ops: (reloc) in the label's place
-  (let* ((node (arm64-memo-node site ops))
-	 (a (or (and node (<arm64-memo>-answer node))
-		(let ((x (arm64-label-site-encode mnemonic ops))) (and node (set (<arm64-memo>-answer node) x)) x))))
-    (if (pair? a)
-	(list 'label-data (car a) (cadr a) (caddr a) (cadddr a) label)
-      (cons mnemonic (map (lambda (o) (if (arm64-reloc? o) (list 'label label) o)) ops)))))
+;; L.  The template is specialised with (reloc) in L's place over the rows that give it a field (arm64-specialise's
+;; label); an instruction no row takes stays the symbolic form, for asm to refuse with its message.
 (define-function arm64-label-site-code (mnemonic specs label)	; label: the (label EXPR) spec, its place in specs
-  (let* ((specs (map (lambda (s) (if (= s label) ''(reloc) s)) specs))
-	 (ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs)))
+  (let ((specs (map (lambda (s) (if (= s label) ''(reloc) s)) specs)))
     (if *arm64-sites*
-	(or (let ((i -1) (at ())) (list-do s specs (set i (+ i 1)) (and (equal s ''(reloc)) (set at i)))
-	      (arm64-specialise mnemonic specs (list at (cadr label))))
-	    `(arm64-label-site-emit ',(arm64-site-new () specs) ',mnemonic (list ,@ops) ,(cadr label)))
-      `(list ',mnemonic ,@(map (lambda (o) (if (equal o ''(reloc)) `(list 'label ,(cadr label)) o)) ops)))))
+	(let ((i -1) (at ())) (list-do s specs (set i (+ i 1)) (and (equal s ''(reloc)) (set at i)))
+	  (arm64-specialise mnemonic specs (list at (cadr label))))
+      `(list ',mnemonic ,@(map (lambda (s) (cond ((equal s ''(reloc))		`(list 'label ,(cadr label)))
+						 ((arm64-site-variable? s)	(arm64-site-expr s))
+						 (else				`',(arm64-site-literal s))))
+			       specs)))))
 
 ;; (arm64-sites `((MNEMONIC OPERAND …) …)): the forms of the instructions a rule always means, each a site, as a list.
 ;; An operand that varies is a kind around an unquote: (x ,r) (w ,r) (n ,v) (lsl ,v) (c ,cond) (f d ,r) (f s ,r)
