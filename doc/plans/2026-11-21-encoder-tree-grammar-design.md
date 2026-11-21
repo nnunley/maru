@@ -1,7 +1,18 @@
 # The arm64 encoder as a tree grammar, and lowering staged by composing two grammars (design)
 
-Status: draft for the user's approval, 2026-11-21. No code. Follows `2026-11-20-staged-native-lowering-design.md`
-(sites), within A1 of `2026-11-19-nile-native-on-eval.md`. Choices the user has not made are marked "my call".
+Status: approved, 2026-11-21 ("All three. Work on them in order": the memo's deletion, this design, then register
+allocation in `native-gen.k` as its own design). Follows `2026-11-20-staged-native-lowering-design.md` (sites), within
+A1 of `2026-11-19-nile-native-on-eval.md`. Choices the user has not made are marked "my call".
+
+**The spike's answer** (`spike/encoder-residual.l`, on AC, best of five rounds of 100,000 emits, 0 mismatches against
+today's sites): ADD Xd, Xn, Xm 12.1 µs a site with its memo hitting, 9.1 µs a residual; LDR Xt, [SP, #n] 13.8 µs
+against 4.6 µs. A residual beats a memo hit, so the memo goes with the specialiser (question 1: yes). The multimethod
+memo step measured 16% of lowering on AC (ab-cpu, 90fbab8 against c54fd2b).
+
+**The other questions, answered by this design's own defaults** (my calls, recorded in the plan's ledger): 2, one step
+(the allocator is the separate third item); 3, binders stay for `asm`, `asm_grammar` holds the two equal; 4, kinds as
+written; 5, the action form stays a macro's name; 6, x86-64 stays on `asm`; 7, the arm64 sweep runs in the suite if it
+takes seconds, else by hand.
 
 ## Intent, and why
 
