@@ -585,6 +585,11 @@
 
 (define-function arm64-site-word-bytes (word)
   (list 'data (& 255 word) (& 255 (>> word 8)) (& 255 (>> word 16)) (& 255 (>> word 24))))
+(define-function arm64-site-new (rows specs)
+  (new <arm64-site> rows
+       (map (lambda (s) (and (arm64-site-variable? s) (arm64-shape-key (arm64-site-representative s)))) specs)
+       (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs)
+       (new <arm64-memo> () () ())))
 
 (define-function arm64-site-make (mnemonic specs)
   (let* ((ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-representative s) (arm64-site-literal s))) specs))
@@ -592,10 +597,7 @@
 	 (rows (asm-candidate-rows 'arm64 insn)))
     (list-do r rows
       (list-do k (cadr r) (and (memq (car k) '(pcrel pcpage)) (error "arm64-site: a PC-relative row for " insn))))
-    (new <arm64-site> rows
-	 (map (lambda (s) (and (arm64-site-variable? s) (arm64-shape-key (arm64-site-representative s)))) specs)
-	 (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs)
-	 (new <arm64-memo> () () ()))))
+    (arm64-site-new rows specs)))
 
 ;; A site's answer depends on its operands' values alone, and lowering names the same few registers, slots and constant
 ;; pieces again and again, so a site remembers its answers in a trie: a step for each varying operand, a symbol (a
@@ -647,3 +649,26 @@
 	     (list 'quote (cons 'data (array->list (asm-buffer-bytes b))))))
 	  (else
 	   `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic)))))))
+
+;; A label site: an instruction with a (label L) operand, (arm64-label-site MNEMONIC SPEC …) with one (label EXPR) spec
+;; naming L.  Its row is chosen as asm chooses one with an open placeholder (asm-select, (reloc) in L's place) and
+;; remembered by its other operands, as a site's answer is; it emits (label-data BYTES POSITION ROW INSN L), the bytes
+;; with the field zero and the report asm would give, which native-assemble places and patches as it did asm's.  An
+;; instruction asm refuses stays the symbolic form, for asm to refuse with its message.
+(define-function arm64-label-site-encode (mnemonic ops)	; (bytes position row insn), or none
+  (let* ((insn (cons mnemonic ops)) (found (asm-select 'arm64 insn 0 (asm-candidate-rows 'arm64 insn))))
+    (if found (list (cadr found) (car (cddr found)) (car found) insn) 'none)))
+(define-function arm64-label-site-emit (site mnemonic ops label)	; ops: (reloc) in the label's place
+  (let* ((node (arm64-memo-node site ops))
+	 (a (or (and node (<arm64-memo>-answer node))
+		(let ((x (arm64-label-site-encode mnemonic ops))) (and node (set (<arm64-memo>-answer node) x)) x))))
+    (if (pair? a)
+	(list 'label-data (car a) (cadr a) (caddr a) (cadddr a) label)
+      (cons mnemonic (map (lambda (o) (if (arm64-reloc? o) (list 'label label) o)) ops)))))
+(define-form arm64-label-site (mnemonic . specs)
+  (let* ((label (list-detect s specs (and (pair? s) (= 'label (car s)))))
+	 (specs (map (lambda (s) (if (and (pair? s) (= 'label (car s))) ''(reloc) s)) specs))
+	 (ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs)))
+    (if *arm64-sites*
+	`(arm64-label-site-emit ',(arm64-site-new () specs) ',mnemonic (list ,@ops) ,(cadr label))
+      `(list ',mnemonic ,@(map (lambda (o) (if (equal o ''(reloc)) `(list 'label ,(cadr label)) o)) ops)))))

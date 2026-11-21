@@ -31,6 +31,10 @@
   (cond
     ((= 'data (car form))	; a site's bytes (asm-arm64.l's arm64-site), 0..255 as it made them: placed as they are
      (list-do b (cdr form) (array-append (asm-buffer-bytes buffer) b)))
+    ((= 'label-data (car form))	; a label site's (label-data BYTES POSITION ROW INSN L): its bytes, and asm's report
+     (let ((offset (array-length (asm-buffer-bytes buffer))) (more (cddddr form)))
+       (list-do b (cadr form) (array-append (asm-buffer-bytes buffer) b))
+       (cons (list (caddr form) offset (cadddr form) (car more)) (cadr more))))
     ((= 'at (car form))
      (if (hash-includes? labels (cadr form))
 	 (error "native: label " (cadr form) " defined twice")

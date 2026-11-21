@@ -37,16 +37,15 @@
 (expect "a far address" (encoded (native-arm64-address 5000 'X9))
 	(encoded (concat-list (arm64-constant 'X9 (- 5000 40000)) '((ADD X9 X29 X9)))))
 
-;; every form but those naming a label (branches, ADR) comes from a site: of LOADER's forms, else maru-check.k's
+;; every form comes from a site, a label's (branches, ADR) from a label site: of LOADER's forms, else maru-check.k's
 (let ((lower (cdr (assq 'arm64 native-lowerings))) (sites 0) (forms 0) (others ()))
   (list-do f (car (native-symbols (<native-unit>-functions (native-compile-file (or loader "maru-check.k")))))
     (list-do fs (lower (cadr f))
       (list-do form fs
 	(unless (= 'at (car form))
 	  (set forms (+ forms 1))
-	  (cond ((= 'data (car form))		(set sites (+ sites 1)))
-		((not (native-form-label form))	(push others form)))))))
+	  (if (memq (car form) '(data label-data)) (set sites (+ sites 1)) (push others form))))))
   (println "sites " sites " of " forms " forms")
-  (expect "every form without a label from a site" others ()))
+  (expect "every form from a site" others ()))
 (or (= 0 failures) (error "native-sites: " failures " failures"))
 (println "native sites ok")

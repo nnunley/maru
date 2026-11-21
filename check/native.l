@@ -111,9 +111,12 @@
     (expect "slots past a load's reach" ((fn image 'far-frame "l>l") 10) 46)))
 
 ;; a conditional branch reaches as far as B, 128 MB, not CBZ's 1 MB: it is lowered as the inverted test over a B.  (A
-;; while body past 1 MB would take minutes to compile on eval2.)
+;; while body past 1 MB would take minutes to compile on eval2.)  A label site's form, (label-data BYTES POSITION ROW
+;; INSN L), names its instruction in INSN.
+(define-function form-mnemonic (f) (if (= 'label-data (car f)) (car (car (cddddr f))) (car f)))
 (expect "a conditional branch as a short one over B"
-	(map (lambda (i) (map car (car (parse-source <native-arm64> $program (list (list i 's0 'far)))))) '(branch-if branch-unless))
+	(map (lambda (i) (map form-mnemonic (car (parse-source <native-arm64> $program (list (list i 's0 'far))))))
+	     '(branch-if branch-unless))
 	'((CBZ B at) (CBNZ B at)))
 (let ((r (car (asm 'arm64 (asm-buffer 0) '(B (reloc))))))
   (expect "B's reach" (asm-field-range 'arm64 (caddr r) (car r) 0) '(-134217728 134217724 4)))

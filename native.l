@@ -210,7 +210,9 @@
 ;; to l if r is nonzero (skip, the inverted test, is CBZ) or zero (CBNZ): the short branch skips over B
 (define-function native-arm64-branch (skip r l)
   (let ((past (string->symbol (concat-string "skip" (long->string (set native-skips (+ native-skips 1)))))))
-    (list (list skip r (list 'label past)) (list 'B (list 'label l)) (list 'at past))))
+    (list (if (= skip 'CBZ) (arm64-label-site CBZ (x r) (label past)) (arm64-label-site CBNZ (x r) (label past)))
+	  (arm64-label-site B (label l))
+	  (list 'at past))))
 (require "native-arm64.g.l")
 (require "native-x64.l")
 (require "native-x64.g.l")
