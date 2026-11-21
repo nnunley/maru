@@ -43,6 +43,7 @@ make Case nile_schedules untested untested.		; and keep the runtime's contracts 
 make Case nile_text_layout untested untested.
 ; what draws, and where
 make Case gezira_image untested untested.			; a Gezira scene rendered to pixels, as the C runtime renders it
+make Case native_nile untested untested.			; the runtime and Gezira compiled natively on eval2 in one unit, within 16 times the C back end
 make Case sdl3_window untested untested.			; a window shows a pixel buffer, and mouse events come back
 make Case ksworld_headless untested untested.		; a document's streams run, and its boxes' paths are asked of a Gezira
 make Case ksworld_pixels untested untested.		; KSWorld.ks's pixels in a window: its bar, background, a filled shape, glyphs
@@ -76,6 +77,8 @@ make Capability NileEndToEnd "text-layout.nl runs end to end through Maru, as th
   "nile/, check/check.l" [ nile_text_layout ] [ NileBuiltins ] no.
 make Capability GeziraImage "Gezira's kernels, compiled through Maru, render a scene to pixels"
   "gezira/, the Nile runtime" [ gezira_image ] [ NileEndToEnd ] no.
+make Capability NativeNileCompiles "native.l compiles the Nile runtime and Gezira in one unit on eval2, within a small multiple of the C back end"
+  "native.l, asm-table.l, asm-arm64.l, native-link.l, hash.l" [ native_nile ] [ GeziraImage ] no.
 make Capability Sdl3Window "an SDL3 window shows a pixel buffer each frame and hands back mouse and key events"
   "sdl3.osdefs, sdl3.k" [ sdl3_window ] [ ] no.
 make Capability DocumentScene "a document's boxes ask a Gezira to fill their shapes' paths, each placed by its matrix and painted in its fill"

@@ -16,7 +16,7 @@ builds nothing the kernel will make unnecessary.
 
 - **The library path.** `gezira.nl` goes through Nile's Maru back end to typed Maru (`build/gezira.k`, 341K). Then
   `ir-gen-c.k` and `maru.k` on `eval2` turn it into C (11.6 s for the runtime and Gezira together, measured
-  2026-11-19), and `cc` builds `build/gezira.dylib`. `gezira-maru.l` opens it with `dlopen` and states eleven
+  2026-11-19; 2.5 s once A1 fixed `eval2`'s global cache), and `cc` builds `build/gezira.dylib`. `gezira-maru.l` opens it with `dlopen` and states eleven
   signatures by hand.
   - `gezira-api.k` fixes the pipelines (`gezira_fill`, `gezira_fill_image`, `gezira_fill_clipped` and the
     image-clipped one) in typed code. Untyped Maru can't compose kernels.
@@ -87,6 +87,25 @@ builds nothing the kernel will make unnecessary.
 ## Part A: now, on today's evaluators
 
 ### A1. The native path's bug
+
+**Done (2026-11-20).** `native_nile` passes: the runtime and Gezira image natively on `eval2` in 32 s of CPU, about
+12.5 times the C back end's 2.5 s, against a bound of 16. The bug was several, each a cost that grew with the unit:
+- `native-form-text` built the image's text by `concat-string`, quadratic in its size (hours for the runtime).
+- `eval2`'s and `eval3`'s global cache was direct-mapped, with a scan of the whole environment on a miss, so lookups
+  swung by up to four times with the allocation layout. It is now open addressing, filled from the globals only.
+- `native-symbols` and `native-assemble` searched lists for table entries and labels; they use `hash.l` tables.
+- `compile-tpeg.l` tried each alternative of a choice of list patterns in turn; it dispatches on the head symbol.
+- `asm-table.l` stepped a chain per operand, making memory operands' shapes afresh, and looked the instruction set
+  up by name per instruction; candidates are now found by mnemonic and one key for the operands' shapes.
+- Structure accessors called `%typecheck` on every read (a fifth of the time); they check their own type inline.
+  Erasing checks already passed is a later pass in the metacircular environment.
+- `hash.l`'s lookup took fewer calls.
+
+What remains is interpretation spread evenly over lowering (about 12 s) and assembly (about 16 s), about 145 µs per
+instruction with 1.08 rows tried each, with no single hot spot left. Closing the gap to the C back end means running
+the compiler itself as native code, on the kernel (Part B, after B1), not more tuning here.
+
+The steps as planned:
 
 - Find it with `superpowers:systematic-debugging`. Reduce a builtin (Zip or SortBy) to the smallest function that
   shows the growth, then time it at two sizes to establish the curve.
@@ -190,7 +209,7 @@ library load that fails, or a Nile error, should unwind to the REPL, not kill it
 ## Left to the builder
 
 - Accessor names, and how A2 exports the runtime's entry points.
-- The `native_nile` bound, once A1 has the curve.
+- The `native_nile` bound, once A1 has the curve. (Set: under 16 times the C back end's CPU, in the same case.)
 - Whether a float field needs a primitive.
 
 ## Open

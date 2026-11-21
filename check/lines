@@ -353,3 +353,4 @@
 +2 global_lookup registered on its own expected line: on-each-evaluator expects a tree check's "tpeg ...", so the case could never pass
 +43 structure accessors check their own type inline (boot.l's and boot2.l's %checked), calling %typecheck only for a derived type or a wrong one, where they called it on every read; structure_fields holds a read under 7/4 of a call and the refusal
 -1 hash.l's lookup in fewer calls: hash-identical? compares addresses first, hash-identity takes the key's type once (hash-address gone), hash-bucket-of masks the power-of-two buckets
++45 native_nile: the Nile runtime and Gezira compiled natively on eval2 in one unit, timed against the C back end on the same files (check/native-nile.l +14; check.l +31, the case, cpu-hundredths, and nile-inputs factored out of nile-build)

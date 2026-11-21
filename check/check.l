@@ -867,21 +867,27 @@
     (list-do x items (or (member? x out) (push out x)))
     (list-reverse! out)))
 
-;; Compiles FILES (paths from the root) with nile.osdefs measured for this host and the runtime's
-;; files, in one ir-gen-c run, then cc -pthread.  nile.k is the runtime's first file and is loaded
-;; once, so kernels don't load it; a file named twice is compiled once.  Returns the binary's path.
-(define-function nile-build (name files cflags)
+;; nile.osdefs measured for this host, the runtime's files, then FILES (paths from the root), as one string of
+;; paths, each after a space.  nile.k is the runtime's first file and is loaded once, so kernels don't load it; a file
+;; named twice is compiled once.
+(define-function nile-inputs (name files)
   (let* ((osdefs  (concat-strings tmp "/" name ".osdefs"))
 	 (listed  ())
-	 (inputs  ""))
+	 (inputs  (concat-strings " " osdefs ".k")))
     (list-do f nile-runtime (push listed (concat-strings nile-dir f)))
     (list-do f files (push listed f))
     (list-do f (unique (list-reverse! listed)) (set inputs (concat-strings inputs " " f)))
     (run (concat-strings name "-osdefs")
 	 (concat-strings "./eval compile-osdefs.l " nile-dir "nile.osdefs > " osdefs ".c"
 			 " && cc -o " osdefs ".exe " osdefs ".c && " osdefs ".exe > " osdefs ".k"))
+    inputs))
+
+;; Compiles FILES with nile.osdefs and the runtime's files (nile-inputs), in one ir-gen-c run, then cc -pthread.
+;; Returns the binary's path.
+(define-function nile-build (name files cflags)
+  (let ((inputs (nile-inputs name files)))
     (run (concat-strings name "-build")
-	 (concat-strings "./eval2 ir-gen-c.k maru.k " osdefs ".k" inputs
+	 (concat-strings "./eval2 ir-gen-c.k maru.k" inputs
 			 " > " tmp "/" name ".c && cc -pthread -fno-builtin -w " cflags
 			 " -o " tmp "/" name " " tmp "/" name ".c"))
     (concat-strings tmp "/" name)))
@@ -993,6 +999,31 @@
     (list-do n '("1" "4")
       (unit-assert (equal (run (concat-strings "nile-gezira-image-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-gezira-image-" n ".err") 300)
 			  '("gezira image ok"))))))
+
+;; The CPU seconds, in hundredths, that /usr/bin/time -p reported in NAME's errors: user and sys, each to two places.
+(define-function cpu-hundredths (name)
+  (let ((total 0))
+    (list-do l (lines (contents-of-file-named (concat-strings tmp "/" name ".err")))
+      (let ((w (words l)))
+	(and (member? (car w) '("user" "sys"))
+	     (set total (+ total (string->long (apply concat-strings (split (cadr w) ?.))))))))
+    total))
+
+;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
+;; 16 times the CPU the C back end takes to turn the same files into C (about 12.5 times, 33.6 s against 2.7 s, on
+;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
+(check "native_nile"
+  (let* ((inputs (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
+						 (concat-strings nile-dir "gezira-api.k"))))
+	 (loader (concat-strings tmp "/native-nile.k")))
+    (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
+    (run "native_nile_c" (concat-strings "/usr/bin/time -p ./eval2 ir-gen-c.k maru.k" inputs " > " tmp "/native-nile.c") 300)
+    (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader) 900))
+			"native nile ok"))
+    (let ((c (cpu-hundredths "native_nile_c")) (n (cpu-hundredths "native_nile")))
+      (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
+      (unit-assert (< 0 c))
+      (unit-assert (< n (* 16 c))))))
 
 ;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
 ;; its selectors, the same rectangle as gezira_image, on one worker and four.
