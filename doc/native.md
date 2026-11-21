@@ -68,9 +68,12 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   those rows and emits `(data b0 b1 b2 b3)`, falling back to the symbolic form (for `asm` to encode or refuse) when an
   operand isn't the declared kind or no row takes it; one with nothing variable is encoded once, and a site remembers
   its answers by its operands' values. A `(label ,l)` operand makes a label site, whose row is chosen as `asm` chooses
-  one with an open placeholder and which emits `(label-data …)`, its bytes and the report `native-assemble` patches; a
-  `(mem ,place)` takes SP's or another register's site by the base. Every arm64 form is a site (`native-arm64.g`,
-  `native.l`'s helpers and `native-arm64-fsites` for float widths, `stub.l`'s `arm64-constant`): all of Gezira's 103,227
+  one with an open placeholder and which emits `(label-data …)`, its bytes and the report `native-assemble` patches.
+  Union kinds serve both widths in one template, `(r ,a)` an X or W register and `(f ,a)` a D or S one, and a
+  `(mem ,place)` takes any `(off BASE N)`, SP or an X register. Each row tests a union's register by its own rule, so
+  the row of its width is the one that takes it; a place is specialised twice, on SP (folded into the rows'
+  constants) and on an X register, and chosen by its base, as testing the base in every row cost lowering 4.5%. Every arm64 form is a site (`native-arm64.g`,
+  `native.l`'s helpers, `stub.l`'s `arm64-constant`): all of Gezira's 103,227
   forms. The case compares every unit's image built with sites and without (`--no-sites`), and checks the sites' own
   cases: SP where an X register was declared, immediates at ADD's edges, near, register-based, unaligned and far
   accesses. Each operand kind binds through its own binder (`define-arm64-binder`), made when the row's plan is.

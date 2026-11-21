@@ -37,6 +37,20 @@
 (expect "an ADR of a label" (adr 'X17 'L3) (asm-label-data '(ADR X17 (reloc)) 'L3))
 (expect "SP where a CBZ's X register was declared: the symbolic form" (cbz 'SP 'L1) '(CBZ SP (label L1)))
 
+;; union kinds: (f ,r) a D or S register, (r ,r) an X or W one; each row tests its own, so either width finds its row
+(define-function fmov-in (f r) (car (arm64-sites `((FMOV (f ,f) (r ,r))))))
+(define-function fadd (d a b) (car (arm64-sites `((FADD (f ,d) (f ,a) (f ,b))))))
+(expect "FMOV from X to D" (fmov-in 'D16 'X9) (asm-bytes '(FMOV D16 X9)))
+(expect "FMOV from W to S" (fmov-in 'S16 'W9) (asm-bytes '(FMOV S16 W9)))
+(expect "FADD of D registers" (fadd 'D16 'D16 'D17) (asm-bytes '(FADD D16 D16 D17)))
+(expect "FADD of S registers" (fadd 'S16 'S16 'S17) (asm-bytes '(FADD S16 S16 S17)))
+(expect "FMOV of S and X: the symbolic form" (fmov-in 'S16 'X9) '(FMOV S16 X9))
+;; a memory hole without a shape: one site for SP's base and another register's
+(define-function ldr (r p) (car (arm64-sites `((LDR (x ,r) (mem ,p))))))
+(expect "a load from SP" (ldr 'X9 '(off SP 16)) (asm-bytes '(LDR X9 (off SP 16))))
+(expect "a load through X10" (ldr 'X9 '(off X10 8)) (asm-bytes '(LDR X9 (off X10 8))))
+(expect "a negative offset no LDR row takes: the symbolic form" (ldr 'X9 '(off X10 -8)) '(LDR X9 (off X10 -8)))
+(expect "ZR as a base: the symbolic form" (ldr 'X9 '(off XZR 8)) '(LDR X9 (off XZR 8)))
 ;; loads and stores: near, through another register, unaligned or far (the address made in X15 first); each form, as a
 ;; site emits it or as asm encodes it, gives the same bytes as the forms the access means
 (define-function encoded (forms) (map (lambda (f) (if (= 'data (car f)) f (asm-bytes f))) forms))

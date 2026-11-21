@@ -628,13 +628,14 @@
   (let ((k (car spec)))
     (cond ((= k 'x)	'X0)
 	  ((= k 'w)	'W0)
+	  ((= k 'r)	'X0)	; a union's first member
 	  ((= k 'n)	0)
-	  ((= k 'f)	(if (= 's (cadr spec)) 'S0 'D0))
+	  ((= k 'f)	(if (and (cddr spec) (= 's (cadr spec))) 'S0 'D0))
 	  ((= k 'mem)	(cadr spec))
 	  ((= k 'lsl)	'(LSL 0))
 	  ((= k 'c)	'EQ)
 	  (else		(error "arm64-site: no operand kind " spec)))))
-(define-function arm64-site-variable? (spec) (and (pair? spec) (memq (car spec) '(x w n f mem lsl c))))
+(define-function arm64-site-variable? (spec) (and (pair? spec) (memq (car spec) '(x w r n f mem lsl c))))
 (define-function arm64-site-literal (spec) (if (and (pair? spec) (= 'quote (car spec))) (cadr spec) spec))
 (define-function arm64-site-expr (spec)	; (x e), (f d e), (mem shape e): the operand's expression, last
   (while (cdr spec) (set spec (cdr spec)))
@@ -704,19 +705,32 @@
 ;;; shifted fields.  The rows are the mnemonic's in file order, so the first that fits is asm's.  A template a kind it
 ;;; can't reason about would meet (vectors, bitmasks) answers (), and the site falls back to its encoder.
 (or (defined? '*arm64-sites-recorder*) (define *arm64-sites-recorder* ()))	; (f mnemonic specs kept-rows fallback), for a check
-(define-function arm64-hole-class (spec)	; a register hole's class (the letter's code), or ()
-  (let ((k (car spec))) (cond ((= k 'x) 88) ((= k 'w) 87) ((= k 'f) (if (= 'd (cadr spec)) 68 83)))))
+(define-function arm64-hole-classes (spec)	; a register hole's classes (the letters' codes), or ()
+  (let ((k (car spec)))
+    (cond ((= k 'x) '(88)) ((= k 'w) '(87)) ((= k 'r) '(88 87))
+	  ((= k 'f) (cond ((not (cddr spec)) '(68 83)) ((= 'd (cadr spec)) '(68)) (else '(83)))))))
+;; a union (r: X or W; f with no width: D or S) is guarded only as a symbol: each row tests it by its own operand rule,
+;; so the row of the register's width is the one that takes it
+(define-function arm64-hole-tested? (spec) (or (= 'r (car spec)) (and (= 'f (car spec)) (not (cddr spec)))))
+(define-function arm64-mem-guard (spec e)
+  (let ((shape (cadr spec)))
+    `(and (pair? ,e) (= ',(car shape) (car ,e)) (pair? (cdr ,e)) (pair? (cddr ,e)) (not (cdddr ,e)) (long? (caddr ,e))
+	  ,(if (= 'SP (cadr shape)) `(= 'SP (cadr ,e)) `(arm64-reg-value 88 'plain (cadr ,e)))
+	  ,e)))
 (define-function arm64-hole-guard (spec e)	; code answering the hole's value from e, or () where it isn't of its kind
-  (let ((k (car spec)) (class (arm64-hole-class spec)))
-    (cond (class	`(arm64-reg-value ,class 'plain ,e))	; X0-X30 and the like, not SP or ZR, as the site's shape key
+  (let ((k (car spec)) (classes (arm64-hole-classes spec)))
+    (cond ((arm64-hole-tested? spec)	`(and (symbol? ,e) ,e))
+	  (classes	`(arm64-reg-value ,(car classes) 'plain ,e))	; X0-X30 and the like, not SP or ZR, as the site's shape key
 	  ((= k 'n)	`(and (long? ,e) ,e))
 	  ((= k 'c)	`(and (symbol? ,e) ,e))
 	  ((= k 'lsl)	`(and (pair? ,e) (= 'LSL (car ,e)) ,e))
 	  ((= k 'mem)
-	   (let ((shape (cadr spec)))
-	     `(and (pair? ,e) (= ',(car shape) (car ,e)) (pair? (cdr ,e)) (pair? (cddr ,e)) (not (cdddr ,e)) (long? (caddr ,e))
-		   ,(if (= 'SP (cadr shape)) `(= 'SP (cadr ,e)) `(arm64-reg-value 88 'plain (cadr ,e)))
-		   ,e))))))
+	   (arm64-mem-guard spec e)))))
+(define-function arm64-mem-hole-forms (spec code)	; a memory hole's (mode base offset), base and offset as forms
+  (let ((shape (cadr spec)))
+    (list (car shape)
+	  (if (= 'SP (cadr shape)) '(lit SP) (list 'hole '(x) `(arm64-reg-value 88 'plain (cadr ,code))))
+	  (list 'hole '(n) `(caddr ,code)))))
 (define-function arm64-join-leaves (a b)	; two reductions in order: drop or fallback if either is
   (cond ((= a 'fallback) a) ((= b 'fallback) b) ((= a 'drop) a) ((= b 'drop) b) (else (concat-list a b))))
 ;; An operand's reduction for a row's kind info: a list of entries, (const v), (value code), (test code) or (check
@@ -767,9 +781,10 @@
 (define-function arm64-literal-value (e l) (eval (arm64-subst e (list 'quote l))))
 (define-function arm64-test-leaf (e code) (list (list 'test (arm64-subst e code))))
 (define-arm64-expr-leaves (arm64-reg-value) (e l spec code)
-  (cond ((not spec)				(arm64-const-leaf (arm64-literal-value e l)))
-	((= (cadr e) (arm64-hole-class spec))	(list (list 'value code)))	; the hole's guard proved the register
-	(else					'drop)))
+  (cond ((not spec)					(arm64-const-leaf (arm64-literal-value e l)))
+	((not (memq (cadr e) (arm64-hole-classes spec)))	'drop)
+	((arm64-hole-tested? spec)				(arm64-test-leaf e code))	; the row's own test
+	(else							(list (list 'value code)))))	; the hole's guard proved it
 (define-arm64-expr-leaves (arm64-number-value) (e l spec code)
   (let ((c (cadr (cadr e))))
     (cond ((not spec)					(arm64-const-leaf (arm64-literal-value e l)))
@@ -806,11 +821,9 @@
     (if (= 'lit (car form))
 	(let ((l (cadr form)))
 	  (if (and (pair? l) (= head (car l))) (arm64-items-leaves items (map (lambda (x) (list 'lit x)) (cdr l))) 'drop))
-      (let ((spec (cadr form)) (code (caddr form)))
-	(if (and (= 'mem (car spec)) (= head (car (cadr spec))) (= 2 (list-length items)))
-	    (arm64-items-leaves items
-				(list (if (= 'SP (cadr (cadr spec))) '(lit SP) (list 'hole '(x) `(arm64-reg-value 88 'plain (cadr ,code))))
-				      (list 'hole '(n) `(caddr ,code))))
+      (let* ((spec (cadr form)) (parts (and (= 'mem (car spec)) (arm64-mem-hole-forms spec (caddr form)))))
+	(if (and parts (= head (car parts)) (= 2 (list-length items)))
+	    (arm64-items-leaves items (cdr parts))
 	  'drop)))))
 (define-function arm64-place-leaves (info leaves vals place-fn check-fn)	; info's leaves to their fields: those left
   (let ((c (car info)))
@@ -888,6 +901,14 @@
 	      (or (and ,@(map car guards) (or ,@(map cdr rows)))
 		  (list ',mnemonic ,@symbolic)))))))
 
+(define-function arm64-place-spec (specs) (list-detect s specs (and (pair? s) (= 'mem (car s)) (not (cddr s)))))
+;; (mem ,place): specialised twice, on SP (a literal, folded into the rows' constants) and on an X register (its guard
+;; proving it once), and chosen by the base as it runs, sooner than testing the base in every row; site-code is
+;; arm64-site-code, for each
+(define-function arm64-place-code (mnemonic specs site-code)
+  (let* ((place (arm64-place-spec specs))
+	 (with (lambda (shape) (site-code mnemonic (map (lambda (s) (if (= s place) (list 'mem shape '_p_) s)) specs)))))
+    `(let ((_p_ ,(cadr place))) (if (and (pair? _p_) (= 'SP (cadr _p_))) ,(with '(off SP 0)) ,(with '(off X0 0))))))
 (define-function arm64-site-code (mnemonic specs)	; the code a site expands to
   (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))
     (cond ((not *arm64-sites*)	symbolic)
@@ -895,6 +916,7 @@
 	   (let* ((b (asm-buffer 0)) (r (asm-attempt 'arm64 b (cons mnemonic (map arm64-site-literal specs)))))
 	     (and (pair? r) (= 'error (car r)) (apply error (cdr r)))
 	     (list 'quote (cons 'data (array->list (asm-buffer-bytes b))))))
+	  ((arm64-place-spec specs)	(arm64-place-code mnemonic specs arm64-site-code))
 	  (else
 	   (or (arm64-specialise mnemonic specs)
 	       `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic))))))))
@@ -925,32 +947,26 @@
 
 ;; (arm64-sites `((MNEMONIC OPERAND …) …)): the forms of the instructions a rule always means, each a site, as a list.
 ;; An operand that varies is a kind around an unquote: (x ,r) (w ,r) (n ,v) (lsl ,v) (c ,cond) (f d ,r) (f s ,r)
-;; (mem SHAPE ,place) (label ,l); (mem ,place) without a shape takes SP's or another register's, by the place's base, as
-;; it runs.  Anything else is literal: SP, 16, (post SP 16), (LSL 0).  An instruction with a (label ,l) is a label site.
+;; (mem SHAPE ,place) (label ,l).  Two are unions: (r ,a) an X or W register, (f ,a) a D or S one, each row testing the
+;; register by its own rule, so one template serves both widths; and (mem ,place) without a shape is any (off BASE N),
+;; its base SP or an X register, specialised for each and chosen by the base (arm64-site-code).  Anything else is literal: SP, 16, (post SP 16), (LSL 0).  An instruction with a
+;; (label ,l) is a label site.
 (define-function arm64-unquoted (x) (and (pair? x) (= 'unquote (car x)) (cadr x)))	; e of ,e, or ()
 (define-function last-pair-of (l) (while (cdr l) (set l (cdr l))) l)
 (define-function arm64-template-spec (op)	; a template operand as a site's spec: (KIND … EXPR), or the literal
   (let ((last (and (pair? op) (let ((l op)) (while (cdr l) (set l (cdr l))) (car l)))))
     (cond ((arm64-unquoted op)	(error "arm64-sites: an operand that varies needs a kind: " op))
-	  ((and (pair? op) (memq (car op) '(x w n lsl c f mem label)) (arm64-unquoted last))
+	  ((and (pair? op) (memq (car op) '(x w r n lsl c f mem label)) (arm64-unquoted last))
 	   (let ((spec (map (lambda (x) x) op)))
 	     (set-car (last-pair-of spec) (arm64-unquoted last))
 	     spec))
 	  ((pair? op)		(list 'quote op))
 	  (else			op))))
-(define-function arm64-insn-code-of (mnemonic specs)
-  (let ((label (list-detect s specs (and (pair? s) (= 'label (car s))))))
-    (if label (arm64-label-site-code mnemonic specs label) (arm64-site-code mnemonic specs))))
 (define-function arm64-insn-site-code (insn)
   (let* ((specs (map arm64-template-spec (cdr insn)))
-	 (label (list-detect s specs (and (pair? s) (= 'label (car s)))))
-	 (place (list-detect s specs (and (pair? s) (= 'mem (car s)) (not (cddr s))))))
-    (cond (place
-	   (let ((with (lambda (shape) (arm64-insn-code-of (car insn) (map (lambda (s) (if (= s place) (list 'mem shape '_p_) s)) specs)))))
-	     `(let ((_p_ ,(cadr place))) (if (= 'SP (cadr _p_)) ,(with '(off SP 0)) ,(with '(off X0 0))))))
-	  (label	(arm64-label-site-code (car insn) specs label))
-	  (else		(arm64-site-code (car insn) specs)))))
-(define-function arm64-insn-code (insn)	; one instruction's code: its site, label site, or SP-or-register choice
+	 (label (list-detect s specs (and (pair? s) (= 'label (car s))))))
+    (if label (arm64-label-site-code (car insn) specs label) (arm64-site-code (car insn) specs))))
+(define-function arm64-insn-code (insn)	; one instruction's code: its site or label site
   (if (= 'at (car insn))
       `(list 'at ,(or (arm64-unquoted (cadr insn)) `',(cadr insn)))	; (at ,l) marks where label l is
     (arm64-insn-site-code insn)))
