@@ -396,6 +396,12 @@
 	  ((= c 'cond)		(list 'cond '(arm64-cond-value v)))
 	  ((= c 'invcond)	(list 'invcond '(arm64-invcond-value v)))
 	  ((= c 'fimm)		(list 'fimm '(arm64-fimm-value v))))))
+;; a kind with no value of its own (vectors, bitmasks, vector shifts) still shows in a row's pattern, by an opaque rule
+;; testing only the operand's shape; the row then encodes through its encoder (arm64-escape-result)
+(define-function arm64-opaque-value (tag v)
+  (if (memq tag '(vreg vlane)) (and (arm64-vector? v) v) (and (long? v) v)))
+(define-function arm64-opaque-rule (info)	; (name expression-of-v)
+  (list (arm64-rule-name "opaque" (symbol->string (car info))) `(arm64-opaque-value ',(car info) v)))
 (define-function arm64-put-leaves (info leaves vals)	; a matched operand's values into vals: the leaves left
   (let ((c (car info)))
     (cond ((memq c '(reg cond invcond fimm))		(arm64-put vals (cadr info) (car leaves)) (cdr leaves))
@@ -716,57 +722,96 @@
 ;; An operand's reduction for a row's kind info: a list of entries, (const v), (value code), (test code) or (check
 ;; code), in leaf order; or drop (the row can't take it), or fallback (beyond the specialiser).  form is (lit L), or
 ;; (hole SPEC code), code the hole's guarded value.
-;; dispatched by the kind's tag: a literal's leaves (an unknown kind is beyond the specialiser) and a hole's (an unknown
-;; kind can't take one)
-(define arm64-literal-leaf-table (identity-hash-table))
-(define arm64-hole-leaf-table (identity-hash-table))
-(define-function arm64-literal-leaves (info l)	; a literal's leaves for info, its values found now
-  (let ((f (hash-at arm64-literal-leaf-table (car info)))) (if f (f info l) 'fallback)))
-(define-function arm64-hole-leaves (info spec code)	; a hole's leaves for info, as code to run
-  (let ((f (hash-at arm64-hole-leaf-table (car info)))) (if f (f info spec code) 'drop)))
-(define-form define-arm64-leaves (table tags params . body)
-  `(let ((f (lambda ,params ,@body))) (list-do tag ',tags (hash-at-put ,table tag f))))
+;; The encoder grammar's rules as data (arm64-rules-data.l: arm64-rules.g parsed by grammar-data.l, at make), loaded
+;; the first time a site is specialised, so no parser loads with native.l; a rule found by name
+(define arm64-rule-defs ())
+(define arm64-rule-index ())
+(define-function arm64-rule (name)	; the rule's pattern, as tpeg parsed it
+  (or arm64-rule-index
+      (let ((t (identity-hash-table)))
+	(load "arm64-rules-data.l")
+	(list-do r arm64-rule-defs (hash-at-put t (car r) (cadr r)))
+	(set arm64-rule-index t)))
+  (hash-at arm64-rule-index name))
+(define-function arm64-mnemonic-rules (mnemonic)	; its rows' rules, in its rule's order (the first that fits is asm's)
+  (let ((pe (arm64-rule (arm64-rule-name "mn" mnemonic))))
+    (cond ((not pe)			())
+	  ((= 'match-first (car pe))	(map (lambda (alt) (arm64-rule (cadr alt))) (cdr pe)))
+	  (else				(list (arm64-rule (cadr pe)))))))
+(define-function arm64-last (l) (while (cdr l) (set l (cdr l))) (car l))
+(define-function arm64-row-rule-parts (pe)	; (k escape items): the row the action names, whether it encodes through its
+  (let* ((first (cadr pe))					; encoder, and the list pattern's operand items
+	 (lst (if (= 'assign-result (car first)) (caddr first) first))
+	 (inner (cadr lst))
+	 (action (cadr (arm64-last pe))))
+    (list (cadr action) (= 'arm64-escape-result (car action)) (if (= 'match-all (car inner)) (cddr inner) ()))))
+(define-function arm64-operand-expr (name)	; an operand rule's value expression, of v: its &-> test
+  (let ((pe (arm64-rule name))) (cadr (caddr pe))))
+(define-function arm64-subst (x code)	; x with v the operand's code and self.pc 0, as a site encodes at 0
+  (cond ((= x 'v)	code)
+	((= x 'self.pc)	0)
+	((pair? x)	(cons (arm64-subst (car x) code) (arm64-subst (cdr x) code)))
+	(else		x)))
 (define-function arm64-const-leaf (v) (if v (list (list 'const v)) 'drop))
-(define-function arm64-triple? (l head) (and (pair? l) (= head (car l)) (pair? (cdr l)) (pair? (cddr l)) (not (cdddr l))))
-(define-function arm64-number-test (info spec kind code)	; a number hole's test for info, if the hole is of kind
-  (let ((w (arm64-info-width info)))
-    (if (and w (= (car spec) kind)) (list (list 'test `(arm64-number-value ',(car info) ,w ,(caddr info) ,code 0))) 'drop)))
-(define-function arm64-mem-base-leaves (info base code)	; a memory hole's base: SP, or a plain X register
-  (if (= 'SP base)
-      (arm64-literal-leaves (caddr info) 'SP)
-    (arm64-hole-leaves (caddr info) '(x) `(arm64-reg-value 88 'plain (cadr ,code)))))
 
-(define-arm64-leaves arm64-literal-leaf-table (reg) (info l)	(arm64-const-leaf (arm64-reg-value (caddr info) (cadddr info) l)))
-(define-arm64-leaves arm64-literal-leaf-table (imm simm pcrel pcpage lsl) (info l)
-  (arm64-const-leaf (arm64-number-value (car info) (arm64-info-width info) (caddr info) l 0)))
-(define-arm64-leaves arm64-literal-leaf-table (cond) (info l)	(arm64-const-leaf (arm64-cond-value l)))
-(define-arm64-leaves arm64-literal-leaf-table (invcond) (info l)	(arm64-const-leaf (arm64-invcond-value l)))
-(define-arm64-leaves arm64-literal-leaf-table (fimm) (info l)	(arm64-const-leaf (arm64-fimm-value l)))
-(define-arm64-leaves arm64-literal-leaf-table (imm0) (info l)	(if (= l 0) () 'drop))
-(define-arm64-leaves arm64-literal-leaf-table (tag) (info l)
-  (if (arm64-triple? l (cadr info))
-      (arm64-join-leaves (arm64-literal-leaves (caddr info) (cadr l)) (arm64-literal-leaves (cadddr info) (caddr l)))
-    'drop))
-(define-arm64-leaves arm64-literal-leaf-table (mreg) (info l)
-  (if (and (pair? l) (= 'reg (car l)) (= (list-length l) (cadr info)) (equal (cdddr l) (caddr info)))
-      (arm64-join-leaves (arm64-literal-leaves (cadddr info) (cadr l)) (arm64-literal-leaves (car (cddddr info)) (caddr l)))
-    'drop))
+;; an operand's leaves, read from the rule that matches it: its value expression, by its head, says what kind it takes;
+;; a literal is evaluated now, a hole is tested as the residual runs.  form is (lit L) or (hole SPEC code).
+(define arm64-expr-leaf-table (identity-hash-table))
+(define-function arm64-rule-leaves (name form)
+  (let* ((e (arm64-operand-expr name)) (f (hash-at arm64-expr-leaf-table (car e))))
+    (cond ((not f)		'fallback)
+	  ((= 'lit (car form))	(f e (car (cdr form)) () ()))
+	  (else			(f e () (cadr form) (caddr form))))))
+(define-form define-arm64-expr-leaves (heads params . body)	; params: (e literal spec code), literal () for a hole
+  `(let ((f (lambda ,params ,@body))) (list-do h ',heads (hash-at-put arm64-expr-leaf-table h f))))
+(define-function arm64-literal-value (e l) (eval (arm64-subst e (list 'quote l))))
+(define-function arm64-test-leaf (e code) (list (list 'test (arm64-subst e code))))
+(define-arm64-expr-leaves (arm64-reg-value) (e l spec code)
+  (cond ((not spec)				(arm64-const-leaf (arm64-literal-value e l)))
+	((= (cadr e) (arm64-hole-class spec))	(list (list 'value code)))	; the hole's guard proved the register
+	(else					'drop)))
+(define-arm64-expr-leaves (arm64-number-value) (e l spec code)
+  (let ((c (cadr (cadr e))))
+    (cond ((not spec)					(arm64-const-leaf (arm64-literal-value e l)))
+	  ((and (memq c '(imm simm)) (= 'n (car spec)))	(arm64-test-leaf e code))
+	  ((and (= c 'lsl) (= 'lsl (car spec)))		(arm64-test-leaf e code))
+	  (else						'drop))))
+(define-arm64-expr-leaves (arm64-cond-value arm64-invcond-value) (e l spec code)
+  (cond ((not spec) (arm64-const-leaf (arm64-literal-value e l))) ((= 'c (car spec)) (arm64-test-leaf e code)) (else 'drop)))
+(define-arm64-expr-leaves (arm64-fimm-value) (e l spec code)
+  (if spec 'drop (arm64-const-leaf (arm64-literal-value e l))))
+(define-arm64-expr-leaves (=) (e l spec code)	; imm0: the operand is 0, and fills no field
+  (cond ((not spec) (if (= l 0) () 'drop)) ((= 'n (car spec)) (list (list 'check (arm64-subst e code)))) (else 'drop)))
+(define-arm64-expr-leaves (arm64-opaque-value) (e l spec code)	; a kind with no value: its row's encoder decides
+  (cond ((not spec) 'fallback)
+	((and (= 'n (car spec)) (memq (cadr (cadr e)) '(bimm lslimm vshl vshr))) 'fallback)
+	(else 'drop)))
 
-(define-arm64-leaves arm64-hole-leaf-table (reg) (info spec code)
-  (if (= (caddr info) (arm64-hole-class spec)) (list (list 'value code)) 'drop))
-(define-arm64-leaves arm64-hole-leaf-table (imm simm) (info spec code)	(arm64-number-test info spec 'n code))
-(define-arm64-leaves arm64-hole-leaf-table (lsl) (info spec code)	(arm64-number-test info spec 'lsl code))
-(define-arm64-leaves arm64-hole-leaf-table (imm0) (info spec code)
-  (if (= (car spec) 'n) (list (list 'check `(= ,code 0))) 'drop))
-(define-arm64-leaves arm64-hole-leaf-table (cond) (info spec code)
-  (if (= (car spec) 'c) (list (list 'test `(arm64-cond-value ,code))) 'drop))
-(define-arm64-leaves arm64-hole-leaf-table (invcond) (info spec code)
-  (if (= (car spec) 'c) (list (list 'test `(arm64-invcond-value ,code))) 'drop))
-(define-arm64-leaves arm64-hole-leaf-table (tag) (info spec code)
-  (if (and (= (car spec) 'mem) (= (cadr info) (car (cadr spec))))
-      (arm64-join-leaves (arm64-mem-base-leaves info (cadr (cadr spec)) code) (arm64-hole-leaves (cadddr info) '(n) `(caddr ,code)))
-    'drop))
-(define-arm64-leaves arm64-hole-leaf-table (bimm lslimm) (info spec code)	(if (= (car spec) 'n) 'fallback 'drop))
+;; a pattern item's leaves: an operand rule, bound or not; a nested list (a memory operand, a register offset); a literal
+(define arm64-item-leaf-table (identity-hash-table))
+(define-function arm64-item-leaves (item form) ((hash-at arm64-item-leaf-table (car item)) item form))
+(define-form define-arm64-item-leaves (head params . body)
+  `(hash-at-put arm64-item-leaf-table ',head (lambda ,params ,@body)))
+(define-arm64-item-leaves assign-result (item form)	(arm64-rule-leaves (cadr (caddr item)) form))
+(define-arm64-item-leaves match-rule (item form)	(arm64-rule-leaves (cadr item) form))
+(define-arm64-item-leaves match-object (item form)
+  (if (and (= 'lit (car form)) (equal (cadr form) (cadr item))) () 'drop))
+(define-function arm64-items-leaves (items forms)	; items against forms, in order
+  (let ((leaves ()))
+    (if (= (list-length items) (list-length forms))
+	(let () (map (lambda (i f) (set leaves (arm64-join-leaves leaves (arm64-item-leaves i f)))) items forms) leaves)
+      'drop)))
+(define-arm64-item-leaves match-list (item form)	; `( 'head item … ): a literal list, or a memory hole of that mode
+  (let* ((inner (cadr item)) (head (cadr (cadr inner))) (items (cddr inner)))
+    (if (= 'lit (car form))
+	(let ((l (cadr form)))
+	  (if (and (pair? l) (= head (car l))) (arm64-items-leaves items (map (lambda (x) (list 'lit x)) (cdr l))) 'drop))
+      (let ((spec (cadr form)) (code (caddr form)))
+	(if (and (= 'mem (car spec)) (= head (car (cadr spec))) (= 2 (list-length items)))
+	    (arm64-items-leaves items
+				(list (if (= 'SP (cadr (cadr spec))) '(lit SP) (list 'hole '(x) `(arm64-reg-value 88 'plain (cadr ,code))))
+				      (list 'hole '(n) `(caddr ,code))))
+	  'drop)))))
 (define-function arm64-place-leaves (info leaves vals place-fn check-fn)	; info's leaves to their fields: those left
   (let ((c (car info)))
     (cond ((memq c '(reg cond invcond fimm))		(place-fn (cadr info) (car leaves)) (cdr leaves))
@@ -810,16 +855,12 @@
     (map (lambda (s e) (and (arm64-site-variable? s)
 			    (let ((g (arm64-hole-guard s e))) (if g (push guards (list (concat-symbol e 'h) g)) (set fallback 1)))))
 	 specs es)
-    (list-do row (asm-rows-for (asm-isa 'arm64) mnemonic)
-      (let ((infos (<arm64-plan>-infos (arm64-row-plan row))) (fs forms) (leaves ()))
-	(if (not (= (list-length infos) (list-length forms)))
-	    (set leaves 'drop)
-	  (list-do info infos
-	    (let ((f (car fs)))
-	      (set leaves (arm64-join-leaves leaves (if (= 'lit (car f)) (arm64-literal-leaves info (cadr f)) (arm64-hole-leaves info (cadr f) (caddr f)))))
-	      (set fs (cdr fs)))))
+    (list-do rule (arm64-mnemonic-rules mnemonic)	; the grammar's rows for the mnemonic, in its order
+      (let* ((parts (arm64-row-rule-parts rule)) (row (array-at arm64-row-vector (car parts)))
+	     (leaves (arm64-items-leaves (caddr parts) forms)))
 	(cond ((= leaves 'fallback) (set fallback 1))
 	      ((= leaves 'drop))
+	      ((cadr parts) (set fallback 1))	; a row that encodes through its encoder takes the template: keep the site's
 	      (else (let ((code (arm64-row-code row leaves))) (if code (push rows (cons row code)) (set fallback 1)))))))
     (set rows (list-reverse! rows))
     (set guards (list-reverse! guards))

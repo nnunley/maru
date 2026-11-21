@@ -28,3 +28,4 @@ erosion -1 the erosion reader counts define-multimethod methods and define-gener
 erosion -2 asm-arm64.l's kind values and the encoder grammar's short callables (arm64-rule-name, arm64-operand-rule, arm64-put-leaves, arm64-row-result ...), and arm64-value-binder's four binders folded into one: they dilute the share over CC 10
 erosion +1 asm-arm64.l's arm64-specialise and arm64-row-code compose a template with its rows in two long callables
 verbosity -1 the specialiser's tables and short callables: forms neither flagged nor cloned dilute the verbose share
+erosion -1 the specialiser's reductions as tables by a pattern item's and an operand rule's head, in short callables

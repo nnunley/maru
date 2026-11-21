@@ -52,7 +52,13 @@ Most of the rest is hash.l and structure accessors, each of which checks its typ
   its rows in file order (asm's first fit) and, per operand position a placeholder can take, the rows giving it a field,
   widest first and stable (asm-best-row's choice for an open placeholder). Over `asm_table`'s arm64 stream (5,098
   instructions with the refusals) the grammar answers the row and word `asm-select` gives, or no row where asm finds
-  none.
+  none. A row whose kinds have no value (vectors, bitmasks) still shows each operand's kind in its pattern, by an opaque
+  rule testing the operand's shape, and encodes through its encoder. The grammar drives lowering's sites: make writes
+  its rules as data (`grammar-data.l` → `arm64-rules-data.l`), and `asm-arm64.l`'s specialiser, loading them the first
+  time a site expands, walks a template's mnemonic rule, each row's list pattern and each operand rule's `&->` test,
+  keeping the rows whose rules take the template's holes and literals and leaving each one's tests and one OR of
+  shifted fields (`native_sites`; `check/arm64-kept-rows.l` holds the kept rows to every candidate that takes the
+  instruction). Loading `native.l` costs about 60 ms more for it.
 - arm64's operand kinds bind through binders made once per row plan (`asm-arm64.l`'s `define-arm64-binder`, a table
   from kind to maker) where `arm64-bind-plan` tested each kind in one chain of conditions; and a lowering rule's
   instructions are sites (`arm64-sites`) whose rows are chosen as the rule loads (see [Native code](native.md),

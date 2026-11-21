@@ -19,6 +19,7 @@
 	((long? x)	(long->string x))
 	((symbol? x)	(symbol->string x))
 	(else		(error "gen-arm64-rules: can't write " x))))
+(define opaque ())	; set when a row's pattern names a kind with no value: the row encodes through its encoder
 
 ;; info's pattern, its leaves named from n: (text . next n), or () if a kind in it has no operand rule
 (define-function pattern (info n)
@@ -35,9 +36,9 @@
 	     (and b (cons (concat-string "`( 'reg " (concat-string (car a) (concat-string " " (concat-string (car b) (concat-string rest " )")))))
 			  (cdr b)))))
 	  (else
-	   (let ((r (arm64-operand-rule info)))
-	     (and r (let () (hash-at-put operand-rules (car r) (cadr r))
-		      (cons (concat-string (symbol->string (car r)) (concat-string ":a" (long->string n))) (+ n 1)))))))))
+	   (let ((r (or (arm64-operand-rule info) (let () (set opaque 1) (arm64-opaque-rule info)))))
+	     (hash-at-put operand-rules (car r) (cadr r))
+	     (cons (concat-string (symbol->string (car r)) (concat-string ":a" (long->string n))) (+ n 1)))))))
 
 (define-function leaves (n) (let ((s "")) (for (i 0 n) (set s (concat-string s (concat-string " a" (long->string i))))) s))
 
@@ -47,15 +48,15 @@
 (define mnemonics ())
 (for (k 0 (array-length arm64-row-vector))
   (let* ((row (array-at arm64-row-vector k)) (name (concat-string "row" (long->string k)))
-	 (n 0) (parts "") (ok 1))
+	 (n 0) (parts ""))
+    (set opaque ())
     (list-do info (<arm64-plan>-infos (arm64-row-plan row))
-      (let ((p (and ok (pattern info n))))
-	(if p (let () (set parts (concat-string parts (concat-string " " (car p)))) (set n (cdr p))) (set ok ()))))
-    (rule name (if ok
-		   (concat-string "`( '" (concat-string (text (car row)) (concat-string parts
-		     (concat-string " ) -> (arm64-row-result " (concat-string (long->string k) (concat-string " (list" (concat-string (leaves n) "))")))))))
-		 (concat-string ".:i &-> (arm64-escape-result " (concat-string (long->string k) (concat-string " i self.pc) -> (arm64-escape-result "
-		   (concat-string (long->string k) " i self.pc)"))))))
+      (let ((p (pattern info n))) (set parts (concat-string parts (concat-string " " (car p)))) (set n (cdr p))))
+    (rule name (concat-string "`( '" (concat-string (text (car row)) (concat-string parts
+		 (if opaque	; the pattern shows each operand's kind; the row encodes through its encoder
+		     (concat-string " ):i &-> (arm64-escape-result " (concat-string (long->string k) (concat-string " i self.pc) -> (arm64-escape-result "
+		       (concat-string (long->string k) " i self.pc)"))))
+		   (concat-string " ) -> (arm64-row-result " (concat-string (long->string k) (concat-string " (list" (concat-string (leaves n) "))")))))))))
     (or (hash-at by-mnemonic (car row)) (push mnemonics (car row)))
     (hash-at-put by-mnemonic (car row) (concat-list (hash-at by-mnemonic (car row)) (list k)))))
 
