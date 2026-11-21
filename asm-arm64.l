@@ -600,23 +600,23 @@
 ;; A site's answer depends on its operands' values alone, and lowering names the same few registers, slots and constant
 ;; pieces again and again, so a site remembers its answers in a trie: a step for each varying operand, a symbol (a
 ;; register or condition) through an identity cache, a number through a cache by value, an (off BASE N) as its base and
-;; then N.  An operand of any other shape, or a step whose slot another key took, is answered afresh.
-(define-function arm64-memo-step (node key)	; node's child for key, made if new, or () if key isn't a symbol or long
-  (cond ((symbol? key)
-	 (let ((c (or (<arm64-memo>-symbols node) (set (<arm64-memo>-symbols node) (identity-cache 32)))))
-	   (or (cache-at c key) (cache-at-put c key (new <arm64-memo> () () ())))))
-	((long? key)
-	 (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 1024))))
-		(i (& (^ key (>> key 3)) 1023)) (e (array-at a i)))	; offsets are multiples of 8: their low bits mixed in
-	   (if (and e (= (car e) key)) (cdr e) (cdr (set-array-at a i (cons key (new <arm64-memo> () () ())))))))))
+;; then N.  The step is a multimethod on the node and the key: an operand of any other shape, or no node, takes its
+;; default, (), and a step whose slot another key took is answered afresh.
+(define-generic arm64-memo-step (node key) ())	; node's child for key, made if new
+(define-multimethod arm64-memo-step ((<arm64-memo> node) (<symbol> key))
+  (let ((c (or (<arm64-memo>-symbols node) (set (<arm64-memo>-symbols node) (identity-cache 32)))))
+    (or (cache-at c key) (cache-at-put c key (new <arm64-memo> () () ())))))
+(define-multimethod arm64-memo-step ((<arm64-memo> node) (<long> key))
+  (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 1024))))
+	 (i (& (^ key (>> key 3)) 1023)) (e (array-at a i)))	; offsets are multiples of 8: their low bits mixed in
+    (if (and e (= (car e) key)) (cdr e) (cdr (set-array-at a i (cons key (new <arm64-memo> () () ())))))))
+(define-multimethod arm64-memo-step ((<arm64-memo> node) (<pair> key))	; (off BASE N): BASE, then N
+  (and (= 'off (car key)) (pair? (cdr key)) (pair? (cddr key)) (not (cdddr key))
+       (arm64-memo-step (arm64-memo-step node (cadr key)) (caddr key))))
 (define-function arm64-memo-node (site ops)	; the trie's node for ops, or ()
   (let ((node (<arm64-site>-memo site)) (ks (<arm64-site>-keys site)))
     (while (and node ops)
-      (let ((op (car ops)))
-	(and (car ks)
-	     (set node (if (and (pair? op) (= 'off (car op)) (pair? (cdr op)) (pair? (cddr op)) (not (cdddr op)))
-			   (let ((b (arm64-memo-step node (cadr op)))) (and b (arm64-memo-step b (caddr op))))
-			 (arm64-memo-step node op)))))
+      (and (car ks) (set node (arm64-memo-step node (car ops))))
       (set ops (cdr ops)) (set ks (cdr ks)))
     node))
 (define-function arm64-site-encode (site mnemonic ops)
