@@ -348,19 +348,19 @@
 (list-do row arm64-rows (set-cdr (cdr (cddddr row)) (list (arm64-plan row))))
 
 (define-function arm64-encode-row (row ops pc)
-  (let* ((plan (arm64-row-plan row)) (kinds (<arm64-plan>-kinds plan)))
-    (and (= (list-length kinds) (list-length ops))
-	 (let ((vals (array (+ 1 (<arm64-plan>-t-slot plan)))) (ok 1))
-	   (list-do p kinds
-	     (and ok (or (p plan (car ops) vals pc) (set ok ())))
-	     (set ops (cdr ops)))
-	   (and ok
-		(let ((word (car (cddddr row))) (shifts (<arm64-plan>-shifts plan)))	; the fixed bits, then each field
-		  (for (i 0 (<arm64-plan>-t-slot plan))
-		    (let ((v (array-at vals i)))
-		      (or v (error (car row)": field "(array-at (<arm64-plan>-names plan) i)" has no arm64-operand"))
-		      (set word (| word (<< v (array-at shifts i))))))
-		  word))))))
+  (let* ((plan (arm64-row-plan row)) (kinds (<arm64-plan>-kinds plan))
+	 (vals (array (+ 1 (<arm64-plan>-t-slot plan)))) (ok 1))
+    (while (and ok kinds ops)	; each operand by its kind's binder, walking both lists, so neither is measured first
+      (or ((car kinds) plan (car ops) vals pc) (set ok ()))
+      (set kinds (cdr kinds))
+      (set ops (cdr ops)))
+    (and ok (not kinds) (not ops)
+	 (let ((word (car (cddddr row))) (shifts (<arm64-plan>-shifts plan)))	; the fixed bits, then each field
+	   (for (i 0 (<arm64-plan>-t-slot plan))
+	     (let ((v (array-at vals i)))
+	       (or v (error (car row)": field "(array-at (<arm64-plan>-names plan) i)" has no arm64-operand"))
+	       (set word (| word (<< v (array-at shifts i))))))
+	   word))))
 
 ;;; ---------------------------------------------------------------- decoding
 
@@ -563,7 +563,9 @@
 ;; the symbolic form, for asm to encode or refuse, when an operand's shape isn't the declared one or no row takes it.
 ;; A site with nothing variable is encoded once, as it loads.  *arm64-sites* () makes every site its symbolic form.
 (or (defined? '*arm64-sites*) (define *arm64-sites* 1))
-(define-structure <arm64-site> (rows keys numbers))	; keys: each operand's shape key, () for a literal; numbers: 1 for n
+(define-structure <arm64-site> (rows keys numbers memo))	; keys: each operand's shape key, () for a literal;
+;; numbers: 1 for n; memo: the site's answers by its operands' values (arm64-memo)
+(define-structure <arm64-memo> (symbols numbers answer))
 
 (define-function arm64-site-representative (spec)
   (let ((k (car spec)))
@@ -592,9 +594,32 @@
       (list-do k (cadr r) (and (memq (car k) '(pcrel pcpage)) (error "arm64-site: a PC-relative row for " insn))))
     (new <arm64-site> rows
 	 (map (lambda (s) (and (arm64-site-variable? s) (arm64-shape-key (arm64-site-representative s)))) specs)
-	 (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs))))
+	 (map (lambda (s) (and (arm64-site-variable? s) (= 'n (car s)))) specs)
+	 (new <arm64-memo> () () ()))))
 
-(define-function arm64-site-emit (site mnemonic ops)	; ops: the operands' values
+;; A site's answer depends on its operands' values alone, and lowering names the same few registers, slots and constant
+;; pieces again and again, so a site remembers its answers in a trie: a step for each varying operand, a symbol (a
+;; register or condition) through an identity cache, a number through a cache by value, an (off BASE N) as its base and
+;; then N.  An operand of any other shape, or a step whose slot another key took, is answered afresh.
+(define-function arm64-memo-step (node key)	; node's child for key, made if new, or () if key isn't a symbol or long
+  (cond ((symbol? key)
+	 (let ((c (or (<arm64-memo>-symbols node) (set (<arm64-memo>-symbols node) (identity-cache 32)))))
+	   (or (cache-at c key) (cache-at-put c key (new <arm64-memo> () () ())))))
+	((long? key)
+	 (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 256))))
+		(i (& key 255)) (e (array-at a i)))
+	   (if (and e (= (car e) key)) (cdr e) (cdr (set-array-at a i (cons key (new <arm64-memo> () () ())))))))))
+(define-function arm64-memo-node (site ops)	; the trie's node for ops, or ()
+  (let ((node (<arm64-site>-memo site)) (ks (<arm64-site>-keys site)))
+    (while (and node ops)
+      (let ((op (car ops)))
+	(and (car ks)
+	     (set node (if (and (pair? op) (= 'off (car op)) (pair? (cdr op)) (pair? (cddr op)) (not (cdddr op)))
+			   (let ((b (arm64-memo-step node (cadr op)))) (and b (arm64-memo-step b (caddr op))))
+			 (arm64-memo-step node op)))))
+      (set ops (cdr ops)) (set ks (cdr ks)))
+    node))
+(define-function arm64-site-encode (site mnemonic ops)
   (let ((ok 1) (os ops) (ks (<arm64-site>-keys site)) (ns (<arm64-site>-numbers site)))
     (while (and ok os)
       (let ((k (car ks)))
@@ -605,6 +630,13 @@
 	(set word (arm64-encode-row (car rows) ops 0))
 	(set rows (cdr rows)))
       (if word (arm64-site-word-bytes word) (cons mnemonic ops)))))
+
+(define-function arm64-site-emit (site mnemonic ops)	; ops: the operands' values
+  (let ((node (arm64-memo-node site ops)))
+    (or (and node (<arm64-memo>-answer node))
+	(let ((answer (arm64-site-encode site mnemonic ops)))
+	  (and node (set (<arm64-memo>-answer node) answer))
+	  answer))))
 
 (define-form arm64-site (mnemonic . specs)
   (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))

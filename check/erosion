@@ -20,3 +20,4 @@ erosion -2 compile-tpeg.l's direct patterns in short callables (tp-direct-rule, 
 erosion -1 asm-arm64.l's sites in short callables (arm64-site-make, -emit, -representative, -expr, -literal, -variable?, -word-bytes): they dilute the share over CC 10
 verbosity -1 native.l's float helpers as sites by width (native-arm64-fsite, -fmov-in, -fmov-out) and the other remaining sites: forms neither flagged nor cloned dilute the verbose share
 erosion -1 the same: short callables dilute the share over CC 10
+erosion -1 asm-arm64.l's site memo in short callables: they dilute the share over CC 10
