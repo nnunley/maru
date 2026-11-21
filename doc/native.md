@@ -62,11 +62,15 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   the string literals, or the labels and branches, take less than eight times as long. Lists searched for each made them
   worse than quadratic (800 strings took 26 times as long as 200).
 - `native_sites` (`check/native-sites.l`, `check/native-images.l`): lowering sites. An instruction a lowering rule always
-  means is an `arm64-site` (`asm-arm64.l`): its candidate rows and each operand's shape key are resolved from a
-  representative instruction as the rule loads, so at run time it binds its operands into those rows and emits
-  `(data b0 b1 b2 b3)`, falling back to the symbolic form (for `asm` to encode or refuse) when an operand isn't the
-  declared kind or no row takes it; one with nothing variable is encoded once. Every arm64 form but branches and
-  labels is a site (`native-arm64.g`, `native.l`'s helpers, `stub.l`'s `arm64-constant`): 97,672 of Gezira's 103,227
+  means is a site (`asm-arm64.l`), written as a quasiquoted list of instructions, each varying operand in its kind:
+  `` (arm64-sites `((ADD (x ,d) (x ,a) (x ,b)))) `` answers the list of forms. A site's candidate rows and each operand's
+  shape key are resolved from a representative instruction as the rule loads, so at run time it binds its operands into
+  those rows and emits `(data b0 b1 b2 b3)`, falling back to the symbolic form (for `asm` to encode or refuse) when an
+  operand isn't the declared kind or no row takes it; one with nothing variable is encoded once, and a site remembers
+  its answers by its operands' values. A `(label ,l)` operand makes a label site, whose row is chosen as `asm` chooses
+  one with an open placeholder and which emits `(label-data …)`, its bytes and the report `native-assemble` patches; a
+  `(mem ,place)` takes SP's or another register's site by the base. Every arm64 form is a site (`native-arm64.g`,
+  `native.l`'s helpers and `native-arm64-fsites` for float widths, `stub.l`'s `arm64-constant`): all of Gezira's 103,227
   forms. The case compares every unit's image built with sites and without (`--no-sites`), and checks the sites' own
   cases: SP where an X register was declared, immediates at ADD's edges, near, register-based, unaligned and far
   accesses. Each operand kind binds through its own binder (`define-arm64-binder`), made when the row's plan is.

@@ -46,7 +46,7 @@ Most of the rest is hash.l and structure accessors, each of which checks its typ
   encodes than the scan (arm64, x64 and x86, under `eval`, and arm64 and x86 under `eval2`).
 - arm64's operand kinds bind through binders made once per row plan (`asm-arm64.l`'s `define-arm64-binder`, a table
   from kind to maker) where `arm64-bind-plan` tested each kind in one chain of conditions; and a lowering rule's
-  instructions are sites (`arm64-site`) whose rows are chosen as the rule loads (see [Native code](native.md),
+  instructions are sites (`arm64-sites`) whose rows are chosen as the rule loads (see [Native code](native.md),
   `native_sites`). `asm` stays the general encoder for everything else.
 - `asm_coverage` (`check/asm-coverage.l`): every form in `asm-coverage.spec`
   has a row, and every operation `ir2.k` declares, on every type, is named

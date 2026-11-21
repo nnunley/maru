@@ -554,10 +554,11 @@
 ;;; ---------------------------------------------------------------- sites
 
 ;; A lowering site: an instruction a lowering rule always means, its row chosen when the rule loads rather than found
-;; again for every instruction (the kernel plan's Task 7; oecm's staged evaluation).  (arm64-site MNEMONIC SPEC …):
-;; each SPEC is a literal operand (a symbol, a number or a quoted list) or (KIND EXPR), KIND one of x (an X register),
-;; w (a W register), n (a number), f with s or d (an FP register: (f d EXPR)), mem with its shape ((mem (off SP 0)
-;; EXPR)), lsl (an (LSL n) operand) or c (a condition).  When the rule loads, a representative instruction (X0, W0, 0,
+;; again for every instruction (the kernel plan's Task 7; oecm's staged evaluation).  Rules write them as arm64-sites
+;; templates (below); inside, a site's specs are each a literal operand (a symbol, a number or a quoted list) or (KIND
+;; EXPR), KIND one of x (an X register), w (a W register), n (a number), f with s or d (an FP register: (f d EXPR)), mem
+;; with its shape ((mem (off SP 0) EXPR)), lsl (an (LSL n) operand) or c (a condition).  When the rule loads, a
+;; representative instruction (X0, W0, 0,
 ;; S0 or D0, the shape given, (LSL 0), EQ) gives the site its candidate rows and each operand's shape key.  At run time
 ;; the site answers (data b0 b1 b2 b3) from the first of those rows that takes the operands, as asm would choose it, or
 ;; the symbolic form, for asm to encode or refuse, when an operand's shape isn't the declared one or no row takes it.
@@ -640,7 +641,7 @@
 	  (and node (set (<arm64-memo>-answer node) answer))
 	  answer))))
 
-(define-form arm64-site (mnemonic . specs)
+(define-function arm64-site-code (mnemonic specs)	; the code a site expands to
   (let ((symbolic `(list ',mnemonic ,@(map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs))))
     (cond ((not *arm64-sites*)	symbolic)
 	  ((not (list-detect s specs (arm64-site-variable? s)))
@@ -650,8 +651,8 @@
 	  (else
 	   `(arm64-site-emit ',(arm64-site-make mnemonic specs) ',mnemonic (list ,@(cddr symbolic)))))))
 
-;; A label site: an instruction with a (label L) operand, (arm64-label-site MNEMONIC SPEC …) with one (label EXPR) spec
-;; naming L.  Its row is chosen as asm chooses one with an open placeholder (asm-select, (reloc) in L's place) and
+;; A label site: an instruction with a (label ,l) operand in an arm64-sites template, one (label EXPR) spec naming
+;; L.  Its row is chosen as asm chooses one with an open placeholder (asm-select, (reloc) in L's place) and
 ;; remembered by its other operands, as a site's answer is; it emits (label-data BYTES POSITION ROW INSN L), the bytes
 ;; with the field zero and the report asm would give, which native-assemble places and patches as it did asm's.  An
 ;; instruction asm refuses stays the symbolic form, for asm to refuse with its message.
@@ -665,10 +666,44 @@
     (if (pair? a)
 	(list 'label-data (car a) (cadr a) (caddr a) (cadddr a) label)
       (cons mnemonic (map (lambda (o) (if (arm64-reloc? o) (list 'label label) o)) ops)))))
-(define-form arm64-label-site (mnemonic . specs)
-  (let* ((label (list-detect s specs (and (pair? s) (= 'label (car s)))))
-	 (specs (map (lambda (s) (if (and (pair? s) (= 'label (car s))) ''(reloc) s)) specs))
+(define-function arm64-label-site-code (mnemonic specs label)	; label: the (label EXPR) spec, its place in specs
+  (let* ((specs (map (lambda (s) (if (= s label) ''(reloc) s)) specs))
 	 (ops (map (lambda (s) (if (arm64-site-variable? s) (arm64-site-expr s) `',(arm64-site-literal s))) specs)))
     (if *arm64-sites*
 	`(arm64-label-site-emit ',(arm64-site-new () specs) ',mnemonic (list ,@ops) ,(cadr label))
       `(list ',mnemonic ,@(map (lambda (o) (if (equal o ''(reloc)) `(list 'label ,(cadr label)) o)) ops)))))
+
+;; (arm64-sites `((MNEMONIC OPERAND …) …)): the forms of the instructions a rule always means, each a site, as a list.
+;; An operand that varies is a kind around an unquote: (x ,r) (w ,r) (n ,v) (lsl ,v) (c ,cond) (f d ,r) (f s ,r)
+;; (mem SHAPE ,place) (label ,l); (mem ,place) without a shape takes SP's or another register's, by the place's base, as
+;; it runs.  Anything else is literal: SP, 16, (post SP 16), (LSL 0).  An instruction with a (label ,l) is a label site.
+(define-function arm64-unquoted (x) (and (pair? x) (= 'unquote (car x)) (cadr x)))	; e of ,e, or ()
+(define-function last-pair-of (l) (while (cdr l) (set l (cdr l))) l)
+(define-function arm64-template-spec (op)	; a template operand as a site's spec: (KIND … EXPR), or the literal
+  (let ((last (and (pair? op) (let ((l op)) (while (cdr l) (set l (cdr l))) (car l)))))
+    (cond ((arm64-unquoted op)	(error "arm64-sites: an operand that varies needs a kind: " op))
+	  ((and (pair? op) (memq (car op) '(x w n lsl c f mem label)) (arm64-unquoted last))
+	   (let ((spec (map (lambda (x) x) op)))
+	     (set-car (last-pair-of spec) (arm64-unquoted last))
+	     spec))
+	  ((pair? op)		(list 'quote op))
+	  (else			op))))
+(define-function arm64-insn-code-of (mnemonic specs)
+  (let ((label (list-detect s specs (and (pair? s) (= 'label (car s))))))
+    (if label (arm64-label-site-code mnemonic specs label) (arm64-site-code mnemonic specs))))
+(define-function arm64-insn-site-code (insn)
+  (let* ((specs (map arm64-template-spec (cdr insn)))
+	 (label (list-detect s specs (and (pair? s) (= 'label (car s)))))
+	 (place (list-detect s specs (and (pair? s) (= 'mem (car s)) (not (cddr s))))))
+    (cond (place
+	   (let ((with (lambda (shape) (arm64-insn-code-of (car insn) (map (lambda (s) (if (= s place) (list 'mem shape '_p_) s)) specs)))))
+	     `(let ((_p_ ,(cadr place))) (if (= 'SP (cadr _p_)) ,(with '(off SP 0)) ,(with '(off X0 0))))))
+	  (label	(arm64-label-site-code (car insn) specs label))
+	  (else		(arm64-site-code (car insn) specs)))))
+(define-function arm64-insn-code (insn)	; one instruction's code: its site, label site, or SP-or-register choice
+  (if (= 'at (car insn))
+      `(list 'at ,(or (arm64-unquoted (cadr insn)) `',(cadr insn)))	; (at ,l) marks where label l is
+    (arm64-insn-site-code insn)))
+(define-form arm64-sites (template)
+  (or (and (pair? template) (= 'quasiquote (car template))) (error "arm64-sites: a quasiquoted list of instructions: " template))
+  `(list ,@(map arm64-insn-code (cadr template))))

@@ -14,9 +14,9 @@
 (define-function as-asm (form insn)	; a site's answer: insn's bytes, or insn itself to be encoded by asm
   (if (= 'data (car form)) (equal form (asm-bytes insn)) (equal form insn)))
 
-(define-function add3 (d a b) (arm64-site ADD (x d) (x a) (x b)))
-(define-function addi (d a v) (arm64-site ADD (x d) (x a) (n v)))
-(define-function ret () (arm64-site RET))
+(define-function add3 (d a b) (car (arm64-sites `((ADD (x ,d) (x ,a) (x ,b))))))
+(define-function addi (d a v) (car (arm64-sites `((ADD (x ,d) (x ,a) (n ,v))))))
+(define-function ret () (car (arm64-sites `((RET)))))
 (expect "three registers, as asm" (add3 'X9 'X10 'X11) (asm-bytes '(ADD X9 X10 X11)))
 (expect "SP where an X register was declared: the symbolic form" (add3 'SP 'X1 'X2) '(ADD SP X1 X2))
 (expect "an immediate that fits" (addi 'X9 'X10 16) (asm-bytes '(ADD X9 X10 16)))
