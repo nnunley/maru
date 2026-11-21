@@ -1009,16 +1009,23 @@
 	     (set total (+ total (double->long (+ 0.5 (* 100.0 (string->double (cadr w))))))))))
     total))
 
+;; The native_nile unit's files (nile.osdefs, the runtime, Gezira), and a file in tmp loading them in order: its path.
+(define-function native-nile-inputs ()
+  (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
+				   (concat-strings nile-dir "gezira-api.k"))))
+(define-function native-nile-loader (inputs)
+  (let ((loader (concat-strings tmp "/native-nile.k")))
+    (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
+    loader))
+
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
 ;; 16 times the CPU the C back end takes to turn the same files into C (about 12 times, 32 s against 2.7 s, on
 ;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
 (check "native_nile"
-  (let* ((inputs (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
-						 (concat-strings nile-dir "gezira-api.k"))))
-	 (loader (concat-strings tmp "/native-nile.k")))
+  (let* ((inputs (native-nile-inputs))
+	 (loader (native-nile-loader inputs)))
     (unit-assert (= 106 (time-hundredths "real 1.20\nuser 0.98\nsys 0.08\n")))	; 0.08 isn't octal
     (unit-assert (= 3395 (time-hundredths "user 33.60\nsys 0.35\n")))
-    (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
     (run "native_nile_c" (concat-strings "/usr/bin/time -p ./eval2 ir-gen-c.k maru.k" inputs " > " tmp "/native-nile.c") 300)
     (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader) 900))
 			"native nile ok"))
