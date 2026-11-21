@@ -2,7 +2,12 @@
 (require "check/tpeg-run.l")
 (define counts ())	; the actions tl-count was called from, latest first
 (define-function tl-count (what) (push counts what) what)
+(define-form tl-wrap (template)	; an action form: it sees the template as written, when the grammar loads
+  (or (and (pair? template) (= 'quasiquote (car template))) (error "tl-wrap: not given the template: " template))
+  `(list 'wrapped ,template))
 (load "build/tpeg-lists.g.l")
+(expect "a quasiquoted action through the rule's action form" (try <trees> $wrapped '((w 1))) '((wrapped (got 1))))
+(expect "any other action as written" (try <trees> $wrapped '(5)) '((plain 5)))
 
 (expect "a node" (try <trees> $node '((add 1 2))) '((1 2)))
 (expect "nested" (try <trees> $deep '((add 3 (mul 4)))) '((3 4)))

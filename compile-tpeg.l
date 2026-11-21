@@ -369,13 +369,27 @@
     (array-do var arr (or (member? var vars) (push vars var)))
     vars))
 
+;; A rule's action form, its (actions form) annotation (`rule <form> = …`): each quasiquoted action, -> `…, is compiled
+;; as (form `…), so the form, a macro, sees the template itself as the grammar loads; any other action is as written
+(define-function tp-action-form (rule)
+  (let ((a (list-detect x (cadddr rule) (and (pair? x) (= 'actions (car x)))))) (and a (cadr a))))
+(define-function tp-through-form (form pe)
+  (cond ((not (pair? pe))	pe)
+	((and (= 'result-expr (car pe)) (pair? (cadr pe)) (= 'quasiquote (car (cadr pe))))
+	 (list 'result-expr (list form (cadr pe))))
+	((= 'quote (car pe))	pe)
+	(else			(map (lambda (x) (tp-through-form form x)) pe))))
+(define-function tp-rule-body (rule)	; the pattern compiled: its parameters read, and its action form applied
+  (let ((form (tp-action-form rule)) (body (tp-parameters (caddr rule) (cadr rule))))
+    (if form (tp-through-form form body) body)))
+
 (define-function compile-value (rule class)
   (let ((name (car rule)))
     (when (member? name '(apply super))
       (error "rule name " name " is reserved by {apply} and {super}"))
     (set *tp-rule* name)
     (set *tp-class* class)
-    (let* ((body (tp-parameters (caddr rule) (cadr rule)))
+    (let* ((body (tp-rule-body rule))
 	   (vars (find-vars body)))
       `(define-method ,(concat-symbol '$ name) ,class ,(tp-method-parameters (caddr rule))
 	 (let ,vars
@@ -385,7 +399,7 @@
   (let ((name (car rule)))
     (set *tp-rule* name)
     (set *tp-class* class)
-    (let* ((body (tp-parameters (caddr rule) (cadr rule)))
+    (let* ((body (tp-rule-body rule))
 	   (vars (find-vars body)))
       `(define-method ,(concat-symbol '$$ name) ,class ,(tp-method-parameters (caddr rule))
 	 (let ,vars

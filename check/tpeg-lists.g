@@ -20,3 +20,6 @@ regs = `( 'r sub:a sub:b ) -> (list a b) ;
 sub = .:v -> (list 'v v) ;
 pair = `( 'p .:a ) -> a ;
 anything = `( 'any .:x ) -> x ;
+# a rule's action form, <form> after its name: each quasiquoted action is compiled as (form `…), the form seeing the
+# template itself; other actions are as written
+wrapped <tl-wrap> = `( 'w .:x ) -> `(got ,x) | .:y -> (list 'plain y) ;

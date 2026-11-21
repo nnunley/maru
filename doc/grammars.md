@@ -51,4 +51,8 @@ PEG and tpeg grammars, left recursion, composition, typed tree matching and gram
   then above, so a block is reflected on like any grammar, inherits through the same rules and fields, and is seen by
   nothing outside its compilation. A rule may be annotated,
   `@decision pick = …`, each `@name` (read as a symbol, so `@left-recursive`) kept in order as data the engine gives no meaning; a rule with none
-  stays `(name body parameters)`, so `compile-peg.l` and `compile-tpeg.l` still write the same `tpeg.l`.
+  stays `(name body parameters)`, so `compile-peg.l` and `compile-tpeg.l` still write the same `tpeg.l`. A rule's
+  action form, `intent <arm64-sites> = …`, is kept among its annotations as `(actions arm64-sites)`: `compile-tpeg.l`
+  compiles each of the rule's quasiquoted actions, `` -> `… ``, as `` (arm64-sites `…) ``, so the form, a macro, sees the
+  template itself as the grammar loads, and any other action is as written (`tree_lists`). native-arm64.g's `intent`
+  writes its instructions this way.
