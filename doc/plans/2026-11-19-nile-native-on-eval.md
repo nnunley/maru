@@ -88,7 +88,11 @@ builds nothing the kernel will make unnecessary.
 
 ### A1. The native path's bug
 
-**The bug is fixed; the speed goal is not met (2026-11-20).** `native_nile` passes: the runtime and Gezira image
+**Open: the speed goal is not met.** The goal is now a small multiple of the C back end as it is today, within 3 times
+its 2.7 s, about 8 s of CPU. A1 closes when `native_nile`'s bound is 3. Until then the bound of 16 only keeps the gap from
+growing.
+
+**The bug is fixed (2026-11-20).** `native_nile` passes: the runtime and Gezira image
 natively on `eval2` in 32 s of CPU, where they ran past 84 CPU-minutes. But that is about 12 times the C back end's
 2.7 s, not the small multiple this step aimed for. The 11.6 s it aimed from was timed before the global cache fix below,
 which sped up both back ends. The bound of 16 records today's gap so it can't grow, not the goal. The bug was several
@@ -105,8 +109,9 @@ costs, each growing with the unit:
 - `hash.l`'s lookup took fewer calls.
 
 What remains is interpretation spread evenly over lowering (about 12 s) and assembly (about 16 s), about 145 µs per
-instruction with 1.08 rows tried each, with no single hot spot left. Closing the gap to the C back end means running
-the compiler itself as native code, on the kernel (Part B, after B1), not more tuning here.
+instruction with 1.08 rows tried each, with no single hot spot left. Reaching the goal on `eval2` means doing less
+interpretive work per instruction, or fewer instructions, in lowering and assembly, which is the next work on this step.
+Running the compiler natively on the kernel (Part B) closes the rest of the gap later, but A1 doesn't wait for it.
 
 The steps as planned:
 
@@ -212,7 +217,7 @@ library load that fails, or a Nile error, should unwind to the REPL, not kill it
 ## Left to the builder
 
 - Accessor names, and how A2 exports the runtime's entry points.
-- The `native_nile` bound, once A1 has the curve. (Set: under 16 times the C back end's CPU, in the same case.)
+- The `native_nile` bound, once A1 has the curve. (16 times the C back end's CPU for now, in the same case; 3 closes A1.)
 - Whether a float field needs a primitive.
 
 ## Open
