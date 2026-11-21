@@ -64,8 +64,8 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
 - `native_nile` (`check/native-nile.l`): the Nile runtime and Gezira's kernels (`gezira.k`, `gezira-image.k`,
   `gezira-api.k`) compiled natively on `eval2` in one unit and made a code image holding every entry point
   `gezira-api.k` exports, in under 16 times the CPU `ir-gen-c.k` takes to turn the same files into C. Both run under
-  `/usr/bin/time -p` in the same case, so the bound holds on any machine. On 2026-11-20 it was about 12.5 times
-  (32 s against 2.5 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes.
+  `/usr/bin/time -p` in the same case, so the bound holds on any machine. On 2026-11-20 it was about 12 times
+  (32 s against 2.7 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes.
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).

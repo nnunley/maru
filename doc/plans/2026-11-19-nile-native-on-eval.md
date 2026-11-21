@@ -16,7 +16,7 @@ builds nothing the kernel will make unnecessary.
 
 - **The library path.** `gezira.nl` goes through Nile's Maru back end to typed Maru (`build/gezira.k`, 341K). Then
   `ir-gen-c.k` and `maru.k` on `eval2` turn it into C (11.6 s for the runtime and Gezira together, measured
-  2026-11-19; 2.5 s once A1 fixed `eval2`'s global cache), and `cc` builds `build/gezira.dylib`. `gezira-maru.l` opens it with `dlopen` and states eleven
+  2026-11-19; 2.7 s once A1 fixed `eval2`'s global cache), and `cc` builds `build/gezira.dylib`. `gezira-maru.l` opens it with `dlopen` and states eleven
   signatures by hand.
   - `gezira-api.k` fixes the pipelines (`gezira_fill`, `gezira_fill_image`, `gezira_fill_clipped` and the
     image-clipped one) in typed code. Untyped Maru can't compose kernels.
@@ -89,8 +89,8 @@ builds nothing the kernel will make unnecessary.
 ### A1. The native path's bug
 
 **The bug is fixed; the speed goal is not met (2026-11-20).** `native_nile` passes: the runtime and Gezira image
-natively on `eval2` in 32 s of CPU, where they ran past 84 CPU-minutes. But that is about 12.5 times the C back end's
-2.5 s, not the small multiple this step aimed for. The 11.6 s it aimed from was timed before the global cache fix below,
+natively on `eval2` in 32 s of CPU, where they ran past 84 CPU-minutes. But that is about 12 times the C back end's
+2.7 s, not the small multiple this step aimed for. The 11.6 s it aimed from was timed before the global cache fix below,
 which sped up both back ends. The bound of 16 records today's gap so it can't grow, not the goal. The bug was several
 costs, each growing with the unit:
 - `native-form-text` built the image's text by `concat-string`, quadratic in its size (hours for the runtime).

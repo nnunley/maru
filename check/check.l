@@ -1010,7 +1010,7 @@
     total))
 
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
-;; 16 times the CPU the C back end takes to turn the same files into C (about 12.5 times, 33.6 s against 2.7 s, on
+;; 16 times the CPU the C back end takes to turn the same files into C (about 12 times, 32 s against 2.7 s, on
 ;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
 (check "native_nile"
   (let* ((inputs (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")

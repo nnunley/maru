@@ -77,7 +77,7 @@ make Capability NileEndToEnd "text-layout.nl runs end to end through Maru, as th
   "nile/, check/check.l" [ nile_text_layout ] [ NileBuiltins ] no.
 make Capability GeziraImage "Gezira's kernels, compiled through Maru, render a scene to pixels"
   "gezira/, the Nile runtime" [ gezira_image ] [ NileEndToEnd ] no.
-make Capability NativeNileCompiles "native.l compiles the Nile runtime and Gezira in one unit on eval2, within 16 times the C back end (12.5 today; the goal, a small multiple, waits on the compiler running natively)"
+make Capability NativeNileCompiles "native.l compiles the Nile runtime and Gezira in one unit on eval2, within 16 times the C back end (12 today; the goal, a small multiple, waits on the compiler running natively)"
   "native.l, asm-table.l, asm-arm64.l, native-link.l, hash.l" [ native_nile ] [ GeziraImage ] no.
 make Capability Sdl3Window "an SDL3 window shows a pixel buffer each frame and hands back mouse and key events"
   "sdl3.osdefs, sdl3.k" [ sdl3_window ] [ ] no.
