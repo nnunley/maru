@@ -13,6 +13,7 @@ osdefs.k
 *.exe
 *.g.l
 /tpeg.l
+/arm64-rules.g
 /tpeg.lls
 /asm-x86.k
 *.o

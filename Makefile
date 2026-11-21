@@ -74,7 +74,7 @@ define with-dbjr
 	  status=$$?; rm -rf "$$dbjr"; exit $$status; fi
 endef
 
-check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l $(CROSS) .force
+check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l arm64-rules.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	$(call with-dbjr,./eval check/parallel.l $(CHECKS))
 
@@ -82,7 +82,7 @@ check-sweep : eval eval2 eval3 .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/sweep.l $(SEEDS)
 
-check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l $(CROSS) .force
+check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l arm64-rules.g.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	$(call with-dbjr,./eval check/parallel.l --quick)
 
@@ -352,3 +352,10 @@ clean : .force
 #----------------------------------------------------------------
 
 .force :
+
+# arm64.spec's rows as a tree grammar (gen-arm64-rules.l), and its compiled rules
+arm64-rules.g : gen-arm64-rules.l asm-arm64.l arm64.spec arm64.g.l | eval
+	./eval gen-arm64-rules.l > $@.tmp && mv $@.tmp $@
+
+arm64-rules.g.l : arm64-rules.g tpeg.l compile-tpeg.l | eval
+	./eval compile-tpeg.l $< > $@

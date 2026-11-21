@@ -239,6 +239,10 @@
   (unit-assert (equal (last (run "asm-table-x86" "./eval check/asm-table.l x86" 600)) "asm table x86 ok"))
   (unit-assert (equal (last (run "asm-table-arm64-2" "./eval2 -b boot2.l check/asm-table.l arm64" 600)) "asm table arm64 ok"))
   (unit-assert (equal (last (run "asm-table-x86-2" "./eval2 -b boot2.l check/asm-table.l x86" 600)) "asm table x86 ok")))
+;; The encoder grammar (arm64-rules.g, from arm64.spec by gen-arm64-rules.l) answers as asm does over the same arm64
+;; stream: the row asm-select chooses and its word, or no row (check/asm-grammar.l)
+(check "asm_grammar"
+  (unit-assert (equal (last (run "asm_grammar" "./eval check/asm-grammar.l" 300)) "asm grammar ok")))
 
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))

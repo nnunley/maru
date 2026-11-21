@@ -25,3 +25,4 @@ erosion +1 asm-arm64.l's memo step is a multimethod (define-generic with a defau
 erosion -1 the label sites' short callables (arm64-label-site-encode, -emit, arm64-site-new): they dilute the share over CC 10
 erosion -1 the template's short callables (arm64-template-spec, arm64-unquoted, arm64-insn-code ...): they dilute the share over CC 10
 erosion -1 the erosion reader counts define-multimethod methods and define-generic defaults as callables (4581 to 4621 callables, forms 94893 to 94955): arm64-memo-step's three methods and the other multimethods' bodies are short, so they dilute the share over CC 10; the new check/erosion.l cases add forms, not callables, bar names-of
+erosion -2 asm-arm64.l's kind values and the encoder grammar's short callables (arm64-rule-name, arm64-operand-rule, arm64-put-leaves, arm64-row-result ...), and arm64-value-binder's four binders folded into one: they dilute the share over CC 10

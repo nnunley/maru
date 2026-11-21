@@ -170,7 +170,7 @@
 ;;; is looked up by name.  A field reference is (width (slot . width) ...), its
 ;;; parts low first.
 
-(define-structure <arm64-plan> (names shifts kinds t-slot allowed q size sz))
+(define-structure <arm64-plan> (names shifts kinds t-slot allowed q size sz infos))	; infos: each kind's info
 
 (define-function arm64-row-plan (row)	(cadr (cdr (cddddr row))))
 
@@ -244,6 +244,26 @@
   (or (cache-at arm64-register-cache op)
       (let ((r (hash-at arm64-register-table op))) (and r (cache-at-put arm64-register-cache op r)))))
 
+;; A simple operand kind's value: what its field holds for op, or () if op isn't of the kind.  Its binder puts the
+;; value in the row's fields, and its operand rule (arm64-operands.g) answers it: the kind is defined here, once.
+(define-function arm64-reg-value (class kind op)	; a register of class, 31 being SP or ZR as kind says: its number
+  (let ((r (and (symbol? op) (arm64-register-entry op))))
+    (and r (= (cadr r) class) (or (not (cadddr r)) (= (cadddr r) kind)) (caddr r))))
+(define-function arm64-cond-value (op) (arm64-cond-code op))
+(define-function arm64-invcond-value (op)	; CSET encodes the inverted condition
+  (let ((q (arm64-cond-code op))) (and q (< q 14) (if (= 0 (& q 1)) (+ q 1) (- q 1)))))
+(define-function arm64-fimm-value (op) (arm64-fp8 op))
+;; a number field width bits wide, scaled: imm, simm, pcrel and pcpage take a placeholder ((reloc), or (reloc N) of
+;; its width), which is zero for now; lsl reads (LSL n)
+(define-function arm64-number-value (c width scale op pc)
+  (if (and (memq c '(imm simm pcrel pcpage)) (arm64-reloc? op))
+      (and width (or (not (cdr op)) (= (cadr op) width)) 0)
+    (let ((v (cond ((= c 'pcrel)	(and (long? op) (- op pc)))
+		   ((= c 'pcpage)	(and (long? op) (- op (arm64-page pc))))
+		   ((= c 'lsl)		(and (pair? op) (= 'LSL (car op)) (cadr op)))
+		   (else		op))))
+      (and width v (arm64-scaled (if (memq c '(imm lsl)) 'imm 'simm) width scale v)))))
+
 ;; Each operand kind binds through a binder of its own, made once when its row's plan is: a function of
 ;; (plan op vals pc) that binds op into vals and answers vals, or () if op doesn't fit.  The kind's info (arm64-kind-info)
 ;; is read when the binder is made, so binding tests nothing about the kind itself.
@@ -256,9 +276,7 @@
 
 (define-arm64-binder (reg) p
   (let ((slot (cadr p)) (class (caddr p)) (kind (cadddr p)))
-    (lambda (plan op vals pc)
-      (let ((r (and (symbol? op) (arm64-register-entry op))))
-	(and r (= (cadr r) class) (or (not (cadddr r)) (= (cadddr r) kind)) (arm64-put vals slot (caddr r)))))))
+    (lambda (plan op vals pc) (let ((q (arm64-reg-value class kind op))) (and q (arm64-put vals slot q))))))
 (define-arm64-binder (vreg) p
   (let ((slot (cadr p)) (a (caddr p)))
     (lambda (plan op vals pc)
@@ -294,15 +312,13 @@
 	   (arm64-put (arm64-put vals immr (& (- w op) (- w 1))) imms (- (- w 1) op))))))
 (define-arm64-binder (fimm) p
   (let ((slot (cadr p)))
-    (lambda (plan op vals pc) (let ((q (arm64-fp8 op))) (and q (arm64-put vals slot q))))))
+    (lambda (plan op vals pc) (let ((q (arm64-fimm-value op))) (and q (arm64-put vals slot q))))))
 (define-arm64-binder (cond) p
   (let ((slot (cadr p)))
-    (lambda (plan op vals pc) (let ((q (arm64-cond-code op))) (and q (arm64-put vals slot q))))))
-(define-arm64-binder (invcond) p	; CSET encodes the inverted condition
+    (lambda (plan op vals pc) (let ((q (arm64-cond-value op))) (and q (arm64-put vals slot q))))))
+(define-arm64-binder (invcond) p
   (let ((slot (cadr p)))
-    (lambda (plan op vals pc)
-      (let ((q (arm64-cond-code op)))
-	(and q (< q 14) (arm64-put vals slot (if (= 0 (& q 1)) (+ q 1) (- q 1))))))))
+    (lambda (plan op vals pc) (let ((q (arm64-invcond-value op))) (and q (arm64-put vals slot q))))))
 (define-arm64-binder (mreg) p
   (let ((n (cadr p)) (rest (caddr p)) (first (arm64-binder (cadddr p))) (second (arm64-binder (car (cddddr p)))))
     (lambda (plan op vals pc)
@@ -311,19 +327,10 @@
 	   (second plan (caddr op) vals pc)))))
 (define-arm64-binder (imm0) p
   (lambda (plan op vals pc) (and (= op 0) vals)))
-;; a number field: a placeholder binds zero for now (imm, simm, pcrel and pcpage take one), else the value fits scaled
-(define-function arm64-value-binder (c p value)	; value: the field's value for op at pc, or ()
-  (let* ((ref (cadr p)) (tag (if (memq c '(imm lsl)) 'imm 'simm)) (width (and ref (car ref))) (scale (caddr p))
-	 (placeholders (memq c '(imm simm pcrel pcpage))))
-    (lambda (plan op vals pc)
-      (if (and placeholders (arm64-reloc? op))
-	  (and ref (or (not (cdr op)) (= (cadr op) (car ref))) (arm64-put-ref ref 0 vals))
-	(let* ((v (value op pc)) (q (and ref v (arm64-scaled tag width scale v))))
-	  (and q (arm64-put-ref ref q vals)))))))
-(define-arm64-binder (imm simm) p	(arm64-value-binder (car p) p (lambda (op pc) op)))
-(define-arm64-binder (pcrel) p		(arm64-value-binder 'pcrel p (lambda (op pc) (and (long? op) (- op pc)))))
-(define-arm64-binder (pcpage) p		(arm64-value-binder 'pcpage p (lambda (op pc) (and (long? op) (- op (arm64-page pc))))))
-(define-arm64-binder (lsl) p		(arm64-value-binder 'lsl p (lambda (op pc) (and (pair? op) (= 'LSL (car op)) (cadr op)))))
+;; a number field: its value (arm64-number-value) put in its parts
+(define-arm64-binder (imm simm pcrel pcpage lsl) p
+  (let* ((c (car p)) (ref (cadr p)) (width (and ref (car ref))) (scale (caddr p)))
+    (lambda (plan op vals pc) (let ((q (arm64-number-value c width scale op pc))) (and q (arm64-put-ref ref q vals))))))
 (define-arm64-binder (tag) p
   (let ((head (cadr p)) (first (arm64-binder (caddr p))) (second (arm64-binder (cadddr p))))
     (lambda (plan op vals pc)
@@ -340,12 +347,19 @@
 	  (and (assq (car f) slots) (error (car row)": field "(car f)" twice in its diagram"))
 	  (set slots (cons (list (car f) n shift w) slots))
 	  (set n (+ n 1)))))
-    (let ((names (array n)) (shifts (array n)))
+    (let ((names (array n)) (shifts (array n)) (infos (map (lambda (k) (arm64-kind-info slots k)) (cadr row))))
       (list-do s slots (set-array-at names (cadr s) (car s)) (set-array-at shifts (cadr s) (caddr s)))
-      (new <arm64-plan> names shifts (map (lambda (k) (arm64-binder (arm64-kind-info slots k))) (cadr row)) n
-	   (arm64-allowed row) (arm64-slot slots 'q) (arm64-slot slots 'size) (arm64-slot slots 'sz)))))
+      (new <arm64-plan> names shifts (map arm64-binder infos) n
+	   (arm64-allowed row) (arm64-slot slots 'q) (arm64-slot slots 'size) (arm64-slot slots 'sz) infos))))
 
 (list-do row arm64-rows (set-cdr (cdr (cddddr row)) (list (arm64-plan row))))
+(define-function arm64-plan-word (row vals)	; the row's fixed bits, then each field of vals in its place
+  (let* ((plan (arm64-row-plan row)) (word (car (cddddr row))) (shifts (<arm64-plan>-shifts plan)))
+    (for (i 0 (<arm64-plan>-t-slot plan))
+      (let ((v (array-at vals i)))
+	(or v (error (car row)": field "(array-at (<arm64-plan>-names plan) i)" has no arm64-operand"))
+	(set word (| word (<< v (array-at shifts i))))))
+    word))
 
 (define-function arm64-encode-row (row ops pc)
   (let* ((plan (arm64-row-plan row)) (kinds (<arm64-plan>-kinds plan))
@@ -354,13 +368,49 @@
       (or ((car kinds) plan (car ops) vals pc) (set ok ()))
       (set kinds (cdr kinds))
       (set ops (cdr ops)))
-    (and ok (not kinds) (not ops)
-	 (let ((word (car (cddddr row))) (shifts (<arm64-plan>-shifts plan)))	; the fixed bits, then each field
-	   (for (i 0 (<arm64-plan>-t-slot plan))
-	     (let ((v (array-at vals i)))
-	       (or v (error (car row)": field "(array-at (<arm64-plan>-names plan) i)" has no arm64-operand"))
-	       (set word (| word (<< v (array-at shifts i))))))
-	   word))))
+    (and ok (not kinds) (not ops) (arm64-plan-word row vals))))
+
+;;; ---------------------------------------------------------------- the encoder grammar
+;;; arm64.spec's rows as a tree grammar (gen-arm64-rules.l writes arm64-rules.g): an operand rule for each simple
+;;; operand kind, answering its value (above), a rule for each row matching an instruction and answering (row .
+;;; word), and for each mnemonic the choice of its rows in file order (asm's first fit), and for a placeholder in an
+;;; operand position the rows sorted by that field's size, widest first (asm-best-row's choice for an open one).
+(define arm64-row-vector (list->array arm64-rows))	; a row by its index, as the rules name it
+(define-function arm64-rule-name (prefix name)	; prefix then name, letters and digits only (a dot spelt dot)
+  (let ((out (array)) (s (concat-string prefix (if (symbol? name) (symbol->string name) name))))
+    (for (i 0 (string-length s))
+      (let ((c (string-at s i)))
+	(if (or (and (<= ?A c) (<= c ?Z)) (and (<= ?a c) (<= c ?z)) (and (<= ?0 c) (<= c ?9)))
+	    (array-append out c)
+	  (string-do d "dot" (array-append out d)))))
+    (string->symbol (array->string out))))
+(define-function arm64-info-width (info) (let ((ref (cadr info))) (and ref (car ref))))
+(define-function arm64-operand-rule (info)	; a simple kind's operand rule: (name expression-of-v), or ()
+  (let ((c (car info)))
+    (cond ((= c 'reg)		(list (arm64-rule-name "reg" (concat-string (long->string (caddr info)) (symbol->string (cadddr info))))
+				      `(arm64-reg-value ,(caddr info) ',(cadddr info) v)))
+	  ((memq c '(imm simm pcrel pcpage lsl))
+	   (let ((w (arm64-info-width info)))
+	     (and w (list (arm64-rule-name (symbol->string c) (concat-string (long->string w) (concat-string "s" (long->string (caddr info)))))
+			  `(arm64-number-value ',c ,w ,(caddr info) v self.pc)))))
+	  ((= c 'cond)		(list 'cond '(arm64-cond-value v)))
+	  ((= c 'invcond)	(list 'invcond '(arm64-invcond-value v)))
+	  ((= c 'fimm)		(list 'fimm '(arm64-fimm-value v))))))
+(define-function arm64-put-leaves (info leaves vals)	; a matched operand's values into vals: the leaves left
+  (let ((c (car info)))
+    (cond ((memq c '(reg cond invcond fimm))		(arm64-put vals (cadr info) (car leaves)) (cdr leaves))
+	  ((memq c '(imm simm pcrel pcpage lsl))	(arm64-put-ref (cadr info) (car leaves) vals) (cdr leaves))
+	  ((= c 'imm0)					leaves)
+	  ((= c 'tag)	(arm64-put-leaves (cadddr info) (arm64-put-leaves (caddr info) leaves vals) vals))
+	  ((= c 'mreg)	(arm64-put-leaves (car (cddddr info)) (arm64-put-leaves (cadddr info) leaves vals) vals))
+	  (else		(error "arm64: no leaves for " info)))))
+(define-function arm64-row-result (k leaves)	; row k's (row . word) from its operands' values, as its rule matched them
+  (let* ((row (array-at arm64-row-vector k)) (vals (array (+ 1 (<arm64-plan>-t-slot (arm64-row-plan row))))))
+    (list-do info (<arm64-plan>-infos (arm64-row-plan row)) (set leaves (arm64-put-leaves info leaves vals)))
+    (cons row (arm64-plan-word row vals))))
+(define-function arm64-escape-result (k insn pc)	; a row whose kinds have no operand rules: its encoder, on the whole insn
+  (let* ((row (array-at arm64-row-vector k)) (w (and (pair? insn) (= (car insn) (car row)) (arm64-encode-row row (cdr insn) pc))))
+    (and w (cons row w))))
 
 ;;; ---------------------------------------------------------------- decoding
 
