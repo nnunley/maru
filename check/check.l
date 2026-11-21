@@ -1000,13 +1000,13 @@
       (unit-assert (equal (run (concat-strings "nile-gezira-image-" n) (concat-strings bin " " n " && test ! -s " tmp "/nile-gezira-image-" n ".err") 300)
 			  '("gezira image ok"))))))
 
-;; The CPU seconds, in hundredths, that /usr/bin/time -p reported in NAME's errors: user and sys, each to two places.
-(define-function cpu-hundredths (name)
+;; The CPU seconds, in hundredths, that /usr/bin/time -p reported in TEXT: user and sys, each to two places.
+(define-function time-hundredths (text)
   (let ((total 0))
-    (list-do l (lines (contents-of-file-named (concat-strings tmp "/" name ".err")))
+    (list-do l (lines text)
       (let ((w (words l)))
 	(and (member? (car w) '("user" "sys"))
-	     (set total (+ total (string->long (apply concat-strings (split (cadr w) ?.))))))))
+	     (set total (+ total (double->long (+ 0.5 (* 100.0 (string->double (cadr w))))))))))
     total))
 
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
@@ -1016,11 +1016,14 @@
   (let* ((inputs (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
 						 (concat-strings nile-dir "gezira-api.k"))))
 	 (loader (concat-strings tmp "/native-nile.k")))
+    (unit-assert (= 106 (time-hundredths "real 1.20\nuser 0.98\nsys 0.08\n")))	; 0.08 isn't octal
+    (unit-assert (= 3395 (time-hundredths "user 33.60\nsys 0.35\n")))
     (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
     (run "native_nile_c" (concat-strings "/usr/bin/time -p ./eval2 ir-gen-c.k maru.k" inputs " > " tmp "/native-nile.c") 300)
     (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader) 900))
 			"native nile ok"))
-    (let ((c (cpu-hundredths "native_nile_c")) (n (cpu-hundredths "native_nile")))
+    (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
+	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
       (unit-assert (< 0 c))
       (unit-assert (< n (* 16 c))))))

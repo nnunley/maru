@@ -88,8 +88,11 @@ builds nothing the kernel will make unnecessary.
 
 ### A1. The native path's bug
 
-**Done (2026-11-20).** `native_nile` passes: the runtime and Gezira image natively on `eval2` in 32 s of CPU, about
-12.5 times the C back end's 2.5 s, against a bound of 16. The bug was several, each a cost that grew with the unit:
+**The bug is fixed; the speed goal is not met (2026-11-20).** `native_nile` passes: the runtime and Gezira image
+natively on `eval2` in 32 s of CPU, where they ran past 84 CPU-minutes. But that is about 12.5 times the C back end's
+2.5 s, not the small multiple this step aimed for. The 11.6 s it aimed from was timed before the global cache fix below,
+which sped up both back ends. The bound of 16 records today's gap so it can't grow, not the goal. The bug was several
+costs, each growing with the unit:
 - `native-form-text` built the image's text by `concat-string`, quadratic in its size (hours for the runtime).
 - `eval2`'s and `eval3`'s global cache was direct-mapped, with a scan of the whole environment on a miss, so lookups
   swung by up to four times with the allocation layout. It is now open addressing, filled from the globals only.
