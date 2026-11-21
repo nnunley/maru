@@ -28,6 +28,10 @@
 (define-function native-arm64-far? (size at) (or (> at (* 4095 size)) (!= 0 (% at size))))
 (define-function native-arm64-w (r)	; X9 to W9
   (let ((name (symbol->string r))) (string->symbol (concat-string "W" (string-copy name 1 (- (string-length name) 1))))))
+(define-function native-arm64-address (slot r)
+  (if (< slot 4096)
+      (arm64-sites `((ADD (x ,r) SP (n ,slot))))
+    (concat-list (arm64-constant r (- slot native-arm64-frame)) (arm64-sites `((ADD (x ,r) X29 (x ,r)))))))
 (define-function native-arm64-access (size base at forms)	; an access's forms, its place reached first if far
   (if (and (= base 'SP) (native-arm64-far? size at))
       (concat-list (native-arm64-address at 'X15) (forms '(off X15 0)))
@@ -48,10 +52,6 @@
 	    ((= size 2) (arm64-sites `((STRH (w ,(native-arm64-w r)) (mem ,place)))))
 	    ((= size 1) (arm64-sites `((STRB (w ,(native-arm64-w r)) (mem ,place)))))
 	    (else (error "native: no store of " size " bytes"))))))
-(define-function native-arm64-address (slot r)
-  (if (< slot 4096)
-      (arm64-sites `((ADD (x ,r) SP (n ,slot))))
-    (concat-list (arm64-constant r (- slot native-arm64-frame)) (arm64-sites `((ADD (x ,r) X29 (x ,r)))))))
 ;; floating point: values stay as bits in slots and integer registers, and visit abi.spec's fscratch registers (D16, or
 ;; its 32-bit view S16) to be operated on; arguments and results use fargs and fresult
 (define-function native-arm64-view (r width)	; D16 at 64 bits, S16 at 32; X9 at 64, W9 at 32
