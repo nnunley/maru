@@ -722,6 +722,13 @@
 ;; maru-test.k's sieve prints the primes below 32, then its struct code sets
 ;; x = 42 and y = 666, sums them and doubles both.  The two lines after the
 ;; primes read uninitialised memory and are skipped.
+;; eval2's profiler reports the 64 most sampled functions and ends cleanly when more were sampled (check/profile.l): the
+;; report's insertion wrote one past its 64 entries when a smaller count came after they were full
+(check "profile"
+  (unit-assert (equal (last (run "profile_p" "./eval2 -p check/profile.l")) "profile ok"))
+  (run "profile_P" "./eval2 -P check/profile.l")
+  (unit-assert (= 64 (list-length (select (lambda (l) (and (string-find l "\t") (<= ?0 (string-at l 0)) (<= (string-at l 0) ?9)))	; COUNT<tab>
+					  (lines (contents-of-file-named (concat-strings tmp "/profile_P.err"))))))))
 ;; a global is found as quickly whichever globals are in use and wherever their symbols were allocated
 ;; (check/global-lookup.l): eval2's and eval3's cache of global bindings keeps every one it found
 (define the-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))
