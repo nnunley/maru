@@ -606,8 +606,8 @@
 	 (let ((c (or (<arm64-memo>-symbols node) (set (<arm64-memo>-symbols node) (identity-cache 32)))))
 	   (or (cache-at c key) (cache-at-put c key (new <arm64-memo> () () ())))))
 	((long? key)
-	 (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 256))))
-		(i (& key 255)) (e (array-at a i)))
+	 (let* ((a (or (<arm64-memo>-numbers node) (set (<arm64-memo>-numbers node) (array 1024))))
+		(i (& (^ key (>> key 3)) 1023)) (e (array-at a i)))	; offsets are multiples of 8: their low bits mixed in
 	   (if (and e (= (car e) key)) (cdr e) (cdr (set-array-at a i (cons key (new <arm64-memo> () () ())))))))))
 (define-function arm64-memo-node (site ops)	; the trie's node for ops, or ()
   (let ((node (<arm64-site>-memo site)) (ks (<arm64-site>-keys site)))
