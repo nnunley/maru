@@ -421,6 +421,8 @@ F3 0F 7E /r		MOVQ xmm, xmm/m64		V V
 F2 0F 7C /r		HADDPS xmm, xmm/m128		V V
 66 0F 7C /r		HADDPD xmm, xmm/m128		V V
 66 0F 3A 40 /r ib u	DPPS xmm, xmm/m128, imm8	V V
+66 0F 3A 0A /r ib u	ROUNDSS xmm, xmm/m32, imm8	V V
+66 0F 3A 0B /r ib u	ROUNDSD xmm, xmm/m64, imm8	V V
 
 # SSE packed integer
 66 0F FC /r		PADDB xmm, xmm/m128		V V

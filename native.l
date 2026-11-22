@@ -72,6 +72,10 @@
   (let ((f0 (native-arm64-f 0 width)) (f1 (native-arm64-f 1 width))
 	(a (native-arm64-view a width)) (b (native-arm64-view b width)) (d (native-arm64-view d width)))
     (cond ((= kind 'neg) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FNEG (f ,f0) (f ,f0)) (FMOV (r ,d) (f ,f0)))))
+	  ;; the C library's floor, ceiling and square root (native-gen.k's native-math-kind): one instruction each, exact
+	  ((= kind 'floor) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FRINTM (f ,f0) (f ,f0)) (FMOV (r ,d) (f ,f0)))))
+	  ((= kind 'ceil) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FRINTP (f ,f0) (f ,f0)) (FMOV (r ,d) (f ,f0)))))
+	  ((= kind 'sqrt) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FSQRT (f ,f0) (f ,f0)) (FMOV (r ,d) (f ,f0)))))
 	  ((= kind 'add) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FMOV (f ,f1) (r ,b)) (FADD (f ,f0) (f ,f0) (f ,f1)) (FMOV (r ,d) (f ,f0)))))
 	  ((= kind 'sub) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FMOV (f ,f1) (r ,b)) (FSUB (f ,f0) (f ,f0) (f ,f1)) (FMOV (r ,d) (f ,f0)))))
 	  ((= kind 'mul) (arm64-sites `((FMOV (f ,f0) (r ,a)) (FMOV (f ,f1) (r ,b)) (FMUL (f ,f0) (f ,f0) (f ,f1)) (FMOV (r ,d) (f ,f0)))))

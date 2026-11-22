@@ -56,6 +56,16 @@
 		((fn image 'null-global "p>l") buffer))
 	  '(0 0 0 0)))
 
+;; the C library's math functions as instructions, exact (check/native/math.k): the functions hold no call
+(let* ((unit (native-compile-file "check/native/math.k")) (image (native-install unit)) (inf (* 1e308 10.0)))
+  (list-do f (<native-unit>-functions unit)
+    (expect (concat-string (symbol->string (car f)) " calls nothing") (list-detect i (cadr f) (= 'call (car i))) ()))
+  (expect "floorf" (map (fn image 'm-floorf "f>f") (list 2.5 -0.5 4294967808.0 inf (- 0.0 inf))) (list 2.0 -1.0 4294967808.0 inf (- 0.0 inf)))
+  (expect "ceilf" (map (fn image 'm-ceilf "f>f") (list 2.5 -1.5 4294967808.0 inf)) (list 3.0 -1.0 4294967808.0 inf))
+  (expect "sqrtf" (map (fn image 'm-sqrtf "f>f") (list 2.25 0.0 inf)) (list 1.5 0.0 inf))
+  (expect "floor" (map (fn image 'm-floor "d>d") (list 2.5 -0.5 1e300 -1e300)) (list 2.0 -1.0 1e300 -1e300))
+  (expect "ceil" (map (fn image 'm-ceil "d>d") (list 2.5 -1.5 9007199254740993.0)) (list 3.0 -1.0 9007199254740993.0))
+  (expect "sqrt" (map (fn image 'm-sqrt "d>d") (list 2.25 1e300)) (list 1.5 1e150)))
 (let ((image (native-install (native-compile-file "check/native/floats.k"))))
   (expect "fadd" ((fn image 'fadd "dd>d") 1.25 2.5) 3.75)
   (expect "fmix, in float" ((fn image 'fmix "fff>f") 2.0 3.0 1.0) 5.5)
