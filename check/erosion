@@ -40,3 +40,4 @@ verbosity -1 rules.l's float helpers, forms neither flagged nor cloned dilute th
 erosion -1 native-gen.k's call lowering split by native-math-kind, and the float operations' new short branches
 erosion -3 the twin support as short callables (segments, pools, isolated runs) and the table generator's helpers
 erosion +1 check/law.l's law-structural, one walk over a value's kinds (string, list, number)
+erosion -3 the algebra support as short callables (one per law, helpers for maps, bands and pixel tables) dilute the share in complex ones

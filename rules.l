@@ -136,11 +136,15 @@
 ;; layout: sign bit 31, exponent bits 23 to 30, mantissa bits 0 to 22.
 ;; the conversions are arithmetic, from the format's definition, so the engine runs on every evaluator (eval2 has no
 ;; data to reinterpret bits in): a normal value is (2^23 + m) 2^(e - 150), a subnormal m 2^-149, e 255 infinity
-(define-function rules-pow2 (n)	; 2^n, exactly
-  (let ((r 1.0))
-    (while (< n 0) (set r (* r 0.5)) (set n (+ n 1)))
-    (while (> n 0) (set r (* r 2.0)) (set n (- n 1)))
-    r))
+;; 2^n, exactly, from a table made once: from 2^-1100 (past double's least subnormal, 2^-1074, so it is 0) to 2^1100 (past
+;; its greatest, so it is infinity); a power made by multiplying each time cost the float checks a loop per comparison
+(define rules-pow2-table
+  (let ((t (array 2201)) (r 1.0))
+    (for (i 0 1101) (set-array-at t (+ 1100 i) r) (set r (* r 2.0)))
+    (set r 1.0)
+    (for (i 0 1101) (set-array-at t (- 1100 i) r) (set r (* r 0.5)))
+    t))
+(define-function rules-pow2 (n) (array-at rules-pow2-table (+ 1100 (max -1100 (min 1100 n)))))
 (define rules-float-inf (* 1e308 10.0))
 (define-function rules-float-of-bits (b)
   (let* ((s (if (= 0 (& b (<< 1 31))) 1.0 -1.0)) (e (& (>> b 23) 255)) (m (& b (- (<< 1 23) 1))))

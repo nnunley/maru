@@ -1,10 +1,49 @@
 -- Gezira's algebra (check/laws/gezira-twin.l): kernels held to mathematics on both builds, the C library and the native
 -- image, so a fault both share shows (the twin compares them with each other, and can't see one).  Values are drawn by
--- the engine's float domain, from a fresh seed each run (MARU_LAW_SEED replays a refutation).
-under test: floor_right, ceiling_right
-defaults trials = 200
+-- the engine's float domain, from a fresh seed each run (MARU_LAW_SEED replays a refutation).  A law whose arithmetic
+-- would leave float32's finite range for the drawn values, or whose matrix is too near singular to invert, counts the
+-- case as outside it (printed at the end) rather than hold it; a law's band is 1e-5 of the sum of its terms' magnitudes,
+-- plus 1e-6, the error of a few float32 operations, or it is exact, as each says.
+under test: floor_right, ceiling_right, transform_compose, transform_identity, transform_inverse, beziers_compose, beziers_identity, beziers_inverse, over_associative, over_identity, clear_absorbs, src_dst_project, separable_commutes, reverse_involution, coverage_translates, gradient_affine, algebra_detects
+let numerals = [-8 .. 8]
+defaults trials = 10, size = 6
+
+rule params6: float(a), float(b), float(c), float(d), float(e), float(f) => params6([a, b, c, d, e, f])
+rule color4:  float(a), float(b), float(c), float(d)                     => color4([a, b, c, d])
+rule floats_one:  float(x)             => floats([x])
+rule floats_more: float(x), floats(xs) => floats([x | xs])
+for k in ["gezira_CompositeMultiply", "gezira_CompositeScreen", "gezira_CompositeDarken", "gezira_CompositeLighten", "gezira_CompositePlus", "gezira_CompositeDifference", "gezira_CompositeExclusion", "gezira_CompositeXor"]: fact symmetric(k)
 
 -- Nile's floor and ceiling (gezira_Floors, gezira_Ceilings: check/gezira/twin-kernels.nl): a whole number within one of
--- x on the right side, an infinity itself, NaN NaN, for every float32
+-- x on the right side, an infinity itself, NaN NaN, for every float32 (exact)
 law floor_is_floor:     all x: float(x). floor_right(x, 1) = 1
 law ceiling_is_ceiling: all x: float(x). ceiling_right(x, 1) = 1
+
+-- affine transforms are a group: composing is a homomorphism, the identity changes nothing (exact, finite points), a
+-- matrix then its inverse is near the identity; for TransformPoints and TransformBeziers
+law transform_compose:  all m: params6(m), n: params6(n), xs: floats(xs), w in [1, 4]. transform_compose(m, n, xs, w) = 1
+law transform_identity: all xs: floats(xs), w in [1, 4]. transform_identity(xs, w) = 1
+law transform_inverse:  all m: params6(m), xs: floats(xs), w in [1, 4]. transform_inverse(m, xs, w) = 1
+law beziers_compose:    all m: params6(m), n: params6(n), xs: floats(xs), w in [1, 4]. beziers_compose(m, n, xs, w) = 1
+law beziers_identity:   all xs: floats(xs), w in [1, 4]. beziers_identity(xs, w) = 1
+law beziers_inverse:    all m: params6(m), xs: floats(xs), w in [1, 4]. beziers_inverse(m, xs, w) = 1
+
+-- compositing premultiplied colours (each drawn float made a unit value, the colour channels within its alpha): Over is
+-- associative (near) with transparent its identity (exact); Clear absorbs and Src and Dst project (exact); the modes
+-- symmetric in their definition commute (near)
+law over_associative:   all a: color4(a), b: color4(b), c: color4(c), w in [1, 4]. over_associative(a, b, c, w) = 1
+law over_identity:      all a: color4(a), w in [1, 4]. over_identity(a, w) = 1
+law clear_absorbs:      all a: color4(a), b: color4(b), w in [1, 4]. clear_absorbs(a, b, w) = 1
+law src_dst_project:    all a: color4(a), b: color4(b), w in [1, 4]. src_dst_project(a, b, w) = 1
+law separable_commutes: all k: symmetric(k), a: color4(a), b: color4(b), w in [1, 4]. separable_commutes(k, a, b, w) = 1
+
+-- paths: reversing twice is the path (exact); a path moved by whole pixels gives its coverage moved, pixel by pixel (near:
+-- moving changes how float32 rounds its coordinates); a
+-- linear gradient's projection is affine: the projection of a midpoint is the midpoint of the projections (near)
+law reverse_involution:  all xs: floats(xs), w in [1, 4]. reverse_involution(xs, w) = 1
+law coverage_translates: all xs: floats(xs), dx: number(dx), dy: number(dy), w in [1, 4]. coverage_translates(xs, dx, dy, w) = 1
+law gradient_affine:     all g: color4(g), xs: floats(xs), w in [1, 4]. gradient_affine(g, xs, w) = 1
+
+-- its own check: composing in the wrong order (M·N for M then N) is told apart wherever the two orders differ past the
+-- band in exact arithmetic, so a comparison that saw nothing fails here
+law algebra_detects: all m: params6(m), n: params6(n), xs: floats(xs). algebra_detects(m, n, xs, 1) = 1

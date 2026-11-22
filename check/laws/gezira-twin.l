@@ -267,3 +267,201 @@
     ok))
 (define-function floor_right (x workers) (twin-rounds "gezira_Floors" x () workers))
 (define-function ceiling_right (x workers) (twin-rounds "gezira_Ceilings" x 1 workers))
+
+;; ---------------------------------------------------------------- Gezira's algebra (check/laws/gezira-algebra.law)
+;; several chains run by one build in one child: jobs (names ps xs), each its output, failed or stuck
+(define-function twin-batch (build jobs workers)
+  (let ((st (law-child (lambda ()
+			 (law-limit (* twin-limit 2))
+			 (set twin-runtimes ())
+			 (let ((parts ()))
+			   (list-do j jobs
+			     (let ((r (twin-run-chain build (twin-segments (car j) (twin-pool (cadr j))) (caddr j) workers ())))
+			       (if (= r 'failed) (push parts "failed") (let () (push parts "ran") (list-do x r (push parts " ") (push parts (long->string (twin-bits x))))))
+			       (push parts "\n")))
+			   (contents-to-file-named (apply concat-strings (list-reverse! parts)) twin-file)
+			   (_exit 0))))))
+    (if (!= 0 st) (map (lambda (j) 'stuck) jobs)
+      (map (lambda (l) (let ((ws (words l))) (if (= "failed" (car ws)) 'failed (map (lambda (w) (twin-of-bits (string->long w))) (cdr ws)))))
+	   (lines (contents-of-file-named twin-file))))))
+(define twin-outside 0)	; cases outside a law's property: overflow, a near-singular matrix, a build that stopped
+(define-function twin-out-of-law () (set twin-outside (+ twin-outside 1)) 1)
+
+;; values from drawn floats: a unit value (its fraction, an infinity or NaN 1), a moderate one (itself up to 1e4, larger
+;; ones scaled into it, so tiny and subnormal values stay), a premultiplied colour (r g b alpha, the channels within it)
+(define-function twin-fraction (a) (if (< a 1e15) (- a (long->double (double->long a))) 0.0))
+(define-function twin-unit (x) (if (twin-finite? x) (twin-fraction (twin-magnitude x)) 1.0))
+(define-function twin-f32 (x) (twin-of-bits (twin-bits x)))	; x rounded to float32, as a kernel reads it
+(define-function twin-moderate-of (x)
+  (cond ((not (twin-finite? x)) (if (= x x) (if (< x 0) -1e4 1e4) 0.0))
+	((<= (twin-magnitude x) 1e4) x)
+	(else (* (if (< x 0) -1e4 1e4) (twin-unit x)))))
+(define-function twin-moderate (x) (twin-f32 (twin-moderate-of x)))
+(define-function twin-colour (c)
+  (let ((alpha (twin-f32 (twin-unit (cadddr c)))))
+    (map twin-f32 (list (* alpha (twin-unit (car c))) (* alpha (twin-unit (cadr c))) (* alpha (twin-unit (caddr c))) alpha))))
+
+;; affine maps (a b c d e f): x' = a x + c y + e, y' = b x + d y + f
+(define-function twin-at (l i) (twin-nth l i))
+(define-function twin-apply (m x y)	; (x' y' sx sy), sx and sy the magnitudes of each output's terms
+  (let ((a (twin-at m 0)) (b (twin-at m 1)) (c (twin-at m 2)) (d (twin-at m 3)) (e (twin-at m 4)) (f (twin-at m 5)))
+    (list (+ (+ (* a x) (* c y)) e) (+ (+ (* b x) (* d y)) f)
+	  (+ (+ (twin-magnitude (* a x)) (twin-magnitude (* c y))) (twin-magnitude e))
+	  (+ (+ (twin-magnitude (* b x)) (twin-magnitude (* d y))) (twin-magnitude f)))))
+(define-function twin-then (m n)	; the map m then n
+  (let ((ma (twin-at m 0)) (mb (twin-at m 1)) (mc (twin-at m 2)) (md (twin-at m 3)) (me (twin-at m 4)) (mf (twin-at m 5))
+	(na (twin-at n 0)) (nb (twin-at n 1)) (nc (twin-at n 2)) (nd (twin-at n 3)) (ne (twin-at n 4)) (nf (twin-at n 5)))
+    (list (+ (* na ma) (* nc mb)) (+ (* nb ma) (* nd mb)) (+ (* na mc) (* nc md)) (+ (* nb mc) (* nd md))
+	  (+ (+ (* na me) (* nc mf)) ne) (+ (+ (* nb me) (* nd mf)) nf))))
+(define-function twin-inverse (m)	; m's inverse, or () when it is too near singular for float32
+  (let* ((a (twin-at m 0)) (b (twin-at m 1)) (c (twin-at m 2)) (d (twin-at m 3)) (e (twin-at m 4)) (f (twin-at m 5))
+	 (det (- (* a d) (* b c))) (size (* (+ (twin-magnitude a) (twin-magnitude b)) (+ (twin-magnitude c) (twin-magnitude d)))))
+    (and (< 0 size) (> (twin-magnitude det) (* 1e-3 size))
+	 (list (/ d det) (/ (- 0.0 b) det) (/ (- 0.0 c) det) (/ a det) (/ (- (* c f) (* d e)) det) (/ (- (* b e) (* a f)) det)))))
+(define-function twin-band (scale) (+ 1e-6 (* 1e-5 scale)))
+(define-function twin-within (x y scale) (and (twin-finite? x) (twin-finite? y) (<= (twin-magnitude (- x y)) (twin-band scale))))
+(define-function twin-same-floats (a b)	; exactly equal, element by element (NaN equal to NaN)
+  (and (= (list-length a) (list-length b))
+       (let ((ok 1)) (while (and ok a) (or (= (car a) (car b)) (and (!= (car a) (car a)) (!= (car b) (car b))) (set ok ())) (set a (cdr a)) (set b (cdr b))) ok)))
+(define-function twin-moderates (xs) (map twin-moderate xs))
+(define-function twin-both (check jobs workers)	; 1 when check holds of each build's outputs for jobs; outside when one stopped
+  (let ((ok 1) (outside ()))
+    (list-do build (list twin-c twin-native)
+      (let ((rs (twin-batch build jobs workers)))
+	(if (list-detect r rs (not (twin-ran? r))) (set outside 1)
+	  (or (check rs) (let () (set ok 0) (println "  algebra: " (if (= build twin-c) "C" "native") " fails for " jobs " giving " rs))))))
+    (if (and outside (= ok 1)) (twin-out-of-law) ok)))
+
+;; the transform laws over points (w = 2) or Béziers (w = 6, three points each)
+(define-function twin-points-of (xs w) (twin-whole (twin-moderates xs) w))
+(define-function twin-map-near (m outs xs scale-of)	; each output point near m's image of its input point
+  (let ((ok 1))
+    (while (and ok xs (cdr xs))
+      (let ((p (twin-apply m (car xs) (cadr xs))))
+	(or (and (twin-within (car outs) (car p) (scale-of p)) (twin-within (cadr outs) (cadr p) (scale-of p))) (set ok ())))
+      (set xs (cddr xs)) (set outs (cddr outs)))
+    ok))
+(define-function twin-compose-law (kernel w m n xs workers)
+  (let* ((m (twin-moderates m)) (n (twin-moderates n)) (xs (twin-points-of xs w)) (nm (twin-then m n)))
+    (if (not xs) 1
+      (twin-both (lambda (rs)	; m then n, and their composite, each near the exact image, by the terms' magnitudes through both
+		   (let ((scale (lambda (p) (+ (+ (caddr p) (cadddr p)) (* (+ 1.0 (apply max (map twin-magnitude n))) (+ (caddr p) (cadddr p)))))))
+		     (and (twin-map-near nm (car rs) xs scale) (twin-map-near nm (cadr rs) xs scale))))
+		 (list (list (list kernel kernel) (concat-list m n) xs) (list (list kernel) nm xs)) workers))))
+(define-function twin-identity-law (kernel w xs workers)
+  (let ((xs (twin-points-of xs w)))
+    (if (not xs) 1 (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list kernel) '(1.0 0.0 0.0 1.0 0.0 0.0) xs)) workers))))
+(define-function twin-inverse-law (kernel w m xs workers)
+  (let* ((m (twin-moderates m)) (inv (twin-inverse m)) (xs (twin-points-of xs w)))
+    (cond ((not xs) 1)
+	  ((not inv) (twin-out-of-law))
+	  (else
+	   (let* ((k (+ 1.0 (apply max (map twin-magnitude inv))))	; m then its inverse near the points: the terms through m,
+		  (scale (lambda (p) (let ((q (twin-apply m (car p) (cadr p)))) (* k (+ (caddr q) (cadddr q)))))))	; scaled by the inverse
+	     (twin-both (lambda (rs) (twin-map-near '(1.0 0.0 0.0 1.0 0.0 0.0) (car rs) xs scale))
+			(list (list (list kernel kernel) (concat-list m inv) xs)) workers))))))
+(define-function transform_compose (m n xs workers) (twin-compose-law "gezira_TransformPoints" 2 m n xs workers))
+(define-function transform_identity (xs workers) (twin-identity-law "gezira_TransformPoints" 2 xs workers))
+(define-function transform_inverse (m xs workers) (twin-inverse-law "gezira_TransformPoints" 2 m xs workers))
+(define-function beziers_compose (m n xs workers) (twin-compose-law "gezira_TransformBeziers" 6 m n xs workers))
+(define-function beziers_identity (xs workers) (twin-identity-law "gezira_TransformBeziers" 6 xs workers))
+(define-function beziers_inverse (m xs workers) (twin-inverse-law "gezira_TransformBeziers" 6 m xs workers))
+
+;; compositing, premultiplied colours: a compositor run on one pair (a, b)
+(define-function twin-near-floats (a b)	; within the band of values at most 1
+  (and (= (list-length a) (list-length b))
+       (let ((ok 1)) (while (and ok a) (or (twin-within (car a) (car b) 1.0) (set ok ())) (set a (cdr a)) (set b (cdr b))) ok)))
+(define-function twin-pair-job (k a b) (list (list k) () (concat-list a b)))
+(define-function over_associative (a b c workers)
+  (let ((a (twin-colour a)) (b (twin-colour b)) (c (twin-colour c)) (o "gezira_CompositeOver") (ok 1) (outside ()))
+    (list-do build (list twin-c twin-native)
+      (let ((s1 (twin-batch build (list (twin-pair-job o a b) (twin-pair-job o b c)) workers)))
+	(if (list-detect r s1 (not (pair? r))) (set outside 1)
+	  (let ((s2 (twin-batch build (list (twin-pair-job o (car s1) c) (twin-pair-job o a (cadr s1))) workers)))
+	    (cond ((list-detect r s2 (not (pair? r))) (set outside 1))
+		  ((not (twin-near-floats (car s2) (cadr s2)))
+		   (set ok 0) (println "  algebra: (a over b) over c is " (car s2) ", a over (b over c) " (cadr s2) (if (= build twin-c) " from C" " natively"))))))))
+    (if (and outside (= ok 1)) (twin-out-of-law) ok)))
+(define-function over_identity (a workers)
+  (let ((a (twin-colour a)) (t '(0.0 0.0 0.0 0.0)) (o "gezira_CompositeOver"))
+    (twin-both (lambda (rs) (and (twin-same-floats (car rs) a) (twin-same-floats (cadr rs) a)))
+	       (list (twin-pair-job o t a) (twin-pair-job o a t)) workers)))
+(define-function clear_absorbs (a b workers)
+  (twin-both (lambda (rs) (twin-same-floats (car rs) '(0.0 0.0 0.0 0.0)))
+	     (list (twin-pair-job "gezira_CompositeClear" (twin-colour a) (twin-colour b))) workers))
+(define-function src_dst_project (a b workers)
+  (let ((a (twin-colour a)) (b (twin-colour b)))
+    (twin-both (lambda (rs) (and (twin-same-floats (car rs) a) (twin-same-floats (cadr rs) b)))
+	       (list (twin-pair-job "gezira_CompositeSrc" a b) (twin-pair-job "gezira_CompositeDst" a b)) workers)))
+(define-function separable_commutes (k a b workers)
+  (let ((a (twin-colour a)) (b (twin-colour b)))
+    (twin-both (lambda (rs) (twin-near-floats (car rs) (cadr rs))) (list (twin-pair-job k a b) (twin-pair-job k b a)) workers)))
+
+;; paths
+(define-function reverse_involution (xs workers)	; any floats: reversing moves them, it computes nothing
+  (let ((xs (twin-whole xs 6)) (r "gezira_ReverseBeziers"))
+    (if (not xs) 1 (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list r r) () xs)) workers))))
+(define-function twin-polygon (xs dx dy)	; a closed path of straight Béziers through the points xs makes on a 64-pixel
+  (let ((pts ()) (out ()))			; canvas (8 in from its edges), moved by (dx, dy)
+    (while (and xs (cdr xs)) (push pts (list (+ (+ 8.0 dx) (* 48.0 (twin-unit (car xs)))) (+ (+ 8.0 dy) (* 48.0 (twin-unit (cadr xs)))))) (set xs (cddr xs)))
+    (set pts (list-reverse! pts))
+    (let ((p pts))
+      (while p
+	(let ((a (car p)) (b (if (cdr p) (cadr p) (car pts))))
+	  (set out (concat-list out (list (car a) (cadr a) (car a) (cadr a) (car b) (cadr b)))))
+	(set p (cdr p))))
+    out))
+(define-function twin-moved-spans (spans dx dy)	; (x y coverage length) spans with x and y moved
+  (let ((out ()))
+    (while spans (push out (+ (car spans) dx)) (push out (+ (cadr spans) dy)) (push out (caddr spans)) (push out (cadddr spans)) (set spans (cddddr spans)))
+    (list-reverse! out)))
+;; coverage moves with its shape, pixel by pixel within the band of its coordinates' magnitudes: moving by whole pixels
+;; changes how a coordinate's fraction rounds in float32 (its binade can change), so spans may also split differently
+(define-function twin-pixels (spans dx dy)	; (x y c l) spans as a table from (x y) to coverage, moved back by (dx, dy)
+  (let ((t (equal-hash-table)))
+    (while spans
+      (let ((x (- (car spans) dx)) (y (- (cadr spans) dy)) (c (caddr spans)) (l (cadddr spans)))
+	(for (i 0 (if (twin-finite? l) (min 4096 (double->long l)) 0)) (hash-at-put t (list (+ x (long->double i)) y) c)))
+      (set spans (cddddr spans)))
+    t))
+(define-function twin-coverage-moved? (a b dx dy scale)
+  (let ((pa (twin-pixels a 0.0 0.0)) (pb (twin-pixels b dx dy)) (ok 1))
+    (hash-do pa (lambda (k c) (or (twin-within c (or (hash-at pb k) 0.0) scale) (set ok ()))))
+    (hash-do pb (lambda (k c) (or (twin-within c (or (hash-at pa k) 0.0) scale) (set ok ()))))
+    ok))
+(define-function coverage_translates (xs dx dy workers)
+  (let ((dx (long->double (if (long? dx) dx (double->long dx)))) (dy (long->double (if (long? dy) dy (double->long dy)))))
+    (if (< (list-length xs) 6) 1
+      (twin-both (lambda (rs) (twin-coverage-moved? (car rs) (cadr rs) dx dy (+ 64.0 (+ (twin-magnitude dx) (twin-magnitude dy)))))
+		 (list (list (list "gezira_Rasterize") () (twin-polygon xs 0.0 0.0)) (list (list "gezira_Rasterize") () (twin-polygon xs dx dy)))
+		 workers))))
+(define-function gradient_affine (g xs workers)	; t = ((p - A).(B - A)) / |B - A|^2, so t of a midpoint is the mean
+  (let* ((g (twin-moderates g)) (ax (car g)) (ay (cadr g)) (vx (- (caddr g) ax)) (vy (- (cadddr g) ay)) (len2 (+ (* vx vx) (* vy vy)))
+	 (ps (twin-points-of xs 2)))
+    (cond ((< (list-length ps) 4) 1)
+	  ((<= len2 (* 1e-6 (+ (* ax ax) (+ (* ay ay) 1.0)))) (twin-out-of-law))	; A and B too near for float32
+	  (else
+	   (let* ((px (car ps)) (py (cadr ps)) (qx (caddr ps)) (qy (cadddr ps)) (mx (/ (+ px qx) 2.0)) (my (/ (+ py qy) 2.0))
+		  (scale (/ (* (+ (+ (twin-magnitude (- px ax)) (twin-magnitude (- py ay))) (+ (twin-magnitude (- qx ax)) (twin-magnitude (- qy ay))))
+			       (+ (twin-magnitude vx) (twin-magnitude vy)))
+			    len2)))
+	     (twin-both (lambda (rs) (let ((t (car rs))) (twin-within (caddr t) (/ (+ (car t) (cadr t)) 2.0) scale)))
+			(list (list (list "gezira_ProjectLinearGradient") (list ax ay (caddr g) (cadddr g)) (list px py qx qy mx my))) workers))))))
+
+;; the algebra's own check: M then N against the wrong composite (N then M, i.e. M·N), wherever the two differ past the
+;; band in exact arithmetic, must be told apart
+(define-function algebra_detects (m n xs workers)
+  (let* ((m (twin-moderates m)) (n (twin-moderates n)) (xs (twin-points-of xs 2)) (wrong (twin-then n m)) (right (twin-then m n)))
+    (if (not xs) 1
+      (let ((differ ()) (p xs))
+	(while (and p (cdr p))
+	  (let ((r (twin-apply right (car p) (cadr p))) (v (twin-apply wrong (car p) (cadr p))))
+	    (or (and (twin-within (car r) (car v) (* 4.0 (+ (+ (caddr r) (cadddr r)) (+ (caddr v) (cadddr v)))))
+		     (twin-within (cadr r) (cadr v) (* 4.0 (+ (+ (caddr r) (cadddr r)) (+ (caddr v) (cadddr v))))))
+		(set differ 1)))
+	  (set p (cddr p)))
+	(if (not differ) 1
+	  (let ((rs (twin-batch twin-native (list (list (list "gezira_TransformPoints" "gezira_TransformPoints") (concat-list m n) xs)) workers)))
+	    (cond ((not (pair? (car rs))) (twin-out-of-law))
+		  ((twin-map-near wrong (car rs) xs (lambda (p) (+ (caddr p) (cadddr p)))) 0)	; seen as the wrong order: blind
+		  (else 1))))))))

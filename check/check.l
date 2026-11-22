@@ -1109,10 +1109,10 @@
 				" MARU_LAW_SEED=" seed " ./eval")))
       (run "native_nile_twin_dir" (concat-strings "mkdir -p " dir))
       (println "native_nile twin laws: MARU_LAW_SEED=" seed)
-      (list-do file '("check/laws/gezira-twin.law" "check/laws/gezira-algebra.law")
-	(let ((out (law-file-holds "native_nile_twin" env "check/laws/gezira-twin.l" file)))
-	  (and out (law-show "native_nile twin" (lines (contents-of-file-named out))))
-	  (unit-assert out))))	; the runner exits 1 if any law is neither TESTED nor PROVED
+      ;; both files in one run of the runner: loading the native image to compare with is most of a run's start
+      (let ((out (law-file-holds "native_nile_twin" env "check/laws/gezira-twin.l" "check/laws/gezira-twin.law check/laws/gezira-algebra.law")))
+	(and out (law-show "native_nile twin" (lines (contents-of-file-named out))))
+	(unit-assert out)))	; the runner exits 1 if any law is neither TESTED nor PROVED
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
