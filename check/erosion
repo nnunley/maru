@@ -43,3 +43,4 @@ erosion +1 check/law.l's law-structural, one walk over a value's kinds (string, 
 erosion -3 the algebra support as short callables (one per law, helpers for maps, bands and pixel tables) dilute the share in complex ones
 erosion -1 the fixes as short helpers (twin-fill, twin-through, twin-invertible, twin-tally)
 verbosity +1 algebra_inside's per-law report and twin_every_kernel's retry loop, each line a case it names
+erosion -1 the held-value allocation as one method per producer and small helpers (native-producer, native-allocate-operands, native-first-only?)

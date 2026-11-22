@@ -60,12 +60,14 @@
 (list-do isa '(arm64 x64)
   (expect (concat-string "the hand-built unit, scanned on " (symbol->string isa)) (native-held-violations held-unit isa (abi isa 'held)) ()))
 (list-do path (concat-list '("check/native/add.k" "check/native/flow.k" "check/native/memory.k" "check/native/floats.k" "check/native/calls.k"
-			     "check/native/extern-self.k")
+			     "check/native/extern-self.k" "check/native/held.k")
 			   (list (or loader "maru-check.k")))
-  (let ((unit (native-compile-file path)))
+  (let ()	; compiled for each ISA with its own count of held registers, as a process on that ISA compiles
     (list-do isa '(arm64 x64)
-      (let ((v (native-held-violations unit isa (abi isa 'held))))
+      (set *native-held-count* (list-length (abi isa (quote held))))
+      (let* ((unit (native-compile-file path)) (v (native-held-violations unit isa (abi isa (quote held)))))
 	(or (not v) (println "  " path " on " isa ": " (car v)))
 	(expect (concat-string path (concat-string " scanned on " (symbol->string isa))) (list-length v) 0)))))
+(set *native-held-count* (list-length (abi (stub-isa) (quote held))))
 (or (= 0 failures) (error "native-held: " failures " failures"))
 (println "native held ok")

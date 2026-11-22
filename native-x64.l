@@ -27,6 +27,9 @@
   `((PUSH RBP) (MOV RBP RSP) ,@(if (= 0 n) () `((SUB RSP ,n)))))
 
 (define native-x64-ops '((add . ADD) (sub . SUB) (and . AND) (or . OR) (xor . XOR)))
+(define-function native-x64-extend (size r)	; r's low size bytes sign-extended in place (a held narrow integer)
+  (cond ((= size 4) `((MOVSXD ,r ,(native-x64-sized r 4)))) ((or (= size 2) (= size 1)) `((MOVSX ,r ,(native-x64-sized r size))))
+	(else (error "native: no extension of " size " bytes"))))
 (define-function native-x64-op (kind d a b)
   (and (!= d a) (= d b) (error "native: x64 op " kind " writing its second operand"))
   (let ((first (if (= d a) () `((MOV ,d ,a)))))

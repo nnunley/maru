@@ -30,6 +30,10 @@
 (define-function native-arm64-far? (size at) (or (> at (* 4095 size)) (!= 0 (% at size))))
 (define-function native-arm64-w (r)	; X9 to W9
   (let ((name (symbol->string r))) (string->symbol (concat-string "W" (string-copy name 1 (- (string-length name) 1))))))
+(define-function native-arm64-extend (size r)	; r's low size bytes sign-extended in place (a held narrow integer)
+  (let ((w (native-arm64-w r)))
+    (cond ((= size 4) (arm64-sites `((SXTW (x ,r) (w ,w))))) ((= size 2) (arm64-sites `((SXTH (x ,r) (w ,w))))) ((= size 1) (arm64-sites `((SXTB (x ,r) (w ,w)))))
+	  (else (error "native: no extension of " size " bytes")))))
 (define-function native-arm64-address (slot r)
   (if (< slot 4096)
       (arm64-sites `((ADD (x ,r) SP (n ,slot))))

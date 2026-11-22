@@ -35,6 +35,7 @@ intent <arm64-sites>
 	| `( 'fop .:k .:w reg:d reg:a reg:b )	-> (native-arm64-fop k w d a b)
 	| `( 'fcompare .:c .:w reg:d reg:a reg:b )	-> (native-arm64-fcompare c w d a b)
 	| `( 'convert .:from .:to reg:d reg:s )	-> (native-arm64-convert from to d s)
+	| `( 'extend .:size reg:r )	-> (native-arm64-extend size r)
 	| `( 'compare .:c reg:d reg:a reg:b )	-> `((CMP (x ,a) (x ,b)) (CSET (x ,d) (c ,(native-arm64-cond c))))
 	| `( 'label .:l )		-> `((at ,l))
 	| `( 'branch .:l )		-> `((B (label ,l)))
