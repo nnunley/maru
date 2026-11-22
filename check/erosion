@@ -46,3 +46,4 @@ verbosity +1 algebra_inside's per-law report and twin_every_kernel's retry loop,
 erosion -1 the held-value allocation as one method per producer and small helpers (native-producer, native-allocate-operands, native-first-only?)
 erosion +1 twin-case's confirming rerun, one more branch in the function that runs both builds
 erosion -1 native-discard as one short method per producer
+verbosity -1 the per-ISA compiles in the held scan and tpeg-direct removed

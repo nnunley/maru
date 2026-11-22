@@ -397,3 +397,4 @@
 +176 held values (register plan Task 2): native-gen.k's allocation decides which values stay in registers (pending depth, the producers and register-reading parents, calls in later siblings) and its lowerings use the registers native-into and native-target answer; the extend intent in both grammars; check/native/held.k and its cases; the held scan and tpeg-direct compiling per ISA
 +5 the twin reruns a native case past its CPU limit with eight times the limit before calling it a hang
 +53 values nothing reads (register plan Task 3): native-discard marks a let's operands before its last and a body's statements (unused) where they'd have a slot of their own, and native-out stores nothing for them; held_discard and its cases
+-6 native intents chip neutral: the held count is the shortest held row, so the held scan and tpeg-direct compile once again

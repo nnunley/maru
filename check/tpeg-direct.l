@@ -9,14 +9,11 @@
 (require "compile-tpeg.l")
 (load "check/native-image-units.l")
 
-;; each unit's functions' intents, in order, compiled for an ISA with its own count of held registers (as a process on it compiles)
+;; each unit's functions' intents, in order
 (define units ())
-(define-function compile-units (isa)
-  (set *native-held-count* (list-length (abi isa (quote held))))
-  (set units ())
-  (list-do path (concat-list (native-image-paths) (if loader (list loader) ()))
-    (push units (car (native-symbols (<native-unit>-functions (native-compile-file path))))))
-  (set units (list-reverse! units)))
+(list-do path (concat-list (native-image-paths) (if loader (list loader) ()))
+  (push units (car (native-symbols (<native-unit>-functions (native-compile-file path))))))
+(set units (list-reverse! units))
 
 (define-function lowered (grammar)	; every function's forms, as grammar lowers them
   (set native-skips 0) (set native-x64-skips 0)	; fresh branch labels numbered from here, alike in both passes
@@ -39,9 +36,7 @@
 		  du su))
 	   direct streamed)
       (println name ": " n " functions"))))
-(compile-units (quote arm64))
 (compare "native-arm64.g" <native-arm64> "native-arm64.g")
-(compile-units (quote x64))
 (compare "native-x64.g" <native-x64> "native-x64.g")
 (or (= 0 failures) (error "tpeg-direct: " failures " functions lowered differently"))
 (println "tpeg direct ok")
