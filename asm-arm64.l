@@ -689,8 +689,14 @@
   (let* ((first (cadr pe))					; encoder, and the list pattern's operand items
 	 (lst (if (= 'assign-result (car first)) (caddr first) first))
 	 (inner (cadr lst))
-	 (action (cadr (arm64-last pe))))
-    (list (cadr action) (= 'arm64-escape-result (car action)) (if (= 'match-all (car inner)) (cddr inner) ()))))
+	 (action (cadr (arm64-last pe)))
+	 (items (if (= 'match-all (car inner)) (cddr inner) ()))
+	 (mnemonic (cadr (if (= 'match-all (car inner)) (cadr inner) inner)))
+	 (row (and (long? (cadr action)) (<= 0 (cadr action)) (< (cadr action) (array-length arm64-row-vector)) (array-at arm64-row-vector (cadr action)))))
+    ;; the rules name rows by index into arm64.spec's: one that doesn't fit its row is data older than the spec
+    (or (and row (= mnemonic (car row)) (= (list-length items) (list-length (cadr row))))
+	(error "arm64-rules-data.l doesn't fit arm64.spec (make arm64-rules-data.l): row " (cadr action) " for " mnemonic))
+    (list (cadr action) (= 'arm64-escape-result (car action)) items)))
 (define-function arm64-operand-expr (name)	; an operand rule's value expression, of v: its &-> test
   (let ((pe (arm64-rule name))) (cadr (caddr pe))))
 (define-function arm64-subst (x code)	; x with v the operand's code and self.pc 0, as a site encodes at 0
@@ -719,7 +725,9 @@
 	(else							(list (list 'value code)))))	; the hole's guard proved it
 (define-arm64-expr-leaves (arm64-number-value) (e l spec code)
   (let ((c (cadr (cadr e))))
-    (cond ((not spec)					(arm64-const-leaf (arm64-literal-value e l)))
+    (cond ((and (memq c '(pcrel pcpage)) (if spec (= 'n (car spec)) (long? l)))	; a site encodes as it loads, not at its address
+	   (error "arm64-sites: a number where a row takes a PC-relative offset (name the target with (label ,l)): " e))
+	  ((not spec)					(arm64-const-leaf (arm64-literal-value e l)))
 	  ((and (memq c '(imm simm)) (= 'n (car spec)))	(arm64-test-leaf e code))
 	  ((and (= c 'lsl) (= 'lsl (car spec)))		(arm64-test-leaf e code))
 	  (else						'drop))))

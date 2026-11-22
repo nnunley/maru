@@ -37,6 +37,18 @@
 (expect "an ADR of a label" (adr 'X17 'L3) (asm-label-data '(ADR X17 (reloc)) 'L3))
 (expect "SP where a CBZ's X register was declared: the symbolic form" (cbz 'SP 'L1) '(CBZ SP (label L1)))
 
+(require "recover.l")
+(define-function refused? (thunk) (try (let () (thunk) ()) (lambda (c) 't)))
+;; a number where a row takes a PC-relative offset: a site encodes as it loads, not at its address, so the template is
+;; refused (a label, (label ,l), is how a branch names its target)
+(expect "a literal branch offset refused" (refused? (lambda () (arm64-insn-code '(CBZ (x (unquote r)) 8)))) 't)
+(expect "a number hole in a branch's offset refused" (refused? (lambda () (arm64-insn-code '(B (n (unquote v)))))) 't)
+;; the grammar's rules as data name their rows by index: a rule that doesn't fit its row (the data older than
+;; arm64.spec) is refused, not followed to another row's encoding
+(expect "a rule naming another mnemonic's row refused"
+	(refused? (lambda () (arm64-row-rule-parts '(match-all (match-list (match-all (match-object NOSUCH)))
+							       (result-expr (arm64-row-result 0 (list)))))))
+	't)
 ;; union kinds: (f ,r) a D or S register, (r ,r) an X or W one; each row tests its own, so either width finds its row
 (define-function fmov-in (f r) (car (arm64-sites `((FMOV (f ,f) (r ,r))))))
 (define-function fadd (d a b) (car (arm64-sites `((FADD (f ,d) (f ,a) (f ,b))))))
