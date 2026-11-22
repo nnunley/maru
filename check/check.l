@@ -1021,7 +1021,7 @@
 ;; The native_nile unit's files (nile.osdefs, the runtime, Gezira), and a file in tmp loading them in order: its path.
 (define-function native-nile-inputs ()
   (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
-				   (concat-strings nile-dir "gezira-api.k"))))
+				   (concat-strings nile-dir "gezira-api.k") "check/gezira-twin.k")))	; the twin laws' driver
 (define-function native-nile-loader (inputs)
   (let ((loader (concat-strings tmp "/native-nile.k")))
     (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
@@ -1049,6 +1049,15 @@
     (let ((out (run "native_nile_pixels_compare" (concat-strings "./eval check/gezira-pixels-compare.l " tmp "/pixels-c.txt " tmp "/pixels-native.txt"))))
       (list-do l out (println "native_nile pixels:" l))
       (unit-assert (equal (last out) "pixels within 1")))
+    ;; the twin laws (check/laws/gezira-twin.law): chains of Gezira's kernels on both builds, cases drawn from a seed
+    ;; fresh each run and printed (MARU_LAW_SEED replays a refutation)
+    (let* ((seed (car (words (car (run "native_nile_twin_seed" "od -An -N2 -tu2 /dev/urandom")))))
+	   (out (law-file-holds "native_nile_twin"
+				(concat-strings "env NILE_TWIN_LIB=build/gezira-twin." *shlib* " NILE_TWIN_IMAGE=" image " MARU_LAW_SEED=" seed " ./eval")
+				"check/laws/gezira-twin.l" "check/laws/gezira-twin.law")))
+      (println "native_nile twin laws: MARU_LAW_SEED=" seed)
+      (and out (list-do l (lines (contents-of-file-named out)) (println "native_nile twin " l)))
+      (unit-assert out))	; the runner exits 1 if any law is neither TESTED nor PROVED
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
