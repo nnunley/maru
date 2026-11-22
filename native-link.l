@@ -64,13 +64,18 @@
 
 ;; a symbol's address read from its table slot: (global NAME), (extern NAME) or (string BYTE …), each entry once, its slot
 ;; found by equal in a table (hash.l) where a list searched for each made a unit's strings and externs quadratic;
-;; answers the functions with their intents rewritten, and the table's entries in slot order
+;; answers the functions with their intents rewritten, and the table's entries in slot order.  An extern the unit
+;; defines (nile.k declares the runtime's interface, nile-builtins.k defines it) is the unit's own function, as C's
+;; linker binds it, not a C symbol looked up as the image loads.
 (define-function native-symbols (functions)
-  (let ((slots (equal-hash-table)) (out ()))
+  (let ((slots (equal-hash-table)) (out ()) (own (identity-hash-table)))
+    (list-do f functions (hash-at-put own (car f) 1))
     (list-do f functions
       (let ((intents ()))
 	(list-do i (cadr f)
 	  (let* ((op (car i))
+		 (i (if (and (= op 'extern-address) (hash-at own (caddr i))) (list 'function-address (cadr i) (caddr i)) i))
+		 (op (car i))
 		 (entry (cond ((= op 'global-address) (list 'global (caddr i)))
 			      ((= op 'extern-address) (list 'extern (caddr i)))
 			      ((= op 'string-address) (cons 'string (native-string-bytes (caddr i)))))))
