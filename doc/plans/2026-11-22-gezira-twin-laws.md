@@ -101,7 +101,41 @@ facts `kernel_type(k, in, out)`) and `bridge_chain` (Bezier to EdgeSample to Spa
 - [ ] **Step 5: Gates and commit** (`native_nile`, `nile_laws`, `law_rules`, `lines`, `erosion`):
   `test(native): Gezira's kernels in generated chains, twinned between the builds`.
 
-### Task 3: Close
+### Task 3: Gezira's algebra
+
+"add them as a fourth task": laws against mathematics, which catch bugs both builds share (the twin can't), run on
+the native build through the same driver. Each law states its band (the twin's) or says it is exact.
+
+**Files:** Create `check/laws/gezira-algebra.law` (support: `check/laws/gezira-twin.l`, which gains `run`, one
+build's output for a chain, and matrix helpers); modify `check/check.l` (`native_nile` runs it, expected lines).
+
+**Interfaces:** Consumes Task 1's driver and Task 2's kernel table and generators. Produces `(run chain n seed
+workers)` → the native build's output floats; `(near a b)` → whether two float lists agree within the band; `(same a
+b)` → exact equality; matrix generators (invertible, identity) and `(compose m n)`, `(invert m)`.
+
+- [ ] **Step 1: Write the failing laws:**
+  - transforms as a group: `transform_compose` (TransformPoints M then N is near TransformPoints of N·M),
+    `transform_identity` (the identity matrix's output is the same as its input, exact), `transform_inverse` (M then M⁻¹
+    is near the input), and the same three for `TransformBeziers`;
+  - compositing: `over_associative` ((a over b) over c is near a over (b over c), premultiplied colours),
+    `over_identity` (transparent over a, and a over transparent, the same as a, exact), `clear_absorbs`,
+    `src_dst_project`, and `separable_commutes` for each blend mode symmetric in its definition;
+  - coverage: `coverage_translates` (a whole-pixel translation moves the coverage, the same values), `coverage_additive`
+    (two disjoint rectangles' coverage sums is near their union's), `reverse_involution` (ReverseBeziers twice is the
+    same as the input, exact);
+  - gradients: `gradient_affine` (a linear gradient's projection of a mid-point is near the mid-point of the
+    projections);
+  - its own refutation check: `algebra_detects`, the composition law stated with N·M swapped for M·N on non-commuting
+    matrices, REFUTED.
+- [ ] **Step 2: Run** `env … ./eval check/law.l check/laws/gezira-twin.l check/laws/gezira-algebra.law`. Expected:
+  fails on the undefined `run`, `near`, `compose`.
+- [ ] **Step 3: Implement** the helpers and generators.
+- [ ] **Step 4: Run** it. Expected: each law TESTED or PROVED as stated, `algebra_detects` REFUTED; a law that fails
+  is a finding about Gezira or the native build (checked against the C build with the twin before it is called
+  either), never answered by widening a band; within the 30 s budget with Task 2's laws.
+- [ ] **Step 5: Gates and commit:** `test(native): Gezira's algebra (transforms, compositing, coverage) as laws`.
+
+### Task 4: Close
 
 - [ ] **Step 1:** `doc/laws.md` and `doc/native.md` describe the twin laws (the driver, the band, the chains, the
   coverage law, how to run a longer sweep by hand).
