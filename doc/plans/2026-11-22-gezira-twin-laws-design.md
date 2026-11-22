@@ -17,7 +17,9 @@ generated inputs by the C build and by the native image, their outputs held to e
 - A chain differs between the builds only by rounding: each output float within a relative band of the other's.
 - A failure is shrunk (a shorter chain, a shorter input, plainer numbers) and printed as the chain, its parameters
   and its input, so it can be replayed by hand.
-- Deterministic in the suite (fixed seeds), with a longer sweep by hand (more seeds, longer chains).
+- A fresh seed every suite run ("yes, switch it"): check.l picks it, passes it as MARU_LAW_SEED (the law engine's own
+  override) and prints it; a failure prints its shrunk case and seed, and MARU_LAW_SEED replays it. The edge cases are
+  exhausted every run, not sampled. A longer sweep by hand: more trials (MARU_LAW_TRIALS), longer chains.
 
 ## Non-goals
 
@@ -55,7 +57,8 @@ generated inputs by the C build and by the native image, their outputs held to e
 - **The laws**, `check/laws/gezira-twin.law`: one law per value type's chains and one per bridge, `twin(chain, input,
   workers)` holding, which runs both builds and is true when the element counts are equal and every float is within
   the band. Domains: chains by type (a recursive rule over the kernel table), parameters and inputs by type, with
-  ordinary values drawn by seed and edges listed (0, -0, ±1, tiny, huge, alpha 0 and 1, coordinates on pixel edges,
+  ordinary values drawn by the engine (integers built into lists by rules, so shrinking shortens and simplifies them,
+  mapped to floats k/16 by the support file) and edges listed (0, -0, ±1, tiny, huge, alpha 0 and 1, coordinates on pixel edges,
   identity and singular matrices), and stream lengths crossing the runtime's buffer boundaries for the element size
   (as `check/laws/runtime.law` lists them).
 - **Where it runs:** `native_nile`, after the pixel check, with the image it made. `doc/laws.md` and `doc/native.md`
@@ -65,7 +68,7 @@ generated inputs by the C build and by the native image, their outputs held to e
 
 - How `rules.l` expresses typed chains (a recursive rule is the intent; whatever it needs is the builder's).
 - Which kernels need parameters kept in a valid range (a stroke width above 0, a texture size above 0) and how.
-- The edge values' exact lists, and the seeds and case counts that fit the budget.
+- The edge values' exact lists, and the trial counts that fit the budget.
 
 ## Risks
 

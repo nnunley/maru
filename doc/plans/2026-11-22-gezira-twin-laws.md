@@ -8,7 +8,7 @@ held within a relative band, through the law engine, failures shrunk.
 
 **Architecture:** a typed-Maru twin driver (`check/gezira-twin.k`) compiled into a C library and into `native_nile`'s
 image runs a chain as a Nile pipeline on a float buffer; a Maru support file (`check/laws/gezira-twin.l`) loads both
-builds, describes each kernel's types and parameters, generates inputs from (n, seed), and answers whether the builds
+builds, describes each kernel's types and parameters, maps the engine's drawn integers to floats, and answers whether the builds
 agree; `check/laws/gezira-twin.law` generates typed chains by rules and states one law per value type and bridge.
 
 **Tech Stack:** typed Maru (ir-gen-c.k and native-gen.k), Maru on eval (the law runner `check/law.l`), `.law` files.
@@ -20,7 +20,7 @@ agree; `check/laws/gezira-twin.law` generates typed chains by rules and states o
 - Band: relative 1e-5 of the larger magnitude, absolute floor 1e-6; never widened to make a change pass.
 - Element counts must be equal; a count difference is printed, not hidden.
 - About 30 s of CPU inside `native_nile` for the suite's run; a longer sweep by hand.
-- Chains of length 1 to 6 in the suite; fixed seeds.
+- Chains of length 1 to 6 in the suite; a fresh seed each run (MARU_LAW_SEED, printed); edge cases exhausted every run.
 - Runtime code in Maru languages only; nothing in `nile/` or `gezira/` (submodules) changes: the driver lives in
   `check/`.
 - Commit at green with `check/lines` and `check/erosion` entries; Conventional Commits; no AI attribution.
@@ -58,20 +58,29 @@ agree; `check/laws/gezira-twin.law` generates typed chains by rules and states o
   compositor step's second stream is the next count floats of `params`' tail after its own parameters (the driver runs
   the chain in segments split at compositors and interleaves the colours).
 - Produces, in `check/laws/gezira-twin.l`: the kernel table `twin-kernels`, each `(number name in-type out-type
-  param-generator)`; `(twin chain n seed workers)` → 0 when both builds' outputs have the same count and every float is
-  within the band, else 1 (and prints the first difference); `(twin_perturbed chain n seed workers)` → the same, with
-  the native side's first parameter moved by 1e-3, for the self-test; the builds from `NILE_TWIN_LIB` (the C library's
-  path) and `NILE_TWIN_IMAGE` (the native image's).
+  param-generator)`; `(twin chain ps xs workers)` → 0 when both builds' outputs have the same count and every float is
+  within the band, else 1 (and prints the first difference), ps and xs lists of integers the engine drew (parameters
+  and input values), each k the float k/16; `(twin_perturbed chain ps xs workers)` → the same, with the native side's
+  first parameter moved by 1e-3, for the self-test; `(twin_edges chain workers)` → 0 when both builds agree on every
+  edge case of the chain's types (edge values and buffer-crossing lengths, enumerated by the support file), else 1;
+  the builds from `NILE_TWIN_LIB` (the C library's path) and `NILE_TWIN_IMAGE` (the native image's).
+- Ruling ("Why are we using hardcoded seeds?" … "yes, switch it"): no seed appears in a law. The engine draws the
+  cases, its seed fresh each suite run: `native_nile` picks one, passes `MARU_LAW_SEED` (the engine's override) and
+  prints it; a REFUTED line carries `seed=s`, which `MARU_LAW_SEED` replays.
 
-- [ ] **Step 1: Write the failing law file** `check/laws/gezira-twin.law`, `under test: twin, twin_perturbed`, with:
-  `law twin_transform_points: all n: number(n), s: seed(s). twin([transform_points], n, s, 1) = 0` (TESTED, 50 trials)
-  and `law twin_detects: all n: number(n), s: seed(s). twin_perturbed([transform_points], n, s, 1) = 1` restricted to
-  n above 0 (PROVED over its small domain).
+- [ ] **Step 1: Write the failing law file** `check/laws/gezira-twin.law`, `under test: twin, twin_perturbed,
+  twin_edges`, with rules building `params6` (six numbers) and `points` (a list of number pairs) from `number`, numerals
+  `[-2000 .. 2000]`, and: `law twin_transform_points: all ps: params6(ps), xs: points(xs). twin(["TransformPoints"],
+  ps, xs, 1) = 0` (TESTED), `law twin_transform_points_edges: twin_edges(["TransformPoints"], 1) = 0` (PROVED), and
+  `law twin_detects: all ps: params6(ps), xs: points(xs). twin_perturbed(["TransformPoints"], ps, xs, 1) = 1`
+  (TESTED; points is never empty).
 - [ ] **Step 2: Run** `env NILE_TWIN_LIB=build/gezira-twin.dylib NILE_TWIN_IMAGE=IMAGE ./eval check/law.l
   check/laws/gezira-twin.l check/laws/gezira-twin.law`. Expected: fails (nothing defines `twin`).
 - [ ] **Step 3: Implement** the driver, the Makefile rules, the support file's loading, table entry for
-  `TransformPoints`, input generation from (n, seed), and `twin`/`twin_perturbed`.
-- [ ] **Step 4: Run** it again. Expected: `law twin_transform_points: TESTED 50` and `law twin_detects: PROVED …`.
+  `TransformPoints`, the integer-to-float mapping, the edge cases, and `twin`, `twin_perturbed`, `twin_edges`; and in
+  `check.l` the fresh seed (from `/dev/urandom`), passed as `MARU_LAW_SEED` and printed.
+- [ ] **Step 4: Run** it again, and with two different `MARU_LAW_SEED`s. Expected: `twin_transform_points: TESTED n`,
+  `twin_transform_points_edges: PROVED 1`, `twin_detects: TESTED n`, on both seeds.
 - [ ] **Step 5: Wire** into `native_nile` (after the pixel comparison, with `law-file-holds`, the expected lines
   listed), run `make check CHECKS="native_nile lines erosion"`, commit `test(native): a twin of Gezira's C and native
   builds, by the law engine`.
@@ -88,7 +97,8 @@ facts `kernel_type(k, in, out)`) and `bridge_chain` (Bezier to EdgeSample to Spa
 `Rasterize`, Point to Number); `(twin_coverage)` → the kernel numbers no case has run, printed.
 
 - [ ] **Step 1: Write the failing laws:** `twin_bezier`, `twin_point`, `twin_color`, `twin_number`, `twin_bridge`,
-  each `all c: TYPE_chain(c), n: number(n), s: seed(s), w: workers(w). twin(c, n, s, w) = 0`, TESTED, the trials
+  each `all c: TYPE_chain(c), ps: params(c, ps), xs: TYPE_input(xs), w: workers(w). twin(c, ps, xs, w) = 0` (the
+  parameters drawn for the chain's kernels), TESTED, beside a `twin_edges` law per chain kind; the trials
   chosen to fit the budget; and a last law `twin_covered: twin_coverage() = []`.
 - [ ] **Step 2: Run** the law file. Expected: the new laws fail on unknown kernels, and `twin_covered` lists them.
 - [ ] **Step 3: Implement** every kernel's entry (all 76, the compositors with their second stream), the edge
@@ -109,7 +119,7 @@ the native build through the same driver. Each law states its band (the twin's) 
 **Files:** Create `check/laws/gezira-algebra.law` (support: `check/laws/gezira-twin.l`, which gains `run`, one
 build's output for a chain, and matrix helpers); modify `check/check.l` (`native_nile` runs it, expected lines).
 
-**Interfaces:** Consumes Task 1's driver and Task 2's kernel table and generators. Produces `(run chain n seed
+**Interfaces:** Consumes Task 1's driver and Task 2's kernel table and generators. Produces `(run chain ps xs
 workers)` → the native build's output floats; `(near a b)` → whether two float lists agree within the band; `(same a
 b)` → exact equality; matrix generators (invertible, identity) and `(compose m n)`, `(invert m)`.
 
