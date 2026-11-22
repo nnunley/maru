@@ -45,3 +45,4 @@ erosion -1 the fixes as short helpers (twin-fill, twin-through, twin-invertible,
 verbosity +1 algebra_inside's per-law report and twin_every_kernel's retry loop, each line a case it names
 erosion -1 the held-value allocation as one method per producer and small helpers (native-producer, native-allocate-operands, native-first-only?)
 erosion +1 twin-case's confirming rerun, one more branch in the function that runs both builds
+erosion -1 native-discard as one short method per producer

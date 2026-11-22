@@ -20,3 +20,4 @@
 		       s))))
 (define-function held_int32_negative long ((a int) (b int)) (return (cast (< (* a b) 0) long)))
 (define-function held_int32_half long ((a int) (b int)) (return (cast (/ (* a b) 2) long)))
+(define-function held_discard long ((a long)) (* a a) (return a))	; a product nothing reads

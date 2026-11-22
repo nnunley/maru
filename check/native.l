@@ -86,7 +86,10 @@
 	  '(1 -1073739507))
   (expect "held_expr loads only its arguments" (list-detect i intents (and (= 'load (car i)) (not (member? (caddr i) params)))) ())
   (list-do i intents (and (= 'store (car i)) (set stores (+ stores 1))))
-  (expect "held_expr stores only its result" stores 1))
+  (expect "held_expr stores only its result" stores 1)
+  (expect "held_discard" ((fn image (quote held_discard) "l>l") 6) 6)
+  (expect "held_discard stores nothing: its product is read by nothing"
+	  (list-detect i (cadr (assq (quote held_discard) (<native-unit>-functions unit))) (= (quote store) (car i))) ()))
 (let ((image (native-install (native-compile-file "check/native/floats.k"))))
   (expect "fadd" ((fn image 'fadd "dd>d") 1.25 2.5) 3.75)
   (expect "fmix, in float" ((fn image 'fmix "fff>f") 2.0 3.0 1.0) 5.5)
