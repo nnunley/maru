@@ -74,8 +74,10 @@
     (list-do o outs (list-do i ins (and (or (= o i) (= o (twin-tuple-head i))) (push out (list 'connects o i)))))
     out))
 
-;; what has run: every kernel a case built, nested ones too
+;; what has been compared: a kernel a case with input ran on both builds reached (the chain's first, and every one it
+;; built when the output wasn't empty), so a kernel no case gave anything to is still owed a comparison
 (define twin-ran (equal-hash-table))
+(define *twin-built* ())	; the kernels a case built, nested ones too
 (define twin-compared 0)	; cases whose outputs were compared
 (define twin-skipped 0)	; cases outside Gezira's domain: the C build stopped (past capacity, failed, or past its time)
 
@@ -86,7 +88,7 @@
   (if (or (!= x x) (> (if (< x 0) (- 0.0 x) x) 1e9)) 0 (% (double->long (if (< x 0) (- 0.0 x) x)) n)))
 (define-function twin-nth (l n) (while (< 0 n) (set l (cdr l)) (set n (- n 1))) (car l))
 (define-function twin-encode (k pool depth)	; floats: k's number and its parameters, prefix order
-  (hash-at-put twin-ran (car k) 1)
+  (push *twin-built* (car k))
   (let ((out (list (long->double (twin-number-of k)))))
     (list-do kind (twin-kinds k)
       (set out (concat-list out
@@ -110,6 +112,10 @@
       (let ((floats ())) (for (i 0 n) (push floats (float-at out i))) (list-reverse! floats)))))
 (define-function twin-whole (xs w)	; xs cut to whole elements of w floats
   (let ((n (* w (/ (list-length xs) w))) (out ())) (for (i 0 n) (push out (car xs)) (set xs (cdr xs))) (list-reverse! out)))
+(define-function twin-fill (xs w least)	; xs over again to whole elements of w floats, at least least of them: never empty
+  (let* ((n (max least (/ (+ (list-length xs) (- w 1)) w))) (out ()) (v xs))
+    (and xs (for (i 0 (* n w)) (or v (set v xs)) (push out (car v)) (set v (cdr v))))
+    (list-reverse! out)))
 (define-function twin-zip (as aw pool bw)	; each element of as (aw floats) followed by bw floats from the pool
   (let ((out ()))
     (while as
@@ -171,10 +177,10 @@
 ;; stops it.  The child starts its own runtimes (worker threads don't survive a fork) and writes the output's float bits
 ;; to NILE_TWIN_TMP's file; the parent reads them back.  A run is its floats, failed (past capacity, or the runtime
 ;; failed) or stuck (past its time).
-(define twin-limit 3)	; CPU seconds a build may take for one case
+(define twin-limit 1)	; CPU seconds a build may take for one case (one takes milliseconds; a looping one costs the whole limit)
 (define twin-file (concat-string (twin-env "NILE_TWIN_TMP") "/twin-case"))
 (define twin-bits-buffer (data 4))
-(define-function twin-bits (x) (set-float-at twin-bits-buffer 0 x) (int32-at twin-bits-buffer 0))
+(define-function twin-bits (x) (set-float-at twin-bits-buffer 0 (* 1.0 x)) (int32-at twin-bits-buffer 0))	; a shrunk float may be a whole long
 (define-function twin-of-bits (b) (set-int32-at twin-bits-buffer 0 b) (float-at twin-bits-buffer 0))
 (define-function twin-ran? (r) (or (pair? r) (= r ())))
 (define-function twin-copy-pool (p) (cons (cdr p) (cdr p)))
@@ -193,16 +199,22 @@
       (let ((ws (words (contents-of-file-named twin-file))))
 	(if (= "failed" (car ws)) 'failed (map (lambda (w) (twin-of-bits (string->long w))) (cdr ws)))))))
 (define-function twin-case (chain ps xs workers move)
+  (set *twin-built* ())
   (let* ((pool (twin-pool ps))
 	 (segs (twin-segments chain pool))
-	 (xs (twin-whole xs (twin-in-floats (twin-kernel (car chain)))))
+	 (built *twin-built*)
+	 (xs (twin-fill xs (twin-in-floats (twin-kernel (car chain))) 1))	; at least one whole element: never empty
 	 (zips ()))
     (list-do s (cdr segs) (push zips (twin-pool (twin-pool-take pool 64))))
     (set zips (list-reverse! zips))
     (let* ((c (twin-isolated twin-c segs xs workers zips))
-	   (n (twin-isolated twin-native segs xs workers zips))
+	   (n (if (twin-ran? c) (twin-isolated twin-native segs xs workers zips) c))	; outside the domain: nothing to compare
 	   (r (twin-compare chain c (if (and move (pair? n)) (move n) n))))
-      (and (twin-ran? c) (twin-ran? n) (set twin-compared (+ twin-compared 1)))
+      (and xs (twin-ran? c) (twin-ran? n)	; compared, on input: the first kernel, and all it built if output came
+	   (let ()
+	     (set twin-compared (+ twin-compared 1))
+	     (hash-at-put twin-ran (car chain) 1)
+	     (and (pair? c) (list-do k built (hash-at-put twin-ran k 1)))))
       r)))
 
 (define-function twin (chain ps xs workers) (twin-case chain ps xs workers ()))
@@ -210,7 +222,7 @@
 ;; nile_Buffer), so w-float elements fill one every 122/w; the drawn elements, repeated, to k buffers' worth and d more
 (define twin-buffer-floats 122)
 (define-function twin-stream (chain xs k d)
-  (let* ((w (twin-in-floats (twin-kernel (car chain)))) (xs (twin-whole xs w)) (n (max 0 (+ (* k (/ twin-buffer-floats w)) d)))
+  (let* ((w (twin-in-floats (twin-kernel (car chain)))) (xs (twin-fill xs w 1)) (n (max 1 (+ (* k (/ twin-buffer-floats w)) d)))
 	 (out ()) (v xs))
     (and xs (for (i 0 (* n w)) (or v (set v xs)) (push out (car v)) (set v (cdr v))))
     (list-reverse! out)))
@@ -232,16 +244,33 @@
   (set twin-quiet 1)
   (let ((r (twin-case chain ps xs workers twin-moved))) (set twin-quiet ()) r))
 
-;; every kernel twinned in every run: each one no chain has reached, alone, on values from the engine's own float
-;; generator (seeded by the law's seed, so a run replays); the disagreements, and the run's tally printed
+;; values from drawn floats: a unit value (its fraction, an infinity or NaN 1), a moderate one (itself up to 1e4, larger
+;; ones scaled into it, so tiny and subnormal values stay), a premultiplied colour (r g b alpha, the channels within it)
+(define-function twin-fraction (a) (if (< a 1e15) (- a (long->double (double->long a))) 0.0))
+(define-function twin-unit (x) (if (twin-finite? x) (twin-fraction (twin-magnitude x)) 1.0))
+(define-function twin-f32 (x) (twin-of-bits (twin-bits x)))	; x rounded to float32, as a kernel reads it
+(define-function twin-moderate-of (x)
+  (cond ((not (twin-finite? x)) (if (= x x) (if (< x 0) -1e4 1e4) 0.0))
+	((<= (twin-magnitude x) 1e4) x)
+	(else (* (if (< x 0) -1e4 1e4) (twin-unit x)))))
+(define-function twin-moderate (x) (twin-f32 (twin-moderate-of x)))
+
+;; every kernel compared in every run: each one no case has compared yet is twinned alone on values from the engine's
+;; own float generator (seeded by the law's seed, so a run replays), up to 25 cases, every other one with its values
+;; made moderate (many kernels stop on the format's extremes), until one is compared; a kernel none compares fails,
+;; named.  The disagreements and the uncompared count, and the run's tally is printed.
 (define-function twin_every_kernel (workers)
   (let ((bad 0))
     (list-do k twin-kernel-table
-      (or (hash-includes? twin-ran (car k))
+      (let ((tries 0))
+	(while (and (not (hash-includes? twin-ran (car k))) (< tries 25))
 	  (let ((ps ()) (xs ()))
 	    (for (i 0 16) (push ps (rules-float-draw)))
 	    (for (i 0 (* 4 (twin-in-floats k))) (push xs (rules-float-draw)))
-	    (set bad (+ bad (twin-case (list (car k)) ps xs workers ()))))))
+	    (and (= 1 (% tries 2)) (let () (set ps (map twin-moderate ps)) (set xs (map twin-moderate xs))))
+	    (set bad (+ bad (twin-case (list (car k)) ps xs workers ())))
+	    (set tries (+ tries 1))))
+	(or (hash-includes? twin-ran (car k)) (let () (set bad (+ bad 1)) (println "  twin: no case compared " (car k))))))
     (println "  twin: " twin-compared " cases compared, " twin-skipped " outside Gezira's domain")
     bad))
 
@@ -285,18 +314,10 @@
       (map (lambda (l) (let ((ws (words l))) (if (= "failed" (car ws)) 'failed (map (lambda (w) (twin-of-bits (string->long w))) (cdr ws)))))
 	   (lines (contents-of-file-named twin-file))))))
 (define twin-outside 0)	; cases outside a law's property: overflow, a near-singular matrix, a build that stopped
-(define-function twin-out-of-law () (set twin-outside (+ twin-outside 1)) 1)
-
-;; values from drawn floats: a unit value (its fraction, an infinity or NaN 1), a moderate one (itself up to 1e4, larger
-;; ones scaled into it, so tiny and subnormal values stay), a premultiplied colour (r g b alpha, the channels within it)
-(define-function twin-fraction (a) (if (< a 1e15) (- a (long->double (double->long a))) 0.0))
-(define-function twin-unit (x) (if (twin-finite? x) (twin-fraction (twin-magnitude x)) 1.0))
-(define-function twin-f32 (x) (twin-of-bits (twin-bits x)))	; x rounded to float32, as a kernel reads it
-(define-function twin-moderate-of (x)
-  (cond ((not (twin-finite? x)) (if (= x x) (if (< x 0) -1e4 1e4) 0.0))
-	((<= (twin-magnitude x) 1e4) x)
-	(else (* (if (< x 0) -1e4 1e4) (twin-unit x)))))
-(define-function twin-moderate (x) (twin-f32 (twin-moderate-of x)))
+(define twin-law-tally (equal-hash-table))	; a law's name (the engine's *lname*) to its (cases outside)
+(define-function twin-tally (outside)
+  (let ((t (or (hash-at twin-law-tally *lname*) (list 0 0)))) (hash-at-put twin-law-tally *lname* (list (+ 1 (car t)) (+ outside (cadr t))))))
+(define-function twin-out-of-law () (set twin-outside (+ twin-outside 1)) (twin-tally 1) 1)
 (define-function twin-colour (c)
   (let ((alpha (twin-f32 (twin-unit (cadddr c)))))
     (map twin-f32 (list (* alpha (twin-unit (car c))) (* alpha (twin-unit (cadr c))) (* alpha (twin-unit (caddr c))) alpha))))
@@ -313,11 +334,12 @@
 	(na (twin-at n 0)) (nb (twin-at n 1)) (nc (twin-at n 2)) (nd (twin-at n 3)) (ne (twin-at n 4)) (nf (twin-at n 5)))
     (list (+ (* na ma) (* nc mb)) (+ (* nb ma) (* nd mb)) (+ (* na mc) (* nc md)) (+ (* nb mc) (* nd md))
 	  (+ (+ (* na me) (* nc mf)) ne) (+ (+ (* nb me) (* nd mf)) nf))))
-(define-function twin-inverse (m)	; m's inverse, or () when it is too near singular for float32
+(define-function twin-inverse (m)	; m's inverse, or () when it is too near singular for float32 (an entry past 1e20 overflows a run)
   (let* ((a (twin-at m 0)) (b (twin-at m 1)) (c (twin-at m 2)) (d (twin-at m 3)) (e (twin-at m 4)) (f (twin-at m 5))
 	 (det (- (* a d) (* b c))) (size (* (+ (twin-magnitude a) (twin-magnitude b)) (+ (twin-magnitude c) (twin-magnitude d)))))
     (and (< 0 size) (> (twin-magnitude det) (* 1e-3 size))
-	 (list (/ d det) (/ (- 0.0 b) det) (/ (- 0.0 c) det) (/ a det) (/ (- (* c f) (* d e)) det) (/ (- (* b e) (* a f)) det)))))
+	 (let ((inv (list (/ d det) (/ (- 0.0 b) det) (/ (- 0.0 c) det) (/ a det) (/ (- (* c f) (* d e)) det) (/ (- (* b e) (* a f)) det))))
+	   (and (not (list-detect v inv (not (< (twin-magnitude v) 1e20)))) inv)))))
 (define-function twin-band (scale) (+ 1e-6 (* 1e-5 scale)))
 (define-function twin-within (x y scale) (and (twin-finite? x) (twin-finite? y) (<= (twin-magnitude (- x y)) (twin-band scale))))
 (define-function twin-same-floats (a b)	; exactly equal, element by element (NaN equal to NaN)
@@ -330,36 +352,40 @@
       (let ((rs (twin-batch build jobs workers)))
 	(if (list-detect r rs (not (twin-ran? r))) (set outside 1)
 	  (or (check rs) (let () (set ok 0) (println "  algebra: " (if (= build twin-c) "C" "native") " fails for " jobs " giving " rs))))))
-    (if (and outside (= ok 1)) (twin-out-of-law) ok)))
+    (if (and outside (= ok 1)) (twin-out-of-law) (let () (twin-tally 0) ok))))
 
 ;; the transform laws over points (w = 2) or Béziers (w = 6, three points each)
-(define-function twin-points-of (xs w) (twin-whole (twin-moderates xs) w))
+(define-function twin-points-of (xs w) (twin-fill (twin-moderates xs) w 1))	; never empty: one whole element at least
 (define-function twin-map-near (m outs xs scale-of)	; each output point near m's image of its input point
   (let ((ok 1))
     (while (and ok xs (cdr xs))
-      (let ((p (twin-apply m (car xs) (cadr xs))))
-	(or (and (twin-within (car outs) (car p) (scale-of p)) (twin-within (cadr outs) (cadr p) (scale-of p))) (set ok ())))
+      (let ((p (twin-apply m (car xs) (cadr xs))) (s (scale-of (car xs) (cadr xs))))
+	(or (and (twin-within (car outs) (car p) s) (twin-within (cadr outs) (cadr p) s)) (set ok ())))
       (set xs (cddr xs)) (set outs (cddr outs)))
     ok))
+(define-function twin-through (m n)	; the error scale of m then n at a point: n's largest entry times m's terms, and n's terms
+  (let ((k (+ 1.0 (apply max (map twin-magnitude n)))))	; at m's image (an entry of n·m can cancel; these terms can't)
+    (lambda (x y)
+      (let* ((q (twin-apply m x y)) (r (twin-apply n (car q) (cadr q))))
+	(+ (* k (+ (caddr q) (cadddr q))) (+ (caddr r) (cadddr r)))))))
 (define-function twin-compose-law (kernel w m n xs workers)
-  (let* ((m (twin-moderates m)) (n (twin-moderates n)) (xs (twin-points-of xs w)) (nm (twin-then m n)))
-    (if (not xs) 1
-      (twin-both (lambda (rs)	; m then n, and their composite, each near the exact image, by the terms' magnitudes through both
-		   (let ((scale (lambda (p) (+ (+ (caddr p) (cadddr p)) (* (+ 1.0 (apply max (map twin-magnitude n))) (+ (caddr p) (cadddr p)))))))
-		     (and (twin-map-near nm (car rs) xs scale) (twin-map-near nm (cadr rs) xs scale))))
-		 (list (list (list kernel kernel) (concat-list m n) xs) (list (list kernel) nm xs)) workers))))
+  (let* ((m (twin-moderates m)) (n (twin-moderates n)) (xs (twin-points-of xs w)) (nm (twin-then m n)) (scale (twin-through m n)))
+    (twin-both (lambda (rs)	; m then n, and their composite, each near the exact image
+		 (and (twin-map-near nm (car rs) xs scale) (twin-map-near nm (cadr rs) xs scale)))
+	       (list (list (list kernel kernel) (concat-list m n) xs) (list (list kernel) nm xs)) workers)))
 (define-function twin-identity-law (kernel w xs workers)
   (let ((xs (twin-points-of xs w)))
-    (if (not xs) 1 (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list kernel) '(1.0 0.0 0.0 1.0 0.0 0.0) xs)) workers))))
+    (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list kernel) '(1.0 0.0 0.0 1.0 0.0 0.0) xs)) workers)))
+(define-function twin-invertible (m)	; an invertible map from six drawn floats: a rotation (a rational one, from the first)
+  (let* ((t (- (* 2.0 (twin-unit (twin-at m 0))) 1.0)) (co (/ (- 1.0 (* t t)) (+ 1.0 (* t t)))) (si (/ (* 2.0 t) (+ 1.0 (* t t))))	; after
+	 (sx (rules-pow2 (- (twin-index (twin-at m 1) 33) 16))) (sy (rules-pow2 (- (twin-index (twin-at m 2) 33) 16)))	; scales 2^-16 to 2^16
+	 (h (twin-unit (twin-at m 3))))	; after a shear, then moved by the last two made moderate
+    (map twin-f32 (list (* co sx) (* si sx) (- (* (* co sx) h) (* si sy)) (+ (* (* si sx) h) (* co sy)) (twin-moderate (twin-at m 4)) (twin-moderate (twin-at m 5))))))
 (define-function twin-inverse-law (kernel w m xs workers)
-  (let* ((m (twin-moderates m)) (inv (twin-inverse m)) (xs (twin-points-of xs w)))
-    (cond ((not xs) 1)
-	  ((not inv) (twin-out-of-law))
-	  (else
-	   (let* ((k (+ 1.0 (apply max (map twin-magnitude inv))))	; m then its inverse near the points: the terms through m,
-		  (scale (lambda (p) (let ((q (twin-apply m (car p) (cadr p)))) (* k (+ (caddr q) (cadddr q)))))))	; scaled by the inverse
-	     (twin-both (lambda (rs) (twin-map-near '(1.0 0.0 0.0 1.0 0.0 0.0) (car rs) xs scale))
-			(list (list (list kernel kernel) (concat-list m inv) xs)) workers))))))
+  (let* ((m (twin-invertible m)) (inv (twin-inverse m)) (xs (twin-points-of xs w)))
+    (if (not inv) (twin-out-of-law)
+      (twin-both (lambda (rs) (twin-map-near '(1.0 0.0 0.0 1.0 0.0 0.0) (car rs) xs (twin-through m inv)))	; m then its inverse
+		 (list (list (list kernel kernel) (concat-list m inv) xs)) workers))))
 (define-function transform_compose (m n xs workers) (twin-compose-law "gezira_TransformPoints" 2 m n xs workers))
 (define-function transform_identity (xs workers) (twin-identity-law "gezira_TransformPoints" 2 xs workers))
 (define-function transform_inverse (m xs workers) (twin-inverse-law "gezira_TransformPoints" 2 m xs workers))
@@ -381,7 +407,7 @@
 	    (cond ((list-detect r s2 (not (pair? r))) (set outside 1))
 		  ((not (twin-near-floats (car s2) (cadr s2)))
 		   (set ok 0) (println "  algebra: (a over b) over c is " (car s2) ", a over (b over c) " (cadr s2) (if (= build twin-c) " from C" " natively"))))))))
-    (if (and outside (= ok 1)) (twin-out-of-law) ok)))
+    (if (and outside (= ok 1)) (twin-out-of-law) (let () (twin-tally 0) ok))))
 (define-function over_identity (a workers)
   (let ((a (twin-colour a)) (t '(0.0 0.0 0.0 0.0)) (o "gezira_CompositeOver"))
     (twin-both (lambda (rs) (and (twin-same-floats (car rs) a) (twin-same-floats (cadr rs) a)))
@@ -399,8 +425,8 @@
 
 ;; paths
 (define-function reverse_involution (xs workers)	; any floats: reversing moves them, it computes nothing
-  (let ((xs (twin-whole xs 6)) (r "gezira_ReverseBeziers"))
-    (if (not xs) 1 (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list r r) () xs)) workers))))
+  (let ((xs (twin-fill xs 6 1)) (r "gezira_ReverseBeziers"))
+    (twin-both (lambda (rs) (twin-same-floats (car rs) xs)) (list (list (list r r) () xs)) workers)))
 (define-function twin-polygon (xs dx dy)	; a closed path of straight Béziers through the points xs makes on a 64-pixel
   (let ((pts ()) (out ()))			; canvas (8 in from its edges), moved by (dx, dy)
     (while (and xs (cdr xs)) (push pts (list (+ (+ 8.0 dx) (* 48.0 (twin-unit (car xs)))) (+ (+ 8.0 dy) (* 48.0 (twin-unit (cadr xs)))))) (set xs (cddr xs)))
@@ -431,14 +457,14 @@
     ok))
 (define-function coverage_translates (xs dx dy workers)
   (let ((dx (long->double (if (long? dx) dx (double->long dx)))) (dy (long->double (if (long? dy) dy (double->long dy)))))
-    (if (< (list-length xs) 6) 1
+    (let ((xs (twin-fill xs 6 1)))	; three points at least: a polygon
       (twin-both (lambda (rs) (twin-coverage-moved? (car rs) (cadr rs) dx dy (+ 64.0 (+ (twin-magnitude dx) (twin-magnitude dy)))))
 		 (list (list (list "gezira_Rasterize") () (twin-polygon xs 0.0 0.0)) (list (list "gezira_Rasterize") () (twin-polygon xs dx dy)))
 		 workers))))
 (define-function gradient_affine (g xs workers)	; t = ((p - A).(B - A)) / |B - A|^2, so t of a midpoint is the mean
   (let* ((g (twin-moderates g)) (ax (car g)) (ay (cadr g)) (vx (- (caddr g) ax)) (vy (- (cadddr g) ay)) (len2 (+ (* vx vx) (* vy vy)))
-	 (ps (twin-points-of xs 2)))
-    (cond ((< (list-length ps) 4) 1)
+	 (ps (twin-fill (twin-moderates xs) 4 1)))	; two points at least
+    (cond
 	  ((<= len2 (* 1e-6 (+ (* ax ax) (+ (* ay ay) 1.0)))) (twin-out-of-law))	; A and B too near for float32
 	  (else
 	   (let* ((px (car ps)) (py (cadr ps)) (qx (caddr ps)) (qy (cadddr ps)) (mx (/ (+ px qx) 2.0)) (my (/ (+ py qy) 2.0))
@@ -463,5 +489,17 @@
 	(if (not differ) 1
 	  (let ((rs (twin-batch twin-native (list (list (list "gezira_TransformPoints" "gezira_TransformPoints") (concat-list m n) xs)) workers)))
 	    (cond ((not (pair? (car rs))) (twin-out-of-law))
-		  ((twin-map-near wrong (car rs) xs (lambda (p) (+ (caddr p) (cadddr p)))) 0)	; seen as the wrong order: blind
+		  ((twin-map-near wrong (car rs) xs (lambda (x y) (let ((p (twin-apply wrong x y))) (+ (caddr p) (cadddr p))))) 0)	; seen as the wrong order: blind
 		  (else 1))))))))
+
+;; every algebra law held somewhere: each one's cases outside its property printed, and a law with none inside fails
+;; (were the native build to stop on everything, every law would count its cases outside and hold)
+(define twin-tally-shown ())	; the engine may run the law more than once: print once
+(define-function algebra_inside (workers)
+  (let ((ok 1))
+    (hash-do twin-law-tally
+	     (lambda (name t)
+	       (and (< 0 (cadr t)) (not twin-tally-shown) (println "  algebra: " name ", " (cadr t) " of " (car t) " cases outside its property"))
+	       (and (= (car t) (cadr t)) (let () (set ok 0) (println "  algebra: " name " held no case inside its property")))))
+    (set twin-tally-shown 1)
+    ok))

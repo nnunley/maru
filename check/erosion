@@ -41,3 +41,5 @@ erosion -1 native-gen.k's call lowering split by native-math-kind, and the float
 erosion -3 the twin support as short callables (segments, pools, isolated runs) and the table generator's helpers
 erosion +1 check/law.l's law-structural, one walk over a value's kinds (string, list, number)
 erosion -3 the algebra support as short callables (one per law, helpers for maps, bands and pixel tables) dilute the share in complex ones
+erosion -1 the fixes as short helpers (twin-fill, twin-through, twin-invertible, twin-tally)
+verbosity +1 algebra_inside's per-law report and twin_every_kernel's retry loop, each line a case it names

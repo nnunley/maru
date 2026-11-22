@@ -4,7 +4,7 @@
 -- would leave float32's finite range for the drawn values, or whose matrix is too near singular to invert, counts the
 -- case as outside it (printed at the end) rather than hold it; a law's band is 1e-5 of the sum of its terms' magnitudes,
 -- plus 1e-6, the error of a few float32 operations, or it is exact, as each says.
-under test: floor_right, ceiling_right, transform_compose, transform_identity, transform_inverse, beziers_compose, beziers_identity, beziers_inverse, over_associative, over_identity, clear_absorbs, src_dst_project, separable_commutes, reverse_involution, coverage_translates, gradient_affine, algebra_detects
+under test: floor_right, ceiling_right, transform_compose, transform_identity, transform_inverse, beziers_compose, beziers_identity, beziers_inverse, over_associative, over_identity, clear_absorbs, src_dst_project, separable_commutes, reverse_involution, coverage_translates, gradient_affine, algebra_detects, algebra_inside
 let numerals = [-8 .. 8]
 defaults trials = 10, size = 6
 
@@ -47,3 +47,6 @@ law gradient_affine:     all g: color4(g), xs: floats(xs), w in [1, 4]. gradient
 -- its own check: composing in the wrong order (M·N for M then N) is told apart wherever the two orders differ past the
 -- band in exact arithmetic, so a comparison that saw nothing fails here
 law algebra_detects: all m: params6(m), n: params6(n), xs: floats(xs). algebra_detects(m, n, xs, 1) = 1
+
+-- last: every law above held some case inside its property (a law whose every case was outside fails, named)
+law algebra_inside: all w in [1]. algebra_inside(w) = 1

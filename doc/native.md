@@ -110,7 +110,8 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
     coverage moving with its shape, the gradient's affinity. Bands follow the terms' magnitudes; a case past float32's
     range or near a singular matrix is counted as outside.
 
-  The twin takes about 60 s and the algebra about 40. A longer sweep by hand: `MARU_LAW_TRIALS=300` (and any seed) on
+  The two files take 20 to 40 s together (a looping case costs its build one CPU second, and C stopping skips the
+  native run). A longer sweep by hand: `MARU_LAW_TRIALS=300` (and any seed) on
   `./eval check/law.l check/laws/gezira-twin.l check/laws/gezira-twin.law check/laws/gezira-algebra.law`, with
   `NILE_TWIN_LIB`, `NILE_TWIN_IMAGE` (`check/native-nile.l LOADER IMAGE` saves one) and `NILE_TWIN_TMP` set.
   The C library's math functions are one instruction each natively: a call to `floorf`, `floor`, `ceilf`, `ceil`,
