@@ -516,15 +516,51 @@
 (check "plan_frontier" (unit-assert (equal (last (run "plan_frontier" "./eval check/plan-frontier.l")) "plan frontier ok")))
 
 
-;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
-(define-function law-run (name files)
-  (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; ./eval check/law.l " files))))
+;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES, with SEED as MARU_LAW_SEED
+;; when given.
+(define-function law-run (name files . seed)
+  (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; "
+					    (if seed (concat-strings "MARU_LAW_SEED=" (car seed) " ") "") "./eval check/law.l " files))))
     (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
-(define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
+(define-function law-fixture (name support . seed) (apply law-run (cons name (cons (concat-strings support " check/laws/fixtures/" name ".law") seed))))
+;; The engine's fixtures run on a seed fresh each time, printed, so they hold the engine's behaviour, not one stream's
+;; draws.  An outcome that doesn't depend on the draws (PROVED, an error, VACUOUS, an exhaustive refutation) is held as
+;; written; a sampled refutation (one naming its seed=) by its verdict and the variables it names, and a sampled
+;; fixture's lines (covers decided sequentially) by their verdicts; and a run with either is run again on its seed and
+;; must give the same lines, so a refutation's printed seed replays it.
+(define *law-seed* (car (words (car (run "law_seed" "od -An -N2 -tu2 /dev/urandom")))))
+(define law-sampled-fixtures '("classify-test" "classify-cap" "float" "minus-right"))
+(define-function law-name-of (token)	; "a=" of a token "a=…" whose name is a variable's, or ()
+  (let ((i 0) (n (string-length token)))
+    (while (and (< i n) (let ((c (string-at token i))) (or (and (<= ?a c) (<= c ?z)) (= c ?_) (and (<= ?0 c) (<= c ?9) (< 0 i))))) (set i (+ i 1)))
+    (and (< 0 i) (< i n) (= ?= (string-at token i)) (string-copy token 0 (+ i 1)))))
+(define-function law-shape (line sampled)
+  (let ((w (words line)))
+    (cond ((< (list-length w) 3) line)
+	  (sampled (concat-strings (car w) " " (cadr w) " " (caddr w)))
+	  ((and (member? "REFUTED" w) (list-detect x w (starts x "seed=")))	; its words to REFUTED, then the names
+	   (let ((s "") (past ()))
+	     (list-do x w
+	       (if past
+		   (let ((n (law-name-of x))) (and n (not (= n "seed=")) (set s (concat-strings s " " n))))
+		 (let () (set s (if (= "" s) x (concat-strings s " " x))) (and (= x "REFUTED") (set past 1)))))
+	     s))
+	  (else line))))
+(define-function law-random? (lines sampled) (or sampled (list-detect l lines (string-find l "seed="))))
 ;; A law file that checks something other than the engine is judged by the runner's exit status, which is 1 if any law
 ;; is neither TESTED nor PROVED; its verdicts are printed, not pinned, so a change of trials or domain needs no edit here.
 ;; (The engine's own fixtures, law_rules and the like, pin their lines: the reports are what they test.)
 (define-function law-show (name lines) (list-do l lines (println name ": " l)))
+(define-function law-fixture-holds (name support want)	; want: (status line …); prints what differs
+  (let* ((sampled (member? name law-sampled-fixtures))
+	 (got (law-fixture name support *law-seed*))
+	 (ok (and (= (car want) (car got))
+		  (equal (map (lambda (l) (law-shape l sampled)) (cdr want)) (map (lambda (l) (law-shape l sampled)) (cdr got))))))
+    (or ok (law-show (concat-strings "law_rules " name " gave") (cons (long->string (car got)) (cdr got))))
+    (and ok (law-random? (cdr got) sampled)
+	 (let ((again (law-fixture name support *law-seed*)))
+	   (or (equal again got) (let () (law-show (concat-strings "law_rules " name " again gave") (cdr again)) (set ok ())))))
+    ok))
 (define-function law-holds (name files)	; whether every law of FILES holds, its verdicts printed
   (let ((r (law-run name files))) (law-show name (cdr r)) (= 0 (car r))))
 
@@ -535,15 +571,16 @@
     (law-show "law_cexpr" (cdr r))
     (unit-assert (= 0 (car r)))
     (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
-  ;; the false law shrinks to three primaries for the seed, and each parses as one
-  (unit-assert (equal (law-fixture "minus-right" "")
-		      '(256 "law minus_right: REFUTED a=\"-5.4\" b=\"p\" c=\"-06\" seed=42" "grammar cexpr.primary: accepted 3 of 3")))
+  ;; the false law is refuted on a fresh seed and shrinks (by its primaries' own text) to primaries the grammar accepts,
+  ;; as the engine keeps a shrunk value in its domain; its seed replays it
+  (unit-assert (law-fixture-holds "minus-right" "" '(256 "law minus_right: REFUTED" "grammar cexpr.primary: accepted")))
   (unit-assert (equal (run "law_primary" "./eval check/law-compile-test.l primary '\"\"' '6'") '("yes" "yes"))))
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
   (unit-assert (law-holds "law_engine" "check/laws/engine.l check/laws/engine.law")))
 (check "law_rules"
+  (println "law_rules: MARU_LAW_SEED=" *law-seed*)
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
@@ -599,9 +636,13 @@
 		 ("float" "check/laws/fixtures/float.l" 256
 		  "law families: TESTED 4000 (zero 7%, subnormal 14%, huge 11%, infinite 7%, near24 8%, ordinary 53%)"
 		  "law below_1000: REFUTED x=1024.000000 seed=43"))
-      (let ((got (law-fixture (car c) (cadr c))))	; a fixture that differs prints what it gave
-	(or (equal (cddr c) got) (law-show (concat-strings "law_rules " (car c) " gave") (cons (long->string (car got)) (cdr got))))
-	(unit-assert (equal (cddr c) got)))))
+      (unit-assert (law-fixture-holds (car c) (cadr c) (cddr c)))))
+  ;; shrinking reaches the one simplest refutation whatever the seed: a list of numbers to the one-element list of 0 (by
+  ;; its structure: elements dropped, the rest simplified), and a float32 against x < 1000 to 1024
+  (let ((list-words (words (cadr (law-fixture "shrink-list" "check/laws/fixtures/shrink-list.l" *law-seed*))))
+	(float-words (words (caddr (law-fixture "float" "check/laws/fixtures/float.l" *law-seed*)))))
+    (unit-assert (equal (list (caddr list-words) (cadddr list-words)) '("REFUTED" "xs=(0)")))
+    (unit-assert (equal (list (caddr float-words) (cadddr float-words)) '("REFUTED" "x=1024.000000"))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (let ((r (law-fixture "empty-domain" "")))	; an empty list is no domain
     (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/empty-domain.out")) "E_DOMAIN"))))
@@ -618,11 +659,12 @@
 		      (starts (caddr r) "law guarded: INCONCLUSIVE status=139 input=("))))
   (let ((r (law-fixture "crash" "")))
     (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
-  ;; a - b = b - a shrinks to a smallest pair, one of them 0 and the other 0.5; the printed seed alone reproduces it
-  (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l")) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
+  ;; a - b = b - a, on a fresh seed, shrinks to a smallest pair, one of them 0 and the other 0.5 (the least numeral not 0);
+  ;; the printed seed alone reproduces it
+  (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l" *law-seed*)) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
     (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
-    (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
-		      (equal ab "a=0.500000 b=0")))
+    (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (starts (last w) "seed=")
+		      (member? ab '("a=0.500000 b=0" "a=0 b=0.500000"))))	; on any seed
     (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
 ;; a law file's rule, fact and facts lines, and a rule's continuation lines, each without its -- comment

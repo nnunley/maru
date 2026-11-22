@@ -22,7 +22,15 @@ The rule engine, `.law` files and their runner, and the laws over C expressions 
 - `law_rules` (`check/law.l`, `check/laws/fixtures/`): the runner prints one line per
   law, `law NAME:`, then `TESTED n`, `PROVED n`, `REFUTED x=v ... seed=s` (shrunk;
   the seed reproduces it), `STARVED k of n`, `VACUOUS` or `INCONCLUSIVE status=s input=...`
-  (a reference crashed). A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal
+  (a reference crashed). A refutation shrinks by the value's own structure (`law-structural`): a list's chunks
+  dropped (halves first), an element that is itself a list put in its place, one element simplified; a string's chunks
+  deleted; a number toward 0, an integer before a float, a float by `rules.l`'s float32 simplicity; each candidate
+  strictly simpler (smaller, then lighter numbers) and kept only while it stays in its domain and the claim still
+  fails, so it reaches a local minimum whatever the stream drew (a list of numbers against `count(xs) < 1` always
+  shrinks to `(0)`, a float32 against `x < 1000` to 1024; `shrink-list.law`, `float.law`); drawing again at a smaller
+  size is the last resort. The fixtures run on a seed fresh each time, printed: an outcome the draws don't decide is held
+  as written, a sampled refutation by its verdict and the variables it names, a sampled fixture by its verdicts, and a
+  run with either again on its seed, which must give the same lines. A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal
   domain must bind its last argument (`E_BINDING`), and a grammar domain must name a
   registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`).
   `law NAME: mutants of R by exhaustion size n. L, ...` judges each mutant of the rules
