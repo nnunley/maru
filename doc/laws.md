@@ -46,6 +46,12 @@ The rule engine, `.law` files and their runner, and the laws over C expressions 
   `E_DOMAIN` (`empty-domain.law`);
   and a law's variable may range over a list, inline or a `let`'s name, which a schema shares (`list-domain.law`). A file may
   `use "other.law"`, read in its place once however often used (`use.law`). `.law` files count toward `lines`.
+- The `float` domain (`rules.l`): float32 values made from the format's own layout, none listed: simple values,
+  random sign, exponent and mantissa bits (every finite magnitude), and the format's boundaries (±0, subnormals, the
+  greatest finite, ±infinity, 2^24, powers of two and their neighbours), drawn by a splitmix64 generator; it shrinks
+  toward simplicity and enumerates the format's landmarks, its arithmetic from the format's definition so it runs on
+  every evaluator (`float.law` holds each region to its share). Draws cost the values they try (lazy Fisher-Yates),
+  not their domain's size. The Gezira twin and algebra laws (`native_nile`, `doc/native.md`) draw with it.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
   well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
   are sound (Nile's own resolver and type checker, forked per question, accept what they

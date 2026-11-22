@@ -93,6 +93,29 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   images can't judge them. It found that an extern the unit itself defines (`nile.k` declares the runtime's interface,
   `nile-builtins.k` defines it) was looked up as a C symbol when the image loaded; `native-symbols` binds it to the
   unit's own function, as C's linker does (`check/native/extern-self.k`).
+  The image also carries the twin's driver and Gezira's test kernels, and two law files then run in one run of the
+  law runner, on a seed fresh each time and printed (`MARU_LAW_SEED=N` replays a refutation):
+  - `check/laws/gezira-twin.law`, the twin: chains of one to six of Gezira's kernels whose types meet, drawn from
+    facts the kernel table gives (`build/gezira-twin-kernels.l`, made by make from `build/gezira.k`'s constructors and
+    `gezira.nl`'s declarations by `check/gezira-twin-gen.l`), run by the C library (`build/gezira-twin.$(SO)`) and the
+    native image on the same drawn floats, which must agree: equal counts, each finite float within 1e-5 of the larger
+    magnitude (at least 1e-6), an infinity or NaN only its own kind. A law per kind of stream a chain starts from, one
+    over any chain, one over long streams (buffers' worth), on one worker and four; the last twins alone each kernel
+    no chain reached, so all of them are compared every run. Each build runs a case in a child of its own under a CPU
+    limit: a kernel can loop on inputs outside its domain (a subdivision handed a NaN), and a case the C build can't
+    finish is counted as outside Gezira's domain, not compared. Its own checks: the two builds are two, and a moved
+    native float is seen. Its first run found Nile's `floor` wrong past ±2^31 in both builds (now `floorf`).
+  - `check/laws/gezira-algebra.law`, Gezira against mathematics on both builds, catching a fault both share: floor
+    and ceiling, affine transforms as a group, compositing's monoid, projections and symmetric modes, reversal,
+    coverage moving with its shape, the gradient's affinity. Bands follow the terms' magnitudes; a case past float32's
+    range or near a singular matrix is counted as outside.
+
+  The twin takes about 60 s and the algebra about 40. A longer sweep by hand: `MARU_LAW_TRIALS=300` (and any seed) on
+  `./eval check/law.l check/laws/gezira-twin.l check/laws/gezira-twin.law check/laws/gezira-algebra.law`, with
+  `NILE_TWIN_LIB`, `NILE_TWIN_IMAGE` (`check/native-nile.l LOADER IMAGE` saves one) and `NILE_TWIN_TMP` set.
+  The C library's math functions are one instruction each natively: a call to `floorf`, `floor`, `ceilf`, `ceil`,
+  `sqrtf` or `sqrt` on a float is `FRINTM`, `FRINTP` or `FSQRT` (arm64), `ROUNDSS`/`SD` or `SQRTSS`/`SD` (x64)
+  (`check/native/math.k`).
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).
