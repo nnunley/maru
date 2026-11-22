@@ -29,11 +29,11 @@
   (cond ((= r 'result) (car (abi isa 'result)))
 	((= r 'a0) (car (abi isa 'args)))
 	((= r 'a1) (cadr (abi isa 'args)))
-	(else (let* ((name (symbol->string r))
-		     (scratch (abi isa 'scratch))
+	(else (let* ((name (symbol->string r))	; sN: scratch's Nth; hN: held's Nth (native code's held values)
+		     (scratch (abi isa (if (= ?h (string-at name 0)) 'held 'scratch)))
 		     (n (- (string-at name 1) ?0)))
 		(while (< 0 n) (set scratch (cdr scratch)) (set n (- n 1)))
-		(car scratch)))))
+		(or (car scratch) (error "stub: " isa " has no register " r))))))
 
 (define stub-reg-caches (identity-cache 8))	; by isa: a cache (hash.l) of each name's register, worked out once
 (define-function stub-reg (isa r)

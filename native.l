@@ -8,6 +8,8 @@
 (require "code-region.l")
 (require "native-image.l")
 (require "stub.l")
+;; how many values native code may hold in registers at once (native-gen.k): abi.spec's held row for the ISA lowered for
+(define *native-held-count* (list-length (abi (stub-isa) 'held)))
 (require "native-gen.k")
 (load "maru.k")		; no arguments left: definitions only
 ;; for native-arm64.g's actions.  X29 holds SP as it was before the frame, so leaving sets SP from it, a frame larger

@@ -381,3 +381,4 @@
 +14 an extern the unit itself defines bound to the unit's function (native-link.l's native-symbols), as C's linker binds it; check/native/extern-self.k and its case in check/native.l
 +75 the pixel check: check/gezira-pixels.l's scenes, gezira-maru.l's entry points from a native code image (gezira-native-image), check/native-nile.l saving its image, check.l's native_nile comparing the native image's pixels with the library's
 +79 the pixel comparison as an error band: check/gezira-pixels-compare.l (channels within EPS, its own cases, each scene's differing words and largest difference), check/strings.l (split, lines, words moved out of check.l for it), native_nile using it
++83 held registers: abi.spec's held rows, stub-reg-of's h names (and its refusal past a row's end), native.l's *native-held-count*, check/native-held.l (the mapping, a hand-built unit run through h registers, the register-use scan on both ISAs), run by native_ir2 and native_ir2_x64

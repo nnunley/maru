@@ -740,12 +740,18 @@
   (list-do e '("./eval" "./eval3")
     (unit-assert (equal (last (run "data_length" (concat-strings e " check/data-length.l"))) "data-length ok"))))
 ;; typed Maru compiled to native code in-process and called by address (check/native.l, native.l)
-(check "native_ir2" (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l" 300)) "native ok")))
+;; and held registers (h0, h1 …): their mapping, a unit computing through them, and no lowering touching one except as
+;; its value (check/native-held.l)
+(check "native_ir2"
+  (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l" 300)) "native ok"))
+  (unit-assert (equal (last (run "native_ir2_held" "./eval2 check/native-held.l" 300)) "native held ok")))
 ;; the same on x86-64: natively where the host is x86-64 (above), and here only as a smoke test under Rosetta, where
 ;; bin/x86_64/eval2 is built (arm64 macOS); it takes over a minute alone, so both get 300 s, for a loaded machine
 (check "native_ir2_x64"
   (if (= 0 (system "test -x bin/x86_64/eval2"))
-      (unit-assert (equal (last (run "native_ir2_x64" "bin/x86_64/eval2 check/native.l" 300)) "native ok"))
+      (let ()
+	(unit-assert (equal (last (run "native_ir2_x64" "bin/x86_64/eval2 check/native.l" 300)) "native ok"))
+	(unit-assert (equal (last (run "native_ir2_x64_held" "bin/x86_64/eval2 check/native-held.l" 600)) "native held ok")))
     (println "native_ir2_x64: SKIP, no bin/x86_64/eval2")))
 ;; a unit saved as a code image on eval2, loaded and called on eval and eval3 with native-image.l alone
 (check "native_image"
