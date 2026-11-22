@@ -82,7 +82,15 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   `gezira-api.k`) compiled natively on `eval2` in one unit and made a code image holding every entry point
   `gezira-api.k` exports, in under 16 times the CPU `ir-gen-c.k` takes to turn the same files into C. Both run under
   `/usr/bin/time -p` in the same case, so the bound holds on any machine. On 2026-11-20 it was about 12 times
-  (32 s against 2.7 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes.
+  (32 s against 2.7 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes. The image, saved, is
+  then run: `check/gezira-pixels.l` draws its scenes (a rectangle's half-covered edges, rotated quadratic Béziers at
+  half alpha over it, a filtered image paint through a rotating texture matrix, a downsample, premultiplied colours)
+  through `gezira-maru.l` bound to the image's entry points (`gezira-native-image`), on one worker and four, and
+  every pixel must equal the library's (`build/gezira.$(SO)`, the same sources through `ir-gen-c.k` and `cc`). This
+  is the behaviour check for changes meant to alter generated code, such as register allocation, where byte-identical
+  images can't judge them. It found that an extern the unit itself defines (`nile.k` declares the runtime's interface,
+  `nile-builtins.k` defines it) was looked up as a C symbol when the image loaded; `native-symbols` binds it to the
+  unit's own function, as C's linker does (`check/native/extern-self.k`).
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).

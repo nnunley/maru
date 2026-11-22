@@ -1034,14 +1034,22 @@
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
 ;; 16 times the CPU the C back end takes to turn the same files into C (about 12 times, 32 s against 2.7 s, on
 ;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
+;; The image, saved, then draws check/gezira-pixels.l's scenes on one worker and four, every pixel the same as the
+;; library's (build/gezira.$(SO), the same sources through ir-gen-c.k and cc): natively compiled Gezira run, its
+;; behaviour held to the C build's.
 (check "native_nile"
   (let* ((inputs (native-nile-inputs))
-	 (loader (native-nile-loader inputs)))
+	 (loader (native-nile-loader inputs))
+	 (image (concat-strings tmp "/native-nile.image")))
     (unit-assert (= 106 (time-hundredths "real 1.20\nuser 0.98\nsys 0.08\n")))	; 0.08 isn't octal
     (unit-assert (= 3395 (time-hundredths "user 33.60\nsys 0.35\n")))
     (run "native_nile_c" (concat-strings "/usr/bin/time -p ./eval2 ir-gen-c.k maru.k" inputs " > " tmp "/native-nile.c") 300)
-    (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader) 900))
+    (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader " " image) 900))
 			"native nile ok"))
+    (unit-assert (equal (last (run "native_nile_pixels_c" (concat-strings "./eval check/gezira-pixels.l > " tmp "/pixels-c.txt && tail -1 " tmp "/pixels-c.txt") 300))
+			"gezira pixels done"))
+    (unit-assert (equal (last (run "native_nile_pixels" (concat-strings "./eval check/gezira-pixels.l " image " > " tmp "/pixels-native.txt && cmp " tmp "/pixels-c.txt " tmp "/pixels-native.txt && echo same") 300))
+			"same"))
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
