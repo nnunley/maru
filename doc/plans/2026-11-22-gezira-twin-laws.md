@@ -81,9 +81,39 @@ agree; `check/laws/gezira-twin.law` generates typed chains by rules and states o
   `check.l` the fresh seed (from `/dev/urandom`), passed as `MARU_LAW_SEED` and printed.
 - [ ] **Step 4: Run** it again, and with two different `MARU_LAW_SEED`s. Expected: `twin_transform_points: TESTED n`,
   `twin_transform_points_edges: PROVED 1`, `twin_detects: TESTED n`, on both seeds.
-- [ ] **Step 5: Wire** into `native_nile` (after the pixel comparison, with `law-file-holds`, the expected lines
-  listed), run `make check CHECKS="native_nile lines erosion"`, commit `test(native): a twin of Gezira's C and native
+- [ ] **Step 5: Wire** into `native_nile` (after the pixel comparison, with `law-file-holds`, judged by its exit status,
+  verdicts printed), run `make check CHECKS="native_nile lines erosion"`, commit `test(native): a twin of Gezira's C and native
   builds, by the law engine`.
+
+### Task 1b: Extremes drawn by the property tester
+
+From the design's "Extremes drawn, not listed". The engine's own changes come first, each test first; then the twin
+uses them.
+
+**Files:** Modify `rules.l` (lazy choices, hashed membership, the `float` builtin and its generator), `check/law.l`
+(float shrinking), `check/laws/gezira-twin.l` and `.law` (floats, computed lengths, no edge list); create
+`check/laws/fixtures/float.law` (+ its support if needed); `check/check.l` (`law_rules` runs the fixture).
+
+**Interfaces:** Produces the domain `float(x)` in law files and rules: x a double holding a float32 value; families
+`simple`, `wide`, `boundary`, drawn about a third each; `(rules-float-family x)` → the family name of a value, for the
+fixture's classes; the shrink order 0, |x|, the integer part, x with its low half of mantissa bits cleared, x with its
+exponent halved toward 0.
+
+- [ ] **Step 1: Failing cases.** `check/laws/fixtures/float.law`: classes over `float(x)` draws, `cover` at least 5%
+  each of zero, subnormal (0 < |x| < 2^-126), huge (|x| > 2^100), infinite, near 2^24 (within 4 of it), and the
+  rest; a false law `all x: float(x). x < 1000` REFUTED with its shrunk value pinned (expected to shrink to 1024,
+  the simplest float32 not below 1000); and a timing case in `check/rules-test.l`: 100 draws of `number(n)` from a
+  numerals list of 100,000 take under a second.
+- [ ] **Step 2: Run** `./eval check/law.l check/laws/fixtures/float.law` and `./eval check/rules-test.l`. Expected:
+  float is unknown; the timing case fails (a full shuffle per draw).
+- [ ] **Step 3: Implement** lazy choices and hashed membership, the generator, the domain and its shrinking.
+- [ ] **Step 4: Run** the fixture, `law_rules`, `law_engine`, `law_cexpr`, `nile_laws`, `gc_laws` (their pinned and
+  status-judged results unchanged).
+- [ ] **Step 5: The twin** draws parameters and inputs with `float`, lengths as k × capacity + d (capacity the
+  runtime's 122 floats over the element size), and drops `twin_edges`; `twin_detects` keeps a perturbation that a
+  float input can't hide (it moves the translation by the band times the largest output, plus 1). Run on two fresh
+  seeds; gates; commit `test(laws): a float domain drawn from float32's own structure, and draws that cost their
+  tries`.
 
 ### Task 2: Every kernel, in chains per value type
 

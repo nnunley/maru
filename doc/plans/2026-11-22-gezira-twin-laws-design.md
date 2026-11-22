@@ -77,3 +77,27 @@ generated inputs by the C build and by the native image, their outputs held to e
   decided then.
 - Kernels with no output stream (`ApplyTexturer`, `CalculateBounds`, `BeginGradientColor`) are compared through what
   they write or answer instead; the driver says how for each.
+
+## Extremes drawn, not listed (added 2026-11-22)
+
+"Make sure that the extremes are tested algorithmically (and stochastically) rather than picking hardcoded values.
+Perhaps this is another case where having better algorithms in our property tester might help." The first twin law
+drew integers from a numerals list (k/16), which the engine made slow in the list's size (a full shuffle per draw, a
+candidate per smaller numeral when shrinking), so the range was cut to ±16 and the extremes were a hand-picked list.
+Instead, the property tester gains:
+
+- **Draws costing their tries:** `rules-choices` shuffles lazily (one Fisher–Yates swap per value tried), and number
+  membership is a hash lookup, so a large numerals list costs nothing per draw.
+- **A `float` domain**, float32 values generated from the format's own parameters (no value listed): a mixture of
+  simple values (small dyadic fractions), wide values (an exponent uniform over -149 to 127, random mantissa bits and
+  sign, so every magnitude is reachable), and the format's boundaries (±0, the smallest subnormal and normal, the
+  largest finite, ±infinity, 2^24 where integers stop being exact, powers of two and their neighbours one ulp away).
+  It draws from its own splitmix-style generator, seeded from the law's seed, so the existing laws' draws and the
+  engine fixtures' pinned counterexamples don't change.
+- **Float shrinking toward simplicity:** candidates 0, the positive, the integer part, fewer mantissa bits, a
+  smaller exponent: a handful per step, not one per numeral.
+- **Its own check:** a fixture law classifying draws by family, each family required at a share (the engine's
+  `cover`), and a false law whose shrunk counterexample is pinned (the engine fixtures pin their reports).
+
+The twin's laws draw parameters and inputs with `float`; stream lengths are computed, k times the runtime's buffer
+capacity for the element type plus d, from drawn k and d; the hand-picked edge law goes.
