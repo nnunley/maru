@@ -1,18 +1,18 @@
 -- Gezira's C build and its native image, twinned (check/laws/gezira-twin.l): a chain of kernels run by both on the same
 -- input agrees when the outputs have the same count and every float is within the band (1e-5 of the larger magnitude,
--- at least 1e-6).  The engine draws each case, parameters and input values as integers (each k the float k/16), from a
--- seed native_nile makes fresh each run and prints (MARU_LAW_SEED replays a refutation); the edge cases (edge values,
--- buffer-crossing lengths) are run whole every time.  twin_detects is the twin's own check: with the native side's first
--- parameter moved by 1e-3 it must disagree, so a twin that compared a build with itself, or never looked at the floats,
--- fails here.
-under test: twin, twin_perturbed, twin_edges
-let numerals = [-256 .. 256]
+-- at least 1e-6).  Parameters and inputs are drawn by the engine's float domain (simple values, magnitudes across the
+-- whole exponent range, the format's boundaries), from a seed native_nile makes fresh each run and prints (MARU_LAW_SEED
+-- replays a refutation); a long stream repeats the drawn elements to k of the runtime's buffers and d elements more.
+-- twin_distinct and twin_detects are the twin's own checks: the two builds are two, and a moved native float is seen.
+under test: twin, twin_long, twin_perturbed, twin_distinct
+let numerals = [-2 .. 3]
 defaults trials = 100, size = 6
 
-rule params6: number(a), number(b), number(c), number(d), number(e), number(f) => params6([a, b, c, d, e, f])
-rule points_one: number(x), number(y) => points([x, y])
-rule points_more: number(x), number(y), points(ps) => points([x, y | ps])
+rule params6: float(a), float(b), float(c), float(d), float(e), float(f) => params6([a, b, c, d, e, f])
+rule points_one: float(x), float(y) => points([x, y])
+rule points_more: float(x), float(y), points(ps) => points([x, y | ps])
 
-law twin_transform_points: all ps: params6(ps), xs: points(xs). twin(["TransformPoints"], ps, xs, 1) = 0
-law twin_transform_points_edges: all w in [1, 4]. twin_edges(["TransformPoints"], w) = 0 by exhaustion
+law twin_transform_points: all ps: params6(ps), xs: points(xs), w in [1, 4]. twin(["TransformPoints"], ps, xs, w) = 0
+law twin_transform_points_long: all ps: params6(ps), xs: points(xs), k: number(k), d: number(d), w in [1, 4]. twin_long(["TransformPoints"], ps, xs, k, d, w) = 0
+law twin_distinct: all w in [1, 4]. twin_distinct(w) = 1 by exhaustion
 law twin_detects: all ps: params6(ps), xs: points(xs). twin_perturbed(["TransformPoints"], ps, xs, 1) = 1

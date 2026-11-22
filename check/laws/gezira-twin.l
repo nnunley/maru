@@ -2,10 +2,13 @@
 ;;; library NILE_TWIN_LIB (build/gezira-twin.$(SO)) and the native image NILE_TWIN_IMAGE (native_nile's, with
 ;;; check/gezira-twin.k), each driven through gezira_twin_run on runtimes of its own.
 ;;;   (twin chain ps xs workers)            0 when both builds' outputs agree, else 1 (the first difference printed)
-;;;   (twin_perturbed chain ps xs workers)  the same, the native side's translation moved by 1: must disagree
-;;;   (twin_edges chain workers)            0 when both agree on every edge case of the chain's types, else 1
-;;; chain is a list of kernel names; ps and xs are the integers the law engine drew, parameters and input values, each
-;;; k the float k/16.  Outputs agree when their counts are equal and each float is within 1e-5 of the larger magnitude,
+;;;   (twin_long chain ps xs k d workers)   the same over a long stream: xs repeated to k buffers' worth plus d elements
+;;;   (twin_perturbed chain ps xs workers)  the same, the native output's first float moved past the band: must disagree
+;;;   (twin_distinct workers)               1 when the two builds are two
+
+;;; chain is a list of kernel names; ps and xs are floats the law engine drew (its float domain: simple values, every
+;;; magnitude, the format's boundaries), parameters and input values.  Outputs agree when their counts are equal and each
+;;; float is within 1e-5 of the larger magnitude,
 ;;; at least 1e-6 (or both are the same infinity, or both NaN).
 
 (define-function twin-env (name)
@@ -53,10 +56,13 @@
 	 (let ((floats ())) (for (i 0 n) (push floats (float-at out i))) (list-reverse! floats)))))
 
 (define-function twin-magnitude (x) (if (< x 0) (- 0.0 x) x))
+(define twin-infinity (* 1e308 10.0))
+(define-function twin-finite? (x) (and (= x x) (< (twin-magnitude x) twin-infinity)))
 (define-function twin-near (a b)
   (or (= a b)
       (and (!= a a) (!= b b))	; both NaN
-      (<= (twin-magnitude (- a b)) (max 1e-6 (* 1e-5 (max (twin-magnitude a) (twin-magnitude b)))))))
+      (and (twin-finite? a) (twin-finite? b)	; an infinity or a NaN only equals its own kind: no band around it
+	   (<= (twin-magnitude (- a b)) (max 1e-6 (* 1e-5 (max (twin-magnitude a) (twin-magnitude b))))))))
 (define twin-quiet ())	; set while the perturbed twin runs: its differences are expected, not news
 (define-function twin-say parts (or twin-quiet (apply println parts)))
 (define-function twin-compare (chain c n)	; 0 when the outputs agree, else 1, the first difference printed
@@ -71,44 +77,45 @@
 	     (set c (cdr c)) (set n (cdr n)) (set i (+ i 1)))
 	   (if bad (let () (twin-say "  twin " chain ": float " (car bad) " is " (cadr bad) " from C, " (caddr bad) " natively") 1) 0)))))
 
-(define-function twin-number (k) (/ (* 1.0 k) 16.0))
-(define-function twin-params (chain ps)	; each kernel's parameters from the drawn integers, reused in turn
+(define-function twin-params (chain ps)	; each kernel's parameters from the drawn floats, reused in turn
   (let ((out ()) (pool ps))
     (list-do name chain
       (for (j 0 (car (cddddr (twin-kernel name))))
-	(or pool (set pool (or ps '(16))))
-	(push out (twin-number (car pool))) (set pool (cdr pool))))
+	(or pool (set pool (or ps '(1.0))))
+	(push out (car pool)) (set pool (cdr pool))))
     (list-reverse! out)))
 (define-function twin-whole (chain xs)	; xs cut to whole elements of the chain's input type
   (let* ((w (caddr (twin-kernel (car chain)))) (n (* w (/ (list-length xs) w))) (out ()))
     (for (i 0 n) (push out (car xs)) (set xs (cdr xs)))
     (list-reverse! out)))
-(define-function twin-case (chain params xs workers perturb)
-  (let ((xs (twin-whole chain xs)))
-    (twin-compare chain (twin-run twin-c chain params xs workers)
-		  (twin-run twin-native chain (if perturb (perturb params) params) xs workers))))
+;; a long stream: the runtime's buffer holds 122 floats (nile-kernel.k's nile_Buffer_capacity: a 512-byte block less its
+;; nile_Buffer), so w-float elements fill one every 122/w; the drawn elements, repeated, to k buffers' worth and d more
+(define twin-buffer-floats 122)
+(define-function twin-stream (chain xs k d)
+  (let* ((w (caddr (twin-kernel (car chain)))) (xs (twin-whole chain xs)) (n (max 0 (+ (* k (/ twin-buffer-floats w)) d)))
+	 (out ()) (v xs))
+    (and xs (for (i 0 (* n w)) (or v (set v xs)) (push out (car v)) (set v (cdr v))))
+    (list-reverse! out)))
+(define-function twin-case (chain params xs workers move)	; move: the native output changed, for the self-test
+  (twin-compare chain (twin-run twin-c chain params xs workers)
+		(let ((n (twin-run twin-native chain params xs workers))) (if move (move n) n))))
 
-(define-function twin (chain ps xs workers) (twin-case chain (twin-params chain ps) (map twin-number xs) workers ()))
-;; the translation e (TransformPoints' fifth parameter) moved by 1: every output moves by 1, past the band for any
-;; value the integers can draw (|x'| under 4e4, so the band is under 0.4)
-(define-function twin-perturb (params)
-  (let ((i 0)) (map (lambda (p) (set i (+ i 1)) (if (= i 5) (+ p 1.0) p)) params)))
+(define-function twin (chain ps xs workers) (twin-case chain (twin-params chain ps) (twin-whole chain xs) workers ()))
+(define-function twin_long (chain ps xs k d workers) (twin-case chain (twin-params chain ps) (twin-stream chain xs k d) workers ()))
+
+;; the twin's own checks.  twin_distinct: the two builds are two (their entry points differ), so a twin that loaded one
+;; build twice fails.  twin_perturbed: the native output's first float moved past the band (by 1 or a thousandth of
+;; it, or an infinity made 0), so a comparison that never read the floats fails.
+(define-function twin_distinct (workers)
+  (if (and (!= (twin-c-entry "gezira_twin_run") (twin-native-entry "gezira_twin_run"))
+	   (!= (twin-runtime twin-c workers) (twin-runtime twin-native workers)))
+      1 0))
+(define-function twin-moved (outs)
+  (and outs
+       (cons (let ((x (car outs)))
+	       (cond ((or (!= x x) (> (twin-magnitude x) 1e38)) 0.0)
+		     (else (+ x (max 1.0 (* 1e-3 (twin-magnitude x)))))))
+	     (cdr outs))))
 (define-function twin_perturbed (chain ps xs workers)
   (set twin-quiet 1)
-  (let ((r (twin-case chain (twin-params chain ps) (map twin-number xs) workers twin-perturb))) (set twin-quiet ()) r))
-
-;; edge cases: values (zero both signs, ±1, tiny, huge, on and between pixels), matrices (identity, singular, flips, a
-;; large scale), and lengths in elements crossing the runtime's buffer (122 floats: 61 points)
-(define twin-edge-values (list 0.0 (* -1.0 0.0) 1.0 -1.0 1e-30 -1e-30 1e30 -1e30 0.5 1.5 -0.5 255.0 256.0 65535.5))
-(define twin-edge-matrices '((1.0 0.0 0.0 1.0 0.0 0.0) (0.0 0.0 0.0 0.0 0.0 0.0) (-1.0 0.0 0.0 1.0 0.5 0.0)
-			     (0.0 1.0 1.0 0.0 0.0 -0.5) (1000.0 0.0 0.0 1000.0 -3.5 7.25)))
-(define twin-edge-lengths '(0 1 2 60 61 62 121 122 123))
-(define-function twin-cycle (values n)	; n floats, values over again
-  (let ((out ()) (v values)) (for (i 0 n) (or v (set v values)) (push out (car v)) (set v (cdr v))) out))
-(define-function twin_edges (chain workers)
-  (let ((bad 0) (w (caddr (twin-kernel (car chain)))))
-    (list-do m twin-edge-matrices
-      (list-do len twin-edge-lengths
-	(and (= 1 (twin-case chain (twin-cycle m (* 6 (list-length chain))) (twin-cycle twin-edge-values (* w len)) workers ()))
-	     (set bad 1))))
-    bad))
+  (let ((r (twin-case chain (twin-params chain ps) (twin-whole chain xs) workers twin-moved))) (set twin-quiet ()) r))
