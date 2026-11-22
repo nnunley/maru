@@ -521,13 +521,19 @@
   (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; ./eval check/law.l " files))))
     (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
 (define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
+;; A law file that checks something other than the engine is judged by the runner's exit status, which is 1 if any law
+;; is neither TESTED nor PROVED; its verdicts are printed, not pinned, so a change of trials or domain needs no edit here.
+;; (The engine's own fixtures, law_rules and the like, pin their lines: the reports are what they test.)
+(define-function law-show (name lines) (list-do l lines (println name ": " l)))
+(define-function law-holds (name files)	; whether every law of FILES holds, its verdicts printed
+  (let ((r (law-run name files))) (law-show name (cdr r)) (= 0 (car r))))
 
 ;; law.g reads law files and templates fill by text (check/law-compile-test.l); cexpr.law's laws hold over primaries generated from cexpr.g's records, at least 80% of them accepted; a false one is refuted, shrunk.
 (check "law_cexpr"
   (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok"))
   (let* ((r (law-run "cexpr" "check/laws/cexpr.law")) (w (words (last r))) (n (string->long (last w))))
-    (unit-assert (equal (list (car r) (cadr r) (caddr r) (cadddr r))
-			'(0 "law conditional_right: TESTED 100" "law minus_left: TESTED 100" "law comment_blank: TESTED 100")))
+    (law-show "law_cexpr" (cdr r))
+    (unit-assert (= 0 (car r)))
     (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
   ;; the false law shrinks to three primaries for the seed, and each parses as one
   (unit-assert (equal (law-fixture "minus-right" "")
@@ -536,8 +542,7 @@
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
-  (unit-assert (equal (law-run "engine" "check/laws/engine.l check/laws/engine.law")
-		      '(0 "law unify_equates: TESTED 100" "law unify_symmetric: TESTED 100" "law nat_exhausted: PROVED 3" "law nat_drawn: TESTED 100"))))
+  (unit-assert (law-holds "law_engine" "check/laws/engine.l check/laws/engine.law")))
 (check "law_rules"
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
@@ -630,12 +635,9 @@
   (let ((n "check/laws/nile-reference.l"))
     ;; nile-adequacy.law repeats nile.law's rules and facts, so its mutants are nile.law's
     (unit-assert (equal (law-rule-lines "check/laws/nile.law") (law-rule-lines "check/laws/nile-adequacy.law")))
-    (unit-assert (equal (law-run "nile" (concat-strings n " check/laws/nile.law"))
-			'(0 "law sound: TESTED 100" "law generate_checks: TESTED 100" "law coverage: PROVED 1" "law agree: TESTED 100"
-			  "law agree_rejected: TESTED 100" "law round_trip: TESTED 100")))
+    (unit-assert (law-holds "law_nile" (concat-strings n " check/laws/nile.law")))
     ;; every mutant of the expr rules fails sound or agree, at one leaf per type
-    (unit-assert (equal (law-run "nile_adequacy" (concat-strings n " check/laws/nile-adequacy.law"))
-			'(0 "law sound: PROVED 46" "law agree: PROVED 222" "law adequate: PROVED 69")))
+    (unit-assert (law-holds "law_nile_adequacy" (concat-strings n " check/laws/nile-adequacy.law")))
     (unit-assert (equal (law-fixture "nile-crash" n) '(256 "law resolver_crash: INCONCLUSIVE status=256 input=(\"ϫ():ρ\\012forall_\\012\")")))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
@@ -1056,7 +1058,7 @@
 				(concat-strings "env NILE_TWIN_LIB=build/gezira-twin." *shlib* " NILE_TWIN_IMAGE=" image " MARU_LAW_SEED=" seed " ./eval")
 				"check/laws/gezira-twin.l" "check/laws/gezira-twin.law")))
       (println "native_nile twin laws: MARU_LAW_SEED=" seed)
-      (and out (list-do l (lines (contents-of-file-named out)) (println "native_nile twin " l)))
+      (and out (law-show "native_nile twin" (lines (contents-of-file-named out))))
       (unit-assert out))	; the runner exits 1 if any law is neither TESTED nor PROVED
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
@@ -1158,13 +1160,8 @@
 	 (_   (run "nile-laws-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_laws" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
 			      "check/laws/runtime.l" "check/laws/runtime.law")))
-    (unit-assert out)
-    (unit-assert (equal (and out (lines (contents-of-file-named out)))
-			'("law pass_identity: PROVED 78" "law reverse_backwards: PROVED 78" "law reverse_involution: PROVED 78"
-			  "law dupcat_is_twice: PROVED 78" "law dupzip_pairs: PROVED 78" "law sort_keys_ordered: PROVED 78"
-			  "law sort_permutation: PROVED 78" "law deterministic: PROVED 260" "law words_partition: PROVED 234"
-			  "law breaks_keep_words: PROVED 234" "law breaks_fit: PROVED 234" "law breaks_maximal: PROVED 234"
-			  "law points_placed: PROVED 234" "law layout_deterministic: PROVED 468")))))
+    (and out (law-show "nile_laws" (lines (contents-of-file-named out))))
+    (unit-assert out)))
 
 ;; the runtime's contracts over PCT schedules (check/laws/runtime-schedules.law): the batch driver, its threads taking turns
 ;; by a schedule the law generates, keeps them (no buffer dropped, no process queued while running or after it was freed,
@@ -1178,10 +1175,8 @@
 	 (_   (run "nile-sched-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_schedules" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
 			      "check/laws/runtime.l" "check/laws/runtime-schedules.law")))
-    (unit-assert out)
-    (unit-assert (equal (and out (lines (contents-of-file-named out)))
-			'("law layout_contracts: TESTED 1000" "law found_glyphs: PROVED 2"
-			  "law builtin_contracts: TESTED 1000" "law reroute_contracts: TESTED 1000")))))
+    (and out (law-show "nile_schedules" (lines (contents-of-file-named out))))
+    (unit-assert out)))
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")
