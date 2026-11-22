@@ -14,11 +14,13 @@
 ;; the library's shared object, by the platform's suffix, opened once from the tree (as make builds it); or, with
 ;; gezira-native-image defined before this loads and naming a code image (native-link.l's native-save), the same
 ;; entry points from that image: the same Gezira compiled by Maru's native back end (check/gezira-pixels.l)
+;; (eval resolves a form's globals before it runs, so an undefined name is looked up only once defined? says it exists)
+(define gezira-native-path (and (defined? 'gezira-native-image) (eval 'gezira-native-image)))
 (define gezira-native-entries
-  (and (defined? 'gezira-native-image) gezira-native-image
-       (let () (load "native-image.l") ((eval 'native-load) gezira-native-image))))	; found once loaded
+  (and gezira-native-path
+       (let () (load "native-image.l") ((eval 'native-load) gezira-native-path))))	; found once loaded
 (define gezira-lib-path
-  (cond (gezira-native-entries				gezira-native-image)
+  (cond (gezira-native-entries				gezira-native-path)
 	((= 0 (system "test `uname` = Darwin"))	"build/gezira.dylib")
 	(else					"build/gezira.so")))
 (define gezira-lib (if gezira-native-entries 0 (dlopen gezira-lib-path 2)))		; RTLD_NOW
