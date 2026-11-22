@@ -186,9 +186,9 @@
 (define-function twin-copy-pool (p) (cons (cdr p) (cdr p)))
 ;; a case: the chain's segments and each boundary's second stream made once from ps, then run on both builds
 (define-function twin-pool-take (pool n) (let ((out ())) (for (i 0 n) (push out (twin-next pool))) (list-reverse! out)))
-(define-function twin-isolated (build segs xs workers zips)
+(define-function twin-isolated-within (build segs xs workers zips limit)
   (let ((st (law-child (lambda ()
-			 (law-limit twin-limit)
+			 (law-limit limit)
 			 (set twin-runtimes ())
 			 (let ((r (twin-run-chain build segs xs workers (map twin-copy-pool zips))) (parts (list "ran")))
 			   (if (= r 'failed) (set parts (list "failed"))
@@ -198,6 +198,8 @@
     (if (!= 0 st) 'stuck
       (let ((ws (words (contents-of-file-named twin-file))))
 	(if (= "failed" (car ws)) 'failed (map (lambda (w) (twin-of-bits (string->long w))) (cdr ws)))))))
+(define-function twin-isolated (build segs xs workers zips)	; under twin-limit CPU seconds (every thread's)
+  (twin-isolated-within build segs xs workers zips twin-limit))
 (define-function twin-case (chain ps xs workers move)
   (set *twin-built* ())
   (let* ((pool (twin-pool ps))
@@ -209,6 +211,9 @@
     (set zips (list-reverse! zips))
     (let* ((c (twin-isolated twin-c segs xs workers zips))
 	   (n (if (twin-ran? c) (twin-isolated twin-native segs xs workers zips) c))	; outside the domain: nothing to compare
+	   (n (if (and (twin-ran? c) (= n (quote stuck)))	; a limit counts every thread, and waiting workers burn CPU on a busy
+		  (twin-isolated-within twin-native segs xs workers zips (* 8 twin-limit))	; machine: a native run past its time
+		n))	; is a hang only if it doesn't finish in eight times that
 	   (r (twin-compare chain c (if (and move (pair? n)) (move n) n))))
       (and xs (twin-ran? c) (twin-ran? n)	; compared, on input: the first kernel, and all it built if output came
 	   (let ()
