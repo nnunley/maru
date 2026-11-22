@@ -380,3 +380,4 @@
 +20 the review's two fixes: a number where a row takes a PC-relative offset refused as the template loads, and arm64-row-rule-parts refusing a rule that doesn't fit its row (data older than arm64.spec); native-sites.l's three cases
 +14 an extern the unit itself defines bound to the unit's function (native-link.l's native-symbols), as C's linker binds it; check/native/extern-self.k and its case in check/native.l
 +75 the pixel check: check/gezira-pixels.l's scenes, gezira-maru.l's entry points from a native code image (gezira-native-image), check/native-nile.l saving its image, check.l's native_nile comparing the native image's pixels with the library's
++79 the pixel comparison as an error band: check/gezira-pixels-compare.l (channels within EPS, its own cases, each scene's differing words and largest difference), check/strings.l (split, lines, words moved out of check.l for it), native_nile using it

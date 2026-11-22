@@ -86,7 +86,9 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   then run: `check/gezira-pixels.l` draws its scenes (a rectangle's half-covered edges, rotated quadratic Béziers at
   half alpha over it, a filtered image paint through a rotating texture matrix, a downsample, premultiplied colours)
   through `gezira-maru.l` bound to the image's entry points (`gezira-native-image`), on one worker and four, and
-  every pixel must equal the library's (`build/gezira.$(SO)`, the same sources through `ir-gen-c.k` and `cc`). This
+  each pixel's four channels must be within one of the library's (`build/gezira.$(SO)`, the same sources through
+  `ir-gen-c.k` and `cc`): an error band, not identity, so either compiler may fuse a multiply and an add and round
+  once (`check/gezira-pixels-compare.l`, which prints how many pixels differ in each scene and by how much). This
   is the behaviour check for changes meant to alter generated code, such as register allocation, where byte-identical
   images can't judge them. It found that an extern the unit itself defines (`nile.k` declares the runtime's interface,
   `nile-builtins.k` defines it) was looked up as a C symbol when the image loaded; `native-symbols` binds it to the

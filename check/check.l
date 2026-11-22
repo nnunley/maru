@@ -11,17 +11,7 @@
 (define tmp (if (env-var "MARU_CHECK_TMP") check-tmp (concat-strings check-tmp "/direct")))
 (system (concat-strings "rm -rf " tmp " && mkdir -p " tmp))
 
-(define-function split (str sep)
-  (let ((out ()) (start 0) (n (string-length str)))
-    (for (i 0 n)
-      (when (= sep (string-at str i))
-	(push out (string-copy str start (- i start)))
-	(set start (+ i 1))))
-    (and (< start n) (push out (string-copy str start (- n start))))
-    (list-reverse! out)))
-
-(define-function lines (str) (split str ?\n))
-(define-function words (str) (let ((ws ())) (list-do w (split str 32) (or (= 0 (string-length w)) (push ws w))) (list-reverse! ws)))
+(require "check/strings.l")
 (define-function starts (str prefix) (and (<= (string-length prefix) (string-length str)) (= 0 (string-compare str prefix 0 (string-length prefix)))))
 (define-function join-words (ws) (let ((s "")) (list-do w ws (set s (if (= 0 (string-length s)) w (concat-strings s " " w)))) s))
 (define-function last (list) (while (cdr list) (set list (cdr list))) (car list))
@@ -1034,9 +1024,10 @@
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
 ;; 16 times the CPU the C back end takes to turn the same files into C (about 12 times, 32 s against 2.7 s, on
 ;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
-;; The image, saved, then draws check/gezira-pixels.l's scenes on one worker and four, every pixel the same as the
-;; library's (build/gezira.$(SO), the same sources through ir-gen-c.k and cc): natively compiled Gezira run, its
-;; behaviour held to the C build's.
+;; The image, saved, then draws check/gezira-pixels.l's scenes on one worker and four, each pixel's channels within one
+;; of the library's (build/gezira.$(SO), the same sources through ir-gen-c.k and cc, whose compiler may fuse float
+;; operations; check/gezira-pixels-compare.l): natively compiled Gezira run, its behaviour held to the C build's, and
+;; how many pixels differ, and by how much, printed.
 (check "native_nile"
   (let* ((inputs (native-nile-inputs))
 	 (loader (native-nile-loader inputs))
@@ -1048,8 +1039,10 @@
 			"native nile ok"))
     (unit-assert (equal (last (run "native_nile_pixels_c" (concat-strings "./eval check/gezira-pixels.l > " tmp "/pixels-c.txt && tail -1 " tmp "/pixels-c.txt") 300))
 			"gezira pixels done"))
-    (unit-assert (equal (last (run "native_nile_pixels" (concat-strings "./eval check/gezira-pixels.l " image " > " tmp "/pixels-native.txt && cmp " tmp "/pixels-c.txt " tmp "/pixels-native.txt && echo same") 300))
-			"same"))
+    (run "native_nile_pixels" (concat-strings "./eval check/gezira-pixels.l " image " > " tmp "/pixels-native.txt") 300)
+    (let ((out (run "native_nile_pixels_compare" (concat-strings "./eval check/gezira-pixels-compare.l " tmp "/pixels-c.txt " tmp "/pixels-native.txt"))))
+      (list-do l out (println "native_nile pixels:" l))
+      (unit-assert (equal (last out) "pixels within 1")))
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
