@@ -1,0 +1,10 @@
+-- Gezira's algebra (check/laws/gezira-twin.l): kernels held to mathematics on both builds, the C library and the native
+-- image, so a fault both share shows (the twin compares them with each other, and can't see one).  Values are drawn by
+-- the engine's float domain, from a fresh seed each run (MARU_LAW_SEED replays a refutation).
+under test: floor_right, ceiling_right
+defaults trials = 200
+
+-- Nile's floor and ceiling (gezira_Floors, gezira_Ceilings: check/gezira/twin-kernels.nl): a whole number within one of
+-- x on the right side, an infinity itself, NaN NaN, for every float32
+law floor_is_floor:     all x: float(x). floor_right(x, 1) = 1
+law ceiling_is_ceiling: all x: float(x). ceiling_right(x, 1) = 1

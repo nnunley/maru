@@ -388,3 +388,5 @@
 +7 the twin draws floats (the engine's float domain), long streams computed from the runtime's buffer, twin_distinct and a moved-output twin_detects; the hand-picked edge law and its lists gone; twin-near bands finite values only
 +2 gezira-maru.l reads gezira-native-image only once defined? says it exists (gezira-native-path)
 +57 the C library's floor, ceiling and square root as one instruction each (native-gen.k's native-math-kind; FRINTM, FRINTP and FSQRT on arm64, ROUNDSS/SD and SQRTSS/SD on x64, the FRINT and ROUND rows new in arm64.spec and x86.spec); check/native/math.k and its cases
++312 every Gezira kernel twinned: check/gezira-twin-gen.l (the kernel table from Gezira, by make), the driver building prefix-encoded chains with a bounded capture, each build's case in a child under a CPU limit, laws per stream type, over any chain, over long streams, and every kernel each run; check/gezira/twin-kernels.nl and check/laws/gezira-algebra.law (floor and ceiling held to their definitions on both builds); native_nile running both
+-2 nile: floor and ceiling as floorf and ceilf (the submodule's e4e2da4)
