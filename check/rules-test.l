@@ -110,4 +110,31 @@
 (rules-expand '((facts (infix) no-facts)))
 (expect "a facts function returning nothing is rejected" (equal *msgs* '("E_NO_FACTS: no-facts")))
 
+;; a draw costs the values it tries, not the domain's size: 200 numbers drawn from 100,000 numerals in well under a
+;; second (a full shuffle per draw took seconds), each one of them, and membership answered without a scan
+(let ((saved *rules-numbers*) (clock (subr "clock" ">l")) (ns ()) (drawn ()))
+  (for (i 0 100000) (push ns i))
+  (set *rules-numbers* ns)
+  (rules-generate () (quote (number $n)) 0) (rules-holds? () (quote (number 1)) 0)	; a list's array and table, made once
+  (let ((t (clock)))
+    (for (i 0 200) (push drawn (rules-generate () '(number $n) 0)))
+    (expect "200 draws from 100,000 numerals take under half a second" (< (- (clock) t) 500000)))
+  (expect "every draw is a numeral" (let ((y 1)) (list-do d drawn (or (and (<= 0 d) (< d 100000)) (set y ()))) y))
+  (expect "the draws differ" (< 1 (list-length (let ((u ())) (list-do d drawn (or (member? d u) (push u d))) u))))
+  (let ((t (clock)))
+    (for (i 0 200) (rules-holds? () '(number 99999) 0))
+    (expect "200 membership checks against 100,000 numerals take under half a second" (< (- (clock) t) 500000)))
+  (set *rules-numbers* saved))
+
+;; float(x): float32 values from the format's own structure; each family drawn, each value a float32
+(rules-seed 11)
+(let ((fams ()) (all-float32 1))
+  (for (i 0 600)
+    (let ((x (rules-generate () '(float $x) 0)))
+      (or (memq (rules-float-family x) fams) (push fams (rules-float-family x)))
+      (or (rules-float32? x) (set all-float32 ()))))
+  (expect "600 float draws reach every family" (= 6 (list-length fams)))
+  (expect "every float draw is a float32 value" all-float32))
+(expect "float checks a float32 value" (and (rules-holds? () '(float 0.5) 0) (not (rules-holds? () '(float "x") 0))))
+
 (println (if ok "rules ok" "rules FAILED"))

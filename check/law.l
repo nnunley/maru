@@ -142,7 +142,7 @@
   (set *rules-random* 1)
   (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)))
     (rules-solve *law-rules* g *rules-empty* size (lambda (s) (list (walk* out s))))))
-(define-function law-pick (l) (array-at (list->array l) (rules-rand (list-length l))))
+(define-function law-pick (l) (rules-pick l))
 (define-function law-draw-at (b vars vals size)	; (value) or (); a grammar's not counted toward acceptance
   (cond ((= 'set (cadr b))	(list (law-pick (caddr b))))
 	((= 'grammar (cadr b))	(let ((s (grammar-regenerate (caddr b) (cadddr b) size))) (and s (list s))))
@@ -231,6 +231,8 @@
 (define-function law-candidates (b vars vals v size)
   (let ((out ()))
     (cond ((= 'let (cadr b))	())
+	  ((and (pair? (caddr b)) (= 'float (car (caddr b))))	; a float: simpler float32 values, not numerals
+	   (set out (map (lambda (c) (cons c size)) (rules-float-simpler v))))
 	  ((law-number? v)		(list-do n *rules-numbers* (and (< (law-abs n) (law-abs v)) (push out (cons n size)))))
 	  ((= 'set (cadr b))	(let ((l (caddr b))) (while (and l (not (= v (car l)))) (push out (cons (car l) size)) (set l (cdr l)))))
 	  (else			(set out (law-regen b vars vals size))))

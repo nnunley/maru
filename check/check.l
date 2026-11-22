@@ -537,7 +537,7 @@
     (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
   ;; the false law shrinks to three primaries for the seed, and each parses as one
   (unit-assert (equal (law-fixture "minus-right" "")
-		      '(256 "law minus_right: REFUTED a=\"\\\"\\\"\" b=\"\\\"\\\"\" c=\"6\" seed=42" "grammar cexpr.primary: accepted 3 of 6")))
+		      '(256 "law minus_right: REFUTED a=\"-5.4\" b=\"p\" c=\"-06\" seed=42" "grammar cexpr.primary: accepted 3 of 3")))
   (unit-assert (equal (run "law_primary" "./eval check/law-compile-test.l primary '\"\"' '6'") '("yes" "yes"))))
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
@@ -589,12 +589,19 @@
 		  "law class_verdict: E_CLAIM a class of class_verdict is a verdict; compare it, e.g. `= accept`"
 		  "law class_crash: INCONCLUSIVE status=7 input=(0)" "law class_twice: E_COVER classify names zero twice")
 		 ("classify-none" "" 256 "law none: TESTED 0" "law none_covered: UNDERCOVERED zero 0 of 0 < 5%")
-		 ;; by test a cover is decided sequentially: 11 of 100 is short of 50% at once, a tenth is short of 12% and meets 9% only
-		 ;; after thousands of cases, and a tenth against 10% can't be decided within 300, so fails
-		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 11 of 100 < 50%" "law sampled_near: UNDERCOVERED zero 915 of 9200 < 12%"
-		  "law sampled_met: TESTED 8700 (zero 10%)" "law sampled_two: TESTED 5800 (zero 10%, low 50%)")
-		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 32 of 300 < 10%"))
-      (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
+		 ;; by test a cover is decided sequentially: 9 of 100 is short of 50% at once, a tenth is short of 12% after thousands
+		 ;; of cases and meets 8% within two thousand, and a tenth against 10% can't be decided within 300, so fails
+		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 9 of 100 < 50%" "law sampled_near: UNDERCOVERED zero 829 of 8400 < 12%"
+		  "law sampled_met: TESTED 1800 (zero 11%)" "law sampled_two: TESTED 2200 (zero 11%, low 50%)")
+		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 31 of 300 < 10%")
+		 ;; float draws float32 values from the format's own structure: each region in its share, and a false law shrinks to
+		 ;; the simplest float32 against it (rules.l's float)
+		 ("float" "check/laws/fixtures/float.l" 256
+		  "law families: TESTED 4000 (zero 7%, subnormal 14%, huge 11%, infinite 7%, near24 8%, ordinary 53%)"
+		  "law below_1000: REFUTED x=1024.000000 seed=43"))
+      (let ((got (law-fixture (car c) (cadr c))))	; a fixture that differs prints what it gave
+	(or (equal (cddr c) got) (law-show (concat-strings "law_rules " (car c) " gave") (cons (long->string (car got)) (cdr got))))
+	(unit-assert (equal (cddr c) got)))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (let ((r (law-fixture "empty-domain" "")))	; an empty list is no domain
     (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/empty-domain.out")) "E_DOMAIN"))))
@@ -611,11 +618,11 @@
 		      (starts (caddr r) "law guarded: INCONCLUSIVE status=139 input=("))))
   (let ((r (law-fixture "crash" "")))
     (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
-  ;; a - b = b - a shrinks to the smallest pair, a=0 b=0.5; the printed seed alone reproduces it
+  ;; a - b = b - a shrinks to a smallest pair, one of them 0 and the other 0.5; the printed seed alone reproduces it
   (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l")) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
     (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
     (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
-		      (equal ab "a=0 b=0.500000")))
+		      (equal ab "a=0.500000 b=0")))
     (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
 ;; a law file's rule, fact and facts lines, and a rule's continuation lines, each without its -- comment
