@@ -27,6 +27,7 @@
 (define *law-failed* ())
 (define *lb* ())  (define *lvars* ())  (define *lnames* ())	; the law: bindings (var kind data), $vars, plain names
 (define *lk* ())  (define *lcover* ())  (define *lcounts* ())	; the law's classes (name . function), covers (percent name), counts
+(define *law-probe* ())	; set in the vacuity probe's child: a failure there is reported unshrunk, only its verdict counts
 (define *lname* ())  (define *lc* ())  (define *lf* ())  (define *ls* 3)  (define *lclaim* ())  (define *lseed* 42)  (define *lmethod* ())
 
 ;; the environment overrides a file's defaults, so a sweep can try fresh seeds and more trials (check/sweep.l)
@@ -301,7 +302,7 @@
 	(let ((c (law-smaller i vals sizes))) (and c (let () (set vals (car c)) (set sizes (cdr c)) (set more 1))))))
     vals))
 (define-function law-failed (r vals)	; the outcome of a failing, crashing or verdict-valued try
-  (cond ((= r 'fail)	(list 'REFUTED (law-shrink vals)))
+  (cond ((= r 'fail)	(list 'REFUTED (if *law-probe* vals (law-shrink vals))))	; a probe needs the verdict, not a shrunk case
 	((= r 'verdict)	(list 'E_CLAIM (concat-strings (cond ((= 'claim *law-verdict*) "the claim of ") ((= 'class *law-verdict*) "a class of ") (else "a condition of ")) (symbol->string *lname*)
 					       " is a verdict; compare it, e.g. `= accept`")))
 	(else		(cons 'INCONCLUSIVE *law-crash*))))
@@ -391,7 +392,7 @@
     (when (= 0 pid) (law-quiet) (run))
     (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
 (define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
-  (let ((st (law-child (lambda () (law-limit 60) (set *lcover* ()) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+  (let ((st (law-child (lambda () (law-limit 60) (set *law-probe* 1) (set *lcover* ()) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
     (cond ((< st 0) 'crash) ((= 0 st) 1))))
 (define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))
