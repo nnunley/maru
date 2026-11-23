@@ -123,6 +123,15 @@
   (unit-assert (= 0 (command-status (make <command> argv: '("true")))))
   (unit-assert (= 256 (command-status (make <command> argv: '("false")))))
   (unit-assert (= 14 (command-status (make <command> argv: '("sleep" "30") wall: 1))))
+  ;; at its limit, or when the runner is interrupted, nothing the program started is left running: here a job it put in
+  ;; the background, which would write a file two seconds in
+  (let* ((left (concat-strings tmp "/run_limit_left")) (job (concat-strings "(sleep 2; touch " left ") & exec sleep 30"))
+	 (gone (lambda () (command-status (make <command> argv: '("sleep" "3"))) (command-status (make <command> argv: (list "test" "!" "-e" left))))))
+    (command-status (make <command> argv: (list "rm" "-f" left)))
+    (unit-assert (= 14 (command-status (make <command> argv: (list "sh" "-c" job) wall: 1))))
+    (unit-assert (= 0 (gone)))
+    (command-status (make <command> argv: (list "sh" "-c" (concat-strings "./eval check/spawn-interrupt.l '" job "' & r=$!; sleep 1; kill -INT $r; wait $r")) out: "/dev/null" err: "/dev/null"))
+    (unit-assert (= 0 (gone))))
   ;; no shell: each argument reaches the program as it is written
   (unit-assert (equal (spawned "spawn-args" (make <command> argv: '("printf" "%s|" "a;b" "c d" "$HOME" "x>y"))) '(0 . "a;b|c d|$HOME|x>y|")))
   (unit-assert (equal (spawned "spawn-env" (make <command> argv: '("printenv" "MARU_SPAWN_SEEN") env: '(("MARU_SPAWN_SEEN" . "yes"))))

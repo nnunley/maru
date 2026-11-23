@@ -55,7 +55,7 @@
 	    (push running (cons (jobs-start dir entry) (cons (car entry) (jobs-time)))))
 	(let* ((pid (jobs-wait4 -1 jobs-status 0 jobs-usage))
 	       (found (assq pid running))
-	       (status (+ (byte-at jobs-status 0) (<< (byte-at jobs-status 1) 8)))
+	       (status (command-ended pid (+ (byte-at jobs-status 0) (<< (byte-at jobs-status 1) 8))))	; its group ended if its limit was hit
 	       (name (cadr found))
 	       (rest ()))
 	  (list-do e running (or (= (car e) pid) (push rest e)))

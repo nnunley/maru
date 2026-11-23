@@ -50,9 +50,30 @@
       (for (k 0 16) (set-byte-at spawn-rlimit k (& 255 (>> cpu (* 8 (% k 8))))))
       ((subr "setrlimit" "ip>i") 0 spawn-rlimit))))	; RLIMIT_CPU is 0 on Darwin and Linux
 
+;; Each program leads a process group of its own, so what it forks can be ended with it: when its wall limit (an alarm
+;; that reaches the program, not what the program started) has ended it, (command-ended pid status) kills its group.  Out
+;; of the terminal's group a program no longer hears Ctrl-C, so while any is running, *backtrace* (which eval calls on an
+;; interrupt before it exits) kills every group still running; once none is, *backtrace* is as it was.
+(define spawn-setpgid	(subr "setpgid" "ii>i"))
+(define spawn-kill	(subr "kill" "ii>i"))
+(define spawn-groups ())  (define spawn-backtrace-was ())
+(define-function spawn-end-groups (stack depth)
+  (list-do g spawn-groups (spawn-kill (- 0 g) 9))
+  (and spawn-backtrace-was (spawn-backtrace-was stack depth)))
+(define-function spawn-group (pid)	; in the parent too, so the group exists before the child has run
+  (spawn-setpgid pid pid)
+  (or spawn-groups (let () (set spawn-backtrace-was *backtrace*) (set *backtrace* spawn-end-groups)))
+  (push spawn-groups pid))
+(define-function command-ended (pid status)	; status, its group killed if the wall limit ended it
+  (let ((rest ())) (list-do g spawn-groups (or (= g pid) (push rest g))) (set spawn-groups rest))
+  (and (= 14 status) (spawn-kill (- 0 pid) 9))
+  (or spawn-groups (set *backtrace* spawn-backtrace-was))
+  status)
+
 (define-function command-start (c)
   (let ((pid (spawn-fork)))
     (when (= 0 pid)
+      (spawn-setpgid 0 0)
       (set error (lambda args (apply print (cons "spawn: " args)) (print "\n") (spawn-exit 127)))	; never the parent's code
       (spawn-limit c)
       (list-do e (<command>-env c)	; a name with no value is taken out of the environment
@@ -62,11 +83,13 @@
       (spawn-redirect c)
       (spawn-execvp (car (<command>-argv c)) (spawn-argv-array (<command>-argv c)))
       (spawn-fail (concat-string "can't start " (car (<command>-argv c)))))	; execvp came back: it couldn't be started
+    (spawn-group pid)
     pid))
 (define-function spawn-status () (+ (byte-at spawn-status-word 0) (<< (byte-at spawn-status-word 1) 8)))
 (define-function command-status (c)
-  (spawn-waitpid (command-start c) spawn-status-word 0)
-  (spawn-status))
+  (let ((pid (command-start c)))
+    (spawn-waitpid pid spawn-status-word 0)
+    (command-ended pid (spawn-status))))
 
 ;; What a program says and whether it ran, for code that only needs that much.
 (define-function program-status (argv . files)	; argv run, its input, output and errors from and to files, if given: in out err
