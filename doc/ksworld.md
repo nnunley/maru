@@ -37,8 +37,8 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   document's `MatrixTransform2x3`, and KScript's `M(...)`, name Squeak's rows, read once into those fields. The check asks
   a recording Gezira: the fixture's one path, matrix and paint, and KSWorld.ks's 7 paths before its text, which is kept as
   `span` records (string, font, fill, size) to be laid out with TrueType glyphs.
-  A box whose `clipping` is true draws its shape, text and children only inside its extent, as `KSBox>>drawOn:` clips its
-  canvas by `drawingBounds` after `transformBy:`. Gezira clips as `GeziraCanvas` does: each clip is a stage of the
+  A box whose `clipping` is true draws its shape, text and children only inside its `drawingBounds`, as
+  `KSBox>>drawOn:` clips its canvas by them after `transformBy:`. Gezira clips as `GeziraCanvas` does: each clip is a stage of the
   pipeline, a `TransformBeziers` into the clip's coordinates and a `ClipBeziers` to its rectangle, interleaved with the
   transforms outside it (`gezira.l`'s `gezira-fill-clipped`, Nile's `gezira_fill_clipped`). Inside a clipping box the
   paths go in the box's own coordinates, so a turned box clips in its own frame. The rectangle is `KSBox>>drawingBounds`,
