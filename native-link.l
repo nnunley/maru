@@ -27,17 +27,28 @@
 ;; the table's labels name 8-byte slots from the first 8-byte boundary after the code; answers the labels, a table by
 ;; identity from each label to its address (a list searched for each label and branch made a unit's assembly quadratic)
 (define-function native-table-label (k) (string->symbol (concat-string "tab." (long->string k))))
+(define-function native-place-form (isa buffer labels form)	; form into the buffer: a fixup (report . label), or ()
+  (cond
+    ((= 'data (car form))	; a site's bytes (asm-arm64.l's arm64-site), 0..255 as it made them: placed as they are
+     (list-do b (cdr form) (array-append (asm-buffer-bytes buffer) b)))
+    ((= 'label-data (car form))	; a label site's (label-data BYTES POSITION ROW INSN L): its bytes, and asm's report
+     (let ((offset (array-length (asm-buffer-bytes buffer))) (more (cddddr form)))
+       (list-do b (cadr form) (array-append (asm-buffer-bytes buffer) b))
+       (cons (list (caddr form) offset (cadddr form) (car more)) (cadr more))))
+    ((= 'at (car form))
+     (if (hash-includes? labels (cadr form))
+	 (error "native: label " (cadr form) " defined twice")
+       (hash-at-put labels (cadr form) (asm-buffer-pc buffer)))
+     ())
+    (else
+     (let* ((label (native-form-label form))
+	    (reports (asm isa buffer (if label (native-form-reloc form label) form))))
+       (and label (cons (car reports) (cadr label)))))))
 (define-function native-assemble (isa buffer intents nslots)
   (let ((isa (asm-isa isa)) (labels (identity-hash-table)) (fixups ()))	; the instruction set found once, not per form
     (list-do forms intents
       (list-do form forms
-	(if (= 'at (car form))
-	    (if (hash-includes? labels (cadr form))
-		(error "native: label " (cadr form) " defined twice")
-	      (hash-at-put labels (cadr form) (asm-buffer-pc buffer)))
-	  (let* ((label (native-form-label form))
-		 (reports (asm isa buffer (if label (native-form-reloc form label) form))))
-	    (and label (push fixups (cons (car reports) (cadr label))))))))
+	(let ((f (native-place-form isa buffer labels form))) (and f (push fixups f)))))
     (let ((table (align (asm-buffer-pc buffer) 8)))
       (for (k 0 nslots) (hash-at-put labels (native-table-label k) (+ table (* 8 k)))))
     (list-do f fixups
@@ -53,13 +64,18 @@
 
 ;; a symbol's address read from its table slot: (global NAME), (extern NAME) or (string BYTE …), each entry once, its slot
 ;; found by equal in a table (hash.l) where a list searched for each made a unit's strings and externs quadratic;
-;; answers the functions with their intents rewritten, and the table's entries in slot order
+;; answers the functions with their intents rewritten, and the table's entries in slot order.  An extern the unit
+;; defines (nile.k declares the runtime's interface, nile-builtins.k defines it) is the unit's own function, as C's
+;; linker binds it, not a C symbol looked up as the image loads.
 (define-function native-symbols (functions)
-  (let ((slots (equal-hash-table)) (out ()))
+  (let ((slots (equal-hash-table)) (out ()) (own (identity-hash-table)))
+    (list-do f functions (hash-at-put own (car f) 1))
     (list-do f functions
       (let ((intents ()))
 	(list-do i (cadr f)
 	  (let* ((op (car i))
+		 (i (if (and (= op 'extern-address) (hash-at own (caddr i))) (list 'function-address (cadr i) (caddr i)) i))
+		 (op (car i))
 		 (entry (cond ((= op 'global-address) (list 'global (caddr i)))
 			      ((= op 'extern-address) (list 'extern (caddr i)))
 			      ((= op 'string-address) (cons 'string (native-string-bytes (caddr i)))))))

@@ -57,7 +57,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c undo.c undo-irl.c osdefs.k
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 # libraries the checks open; a library that fails to build fails only the checks that need it
-CHECK_LIBS = build/gc-shapes.g.l build/sat.$(SO) build/png.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/library-mode.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
+CHECK_LIBS = build/gc-shapes.g.l build/sat.$(SO) build/png.$(SO) build/irl-lib.$(SO) build/irl-grammar.$(SO) build/gezira.$(SO) build/gezira-twin.$(SO) build/gezira-twin-kernels.k build/gezira-twin-kernels.l build/library-mode.$(SO) build/tpeg-foreign-a.g.l build/tpeg-foreign-b.g.l \
 	     build/tpeg-mini.g.l build/tpeg-textargs.g.l build/tpeg-lists.g.l build/tpeg-args.g.l \
 	     build/tpeg-memo.g.l build/tpeg-foreign-sa.g.l build/tpeg-foreign-sb.g.l build/tpeg-literals.g.l build/tpeg-calc.g.l build/tpeg-calceval.g.l \
 	     sdl3.osdefs.k
@@ -74,7 +74,7 @@ define with-dbjr
 	  status=$$?; rm -rf "$$dbjr"; exit $$status; fi
 endef
 
-check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l $(CROSS) .force
+check : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l arm64-rules.g.l arm64-rules-data.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	$(call with-dbjr,./eval check/parallel.l $(CHECKS))
 
@@ -82,7 +82,7 @@ check-sweep : eval eval2 eval3 .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	./eval check/sweep.l $(SEEDS)
 
-check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l $(CROSS) .force
+check-quick : eval eval2 eval3 osdefs.k asm-x86.k arm64.g.l x86.g.l cexpr.g.l irl.g.l law.g.l john.g.l abi.g.l stub-arm64.g.l stub-x64.g.l native-arm64.g.l native-x64.g.l kscript.g.l arm64-rules.g.l arm64-rules-data.l $(CROSS) .force
 	-$(MAKE) -k -s $(CHECK_LIBS)
 	$(call with-dbjr,./eval check/parallel.l --quick)
 
@@ -222,6 +222,22 @@ build/gezira.k : gezira/nile/gezira.nl nile/compilers/maru/nile-gen-code.l nile/
 	./nile/compilers/maru/nile-to-maru-compiler.sh gezira gezira/nile/gezira.nl > /dev/null && mv gezira.k $@
 build/gezira.c : build/gezira.k build/nile.osdefs.k $(NILE_RT) nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k | eval2
 	./eval2 ir-gen-c.k maru.k build/nile.osdefs.k $(NILE_RT) build/gezira.k nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k > $@.tmp && mv $@.tmp $@
+# Gezira with the twin laws' driver (check/gezira-twin.k), its C build for check/laws/gezira-twin.l
+# the twin's Gezira: gezira.nl and its test kernels (check/gezira/twin-kernels.nl), one module, as gezira_vector builds its own
+build/gezira-twin-nile.k : gezira/nile/gezira.nl check/gezira/twin-kernels.nl nile/compilers/maru/nile-gen-code.l nile/compilers/maru/nile-gen-code-maru.l nile/compilers/maru/nile-builtins-maru.l nile/compilers/prelude.nl | eval2
+	@mkdir -p build/twin-gen
+	cat gezira/nile/gezira.nl check/gezira/twin-kernels.nl > build/twin-gen/gezira_twin.nl
+	R=$$PWD; cd build/twin-gen && $$R/nile/compilers/maru/nile-to-maru-compiler.sh gezira gezira_twin.nl > /dev/null
+	mv build/twin-gen/gezira.k $@
+# the twin's kernel table, from Gezira's constructors and declarations (check/gezira-twin-gen.l): typed Maru and Maru
+build/gezira-twin-kernels.k : build/gezira-twin-nile.k build/twin-gen/gezira_twin.nl check/gezira-twin-gen.l check/strings.l | eval
+	./eval check/gezira-twin-gen.l build/gezira-twin-nile.k build/twin-gen/gezira_twin.nl k > $@.tmp && mv $@.tmp $@
+build/gezira-twin-kernels.l : build/gezira-twin-nile.k build/twin-gen/gezira_twin.nl check/gezira-twin-gen.l check/strings.l | eval
+	./eval check/gezira-twin-gen.l build/gezira-twin-nile.k build/twin-gen/gezira_twin.nl l > $@.tmp && mv $@.tmp $@
+build/gezira-twin.c : build/gezira-twin-nile.k build/nile.osdefs.k $(NILE_RT) nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k build/gezira-twin-kernels.k check/gezira-twin.k | eval2
+	./eval2 ir-gen-c.k maru.k build/nile.osdefs.k $(NILE_RT) build/gezira-twin-nile.k nile/runtimes/maru/gezira-image.k nile/runtimes/maru/gezira-api.k build/gezira-twin-kernels.k check/gezira-twin.k > $@.tmp && mv $@.tmp $@
+build/gezira-twin.$(SO) : build/gezira-twin.c
+	$(CC) -pthread -shared -fPIC -fno-builtin -w -o $@ $< -lm
 build/gezira.$(SO) : build/gezira.c
 	$(CC) -pthread -shared -fPIC -fno-builtin -w -o $@ $< -lm
 
@@ -352,3 +368,14 @@ clean : .force
 #----------------------------------------------------------------
 
 .force :
+
+# arm64.spec's rows as a tree grammar (gen-arm64-rules.l), and its compiled rules
+arm64-rules.g : gen-arm64-rules.l asm-arm64.l arm64.spec arm64.g.l | eval
+	./eval gen-arm64-rules.l > $@.tmp && mv $@.tmp $@
+
+arm64-rules.g.l : arm64-rules.g tpeg.l compile-tpeg.l | eval
+	./eval compile-tpeg.l $< > $@
+
+# the encoder grammar's rules as data, for the specialiser (asm-arm64.l), which composes with them without a parser
+arm64-rules-data.l : arm64-rules.g grammar-data.l tpeg.l compile-tpeg.l | eval
+	./eval grammar-data.l arm64-rules.g arm64-rule-defs > $@.tmp && mv $@.tmp $@

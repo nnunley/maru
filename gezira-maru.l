@@ -11,12 +11,23 @@
 
 (require "gezira.l")
 
-;; the library's shared object, by the platform's suffix, opened once from the tree (as make builds it)
+;; the library's shared object, by the platform's suffix, opened once from the tree (as make builds it); or, with
+;; gezira-native-image defined before this loads and naming a code image (native-link.l's native-save), the same
+;; entry points from that image: the same Gezira compiled by Maru's native back end (check/gezira-pixels.l)
+;; (eval resolves a form's globals before it runs, so an undefined name is looked up only once defined? says it exists)
+(define gezira-native-path (and (defined? 'gezira-native-image) (eval 'gezira-native-image)))
+(define gezira-native-entries
+  (and gezira-native-path
+       (let () (load "native-image.l") ((eval 'native-load) gezira-native-path))))	; found once loaded
 (define gezira-lib-path
-  (if (= 0 (system "test `uname` = Darwin")) "build/gezira.dylib" "build/gezira.so"))
-(define gezira-lib (dlopen gezira-lib-path 2))		; RTLD_NOW
+  (cond (gezira-native-entries				gezira-native-path)
+	((= 0 (system "test `uname` = Darwin"))	"build/gezira.dylib")
+	(else					"build/gezira.so")))
+(define gezira-lib (if gezira-native-entries 0 (dlopen gezira-lib-path 2)))		; RTLD_NOW
 (define-function gezira-entry (name sig)
-  (let ((f (if (= 0 gezira-lib) 0 (dlsym gezira-lib name))))
+  (let ((f (cond (gezira-native-entries	(or (cdr (assq (string->symbol name) gezira-native-entries)) 0))
+		 ((= 0 gezira-lib)	0)
+		 (else			(dlsym gezira-lib name)))))
     (if (= 0 f) (error "gezira-maru: " gezira-lib-path " has no " name))
     (subr f sig)))
 (define gezira-start-entry (gezira-entry "gezira_start" "i>l"))

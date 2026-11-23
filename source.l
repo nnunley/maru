@@ -147,6 +147,10 @@
 (define-structure <definition> (kind name source))
 (define-method do-print <definition> () (print "<" self.kind " " self.name ">"))
 (define-method source-of <definition> () self.source)
+(define-function multimethod-name (n typed)	; a method's name for erosion: NAME (<type> ...), its argument types in order
+  (let ((s (concat-strings (symbol->string n) " (")) (sep ""))
+    (list-do a typed (set s (concat-strings s sep (symbol->string (car a)))) (set sep " "))
+    (string->symbol (concat-strings s ")"))))
 (define-function source-lift-concat (ds) (let ((out ())) (list-do d ds (list-do e d (push out e))) (list-reverse! out)))
 (define source-lift ())	; the grammar's action, set once its type exists
 (tpeg-load "source-lift.g")

@@ -1,0 +1,6 @@
+-- structural shrinking (check/law.l's law-structural): a false law over drawn lists of numbers shrinks to the one list
+-- that is simplest, whatever the seed: one element, the simplest numeral, by dropping elements and simplifying the rest
+under test: count
+rule one:  number(a)           => nums([a])
+rule more: number(a), nums(xs) => nums([a | xs])
+law empty: all xs: nums(xs). count(xs) < 1

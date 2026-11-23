@@ -1,0 +1,7 @@
+-- float(x) draws float32 values from the format's own structure: each family turns up in its share of draws (simple
+-- values, magnitudes across the exponent range, the format's boundaries), and a false law shrinks to the simplest
+-- float32 against it.
+under test: family, is_float32
+defaults trials = 2000
+law families: all x: float(x). is_float32(x) = 1 by test classify zero when family(x) = "zero", subnormal when family(x) = "subnormal", huge when family(x) = "huge", infinite when family(x) = "infinite", near24 when family(x) = "near24", ordinary when family(x) = "ordinary" cover 5% zero, 5% subnormal, 5% huge, 5% infinite, 5% near24, 5% ordinary
+law below_1000: all x: float(x). x < 1000

@@ -1,0 +1,32 @@
+-- Gezira's C build and its native image, twinned (check/laws/gezira-twin.l): chains of Gezira's kernels, of one to
+-- several kernels whose types meet (a stream of A also feeds a kernel reading (A, B), a drawn B zipped in), run by both
+-- builds on the same input, agree when the outputs have the same count and every finite float is within the band (1e-5
+-- of the larger magnitude, at least 1e-6).  The kernels are Gezira's own, read from it by make
+-- (build/gezira-twin-kernels.l); parameters and inputs are drawn by the engine's float domain from a seed native_nile
+-- makes fresh each run and prints (MARU_LAW_SEED replays a refutation).  A law per kind of stream a chain starts from, one
+-- over any chain, one over long streams; twin_distinct and twin_detects are the twin's own checks, and
+-- twin_every_kernel, last, twins alone each kernel no chain reached, so all of them are compared in every run.
+under test: twin, twin_long, twin_perturbed, twin_distinct, twin_every_kernel
+let numerals = [-2 .. 3]
+defaults trials = 30, size = 6
+facts kernel, connects from twin_kernel_facts
+
+rule chain_one:  kernel(k, t, u)                                  => chain(t, u, [k])
+rule chain_more: kernel(k, t, v), connects(v, w), chain(w, u, ks) => chain(t, u, [k | ks])
+rule floats_one:  float(x)            => floats([x])
+rule floats_more: float(x), floats(xs) => floats([x | xs])
+rule params6: float(a), float(b), float(c), float(d), float(e), float(f) => params6([a, b, c, d, e, f])
+rule points_one: float(x), float(y) => points([x, y])
+rule points_more: float(x), float(y), points(ps) => points([x, y | ps])
+
+law twin_points:   all c: chain("Point", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_beziers:  all c: chain("Bezier", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_colors:   all c: chain("(Color,Color)", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_numbers:  all c: chain("Number", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_spans:    all c: chain("SpanCoverage", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_edges:    all c: chain("EdgeSample", u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_any:      all c: chain(t, u, c), ps: floats(ps), xs: floats(xs), w in [1, 4]. twin(c, ps, xs, w) = 0
+law twin_long_any: all c: chain(t, u, c), ps: floats(ps), xs: floats(xs), k: number(k), d: number(d), w in [1, 4]. twin_long(c, ps, xs, k, d, w) = 0
+law twin_distinct: all w in [1, 4]. twin_distinct(w) = 1 by exhaustion
+law twin_detects:  all ps: params6(ps), xs: points(xs). twin_perturbed(["gezira_TransformPoints"], ps, xs, 1) = 1
+law twin_every_kernel: all w in [1, 4]. twin_every_kernel(w) = 0 by exhaustion

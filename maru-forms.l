@@ -26,6 +26,7 @@
 (define forms-bind ())
 (define forms-params ())
 (define forms-list ())
+(define forms-typed ())
 (tpeg-load "maru-forms.g")
 (set forms-bind (lambda (self v) (and v (symbol? v) (hash-at-put (<maru-forms>-binders self) v 't)) *forms-none*))
 (set forms-params	; a parameter list's names bound, its dotted rest among them; one form if it's a list
@@ -34,6 +35,13 @@
 	 (while (pair? p) (forms-bind self (car p)) (set p (cdr p)))
 	 (forms-bind self p))
        (if (pair? ps) '(0 1 ()) *forms-none*)))
+(set forms-typed	; a multimethod's typed arguments: each (type arg) is a form of its own, its arg bound; the list one form
+     (lambda (self ps)
+       (let ((p ps) (n 0))
+	 (while (pair? p)
+	   (and (pair? (car p)) (set n (+ n 1)) (forms-bind self (cadr (car p))))
+	   (set p (cdr p)))
+	 (if (pair? ps) (list 0 (+ 1 n) ()) *forms-none*))))
 (set forms-list		; a list's answer: quoted data none, the reader's syntax not itself a form
      (lambda (self x r)
        (cond ((= r 'data)		*forms-none*)

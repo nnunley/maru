@@ -11,17 +11,7 @@
 (define tmp (if (env-var "MARU_CHECK_TMP") check-tmp (concat-strings check-tmp "/direct")))
 (system (concat-strings "rm -rf " tmp " && mkdir -p " tmp))
 
-(define-function split (str sep)
-  (let ((out ()) (start 0) (n (string-length str)))
-    (for (i 0 n)
-      (when (= sep (string-at str i))
-	(push out (string-copy str start (- i start)))
-	(set start (+ i 1))))
-    (and (< start n) (push out (string-copy str start (- n start))))
-    (list-reverse! out)))
-
-(define-function lines (str) (split str ?\n))
-(define-function words (str) (let ((ws ())) (list-do w (split str 32) (or (= 0 (string-length w)) (push ws w))) (list-reverse! ws)))
+(require "check/strings.l")
 (define-function starts (str prefix) (and (<= (string-length prefix) (string-length str)) (= 0 (string-compare str prefix 0 (string-length prefix)))))
 (define-function join-words (ws) (let ((s "")) (list-do w ws (set s (if (= 0 (string-length s)) w (concat-strings s " " w)))) s))
 (define-function last (list) (while (cdr list) (set list (cdr list))) (car list))
@@ -239,6 +229,10 @@
   (unit-assert (equal (last (run "asm-table-x86" "./eval check/asm-table.l x86" 600)) "asm table x86 ok"))
   (unit-assert (equal (last (run "asm-table-arm64-2" "./eval2 -b boot2.l check/asm-table.l arm64" 600)) "asm table arm64 ok"))
   (unit-assert (equal (last (run "asm-table-x86-2" "./eval2 -b boot2.l check/asm-table.l x86" 600)) "asm table x86 ok")))
+;; The encoder grammar (arm64-rules.g, from arm64.spec by gen-arm64-rules.l) answers as asm does over the same arm64
+;; stream: the row asm-select chooses and its word, or no row (check/asm-grammar.l)
+(check "asm_grammar"
+  (unit-assert (equal (last (run "asm_grammar" "./eval check/asm-grammar.l" 300)) "asm grammar ok")))
 
 (check "asm_coverage"
   (unit-assert (equal (last (run "asm-coverage-arm64" "./eval check/asm-coverage.l arm64")) "asm coverage arm64 ok"))
@@ -390,11 +384,13 @@
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
     (unit-assert (equal (last (run "weak_table" (concat-strings evaluator " check/weak.l"))) "weak ok"))
     (unit-assert (law-file-holds "weak_table" evaluator "check/laws/weak.l" "check/laws/weak.law"))))
-;; hash.l's tables against an association list, on every evaluator, and an identity table across a saved image (only eval
+;; hash.l's tables against an association list, and its identity caches (check/identity-cache.l), on every evaluator,
+;; and an identity table across a saved image (only eval
 ;; saves images), where every object has moved: it rehashes itself before answering
 (check "hash_table"
   (list-do evaluator '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l")
-    (unit-assert (law-file-holds "hash_table" evaluator "check/laws/hash.l" "check/laws/hash.law")))
+    (unit-assert (law-file-holds "hash_table" evaluator "check/laws/hash.l" "check/laws/hash.law"))
+    (unit-assert (equal (last (run "identity_cache" (concat-strings evaluator " check/identity-cache.l"))) "identity cache ok")))
   (let ((image (concat-strings tmp "/hash-image")))
     (run "hash_image_save" (concat-strings "./eval check/hash-image-save.l " image))
     (unit-assert (equal (run "hash_image_load" (concat-strings "./eval -l " image " check/hash-image-read.l"))
@@ -520,29 +516,71 @@
 (check "plan_frontier" (unit-assert (equal (last (run "plan_frontier" "./eval check/plan-frontier.l")) "plan frontier ok")))
 
 
-;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES.
-(define-function law-run (name files)
-  (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; ./eval check/law.l " files))))
+;; check/law.l runs law files, one outcome line per law: (status . lines) of a run over FILES, with SEED as MARU_LAW_SEED
+;; when given.
+(define-function law-run (name files . seed)
+  (let ((st (run-status 120 (concat-strings "exec </dev/null >" tmp "/" name ".out 2>" tmp "/" name ".err; "
+					    (if seed (concat-strings "MARU_LAW_SEED=" (car seed) " ") "") "./eval check/law.l " files))))
     (cons st (lines (contents-of-file-named (concat-strings tmp "/" name ".out"))))))
-(define-function law-fixture (name support) (law-run name (concat-strings support " check/laws/fixtures/" name ".law")))
+(define-function law-fixture (name support . seed) (apply law-run (cons name (cons (concat-strings support " check/laws/fixtures/" name ".law") seed))))
+;; The engine's fixtures run on a seed fresh each time, printed, so they hold the engine's behaviour, not one stream's
+;; draws.  An outcome that doesn't depend on the draws (PROVED, an error, VACUOUS, an exhaustive refutation) is held as
+;; written; a sampled refutation (one naming its seed=) by its verdict and the variables it names, and a sampled
+;; fixture's lines (covers decided sequentially) by their verdicts; and a run with either is run again on its seed and
+;; must give the same lines, so a refutation's printed seed replays it.
+(define *law-seed* (car (words (car (run "law_seed" "od -An -N2 -tu2 /dev/urandom")))))
+(define law-sampled-fixtures '("classify-test" "classify-cap" "float" "minus-right"))
+(define-function law-name-of (token)	; "a=" of a token "a=…" whose name is a variable's, or ()
+  (let ((i 0) (n (string-length token)))
+    (while (and (< i n) (let ((c (string-at token i))) (or (and (<= ?a c) (<= c ?z)) (= c ?_) (and (<= ?0 c) (<= c ?9) (< 0 i))))) (set i (+ i 1)))
+    (and (< 0 i) (< i n) (= ?= (string-at token i)) (string-copy token 0 (+ i 1)))))
+(define-function law-shape (line sampled)
+  (let ((w (words line)))
+    (cond ((< (list-length w) 3) line)
+	  (sampled (concat-strings (car w) " " (cadr w) " " (caddr w)))
+	  ((and (member? "REFUTED" w) (list-detect x w (starts x "seed=")))	; its words to REFUTED, then the names
+	   (let ((s "") (past ()))
+	     (list-do x w
+	       (if past
+		   (let ((n (law-name-of x))) (and n (not (= n "seed=")) (set s (concat-strings s " " n))))
+		 (let () (set s (if (= "" s) x (concat-strings s " " x))) (and (= x "REFUTED") (set past 1)))))
+	     s))
+	  (else line))))
+(define-function law-random? (lines sampled) (or sampled (list-detect l lines (string-find l "seed="))))
+;; A law file that checks something other than the engine is judged by the runner's exit status, which is 1 if any law
+;; is neither TESTED nor PROVED; its verdicts are printed, not pinned, so a change of trials or domain needs no edit here.
+;; (The engine's own fixtures, law_rules and the like, pin their lines: the reports are what they test.)
+(define-function law-show (name lines) (list-do l lines (println name ": " l)))
+(define-function law-fixture-holds (name support want)	; want: (status line …); prints what differs
+  (let* ((sampled (member? name law-sampled-fixtures))
+	 (got (law-fixture name support *law-seed*))
+	 (ok (and (= (car want) (car got))
+		  (equal (map (lambda (l) (law-shape l sampled)) (cdr want)) (map (lambda (l) (law-shape l sampled)) (cdr got))))))
+    (or ok (law-show (concat-strings "law_rules " name " gave") (cons (long->string (car got)) (cdr got))))
+    (and ok (law-random? (cdr got) sampled)
+	 (let ((again (law-fixture name support *law-seed*)))
+	   (or (equal again got) (let () (law-show (concat-strings "law_rules " name " again gave") (cdr again)) (set ok ())))))
+    ok))
+(define-function law-holds (name files)	; whether every law of FILES holds, its verdicts printed
+  (let ((r (law-run name files))) (law-show name (cdr r)) (= 0 (car r))))
 
 ;; law.g reads law files and templates fill by text (check/law-compile-test.l); cexpr.law's laws hold over primaries generated from cexpr.g's records, at least 80% of them accepted; a false one is refuted, shrunk.
 (check "law_cexpr"
   (unit-assert (equal (last (run "law_cexpr" "./eval check/law-compile-test.l")) "law compile ok"))
   (let* ((r (law-run "cexpr" "check/laws/cexpr.law")) (w (words (last r))) (n (string->long (last w))))
-    (unit-assert (equal (list (car r) (cadr r) (caddr r) (cadddr r))
-			'(0 "law conditional_right: TESTED 100" "law minus_left: TESTED 100" "law comment_blank: TESTED 100")))
+    (law-show "law_cexpr" (cdr r))
+    (unit-assert (= 0 (car r)))
     (unit-assert (and (equal (cadr w) "cexpr.primary:") (< 0 n) (<= (* 4 n) (* 5 (string->long (cadddr w)))))))
-  ;; the false law shrinks to three primaries for the seed, and each parses as one
-  (unit-assert (equal (law-fixture "minus-right" "")
-		      '(256 "law minus_right: REFUTED a=\"\\\"\\\"\" b=\"\\\"\\\"\" c=\"6\" seed=42" "grammar cexpr.primary: accepted 3 of 6")))
+  ;; the false law is refuted on a fresh seed and shrinks (by its primaries' own text) to primaries the grammar accepts,
+  ;; as the engine keeps a shrunk value in its domain; its seed replays it
+  (unit-assert (law-fixture-holds "minus-right" "" '(256 "law minus_right: REFUTED" "grammar cexpr.primary: accepted")))
   (unit-assert (equal (run "law_primary" "./eval check/law-compile-test.l primary '\"\"' '6'") '("yes" "yes"))))
 ;; rules.l: one rule set generates, checks and enumerates; size bound; occurs check; builtins (check/rules-test.l); and check/laws/engine.law's laws about unify and the three modes.
 (check "law_engine"
   (unit-assert (equal (last (run "law_engine" "./eval check/rules-test.l")) "rules ok"))
-  (unit-assert (equal (law-run "engine" "check/laws/engine.l check/laws/engine.law")
-		      '(0 "law unify_equates: TESTED 100" "law unify_symmetric: TESTED 100" "law nat_exhausted: PROVED 3" "law nat_drawn: TESTED 100"))))
+  (unit-assert (law-holds "law_engine" "check/laws/engine.l check/laws/engine.law")))
 (check "law_rules"
+  (println "law_rules: MARU_LAW_SEED=" *law-seed*)
   (let ((d "check/laws/fixtures/double.l"))
     (list-do c `(("tested" ,d 0 "law double_sum: TESTED 100" "law first: TESTED 100") ("proved" "" 0 "law shaded: PROVED 3")
 		 ("starved" "" 256 "law blue: STARVED 0 of 2000") ("vacuous" ,d 256 "law plus_zero: VACUOUS" "law cancels: VACUOUS")
@@ -588,12 +626,25 @@
 		  "law class_verdict: E_CLAIM a class of class_verdict is a verdict; compare it, e.g. `= accept`"
 		  "law class_crash: INCONCLUSIVE status=7 input=(0)" "law class_twice: E_COVER classify names zero twice")
 		 ("classify-none" "" 256 "law none: TESTED 0" "law none_covered: UNDERCOVERED zero 0 of 0 < 5%")
-		 ;; by test a cover is decided sequentially: 11 of 100 is short of 50% at once, a tenth is short of 12% and meets 9% only
-		 ;; after thousands of cases, and a tenth against 10% can't be decided within 300, so fails
-		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 11 of 100 < 50%" "law sampled_near: UNDERCOVERED zero 915 of 9200 < 12%"
-		  "law sampled_met: TESTED 8700 (zero 10%)" "law sampled_two: TESTED 5800 (zero 10%, low 50%)")
-		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 32 of 300 < 10%"))
-      (unit-assert (equal (cddr c) (law-fixture (car c) (cadr c))))))
+		 ;; by test a cover is decided sequentially: 9 of 100 is short of 50% at once, a tenth is short of 12% after thousands
+		 ;; of cases and meets 8% within two thousand, and a tenth against 10% can't be decided within 300, so fails
+		 ("classify-test" "" 256 "law sampled_short: UNDERCOVERED zero 9 of 100 < 50%" "law sampled_near: UNDERCOVERED zero 829 of 8400 < 12%"
+		  "law sampled_met: TESTED 1800 (zero 11%)" "law sampled_two: TESTED 2200 (zero 11%, low 50%)")
+		 ("classify-cap" "" 256 "law undecided: UNDERCOVERED zero 31 of 300 < 10%")
+		 ;; float draws float32 values from the format's own structure: each region in its share, and a false law shrinks to
+		 ;; the simplest float32 against it (rules.l's float)
+		 ("float" "check/laws/fixtures/float.l" 256
+		  "law families: TESTED 4000 (zero 7%, subnormal 14%, huge 11%, infinite 7%, near24 8%, ordinary 53%)"
+		  "law below_1000: REFUTED"))	; what it shrinks to is held below, worked out from the format
+      (unit-assert (law-fixture-holds (car c) (cadr c) (cddr c)))))
+  ;; shrinking reaches the one simplest refutation whatever the seed: a list of numbers to the one-element list of 0 (by
+  ;; its structure: elements dropped, the rest simplified), and a float32 against x < 1000 to the simplest float32 at or
+  ;; above 1000 by rules-float-cost, which check/law-float-simplest.l works out from the format's bits
+  (let ((list-words (words (cadr (law-fixture "shrink-list" "check/laws/fixtures/shrink-list.l" *law-seed*))))
+	(float-words (words (caddr (law-fixture "float" "check/laws/fixtures/float.l" *law-seed*))))
+	(float-simplest (car (run "law_float_simplest" "./eval check/law-float-simplest.l 1000"))))
+    (unit-assert (equal (list (caddr list-words) (cadddr list-words)) '("REFUTED" "xs=(0)")))
+    (unit-assert (equal (list (caddr float-words) (cadddr float-words)) (list "REFUTED" float-simplest))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (let ((r (law-fixture "empty-domain" "")))	; an empty list is no domain
     (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/empty-domain.out")) "E_DOMAIN"))))
@@ -610,11 +661,12 @@
 		      (starts (caddr r) "law guarded: INCONCLUSIVE status=139 input=("))))
   (let ((r (law-fixture "crash" "")))
     (unit-assert (and (= (<< 7 8) (car r)) (starts (last (cdr r)) "law boom:"))))
-  ;; a - b = b - a shrinks to the smallest pair, a=0 b=0.5; the printed seed alone reproduces it
-  (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l")) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
+  ;; a - b = b - a, on a fresh seed, shrinks to a smallest pair, one of them 0 and the other 0.5 (the least numeral not 0);
+  ;; the printed seed alone reproduces it
+  (let* ((r (law-fixture "refuted" "check/laws/fixtures/double.l" *law-seed*)) (w (words (caddr r))) (seed (string-copy (last w) 5 (- (string-length (last w)) 5))) (ab (and (cdddr w) (concat-strings (cadddr w) " " (car (cddddr w))))))
     (unit-assert (equal (cadr r) "law double_sum: TESTED 100"))
-    (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (equal (last w) "seed=43")
-		      (equal ab "a=0 b=0.500000")))
+    (unit-assert (and (equal (list "law" "swap:" "REFUTED") (list (car w) (cadr w) (caddr w))) (starts (last w) "seed=")
+		      (member? ab '("a=0.500000 b=0" "a=0 b=0.500000"))))	; on any seed
     (contents-to-file-named (concat-strings "under test: double\ndefaults seed = " seed "\nlaw swap: all a, b: number. a - b = b - a\n") (concat-strings tmp "/reseed.law"))
     (unit-assert (equal (cdr (law-run "reseed" (concat-strings "check/laws/fixtures/double.l " tmp "/reseed.law"))) (cddr r)))))
 ;; a law file's rule, fact and facts lines, and a rule's continuation lines, each without its -- comment
@@ -634,12 +686,9 @@
   (let ((n "check/laws/nile-reference.l"))
     ;; nile-adequacy.law repeats nile.law's rules and facts, so its mutants are nile.law's
     (unit-assert (equal (law-rule-lines "check/laws/nile.law") (law-rule-lines "check/laws/nile-adequacy.law")))
-    (unit-assert (equal (law-run "nile" (concat-strings n " check/laws/nile.law"))
-			'(0 "law sound: TESTED 100" "law generate_checks: TESTED 100" "law coverage: PROVED 1" "law agree: TESTED 100"
-			  "law agree_rejected: TESTED 100" "law round_trip: TESTED 100")))
+    (unit-assert (law-holds "law_nile" (concat-strings n " check/laws/nile.law")))
     ;; every mutant of the expr rules fails sound or agree, at one leaf per type
-    (unit-assert (equal (law-run "nile_adequacy" (concat-strings n " check/laws/nile-adequacy.law"))
-			'(0 "law sound: PROVED 46" "law agree: PROVED 222" "law adequate: PROVED 69")))
+    (unit-assert (law-holds "law_nile_adequacy" (concat-strings n " check/laws/nile-adequacy.law")))
     (unit-assert (equal (law-fixture "nile-crash" n) '(256 "law resolver_crash: INCONCLUSIVE status=256 input=(\"ϫ():ρ\\012forall_\\012\")")))))
 
 ;; maru.k is the one typed IR: ir.k and irgol are gone (so nothing that runs
@@ -720,6 +769,13 @@
 ;; maru-test.k's sieve prints the primes below 32, then its struct code sets
 ;; x = 42 and y = 666, sums them and doubles both.  The two lines after the
 ;; primes read uninitialised memory and are skipped.
+;; eval2's profiler reports the 64 most sampled functions and ends cleanly when more were sampled (check/profile.l): the
+;; report's insertion wrote one past its 64 entries when a smaller count came after they were full
+(check "profile"
+  (unit-assert (equal (last (run "profile_p" "./eval2 -p check/profile.l")) "profile ok"))
+  (run "profile_P" "./eval2 -P check/profile.l")
+  (unit-assert (= 64 (list-length (select (lambda (l) (and (string-find l "\t") (<= ?0 (string-at l 0)) (<= (string-at l 0) ?9)))	; COUNT<tab>
+					  (lines (contents-of-file-named (concat-strings tmp "/profile_P.err"))))))))
 ;; a global is found as quickly whichever globals are in use and wherever their symbols were allocated
 ;; (check/global-lookup.l): eval2's and eval3's cache of global bindings keeps every one it found
 (define the-evaluators '("./eval" "./eval2 -b boot2.l" "./eval3 -b boot2.l"))
@@ -737,12 +793,18 @@
   (list-do e '("./eval" "./eval3")
     (unit-assert (equal (last (run "data_length" (concat-strings e " check/data-length.l"))) "data-length ok"))))
 ;; typed Maru compiled to native code in-process and called by address (check/native.l, native.l)
-(check "native_ir2" (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l" 300)) "native ok")))
+;; and held registers (h0, h1 …): their mapping, a unit computing through them, and no lowering touching one except as
+;; its value (check/native-held.l)
+(check "native_ir2"
+  (unit-assert (equal (last (run "native_ir2" "./eval2 check/native.l" 300)) "native ok"))
+  (unit-assert (equal (last (run "native_ir2_held" "./eval2 check/native-held.l" 300)) "native held ok")))
 ;; the same on x86-64: natively where the host is x86-64 (above), and here only as a smoke test under Rosetta, where
 ;; bin/x86_64/eval2 is built (arm64 macOS); it takes over a minute alone, so both get 300 s, for a loaded machine
 (check "native_ir2_x64"
   (if (= 0 (system "test -x bin/x86_64/eval2"))
-      (unit-assert (equal (last (run "native_ir2_x64" "bin/x86_64/eval2 check/native.l" 300)) "native ok"))
+      (let ()
+	(unit-assert (equal (last (run "native_ir2_x64" "bin/x86_64/eval2 check/native.l" 300)) "native ok"))
+	(unit-assert (equal (last (run "native_ir2_x64_held" "bin/x86_64/eval2 check/native-held.l" 600)) "native held ok")))
     (println "native_ir2_x64: SKIP, no bin/x86_64/eval2")))
 ;; a unit saved as a code image on eval2, loaded and called on eval and eval3 with native-image.l alone
 (check "native_image"
@@ -1009,24 +1071,75 @@
 	     (set total (+ total (double->long (+ 0.5 (* 100.0 (string->double (cadr w))))))))))
     total))
 
+;; The native_nile unit's files (nile.osdefs, the runtime, Gezira), and a file in tmp loading them in order: its path.
+(define-function native-nile-inputs ()
+  (nile-inputs "native-nile" (list "build/gezira-twin-nile.k" (concat-strings nile-dir "gezira-image.k")	; Gezira and the twin's test kernels
+				   (concat-strings nile-dir "gezira-api.k") "build/gezira-twin-kernels.k" "check/gezira-twin.k")))	; the twin laws' driver
+(define-function native-nile-loader (inputs)
+  (let ((loader (concat-strings tmp "/native-nile.k")))
+    (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
+    loader))
+
 ;; The runtime and Gezira compiled natively in one unit and made a code image on eval2 (check/native-nile.l), in under
 ;; 16 times the CPU the C back end takes to turn the same files into C (about 12 times, 32 s against 2.7 s, on
 ;; 2026-11-20; it ran past 84 CPU-minutes on 2026-11-19).  Both are timed in this run, so the bound holds on any machine.
+;; The image, saved, then draws check/gezira-pixels.l's scenes on one worker and four, each pixel's channels within one
+;; of the library's (build/gezira.$(SO), the same sources through ir-gen-c.k and cc, whose compiler may fuse float
+;; operations; check/gezira-pixels-compare.l): natively compiled Gezira run, its behaviour held to the C build's, and
+;; how many pixels differ, and by how much, printed.
 (check "native_nile"
-  (let* ((inputs (nile-inputs "native-nile" (list (gezira-kernels) (concat-strings nile-dir "gezira-image.k")
-						 (concat-strings nile-dir "gezira-api.k"))))
-	 (loader (concat-strings tmp "/native-nile.k")))
+  (let* ((inputs (native-nile-inputs))
+	 (loader (native-nile-loader inputs))
+	 (image (concat-strings tmp "/native-nile.image")))
     (unit-assert (= 106 (time-hundredths "real 1.20\nuser 0.98\nsys 0.08\n")))	; 0.08 isn't octal
     (unit-assert (= 3395 (time-hundredths "user 33.60\nsys 0.35\n")))
-    (contents-to-file-named (apply concat-strings (map (lambda (f) (concat-strings "(load \"" f "\")\n")) (words inputs))) loader)
     (run "native_nile_c" (concat-strings "/usr/bin/time -p ./eval2 ir-gen-c.k maru.k" inputs " > " tmp "/native-nile.c") 300)
-    (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader) 900))
+    (unit-assert (equal (last (run "native_nile" (concat-strings "/usr/bin/time -p ./eval2 check/native-nile.l " loader " " image) 900))
 			"native nile ok"))
+    (unit-assert (equal (last (run "native_nile_pixels_c" (concat-strings "./eval check/gezira-pixels.l > " tmp "/pixels-c.txt && tail -1 " tmp "/pixels-c.txt") 300))
+			"gezira pixels done"))
+    (run "native_nile_pixels" (concat-strings "./eval check/gezira-pixels.l " image " > " tmp "/pixels-native.txt") 300)
+    (let ((out (run "native_nile_pixels_compare" (concat-strings "./eval check/gezira-pixels-compare.l " tmp "/pixels-c.txt " tmp "/pixels-native.txt"))))
+      (list-do l out (println "native_nile pixels:" l))
+      (unit-assert (equal (last out) "pixels within 1")))
+    ;; the twin laws (check/laws/gezira-twin.law): chains of Gezira's kernels on both builds, cases drawn from a seed
+    ;; fresh each run and printed (MARU_LAW_SEED replays a refutation)
+    ;; and Gezira's algebra (check/laws/gezira-algebra.law): kernels held to mathematics on both builds
+    (let* ((seed (car (words (car (run "native_nile_twin_seed" "od -An -N2 -tu2 /dev/urandom")))))
+	   (dir (concat-strings tmp "/native-nile-twin"))
+	   (env (concat-strings "env NILE_TWIN_LIB=build/gezira-twin." *shlib* " NILE_TWIN_IMAGE=" image " NILE_TWIN_TMP=" dir
+				" MARU_LAW_SEED=" seed " ./eval")))
+      (run "native_nile_twin_dir" (concat-strings "mkdir -p " dir))
+      (println "native_nile twin laws: MARU_LAW_SEED=" seed)
+      ;; both files in one run of the runner: loading the native image to compare with is most of a run's start
+      (let ((out (law-file-holds "native_nile_twin" env "check/laws/gezira-twin.l" "check/laws/gezira-twin.law check/laws/gezira-algebra.law")))
+	(and out (law-show "native_nile twin" (lines (contents-of-file-named out))))
+	(unit-assert out)))	; the runner exits 1 if any law is neither TESTED nor PROVED
     (let ((c (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile_c.err"))))
 	  (n (time-hundredths (contents-of-file-named (concat-strings tmp "/native_nile.err")))))
       (println "native_nile: " n " hundredths of a CPU second natively, " c " by the C back end")
       (unit-assert (< 0 c))
       (unit-assert (< n (* 16 c))))))
+
+;; Direct list patterns (compile-tpeg.l) lower every intent of the native units to the same forms as the stream path
+;; does, through native-arm64.g and native-x64.g (check/tpeg-direct.l; given native_nile's loader by hand, Gezira's too,
+;; which the suite leaves out: it was most of the time, and native_nile compiles it)
+(check "tpeg_direct"
+  (unit-assert (equal (last (run "tpeg_direct" "./eval2 check/tpeg-direct.l" 300)) "tpeg direct ok")))
+
+;; Lowering sites (asm-arm64.l's arm64-site): every native unit's image the same with sites as without
+;; (check/native-images.l --no-sites), and the sites' own cases (check/native-sites.l), with the share of maru-check.k's
+;; forms they emit; Gezira's comparison, by hand, gives native-images.l and native-sites.l native_nile's loader
+(check "native_sites"
+  (let ((dir (concat-strings tmp "/native-sites")))
+    (run "native_sites_dirs" (concat-strings "rm -rf " dir " && mkdir -p " dir "/on " dir "/off"))
+    (run "native_sites_on" (concat-strings "./eval2 check/native-images.l " dir "/on") 300)
+    (run "native_sites_off" (concat-strings "./eval2 check/native-images.l --no-sites " dir "/off") 300)
+    (run "native_sites_same" (concat-strings "diff -r " dir "/on " dir "/off"))
+    (unit-assert (equal (last (run "native_sites_kept" "./eval2 check/arm64-kept-rows.l" 300)) "kept rows ok"))
+    (let ((out (run "native_sites" "./eval2 check/native-sites.l" 300)))
+      (list-do l out (and (= 0 (string-find l "sites ")) (println "native_sites: " l)))
+      (unit-assert (equal (last out) "native sites ok")))))
 
 ;; gezira-maru.l: the Gezira library (build/gezira.dylib, built by make from the 2016 source and the runtime) through
 ;; its selectors, the same rectangle as gezira_image, on one worker and four.
@@ -1102,13 +1215,8 @@
 	 (_   (run "nile-laws-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_laws" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
 			      "check/laws/runtime.l" "check/laws/runtime.law")))
-    (unit-assert out)
-    (unit-assert (equal (and out (lines (contents-of-file-named out)))
-			'("law pass_identity: PROVED 78" "law reverse_backwards: PROVED 78" "law reverse_involution: PROVED 78"
-			  "law dupcat_is_twice: PROVED 78" "law dupzip_pairs: PROVED 78" "law sort_keys_ordered: PROVED 78"
-			  "law sort_permutation: PROVED 78" "law deterministic: PROVED 260" "law words_partition: PROVED 234"
-			  "law breaks_keep_words: PROVED 234" "law breaks_fit: PROVED 234" "law breaks_maximal: PROVED 234"
-			  "law points_placed: PROVED 234" "law layout_deterministic: PROVED 468")))))
+    (and out (law-show "nile_laws" (lines (contents-of-file-named out))))
+    (unit-assert out)))
 
 ;; the runtime's contracts over PCT schedules (check/laws/runtime-schedules.law): the batch driver, its threads taking turns
 ;; by a schedule the law generates, keeps them (no buffer dropped, no process queued while running or after it was freed,
@@ -1122,10 +1230,8 @@
 	 (_   (run "nile-sched-dir" (concat-strings "mkdir -p " dir)))
 	 (out (law-file-holds "nile_schedules" (concat-strings "env NILE_LAW_RUNTIME=" bin " NILE_LAW_TMP=" dir " ./eval")
 			      "check/laws/runtime.l" "check/laws/runtime-schedules.law")))
-    (unit-assert out)
-    (unit-assert (equal (and out (lines (contents-of-file-named out)))
-			'("law layout_contracts: TESTED 1000" "law found_glyphs: PROVED 2"
-			  "law builtin_contracts: TESTED 1000" "law reroute_contracts: TESTED 1000")))))
+    (and out (law-show "nile_schedules" (lines (contents-of-file-named out))))
+    (unit-assert out)))
 (check "nile_interface"
   (let ((n "nile/runtimes/maru/nile.k")
 	(c "$R/nile/compilers/maru")

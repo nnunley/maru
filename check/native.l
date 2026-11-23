@@ -25,6 +25,8 @@
   (expect "add3 of large and negative" ((fn image 'add3 "lll>l") 4000000000 -1 -2) 3999999997)
   (expect "neg of 5" ((fn image 'neg "l>l") 5) -5))
 
+(let ((image (native-install (native-compile-file "check/native/extern-self.k"))))
+  (expect "a call through an extern the unit defines" ((fn image 'call_twice "l>l") 20) 41))
 (let ((image (native-install (native-compile-file "check/native/flow.k"))))
   (expect "gcd of 1071 and 462" ((fn image 'gcd "ll>l") 1071 462) 21)
   (expect "max3, each place" (map (lambda (abc) (apply (fn image 'max3 "lll>l") abc)) '((9 2 3) (2 9 3) (2 3 9) (5 5 1))) '(9 9 9 5))
@@ -54,6 +56,43 @@
 		((fn image 'null-global "p>l") buffer))
 	  '(0 0 0 0)))
 
+;; the C library's math functions as instructions, exact (check/native/math.k): the functions hold no call
+(let* ((unit (native-compile-file "check/native/math.k")) (image (native-install unit)) (inf (* 1e308 10.0)))
+  (list-do f (<native-unit>-functions unit)
+    (expect (concat-string (symbol->string (car f)) " calls nothing") (list-detect i (cadr f) (= 'call (car i))) ()))
+  (expect "floorf" (map (fn image 'm-floorf "f>f") (list 2.5 -0.5 4294967808.0 inf (- 0.0 inf))) (list 2.0 -1.0 4294967808.0 inf (- 0.0 inf)))
+  (expect "ceilf" (map (fn image 'm-ceilf "f>f") (list 2.5 -1.5 4294967808.0 inf)) (list 3.0 -1.0 4294967808.0 inf))
+  (expect "sqrtf" (map (fn image 'm-sqrtf "f>f") (list 2.25 0.0 inf)) (list 1.5 0.0 inf))
+  (expect "floor" (map (fn image 'm-floor "d>d") (list 2.5 -0.5 1e300 -1e300)) (list 2.0 -1.0 1e300 -1e300))
+  (expect "ceil" (map (fn image 'm-ceil "d>d") (list 2.5 -1.5 9007199254740993.0)) (list 3.0 -1.0 9007199254740993.0))
+  (expect "sqrt" (map (fn image 'm-sqrt "d>d") (list 2.25 1e300)) (list 1.5 1e150)))
+;; values held in registers (check/native/held.k): the answers, and held_expr's temporaries never in the frame: every load
+;; is of an argument's slot, and the one store is the returned value's (a result is read from a slot)
+(let* ((unit (native-compile-file "check/native/held.k")) (image (native-install unit))
+       (pair ((subr "calloc" "ll>p") 2 8))
+       (intents (cadr (assq 'held_expr (<native-unit>-functions unit))))
+       (params (map cadr (cadr (assq 'params intents))))
+       (stores 0))
+  (expect "held_expr" ((fn image 'held_expr "lll>l") 3 4 5) 14)
+  (expect "held_call_in_branch" ((fn image 'held_call_in_branch "ll>l") 5 3) 16)
+  (expect "held_deep, more pending than held registers" ((fn image 'held_deep "l>l") 2) 30)
+  (expect "held_float32" ((fn image 'held_float32 "ff>f") 3.0 2.0) 5.0)
+  (expect "held_float64" ((fn image 'held_float64 "dd>d") 3.0 2.0) 5.0)
+  ((fn image 'held_pair_set "pll>l") pair 7 8)
+  (expect "held_struct_member" ((fn image 'held_struct_member "p>l") pair) 15)
+  (expect "held_loop_in_operand" ((fn image 'held_loop_in_operand "l>l") 4) 10)
+  (expect "held_int32, wrapping to 0" (list ((fn image 'held_int32_negative "ii>l") 65536 65536) ((fn image 'held_int32_half "ii>l") 65536 65536)) '(0 0))
+  (expect "held_int32, wrapping negative" (list ((fn image 'held_int32_negative "ii>l") 46341 46341) ((fn image 'held_int32_half "ii>l") 46341 46341))
+	  '(1 -1073739507))
+  (expect "held_expr loads only its arguments" (list-detect i intents (and (= 'load (car i)) (not (member? (caddr i) params)))) ())
+  (list-do i intents (and (= 'store (car i)) (set stores (+ stores 1))))
+  (expect "held_expr stores only its result" stores 1)
+  (expect "a wide int literal compares the same held or from a slot (which answer is right waits on ir2, which narrows the literal to an int)"
+	  (let ((held ((fn image (quote held_literal_wide) "i>l") 0)) (slot ((fn image (quote held_literal_wide_deep) "il>l") 0 5)))
+	    (and (= held (- slot 20)) 1)) 1)
+  (expect "held_discard" ((fn image (quote held_discard) "l>l") 6) 6)
+  (expect "held_discard stores nothing: its product is read by nothing"
+	  (list-detect i (cadr (assq (quote held_discard) (<native-unit>-functions unit))) (= (quote store) (car i))) ()))
 (let ((image (native-install (native-compile-file "check/native/floats.k"))))
   (expect "fadd" ((fn image 'fadd "dd>d") 1.25 2.5) 3.75)
   (expect "fmix, in float" ((fn image 'fmix "fff>f") 2.0 3.0 1.0) 5.5)
@@ -111,9 +150,12 @@
     (expect "slots past a load's reach" ((fn image 'far-frame "l>l") 10) 46)))
 
 ;; a conditional branch reaches as far as B, 128 MB, not CBZ's 1 MB: it is lowered as the inverted test over a B.  (A
-;; while body past 1 MB would take minutes to compile on eval2.)
+;; while body past 1 MB would take minutes to compile on eval2.)  A label site's form, (label-data BYTES POSITION ROW
+;; INSN L), names its instruction in INSN.
+(define-function form-mnemonic (f) (if (= 'label-data (car f)) (car (car (cddddr f))) (car f)))
 (expect "a conditional branch as a short one over B"
-	(map (lambda (i) (map car (car (parse-source <native-arm64> $program (list (list i 's0 'far)))))) '(branch-if branch-unless))
+	(map (lambda (i) (map form-mnemonic (car (parse-source <native-arm64> $program (list (list i 's0 'far))))))
+	     '(branch-if branch-unless))
 	'((CBZ B at) (CBNZ B at)))
 (let ((r (car (asm 'arm64 (asm-buffer 0) '(B (reloc))))))
   (expect "B's reach" (asm-field-range 'arm64 (caddr r) (car r) 0) '(-134217728 134217724 4)))

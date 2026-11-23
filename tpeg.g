@@ -129,8 +129,11 @@ parameters	= (colon identifier)* ;
 
 annotation	= at varname:a					-> a ;	# read as a symbol is, so @left-recursive is one
 
-definition	= space annotation*:as identifier:id parameters:p
-		  equals expression:e ";"			-> `(,id ,e ,p ,@(and as (list as))) ;	# annotations, if any
+# a rule's action form, <form> after its parameters: kept among its annotations as (actions form)
+actionform	= "<" (!">" .)+ @$$:f ">" space			-> `(actions ,f) ;
+
+definition	= space annotation*:as identifier:id parameters:p actionform?:af
+		  equals expression:e ";"			-> `(,id ,e ,p ,@(let ((all (concat-list as af))) (and all (list all)))) ;	# annotations, if any
 
 definitions	= definition* ;
 

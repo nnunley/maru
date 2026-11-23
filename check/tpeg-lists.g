@@ -13,3 +13,13 @@ either = `( 'a 'b ) -> 'ab | `( 'a .* ) -> 'a-any ;
 # none, in their order: a head that isn't a symbol tries them all
 pick = `( 'a .:x ) -> (list 'a x) | `( 'b .:x ) -> (list 'b x) | `( .:h 'c ) -> (list 'any-c h) | `( 'c .:x ) -> (list 'c x)
      | `( 'd ) -> 'd | `( 'e ) -> 'e | `( 'f ) -> 'f | `( 'g ) -> 'g | .:o -> (list 'other o) ;
+# a list pattern of literals, any element, and rules that take one element (a direct rule, `.:v -> e`) is matched by
+# walking the list directly: an action runs only for the alternative that matched, once
+once = `( 'k .:x ) -> (tl-count 'one) | `( 'k .:x .:y ) -> (tl-count 'two) ;
+regs = `( 'r sub:a sub:b ) -> (list a b) ;
+sub = .:v -> (list 'v v) ;
+pair = `( 'p .:a ) -> a ;
+anything = `( 'any .:x ) -> x ;
+# a rule's action form, <form> after its name: each quasiquoted action is compiled as (form `…), the form seeing the
+# template itself; other actions are as written
+wrapped <tl-wrap> = `( 'w .:x ) -> `(got ,x) | .:y -> (list 'plain y) ;

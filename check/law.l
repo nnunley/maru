@@ -27,6 +27,7 @@
 (define *law-failed* ())
 (define *lb* ())  (define *lvars* ())  (define *lnames* ())	; the law: bindings (var kind data), $vars, plain names
 (define *lk* ())  (define *lcover* ())  (define *lcounts* ())	; the law's classes (name . function), covers (percent name), counts
+(define *law-probe* ())	; set in the vacuity probe's child: a failure there is reported unshrunk, only its verdict counts
 (define *lname* ())  (define *lc* ())  (define *lf* ())  (define *ls* 3)  (define *lclaim* ())  (define *lseed* 42)  (define *lmethod* ())
 
 ;; the environment overrides a file's defaults, so a sweep can try fresh seeds and more trials (check/sweep.l)
@@ -142,7 +143,7 @@
   (set *rules-random* 1)
   (let* ((env (list ())) (g (rules-rename goal env)) (out (rules-rename (rules-last goal) env)))
     (rules-solve *law-rules* g *rules-empty* size (lambda (s) (list (walk* out s))))))
-(define-function law-pick (l) (array-at (list->array l) (rules-rand (list-length l))))
+(define-function law-pick (l) (rules-pick l))
 (define-function law-draw-at (b vars vals size)	; (value) or (); a grammar's not counted toward acceptance
   (cond ((= 'set (cadr b))	(list (law-pick (caddr b))))
 	((= 'grammar (cadr b))	(let ((s (grammar-regenerate (caddr b) (cadddr b) size))) (and s (list s))))
@@ -228,12 +229,58 @@
   (let ((out ()))
     (for (s 0 size) (for (k 0 10) (let ((v (law-draw-at b vars vals s))) (and v (push out (cons (car v) s))))))
     (list-reverse! out)))
+;; structural shrinking: candidates made from the value itself, each strictly simpler, simplest kinds first; the
+;; shrinker keeps one only while it is still in its domain (law-valid?) and the claim still fails, so a refutation
+;; shrinks to a local minimum whatever the random stream drew.  Simpler: a smaller size (a list's elements and their
+;; sizes, a string's length, a number 1), then smaller numbers within it (law-weight).
+(define-function law-size (v)
+  (cond ((pair? v)	(let ((n 1)) (while (pair? v) (set n (+ n (law-size (car v)))) (set v (cdr v))) n))
+	((string? v)	(+ 1 (string-length v)))
+	(else		1)))
+(define-function law-weight (v)	; numbers' magnitudes, a float by its float32 cost and one more: an integer is simpler
+  (cond ((pair? v)	(let ((w 0)) (while (pair? v) (set w (+ w (law-weight (car v)))) (set v (cdr v))) w))
+	((double? v)	(+ 1 (if (rules-float32? v) (rules-float-cost v) (law-abs v))))
+	((long? v)	(law-abs v))
+	(else		0)))
+(define-function law-simpler? (c v)
+  (let ((a (law-size c)) (b (law-size v))) (or (< a b) (and (= a b) (< (law-weight c) (law-weight v))))))
+(define-function law-chunks (n)	; deletion lengths, halves first, down to 1
+  (let ((out ()) (k (/ n 2))) (while (< 0 k) (push out k) (set k (/ k 2))) (or (member? 1 out) (push out 1)) (list-reverse! out)))
+(define-function law-without (l at k)	; l without its k elements from at
+  (let ((out ()) (i 0)) (list-do x l (or (and (<= at i) (< i (+ at k))) (push out x)) (set i (+ i 1))) (list-reverse! out)))
+(define-function law-number-simpler (v)	; numbers simpler than v: numerals no further from 0, and simpler floats
+  (let ((out ()))
+    (list-do n *rules-numbers* (and (<= (law-abs n) (law-abs v)) (push out n)))
+    (concat-list (list-reverse! out) (if (and (double? v) (rules-float32? v)) (rules-float-simpler v) ()))))
+(define-function law-structural (v depth)	; candidate values from v's own structure
+  (let ((out ()))
+    (cond ((string? v)	; chunks deleted, halves first
+	   (let ((n (string-length v)))
+	     (list-do k (law-chunks n)
+	       (for (at 0 (+ 1 (- n k)))
+		 (push out (concat-string (string-copy v 0 at) (string-copy v (+ at k) (- (- n at) k))))))))
+	  ((pair? v)
+	   (let ((n (list-length v)))
+	     (list-do k (law-chunks n) (for (at 0 (+ 1 (- n k))) (push out (law-without v at k))))	; chunks dropped
+	     (list-do x v (and (pair? x) (push out x)))	; an element that is itself a list, in v's place
+	     (and (< depth 3)	; one element simpler, in place, a few candidates each
+		  (let ((i 0))
+		    (list-do x v
+		      (let ((cs (law-structural x (+ depth 1))) (taken 0))
+			(while (and cs (< taken 8))
+			  (push out (law-put v i (car cs))) (set cs (cdr cs)) (set taken (+ taken 1))))
+		      (set i (+ i 1)))))))
+	  ((law-number? v)	(set out (list-reverse! (law-number-simpler v)))))
+    (let ((keep ())) (list-do c (list-reverse! out) (and (law-simpler? c v) (push keep c))) (list-reverse! keep))))
 (define-function law-candidates (b vars vals v size)
   (let ((out ()))
     (cond ((= 'let (cadr b))	())
+	  ((and (pair? (caddr b)) (= 'float (car (caddr b))))	; a float: simpler float32 values, not numerals
+	   (set out (map (lambda (c) (cons c size)) (rules-float-simpler v))))
 	  ((law-number? v)		(list-do n *rules-numbers* (and (< (law-abs n) (law-abs v)) (push out (cons n size)))))
 	  ((= 'set (cadr b))	(let ((l (caddr b))) (while (and l (not (= v (car l)))) (push out (cons (car l) size)) (set l (cdr l)))))
-	  (else			(set out (law-regen b vars vals size))))
+	  (else			; the value's own structure first; drawing again at a smaller size last
+	   (set out (concat-list (map (lambda (c) (cons c size)) (law-structural v 0)) (law-regen b vars vals size)))))
     out))
 (define-function law-valid? (vals i)	; values from i on are still in their domains
   (let ((ok 1) (n (list-length *lb*)))
@@ -255,7 +302,7 @@
 	(let ((c (law-smaller i vals sizes))) (and c (let () (set vals (car c)) (set sizes (cdr c)) (set more 1))))))
     vals))
 (define-function law-failed (r vals)	; the outcome of a failing, crashing or verdict-valued try
-  (cond ((= r 'fail)	(list 'REFUTED (law-shrink vals)))
+  (cond ((= r 'fail)	(list 'REFUTED (if *law-probe* vals (law-shrink vals))))	; a probe needs the verdict, not a shrunk case
 	((= r 'verdict)	(list 'E_CLAIM (concat-strings (cond ((= 'claim *law-verdict*) "the claim of ") ((= 'class *law-verdict*) "a class of ") (else "a condition of ")) (symbol->string *lname*)
 					       " is a verdict; compare it, e.g. `= accept`")))
 	(else		(cons 'INCONCLUSIVE *law-crash*))))
@@ -345,7 +392,7 @@
     (when (= 0 pid) (law-quiet) (run))
     (if (and (< 0 pid) (= pid (waitpid pid status-word 0))) (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8)) -1)))
 (define-function law-holds-with (fs k)	; 1 if the law passes with every function returning k, (), or crash if no child ran
-  (let ((st (law-child (lambda () (law-limit 60) (set *lcover* ()) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
+  (let ((st (law-child (lambda () (law-limit 60) (set *law-probe* 1) (set *lcover* ()) (list-do f fs (law-set-global (car f) (lambda args k))) (_exit (if (law-pass? (law-method)) 0 1))))))
     (cond ((< st 0) 'crash) ((= 0 st) 1))))
 (define-function law-vacuous? ()	; 1, (), or crash
   (or (not (law-names-under?))

@@ -16,7 +16,9 @@ The three evaluators (`eval`, `eval2`, `eval3`), what they share through `boot.l
   out. A function's count is kept as an odd word in its `profile` field, since `eval2` boxes its longs and the signal
   handler can't allocate one. `eval2 -PN FILE` counts every function on the stack instead, each once a sample, so a count
   is the time spent in a function and in what it called: the profile that names which operation a program's time
-  serves, where `-p` spreads it over the primitives doing the work.
+  serves, where `-p` spreads it over the primitives doing the work. `profile` (`check/profile.l`): a run that samples more
+  than 64 functions (a native compile, under `-P`) ends cleanly with 64 in its report; the report's insertion, as in
+  `eval.c`, wrote one entry past its array when a smaller count came after it was full, and `eval2 -P` aborted on exit.
 - `global_lookup` (`check/global-lookup.l`): a global is found in about the same time whichever globals are in use and
   wherever their symbols were allocated. `eval2` and `eval3` cache the global bindings they have found in an
   open-addressing table kept at most half full, which grows; a global costs one search of the global namespace, the

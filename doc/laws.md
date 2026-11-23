@@ -22,7 +22,19 @@ The rule engine, `.law` files and their runner, and the laws over C expressions 
 - `law_rules` (`check/law.l`, `check/laws/fixtures/`): the runner prints one line per
   law, `law NAME:`, then `TESTED n`, `PROVED n`, `REFUTED x=v ... seed=s` (shrunk;
   the seed reproduces it), `STARVED k of n`, `VACUOUS` or `INCONCLUSIVE status=s input=...`
-  (a reference crashed). A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal
+  (a reference crashed). A refutation shrinks by the value's own structure (`law-structural`): a list's chunks
+  dropped (halves first), an element that is itself a list put in its place, one element simplified; a string's chunks
+  deleted; a number toward 0, an integer before a float, a float by `rules.l`'s float32 simplicity; each candidate
+  strictly simpler (smaller, then lighter numbers) and kept only while it stays in its domain and the claim still
+  fails, so it reaches a local minimum whatever the stream drew (a list of numbers against `count(xs) < 1` always
+  shrinks to `(0)`; `shrink-list.law`). A float moves by its bits (each count of mantissa bits rounded down and up, the
+  next binade toward 1's with its top bits filled, a walk down at the same bits), simplest first, an equal cost going to
+  the value nearer 0, so a float32 against `x < T` reaches the simplest float32 at or above T: `law_rules` holds
+  `float.law`'s answer to `x < 1000` to the one `check/law-float-simplest.l` works out from the format (1008, which is
+  1.11111b × 2^9, simpler than 2^10 by its nearer exponent). Drawing again at a smaller
+  size is the last resort. The fixtures run on a seed fresh each time, printed: an outcome the draws don't decide is held
+  as written, a sampled refutation by its verdict and the variables it names, a sampled fixture by its verdicts, and a
+  run with either again on its seed, which must give the same lines. A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal
   domain must bind its last argument (`E_BINDING`), and a grammar domain must name a
   registered language (`E_GRAMMAR`) and can't be exhausted (`E_EXHAUST`).
   `law NAME: mutants of R by exhaustion size n. L, ...` judges each mutant of the rules
@@ -38,6 +50,12 @@ The rule engine, `.law` files and their runner, and the laws over C expressions 
   `E_DOMAIN` (`empty-domain.law`);
   and a law's variable may range over a list, inline or a `let`'s name, which a schema shares (`list-domain.law`). A file may
   `use "other.law"`, read in its place once however often used (`use.law`). `.law` files count toward `lines`.
+- The `float` domain (`rules.l`): float32 values made from the format's own layout, none listed: simple values,
+  random sign, exponent and mantissa bits (every finite magnitude), and the format's boundaries (±0, subnormals, the
+  greatest finite, ±infinity, 2^24, powers of two and their neighbours), drawn by a splitmix64 generator; it shrinks
+  toward simplicity and enumerates the format's landmarks, its arithmetic from the format's definition so it runs on
+  every evaluator (`float.law` holds each region to its share). Draws cost the values they try (lazy Fisher-Yates),
+  not their domain's size. The Gezira twin and algebra laws (`native_nile`, `doc/native.md`) draw with it.
 - `law_nile` (`check/laws/nile.law`, `check/laws/nile-reference.l`): rules for
   well-typed Nile expressions, with operator facts read from `nile/compilers/prelude.nl`,
   are sound (Nile's own resolver and type checker, forked per question, accept what they

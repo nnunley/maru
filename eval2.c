@@ -3351,10 +3351,12 @@ static void profilingDisable(int stats)
 	    if (profile) {
 		int index= 0;
 		while (index < nprofiles && profile <= profiles[index].profile) ++index;
-		if (nprofiles < 64) ++nprofiles;
-		int jndex;
-		for (jndex= nprofiles - 1;  jndex > index;  --jndex) profiles[jndex] = profiles[jndex - 1];
-		profiles[index]= (struct profile){ profile, obj, source };
+		if (index < 64) {	/* a count below all 64 kept isn't kept: profiles[64] is past the end */
+		    if (nprofiles < 64) ++nprofiles;
+		    int jndex;
+		    for (jndex= nprofiles - 1;  jndex > index;  --jndex) profiles[jndex] = profiles[jndex - 1];
+		    profiles[index]= (struct profile){ profile, obj, source };
+		}
 	    }
 	}
 	int i;

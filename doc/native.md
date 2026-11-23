@@ -34,7 +34,15 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   Maru (normal numbers and zero; a subnormal, infinite, NaN or `-0.0` literal is an error). A write
   stores at the size of the place it writes, so zero (an `int`) written to a pointer clears all of it. A frame beyond an
   immediate's reach is made from X29, and a slot a load's scaled offset doesn't reach (too far, or not a multiple of the
-  access) has its address made in X15. Each unit starts from maru.k's own declarations, as maru.k
+  access) has its address made in X15. A value read once, by the operation it feeds, is held in a register rather than a
+  slot (`(held K)`, abi.spec's `held` rows): an integer or pointer from a literal, arithmetic, a comparison, a cast, an
+  indirection, a member, a global or an extern, while no later operand calls and fewer than `*native-held-count*` are
+  pending. That count is the shortest `held` row of all the ISAs (two, x86-64's RSI and RDI), so a unit's intents are
+  the same whichever chip lowers them. A result shares only its first operand's register (x86-64's two-operand rule), a
+  narrow held integer is sign-extended as a load from its slot would be (`extend`), and a value nothing reads is not
+  stored at all. Floats, call arguments and results, and return values keep their slots. `check/native/held.k`'s cases
+  pin this, and `check/native-held.l` lowers every native program for both ISAs and reports any form naming a held
+  machine register that its intent doesn't carry as that `h` register; an `h` register past its row is refused. Each unit starts from maru.k's own declarations, as maru.k
   compiles once a process. `check/native/floats.k`, `labels.k`, `structs.k` (12 and 16 bytes both ways, C's `ldiv`, a
   spill after seven longs, 8-byte pieces at slots 4 past a multiple of 8), `stack.k` (ints past the eighth argument,
   from C too), `frame.k` (a frame of 9760 bytes), `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
@@ -61,11 +69,62 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   (`native-symbols` keys entries by `equal`, `native-assemble` labels by identity, both in `hash.l` tables): four times
   the string literals, or the labels and branches, take less than eight times as long. Lists searched for each made them
   worse than quadratic (800 strings took 26 times as long as 200).
+- `native_sites` (`check/native-sites.l`, `check/native-images.l`): lowering sites. An instruction a lowering rule always
+  means is a site (`asm-arm64.l`), written as a quasiquoted list of instructions, each varying operand in its kind:
+  `` (arm64-sites `((ADD (x ,d) (x ,a) (x ,b)))) `` answers the list of forms. As the rule loads, the specialiser reduces
+  the encoder grammar's rows for the mnemonic to those that can take the template (`doc/assemblers.md`), each left as
+  its operands' tests and one OR of shifted fields, or, for a row whose kinds have no value, a call of that row's
+  encoder; at run time the site emits `(data b0 b1 b2 b3)` from the first that takes the operands, falling back to the
+  symbolic form (for `asm` to encode or refuse) when an operand isn't the declared kind or no row takes it, and one
+  with nothing variable is encoded once. A `(label ,l)` operand makes a label site, specialised over the grammar's
+  rows for an open placeholder at the label (widest field first, `asm`'s choice), which emits `(label-data …)`, its bytes and the report `native-assemble` patches.
+  Union kinds serve both widths in one template, `(r ,a)` an X or W register and `(f ,a)` a D or S one, and a
+  `(mem ,place)` takes any `(off BASE N)`, SP or an X register. Each row tests a union's register by its own rule, so
+  the row of its width is the one that takes it; a place is specialised twice, on SP (folded into the rows'
+  constants) and on an X register, and chosen by its base, as testing the base in every row cost lowering 4.5%. Every arm64 form is a site (`native-arm64.g`,
+  `native.l`'s helpers, `stub.l`'s `arm64-constant`): all of Gezira's 103,227
+  forms. The case compares every unit's image built with sites and without (`--no-sites`), and checks the sites' own
+  cases: SP where an X register was declared, immediates at ADD's edges, near, register-based, unaligned and far
+  accesses. Each operand kind binds through its own binder (`define-arm64-binder`), made when the row's plan is.
 - `native_nile` (`check/native-nile.l`): the Nile runtime and Gezira's kernels (`gezira.k`, `gezira-image.k`,
   `gezira-api.k`) compiled natively on `eval2` in one unit and made a code image holding every entry point
   `gezira-api.k` exports, in under 16 times the CPU `ir-gen-c.k` takes to turn the same files into C. Both run under
   `/usr/bin/time -p` in the same case, so the bound holds on any machine. On 2026-11-20 it was about 12 times
-  (32 s against 2.7 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes.
+  (32 s against 2.7 s, 416,552 bytes, 335 functions); on 2026-11-19 it ran past 84 CPU-minutes. The image, saved, is
+  then run: `check/gezira-pixels.l` draws its scenes (a rectangle's half-covered edges, rotated quadratic Béziers at
+  half alpha over it, a filtered image paint through a rotating texture matrix, a downsample, premultiplied colours)
+  through `gezira-maru.l` bound to the image's entry points (`gezira-native-image`), on one worker and four, and
+  each pixel's four channels must be within one of the library's (`build/gezira.$(SO)`, the same sources through
+  `ir-gen-c.k` and `cc`): an error band, not identity, so either compiler may fuse a multiply and an add and round
+  once (`check/gezira-pixels-compare.l`, which prints how many pixels differ in each scene and by how much). This
+  is the behaviour check for changes meant to alter generated code, such as register allocation, where byte-identical
+  images can't judge them. It found that an extern the unit itself defines (`nile.k` declares the runtime's interface,
+  `nile-builtins.k` defines it) was looked up as a C symbol when the image loaded; `native-symbols` binds it to the
+  unit's own function, as C's linker does (`check/native/extern-self.k`).
+  The image also carries the twin's driver and Gezira's test kernels, and two law files then run in one run of the
+  law runner, on a seed fresh each time and printed (`MARU_LAW_SEED=N` replays a refutation):
+  - `check/laws/gezira-twin.law`, the twin: chains of one to six of Gezira's kernels whose types meet, drawn from
+    facts the kernel table gives (`build/gezira-twin-kernels.l`, made by make from `build/gezira.k`'s constructors and
+    `gezira.nl`'s declarations by `check/gezira-twin-gen.l`), run by the C library (`build/gezira-twin.$(SO)`) and the
+    native image on the same drawn floats, which must agree: equal counts, each finite float within 1e-5 of the larger
+    magnitude (at least 1e-6), an infinity or NaN only its own kind. A law per kind of stream a chain starts from, one
+    over any chain, one over long streams (buffers' worth), on one worker and four; the last twins alone each kernel
+    no chain reached, so all of them are compared every run. Each build runs a case in a child of its own under a CPU
+    limit: a kernel can loop on inputs outside its domain (a subdivision handed a NaN), and a case the C build can't
+    finish is counted as outside Gezira's domain, not compared. Its own checks: the two builds are two, and a moved
+    native float is seen. Its first run found Nile's `floor` wrong past ±2^31 in both builds (now `floorf`).
+  - `check/laws/gezira-algebra.law`, Gezira against mathematics on both builds, catching a fault both share: floor
+    and ceiling, affine transforms as a group, compositing's monoid, projections and symmetric modes, reversal,
+    coverage moving with its shape, the gradient's affinity. Bands follow the terms' magnitudes; a case past float32's
+    range or near a singular matrix is counted as outside.
+
+  The two files take 20 to 40 s together (a looping case costs its build one CPU second, and C stopping skips the
+  native run). A longer sweep by hand: `MARU_LAW_TRIALS=300` (and any seed) on
+  `./eval check/law.l check/laws/gezira-twin.l check/laws/gezira-twin.law check/laws/gezira-algebra.law`, with
+  `NILE_TWIN_LIB`, `NILE_TWIN_IMAGE` (`check/native-nile.l LOADER IMAGE` saves one) and `NILE_TWIN_TMP` set.
+  The C library's math functions are one instruction each natively: a call to `floorf`, `floor`, `ceilf`, `ceil`,
+  `sqrtf` or `sqrt` on a float is `FRINTM`, `FRINTP` or `FSQRT` (arm64), `ROUNDSS`/`SD` or `SQRTSS`/`SD` (x64)
+  (`check/native/math.k`).
 - `jit_run` (`check/jit-run.l`): code assembled into a code region runs
   in-process through the C ABI on each evaluator the host has (arm64, and
   x86-64 under Rosetta through `bin/x86_64/eval2`).

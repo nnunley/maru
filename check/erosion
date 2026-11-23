@@ -15,3 +15,35 @@ erosion -1 asm-arm64.l's shape key in four short callables (arm64-shape-key, arm
 verbosity -1 the same: the key's forms neither flagged nor cloned dilute the verbose share
 verbosity +1 %checked in boot.l and boot2.l alike, a clone between the two boots as their accessor makers already are
 verbosity -1 check.l's native_nile case, cpu-hundredths and nile-inputs (factored out of nile-build): forms neither flagged nor cloned dilute the verbose share
+erosion -8 asm-arm64.l: arm64-bind-plan (CC 71, the assembler's highest) split into one binder per operand kind, dispatched by a table when the row's plan is made; it leaves the time sinks
+erosion -2 compile-tpeg.l's direct patterns in short callables (tp-direct-rule, -item, -items, -value, -literal, -rules?, -pattern): they dilute the share over CC 10
+erosion -1 asm-arm64.l's sites in short callables (arm64-site-make, -emit, -representative, -expr, -literal, -variable?, -word-bytes): they dilute the share over CC 10
+verbosity -1 native.l's float helpers as sites by width (native-arm64-fsite, -fmov-in, -fmov-out) and the other remaining sites: forms neither flagged nor cloned dilute the verbose share
+erosion -1 the same: short callables dilute the share over CC 10
+erosion -1 asm-arm64.l's site memo in short callables: they dilute the share over CC 10
+erosion +1 asm-arm64.l's memo step is a multimethod (define-generic with a default, a method per key type), which erosion doesn't read as a callable: its forms leave the share's denominator, though arm64-memo-node's complexity went from 10 to 4
+erosion -1 the label sites' short callables (arm64-label-site-encode, -emit, arm64-site-new): they dilute the share over CC 10
+erosion -1 the template's short callables (arm64-template-spec, arm64-unquoted, arm64-insn-code ...): they dilute the share over CC 10
+erosion -1 the erosion reader counts define-multimethod methods and define-generic defaults as callables (4581 to 4621 callables, forms 94893 to 94955): arm64-memo-step's three methods and the other multimethods' bodies are short, so they dilute the share over CC 10; the new check/erosion.l cases add forms, not callables, bar names-of
+erosion -2 asm-arm64.l's kind values and the encoder grammar's short callables (arm64-rule-name, arm64-operand-rule, arm64-put-leaves, arm64-row-result ...), and arm64-value-binder's four binders folded into one: they dilute the share over CC 10
+erosion +1 asm-arm64.l's arm64-specialise and arm64-row-code compose a template with its rows in two long callables
+verbosity -1 the specialiser's tables and short callables: forms neither flagged nor cloned dilute the verbose share
+erosion -1 the specialiser's reductions as tables by a pattern item's and an operand rule's head, in short callables
+erosion +1 arm64-hole-guard's and arm64-site-code's added branches (union kinds, the place split), with the memory guard and the place split extracted into their own functions
+erosion +1 the deletions take some 50 low-complexity forms out of the total, raising the share inside the complex callables that stay
+erosion +1 native-symbols' rebinding of an intent (an extern the unit defines made a function-address) in its let*
+verbosity +1 check/gezira-pixels.l's scene calls and check.l's native_nile comparison, long forms repeating their shape
+erosion +1 check/gezira-pixels-compare.l's compare-lines, one loop over two outputs' scenes and rows
+erosion -1 the twin support file's short callables dilute the share in complex ones
+erosion -1 rules.l's float domain as short callables, and law_rules' loop answering a mismatch by printing
+verbosity -1 rules.l's float helpers, forms neither flagged nor cloned dilute the verbose share
+erosion -1 native-gen.k's call lowering split by native-math-kind, and the float operations' new short branches
+erosion -3 the twin support as short callables (segments, pools, isolated runs) and the table generator's helpers
+erosion +1 check/law.l's law-structural, one walk over a value's kinds (string, list, number)
+erosion -3 the algebra support as short callables (one per law, helpers for maps, bands and pixel tables) dilute the share in complex ones
+erosion -1 the fixes as short helpers (twin-fill, twin-through, twin-invertible, twin-tally)
+verbosity +1 algebra_inside's per-law report and twin_every_kernel's retry loop, each line a case it names
+erosion -1 the held-value allocation as one method per producer and small helpers (native-producer, native-allocate-operands, native-first-only?)
+erosion +1 twin-case's confirming rerun, one more branch in the function that runs both builds
+erosion -1 native-discard as one short method per producer
+verbosity -1 the per-ISA compiles in the held scan and tpeg-direct removed

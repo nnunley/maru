@@ -44,6 +44,25 @@ Most of the rest is hash.l and structure accessors, each of which checks its typ
   number in turn a placeholder) and every refusal, with the same bytes, reports and error text, and a refusal writing
   nothing; every row that encodes an instruction is among its candidates; over the whole stream the table tries fewer
   encodes than the scan (arm64, x64 and x86, under `eval`, and arm64 and x86 under `eval2`).
+- `asm_grammar` (`check/asm-grammar.l`): arm64's encoder as a tree grammar. `gen-arm64-rules.l` writes `arm64-rules.g`
+  from `arm64.spec` (make): an operand rule for each simple operand kind, answering the value its binder would put in
+  its field (`asm-arm64.l`'s `arm64-reg-value`, `arm64-number-value`, … are each kind's one definition, which binders
+  and rules both call); a rule per row, a list pattern over the instruction answering `(row . word)`
+  (`arm64-row-result`), a row whose kinds have no rule (the vector rows) matched whole by its encoder; and per mnemonic
+  its rows in file order (asm's first fit) and, per operand position a placeholder can take, the rows giving it a field,
+  widest first and stable (asm-best-row's choice for an open placeholder). Over `asm_table`'s arm64 stream (5,098
+  instructions with the refusals) the grammar answers the row and word `asm-select` gives, or no row where asm finds
+  none. A row whose kinds have no value (vectors, bitmasks) still shows each operand's kind in its pattern, by an opaque
+  rule testing the operand's shape, and encodes through its encoder. The grammar drives lowering's sites: make writes
+  its rules as data (`grammar-data.l` → `arm64-rules-data.l`), and `asm-arm64.l`'s specialiser, loading them the first
+  time a site expands, walks a template's mnemonic rule, each row's list pattern and each operand rule's `&->` test,
+  keeping the rows whose rules take the template's holes and literals and leaving each one's tests and one OR of
+  shifted fields (`native_sites`; `check/arm64-kept-rows.l` holds the kept rows to every candidate that takes the
+  instruction). Loading `native.l` costs about 60 ms more for it.
+- arm64's operand kinds bind through binders made once per row plan (`asm-arm64.l`'s `define-arm64-binder`, a table
+  from kind to maker) where `arm64-bind-plan` tested each kind in one chain of conditions; and a lowering rule's
+  instructions are sites (`arm64-sites`) whose rows are chosen as the rule loads (see [Native code](native.md),
+  `native_sites`). `asm` stays the general encoder for everything else.
 - `asm_coverage` (`check/asm-coverage.l`): every form in `asm-coverage.spec`
   has a row, and every operation `ir2.k` declares, on every type, is named
   there for each instruction set.

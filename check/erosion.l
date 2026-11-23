@@ -32,6 +32,15 @@
 	(map (lambda (c) (<callable>-name c))
 	     (callables-of "(define-function a () 1)\n(define-method b <t> () 1)\n(define-form c () 1)\n(define-selector d)\n(define e (lambda () 1))\n(set f (lambda () 1))\n(define g 3)\n(print 4)"))
 	'(a b c d e f))
+(define-function names-of (text) (map (lambda (c) (symbol->string (<callable>-name c))) (callables-of text)))
+(expect "a define-multimethod method is a callable, named by its selector and argument types"
+	(names-of "(define-multimethod f ((<t> x)) 1)\n(define-multimethod f ((<u> x) (<v> y)) 2)") '("f (<t>)" "f (<u> <v>)"))
+(expect "a multimethod's body is its own callable: CC 2, and the typed arguments' lists are forms, as parameters are: 4"
+	(list (cc-of "(define-multimethod f ((<t> x)) (if x 1 2))") (forms-of "(define-multimethod f ((<t> x)) (if x 1 2))")) '(2 4))
+(expect "a define-generic's default body is a callable, named by the generic: CC 2, 3 forms"
+	(list (names-of "(define-generic g (x) (if x 1 2))") (cc-of "(define-generic g (x) (if x 1 2))") (forms-of "(define-generic g (x) (if x 1 2))"))
+	'(("g") 2 3))
+(expect "a define-generic with no default has no body, so no callable" (list-length (callables-of "(define-generic g)")) 0)
 ;; forms: lists outside quoted data
 (expect "a definition, its parameters and a call are three forms" (forms-of "(define-function f (x) (g x))") 3)
 (expect "a quoted datum, its quote included, is no form" (forms-of "(define f (lambda () '(a (b c))))") 2)
