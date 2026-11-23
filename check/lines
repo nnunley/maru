@@ -401,3 +401,4 @@
 +4 structure-fields.l times reads and calls as the least of five runs, so a full make check's load doesn't fail it
 +8 a held int literal is taken as sign-extended only if it fits its size, so a wider one is wrapped as its slot would wrap it (whole-branch review); held.k's two cases of 3000000000 compared with an int, held and from a slot
 +43 a float shrinks to the simplest float32 still against the claim: rules-float-simpler adds moves by the bits (each count of mantissa bits rounded down and up, the next binade toward 1's with its top bits filled, a walk down at the same bits) and tries them simplest first, ties to the one nearer 0 (rules-float-before?); law_rules holds its answer to x < 1000 to the one check/law-float-simplest.l works out from the format's bits (1008, not the 1024 pinned before)
++1 the wide-literal case asserts the held and slot answers agree, not that the literal wraps: which answer is right is ir2's to settle
