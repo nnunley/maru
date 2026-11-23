@@ -48,6 +48,8 @@
   (expect "a literal wider than an int, kept whole" (list ((fn image 'wide-literal "l>l") 0) ((fn image 'wide-literal "l>l") 1))
 	  '(4611686018427387909 9223372036854775807))
   (expect "a global whose initial value is wider than an int, kept whole" ((fn image 'wide-global-value ">l")) 4611686018427387909)
+  (expect "two literals, the narrower widened: 1 + 3000000000" ((fn image 'literal-sum ">l")) 3000000001)
+  (expect "a literal cast to an int, wrapped as the cast says" ((fn image 'literal-cast-wraps ">l")) -1294967296)
   (expect "arithmetic and bits, C's signed results"
 	  (map (lambda (args) (apply (fn image 'arith "lll>l") args))
 	       '((-7 6 0) (-7 2 1) (-7 2 2) (12 10 3) (12 10 4) (12 10 5) (3 4 6) (-8 1 7) (5 0 8)))
@@ -223,6 +225,12 @@
 	 "no such field")
 (refuses "an oop written to a long field" (lambda () (native-compile-file "check/native/objects-bad-assign.k"))
 	 "type mismatch")
+;; a literal its type can't hold is refused, never wrapped or flushed: the program states the width, or casts
+(list-do c '(("an int compared with 3000000000" "check/native/literal-int-compare.k")
+	     ("3000000000 given to an int" "check/native/literal-int-assign.k")
+	     ("1e39 beside a float" "check/native/literal-float-over.k")
+	     ("1e-50 beside a float" "check/native/literal-float-under.k"))
+  (refuses (car c) (lambda () (native-compile-file (cadr c))) "can't hold"))
 
 ;; check/gc.k in place of maru-gc.k's main: the heap grows when needed and adjacent free chunks merge
 (let* ((gc (contents-of-file-named "maru-gc.k"))
