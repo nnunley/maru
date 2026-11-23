@@ -27,7 +27,11 @@ The rule engine, `.law` files and their runner, and the laws over C expressions 
   deleted; a number toward 0, an integer before a float, a float by `rules.l`'s float32 simplicity; each candidate
   strictly simpler (smaller, then lighter numbers) and kept only while it stays in its domain and the claim still
   fails, so it reaches a local minimum whatever the stream drew (a list of numbers against `count(xs) < 1` always
-  shrinks to `(0)`, a float32 against `x < 1000` to 1024; `shrink-list.law`, `float.law`); drawing again at a smaller
+  shrinks to `(0)`; `shrink-list.law`). A float moves by its bits (each count of mantissa bits rounded down and up, the
+  next binade toward 1's with its top bits filled, a walk down at the same bits), simplest first, an equal cost going to
+  the value nearer 0, so a float32 against `x < T` reaches the simplest float32 at or above T: `law_rules` holds
+  `float.law`'s answer to `x < 1000` to the one `check/law-float-simplest.l` works out from the format (1008, which is
+  1.11111b × 2^9, simpler than 2^10 by its nearer exponent). Drawing again at a smaller
   size is the last resort. The fixtures run on a seed fresh each time, printed: an outcome the draws don't decide is held
   as written, a sampled refutation by its verdict and the variables it names, a sampled fixture by its verdicts, and a
   run with either again on its seed, which must give the same lines. A file with no `under test:` line is `E_NO_UNDER_TEST`, a goal

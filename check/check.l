@@ -635,14 +635,16 @@
 		 ;; the simplest float32 against it (rules.l's float)
 		 ("float" "check/laws/fixtures/float.l" 256
 		  "law families: TESTED 4000 (zero 7%, subnormal 14%, huge 11%, infinite 7%, near24 8%, ordinary 53%)"
-		  "law below_1000: REFUTED x=1024.000000 seed=43"))
+		  "law below_1000: REFUTED"))	; what it shrinks to is held below, worked out from the format
       (unit-assert (law-fixture-holds (car c) (cadr c) (cddr c)))))
   ;; shrinking reaches the one simplest refutation whatever the seed: a list of numbers to the one-element list of 0 (by
-  ;; its structure: elements dropped, the rest simplified), and a float32 against x < 1000 to 1024
+  ;; its structure: elements dropped, the rest simplified), and a float32 against x < 1000 to the simplest float32 at or
+  ;; above 1000 by rules-float-cost, which check/law-float-simplest.l works out from the format's bits
   (let ((list-words (words (cadr (law-fixture "shrink-list" "check/laws/fixtures/shrink-list.l" *law-seed*))))
-	(float-words (words (caddr (law-fixture "float" "check/laws/fixtures/float.l" *law-seed*)))))
+	(float-words (words (caddr (law-fixture "float" "check/laws/fixtures/float.l" *law-seed*))))
+	(float-simplest (car (run "law_float_simplest" "./eval check/law-float-simplest.l 1000"))))
     (unit-assert (equal (list (caddr list-words) (cadddr list-words)) '("REFUTED" "xs=(0)")))
-    (unit-assert (equal (list (caddr float-words) (cadddr float-words)) '("REFUTED" "x=1024.000000"))))
+    (unit-assert (equal (list (caddr float-words) (cadddr float-words)) (list "REFUTED" float-simplest))))
   ;; a field the record doesn't have, or a field of a value that isn't a record, stops the run naming it (the error is printed on the output)
   (let ((r (law-fixture "empty-domain" "")))	; an empty list is no domain
     (unit-assert (and (= 256 (car r)) (string-find (contents-of-file-named (concat-strings tmp "/empty-domain.out")) "E_DOMAIN"))))

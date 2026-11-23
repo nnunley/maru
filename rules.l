@@ -221,9 +221,28 @@
       (while (and (< 0 bits) (= 0 (& m 1)) (< 0 m)) (set m (>> m 1)) (set bits (- bits 1)))
       (and (= 0 (& b rules-float-mantissa-mask)) (set bits 0))
       (+ (+ (if (= e 255) 100000 0) (* 64 (if (< e 127) (- 127 e) (- e 127)))) (+ (* 2 bits) (if (= 0 (& b rules-float-sign-bit)) 0 1))))))
-(define-function rules-float-simpler (x)
+(define-function rules-float-before? (a b)	; a simpler than b: cheaper, or as cheap and nearer 0
+  (let ((ca (rules-float-cost a)) (cb (rules-float-cost b)))
+    (or (< ca cb) (and (= ca cb) (< (rules-float-magnitude a) (rules-float-magnitude b))))))
+(define-function rules-float-bits-of-mantissa (m)	; how many of a mantissa's bits are significant
+  (let ((bits 23)) (if (= m 0) 0 (let () (while (= 0 (& m 1)) (set m (>> m 1)) (set bits (- bits 1))) bits))))
+;; the mantissas a float's search can move to by its bits alone: m rounded down and up to each count of bits, the next
+;; binade toward 1's with its top bits filled (the values just across the binade's edge), and, at m's own count of bits,
+;; m less each power of two of its last bit (as cheap, nearer 0, so a value can walk down to the least that still fails)
+(define-function rules-float-moves (sign e m)
+  (let ((out ()) (near (cond ((< e 127) (+ e 1)) ((> e 127) (- e 1)) (else e))) (last (<< 1 (- 23 (rules-float-bits-of-mantissa m)))))
+    (for (k 0 24)
+      (let* ((step (<< 1 (- 23 k))) (down (* step (/ m step))) (up (+ down (if (= down m) 0 step))))
+	(push out (rules-float-of-bits (| sign (| (<< e 23) down))))
+	(and (<= up rules-float-mantissa-mask) (push out (rules-float-of-bits (| sign (| (<< e 23) up)))))
+	(push out (rules-float-of-bits (| sign (| (<< near 23) (& rules-float-mantissa-mask (- 0 step))))))
+	(and (<= (<< last k) m) (< k 23) (push out (rules-float-of-bits (| sign (| (<< e 23) (- m (<< last k)))))))))
+    out))
+(define-function rules-float-insert (c out)	; c into out, which is simplest first
+  (if (or (not out) (rules-float-before? c (car out))) (cons c out) (cons (car out) (rules-float-insert c (cdr out)))))
+(define-function rules-float-simpler (x)	; simpler float32 values, simplest first
   (let* ((b (rules-bits-of-float x)) (sign (& b rules-float-sign-bit)) (e (& (>> b 23) 255)) (m (& b rules-float-mantissa-mask))
-	 (cs (list 0.0
+	 (cs (concat-list (list 0.0
 		   (rules-float-of-bits (& b (- rules-float-sign-bit 1)))			; positive
 		   (if (= e 255) (rules-float-of-bits (| sign rules-float-greatest-bits)) x)	; infinity to the greatest finite
 		   (if (and (< (rules-float-magnitude x) rules-float-2^24) (< (rules-float-magnitude x) 1e15))
@@ -231,10 +250,11 @@
 		   (rules-float-of-bits (| sign (| (<< e 23) (& m (- rules-float-mantissa-mask 4095)))))	; low mantissa bits cleared
 		   (rules-float-of-bits (| sign (<< e 23)))						; no mantissa: a power of two
 		   (rules-float-of-bits (| sign (| (<< (+ 127 (/ (- e 127) 2)) 23) m)))		; the exponent halved toward 1's
-		   (rules-float-of-bits (| sign (| (<< (cond ((< e 127) (+ e 1)) ((> e 127) (- e 1)) (else e)) 23) m)))))	; a step toward it
+		   (rules-float-of-bits (| sign (| (<< (cond ((< e 127) (+ e 1)) ((> e 127) (- e 1)) (else e)) 23) m))))	; a step toward it
+		  (if (= e 255) () (rules-float-moves sign e m))))
 	 (out ()))
-    (list-do c cs (and (rules-float32? c) (< (rules-float-cost c) (rules-float-cost x)) (not (member? c out)) (push out c)))
-    (list-reverse! out)))
+    (list-do c cs (and (rules-float32? c) (rules-float-before? c x) (not (member? c out)) (set out (rules-float-insert c out))))
+    out))
 (define-function rules-solve-eq (goal s k)
   (let ((s2 (unify (cadr goal) (caddr goal) s))) (and s2 (k s2))))
 (define-function rules-note (rl v)
