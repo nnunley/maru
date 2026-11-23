@@ -398,3 +398,4 @@
 +5 the twin reruns a native case past its CPU limit with eight times the limit before calling it a hang
 +53 values nothing reads (register plan Task 3): native-discard marks a let's operands before its last and a body's statements (unused) where they'd have a slot of their own, and native-out stores nothing for them; held_discard and its cases
 -6 native intents chip neutral: the held count is the shortest held row, so the held scan and tpeg-direct compile once again
++4 structure-fields.l times reads and calls as the least of five runs, so a full make check's load doesn't fail it

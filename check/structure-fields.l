@@ -13,7 +13,11 @@
 (or (= 9 (+ (<sf-point>-x p) (<sf-point>-y p))) (error "structure-fields: a field read or written wrong"))
 (or (= 3 (+ (<sf-point>-x q) (<sf-point>-y q))) (error "structure-fields: a field of a derived type read wrong"))
 (define-function one (x) x)
-(define-function time-of (f) (let ((t (clock))) (f) (- (clock) t)))
+;; the least of five runs, so a run the machine's load slowed (as a full make check does) doesn't decide it
+(define-function time-of (f)
+  (let ((best ()))
+    (for (i 0 5) (let ((t (clock))) (f) (let ((d (- (clock) t))) (or (and best (< best d)) (set best d)))))
+    best))
 (define-function reads () (for (i 0 200000) (<sf-point>-x p)))
 (define-function calls () (for (i 0 200000) (one p)))
 (reads) (calls)
