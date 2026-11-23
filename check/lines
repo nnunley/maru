@@ -399,3 +399,4 @@
 +53 values nothing reads (register plan Task 3): native-discard marks a let's operands before its last and a body's statements (unused) where they'd have a slot of their own, and native-out stores nothing for them; held_discard and its cases
 -6 native intents chip neutral: the held count is the shortest held row, so the held scan and tpeg-direct compile once again
 +4 structure-fields.l times reads and calls as the least of five runs, so a full make check's load doesn't fail it
++8 a held int literal is taken as sign-extended only if it fits its size, so a wider one is wrapped as its slot would wrap it (whole-branch review); held.k's two cases of 3000000000 compared with an int, held and from a slot

@@ -301,7 +301,9 @@
 ;; narrower than a register sign-extended, as a load from its slot would have, unless its producer already did (a load,
 ;; a comparison, a literal)
 (define-selector native-extended? (insn) ())
-(define-method native-extended? <ir-lit> () 1)
+(define-method native-extended? <ir-lit> ()	; only if it fits its size: a wider one is wrapped as a slot would wrap it
+  (let ((v (car self.parameters)) (half (<< 1 (- (* 8 (native-size self)) 1))))
+    (or (not (long? v)) (<= 8 (native-size self)) (and (<= (- 0 half) v) (< v half)))))
 (define-method native-extended? <ir-indir> () 1)
 (define-method native-extended? <ir-member> () 1)
 (define-method native-extended? <ir-get-var> () 1)

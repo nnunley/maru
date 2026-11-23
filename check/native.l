@@ -87,6 +87,8 @@
   (expect "held_expr loads only its arguments" (list-detect i intents (and (= 'load (car i)) (not (member? (caddr i) params)))) ())
   (list-do i intents (and (= 'store (car i)) (set stores (+ stores 1))))
   (expect "held_expr stores only its result" stores 1)
+  (expect "a wide int literal wraps to its int whether held or in a slot"
+	  (list ((fn image (quote held_literal_wide) "i>l") 0) ((fn image (quote held_literal_wide_deep) "il>l") 0 5)) (quote (0 20)))
   (expect "held_discard" ((fn image (quote held_discard) "l>l") 6) 6)
   (expect "held_discard stores nothing: its product is read by nothing"
 	  (list-detect i (cadr (assq (quote held_discard) (<native-unit>-functions unit))) (= (quote store) (car i))) ()))

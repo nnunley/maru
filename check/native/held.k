@@ -21,3 +21,7 @@
 (define-function held_int32_negative long ((a int) (b int)) (return (cast (< (* a b) 0) long)))
 (define-function held_int32_half long ((a int) (b int)) (return (cast (/ (* a b) 2) long)))
 (define-function held_discard long ((a long)) (* a a) (return a))	; a product nothing reads
+;; an int literal past an int's range, compared held (nothing pending) and from a slot (two values pending): both must
+;; see it wrapped to 32 bits, as storing it in its int slot does (3000000000 is -1294967296)
+(define-function held_literal_wide long ((x int)) (return (cast (< x 3000000000) long)))
+(define-function held_literal_wide_deep long ((x int) (a long)) (return (+ (* 2 a) (+ (* 2 a) (cast (< x 3000000000) long)))))
