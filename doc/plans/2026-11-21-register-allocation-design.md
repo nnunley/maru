@@ -1,6 +1,6 @@
 # Register allocation for native-gen.k: design
 
-Status: draft for approval, 2026-11-21. Branch nile-native-eval (A1: native imaging of Nile and Gezira on eval2).
+Status: step 1 landed 2026-11-23 (held values: on Gezira 19,336 loads and 18,765 stores became 14,941 and 12,809; lowering 0.85 of its CPU, the whole compile 25.7 s to 23.4 s). Step 2 deferred: "Let's worry about the levels later. We seem to be fast enough for now." Branch nile-native-eval.
 
 ## Intent
 

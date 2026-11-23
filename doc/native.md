@@ -34,7 +34,15 @@ Typed Maru compiled to arm64 and x86-64 in process, code images, and the JIT.
   Maru (normal numbers and zero; a subnormal, infinite, NaN or `-0.0` literal is an error). A write
   stores at the size of the place it writes, so zero (an `int`) written to a pointer clears all of it. A frame beyond an
   immediate's reach is made from X29, and a slot a load's scaled offset doesn't reach (too far, or not a multiple of the
-  access) has its address made in X15. Each unit starts from maru.k's own declarations, as maru.k
+  access) has its address made in X15. A value read once, by the operation it feeds, is held in a register rather than a
+  slot (`(held K)`, abi.spec's `held` rows): an integer or pointer from a literal, arithmetic, a comparison, a cast, an
+  indirection, a member, a global or an extern, while no later operand calls and fewer than `*native-held-count*` are
+  pending. That count is the shortest `held` row of all the ISAs (two, x86-64's RSI and RDI), so a unit's intents are
+  the same whichever chip lowers them. A result shares only its first operand's register (x86-64's two-operand rule), a
+  narrow held integer is sign-extended as a load from its slot would be (`extend`), and a value nothing reads is not
+  stored at all. Floats, call arguments and results, and return values keep their slots. `check/native/held.k`'s cases
+  pin this, and `check/native-held.l` lowers every native program for both ISAs and reports any form naming a held
+  machine register that its intent doesn't carry as that `h` register; an `h` register past its row is refused. Each unit starts from maru.k's own declarations, as maru.k
   compiles once a process. `check/native/floats.k`, `labels.k`, `structs.k` (12 and 16 bytes both ways, C's `ldiv`, a
   spill after seven longs, 8-byte pieces at slots 4 past a multiple of 8), `stack.k` (ints past the eighth argument,
   from C too), `frame.k` (a frame of 9760 bytes), `maru-check.k`'s six sections, `maru-gc.k`'s eleven reports
