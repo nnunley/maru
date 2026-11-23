@@ -157,7 +157,7 @@
 (define-function test-bytes void ()
   ;; No integer promotion is performed on bytes when manipulation them.  They are considered signed
   ;; when cast to another type.  To perform an unsigned cast, AND the signed cast with a mask.
-  (let (((a int8) 10)	((b int8) 20)	((c int8) 40)	((d int8) 80)	((e int8) 160))
+  (let (((a int8) 10)	((b int8) 20)	((c int8) 40)	((d int8) 80)	((e int8) (cast 160 int8)))
     ;;        signed cast                                 unsigned cast
     (assert (=  -96 (cast      e  int)))    (assert (= 160 (& 255 (cast      e  int))))
     (assert (=  -16 (cast (+ d e) int)))    (assert (= 240 (& 255 (cast (+ d e) int))))
@@ -179,7 +179,7 @@
     ;; Remainder has the same sign as dividend.
     (assert (=   80 (cast (% d e) int)))    (assert (= -16 (cast (% e d) int)))	;; -96 % 80
     )
-  (let (((x0a int8) 10) ((x80 int8) 128))
+  (let (((x0a int8) 10) ((x80 int8) (cast 128 int8)))
     (assert (=   10 (cast (<< x0a 0) int)))
     (assert (=   80 (cast (<< x0a 3) int)))
     (assert (=  -96 (cast (<< x0a 4) int)))
@@ -216,7 +216,7 @@
     (assert (=       18 (cast (/ f g) int)))
     (assert (=     1094 (cast (% f g) int)))
     )
-  (let (((x0a00 int16) 0x0a00) ((x8000 int16) 0x8000))
+  (let (((x0a00 int16) 0x0a00) ((x8000 int16) (cast 0x8000 int16)))
     (assert (=  2560  (cast (<< x0a00  0) int)))
     (assert (= 20480  (cast (<< x0a00  3) int)))
     (assert (= 0x4000 (cast (<< x0a00  5) int)))
@@ -251,7 +251,7 @@
     (assert (=  	      2      (cast (/ f e) int)))
     (assert (= 	             18      (cast (/ f g) int)))
     (assert (= 	          10922      (cast (% f g) int))))
-  (let (((x0a00 int32) 0x0a00) ((x80kk int32) 0x80000000))
+  (let (((x0a00 int32) 0x0a00) ((x80kk int32) (cast 0x80000000 int32)))
     (assert (=        2560 (cast (<< x0a00  0) int)))
     (assert (=       20480 (cast (<< x0a00  3) int)))
     (assert (=  0x50000000 (cast (<< x0a00 19) int)))

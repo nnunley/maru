@@ -353,12 +353,23 @@
       (set i (>> i 1)))
     (>> (+ w 7) 3)))
 
+;; A literal is given another type of its kind only if that type holds it: an integer within the type's signed range; a
+;; floating literal at either width, unless float would round it to infinity or a nonzero value to 0 (rounding it to
+;; float's nearest is not refused).  One that doesn't fit is refused, never wrapped: the program states the width, or casts.
+(define ir-float-overflow (let ((x 1.0)) (for (i 0 128) (set x (* x 2.0))) (* x (- 1.0 (/ 1.0 33554432.0)))))	; 2^128 (1 - 2^-25): rounds to infinity
+(define ir-float-underflow (let ((x 1.0)) (for (i 0 150) (set x (/ x 2.0))) x))					; 2^-150: rounds to 0
+(define-function ir-literal-fits? (ltype rhs)
+  (let ((v (car (<ir-insn>-parameters rhs))) (bits (* 8 (<ir-type>-size ltype))))
+    (cond ((ir-integral-type? ltype)	(or (<= 64 bits) (and (<= (- 0 (<< 1 (- bits 1))) v) (< v (<< 1 (- bits 1))))))
+	  ((<= 64 bits)			1)
+	  (else				(let ((m (if (< v 0) (- 0.0 v) v)))
+					  (and (< m ir-float-overflow) (or (= m 0.0) (> m ir-float-underflow))))))))
 (define-function ir-can-coerce (ltype rhs)
   (and (ir-lit? rhs)
        (let ((rtype (<ir-insn>-type rhs)))
-	 (or (and (ir-integral-type? ltype) (ir-integral-type? rtype)
+	 (or (and (ir-integral-type? ltype) (ir-integral-type? rtype) (ir-literal-fits? ltype rhs)
 		  (set (<ir-insn>-type rhs) ltype))
-	     (and (ir-floating-type? ltype) (ir-floating-type? rtype)
+	     (and (ir-floating-type? ltype) (ir-floating-type? rtype) (ir-literal-fits? ltype rhs)
 		  (set (<ir-insn>-type rhs) ltype)))
 	 )))
 
@@ -370,9 +381,22 @@
       (ir-can-coerce          ltype		       rhs   )
       ))
 
+(define-function ir-unheld-literal (ltype rhs)	; rhs, if it is a literal of ltype's kind that ltype can't hold
+  (let ((rtype (and (ir-lit? rhs) (<ir-insn>-type rhs))))
+    (and rtype (or (and (ir-integral-type? ltype) (ir-integral-type? rtype)) (and (ir-floating-type? ltype) (ir-floating-type? rtype)))
+	 (not (ir-literal-fits? ltype rhs)) rhs)))
+(define-function ir-refuse-literal (ltype lit who)
+  (error "a literal its type can't hold: "(car (<ir-insn>-parameters lit))" as "ltype" in: "who"; cast it, or state the width"))
 (define-function ir-check-assignment (ltype rtype rhs who)
   (or (ir-can-assign ltype rtype rhs)
+      (and (ir-unheld-literal ltype rhs) (ir-refuse-literal ltype rhs who))
       (error "type mismatch ("ltype" <- "rtype") in assignment: "who)))
+(define-function ir-illegal-types (insn)	; an operation's operands of types it can't take, naming a literal that didn't fit
+  (let* ((a (car (<ir-insn>-operands insn))) (b (cadr (<ir-insn>-operands insn)))
+	 (ta (and a (<ir-insn>-type a))) (tb (and b (<ir-insn>-type b))))
+    (cond ((and ta tb (ir-unheld-literal ta b))	(ir-refuse-literal ta b insn))
+	  ((and ta tb (ir-unheld-literal tb a))	(ir-refuse-literal tb a insn))
+	  (else					(error "illegal types in: "insn)))))
 
 ;
 
@@ -917,7 +941,7 @@
 								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
 								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	lht)
-								 (else (error "illegal types in: "self))))))
+								 (else (ir-illegal-types self))))))
 
 ;
 
@@ -933,7 +957,7 @@
 								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
 								 ((and (ir-pointer-type? lht) (=                 lht rht))	(ir-integral-of-size (<ir-type>-size lht)))
 								 ((and (ir-pointer-type? lht) (ir-integral-type? rht))	lht)
-								 (else (error "illegal types in: "self))))))
+								 (else (ir-illegal-types self))))))
 
 ;
 
@@ -944,7 +968,7 @@
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
 							(let ((type (ir-check-type (car self.operands) ir 1)))
-							  (or (,test type) (error "illegal types in: "self))
+							  (or (,test type) (ir-illegal-types self))
 							  (set self.type type))))))
 
 (define-unary-arithmetic neg ir-numeric-type?)
@@ -964,7 +988,7 @@
 								 ((and (,test lht) (= rht lht))			lht)
 								 ((and (,test lht) (ir-can-coerce lht rhs))	lht)
 								 ((and (,test rht) (ir-can-coerce rht lhs))	rht)
-								 (else (error "illegal types in: "self)))))))))
+								 (else (ir-illegal-types self)))))))))
 
 (define-binary-arithmetic mul 	 ir-numeric-type?)
 (define-binary-arithmetic div 	 ir-numeric-type?)
@@ -985,7 +1009,7 @@
 								   (ir-integral-type? rht)
 								   (or (= IR-INT rht)
 								       (ir-can-coerce IR-INT rhs)))
-							      (error "illegal types in: "self))
+							      (ir-illegal-types self))
 							  (set self.type lht))))))
 
 (define-shift shl)
@@ -1008,7 +1032,7 @@
 							      (and (= IR-VOID*        lht) (ir-pointer-type?  rht))
 							      (and (ir-pointer-type?  lht) (ir-zero?          rhs))
 							      (and (ir-zero?          lhs) (ir-pointer-type?  rht))
-							      (error "illegal types in: "self))
+							      (ir-illegal-types self))
 							  (set self.type IR-BOOL))))))
 
 (define-relation eq)
@@ -1025,7 +1049,7 @@
 							  (or (and (ir-scalar-type?   lht) (= lht rht))
 							      (and (ir-numeric-type? lht) (ir-can-coerce lht rhs))
 							      (and (ir-numeric-type? rht) (ir-can-coerce rht lhs))
-							      (error "illegal types in: "self))
+							      (ir-illegal-types self))
 							  (set self.type IR-BOOL))))))
 
 (define-arithmetic-relation lt)

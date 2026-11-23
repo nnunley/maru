@@ -64,3 +64,7 @@
 ;; so is a global whose type comes from its initial value
 (define wide-global 4611686018427387909)
 (define-function wide-global-value long () (return (cast wide-global long)))
+;; two literals: the narrower one widens to the other's type, so 1 + 3000000000 is a long sum
+(define-function literal-sum long () (return (+ 1 3000000000)))
+;; an int that a literal is cast to wraps it, because the program says so
+(define-function literal-cast-wraps long () (return (cast (cast 3000000000 int) long)))
