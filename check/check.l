@@ -33,24 +33,9 @@
     (while (and (<= i n) (not (= sub (string-copy str i (string-length sub))))) (incr i))
     (and (<= i n) i)))
 
-;; Run cmd under sh with a limit of secs seconds, which an alarm set in the
-;; child enforces (it survives exec); returns the status waitpid gives.
-(define fork	(subr "fork" ">i"))
-(define alarm	(subr "alarm" "i>i"))
-(define execl	(subr "execl" "ss.>i"))	; two fixed arguments, the rest variadic
-(define waitpid	(subr "waitpid" "ipi>i"))
-(define _exit	(subr "_exit" "i"))
-(define status-word ((subr "malloc" "l>p") 8))
+(require "check/run-status.l")
 (define setrlimit (subr "setrlimit" "ip>i"))
 (define rlimit ((subr "malloc" "l>p") 16))	; struct rlimit: soft and hard limits, 64 bits each, on Darwin and Linux alike
-(define-function run-status (secs cmd)
-  (let ((pid (fork)))
-    (when (= 0 pid)
-      (alarm secs)
-      (execl "/bin/sh" "sh" "-c" cmd 0)
-      (_exit 127))
-    (waitpid pid status-word 0)
-    (+ (byte-at status-word 0) (<< (byte-at status-word 1) 8))))
 
 ;; Run a shell command with no input and a 120 s limit (or SECS); keep its
 ;; output in tmp/NAME.out.  Returns the output's lines, or fails the case.
@@ -85,7 +70,19 @@
 (check "run_limit"
   (unit-assert (= 0 (run-status 5 "true")))
   (unit-assert (= 768 (run-status 5 "exit 3")))
-  (unit-assert (= 14 (run-status 1 "sleep 30"))))
+  (unit-assert (= 14 (run-status 1 "sleep 30")))
+  ;; at its limit nothing it started is left running: not the program sh started, nor what that program forked (a
+  ;; native check's child), which the alarm never reaches
+  (let ((left (concat-strings tmp "/run_limit_left")))
+    (run-status 5 (concat-strings "rm -f " left))
+    (unit-assert (= 14 (run-status 1 (concat-strings "(sleep 2; touch " left ") & exec sh -c 'sleep 30'"))))
+    (run-status 10 "sleep 3")
+    (unit-assert (= 0 (run-status 5 (concat-strings "test ! -e " left))))
+    ;; nor when the runner is interrupted (Ctrl-C reaches the terminal's group, which the command has left): a runner
+    ;; interrupted a second into its command leaves nothing of it to write the file two seconds in
+    (run-status 20 (concat-strings "./eval check/run-interrupt.l \"(sleep 2; touch " left ") & exec sleep 30\" & r=$!; "
+				   "sleep 1; kill -INT $r; wait $r; sleep 3"))
+    (unit-assert (= 0 (run-status 5 (concat-strings "test ! -e " left))))))
 
 ;; A name asked for that no check has fails the run instead of passing unrun.
 (check "unmatched"
