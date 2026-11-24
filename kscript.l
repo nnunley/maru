@@ -527,8 +527,8 @@
 	 ((= op 'dict)
 	  (map (lambda (p) (cons (car p) (ks-stream-curr (ks-eval (cadr p) env this)))) (cdr exp)))
 	 ((= op 'range)
-	  (ks-range (ks-stream-curr (ks-eval (cadr exp) env this))
-		    (ks-stream-curr (ks-eval (caddr exp) env this)) ()))
+	  (ks-range (ks-stream-curr (ks-eval (cadr exp) env this))	; a step, as [b .. e] gives, makes b > e empty
+		    (ks-stream-curr (ks-eval (caddr exp) env this)) (and (cdddr exp) (ks-stream-curr (ks-eval (cadddr exp) env this)))))
 	 ((= op 'fn)
 	  (new <ks-closure> (cadr exp) (cddr exp) env this))
 	 ((= op 'field)

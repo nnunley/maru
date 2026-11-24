@@ -15,7 +15,8 @@ KScript's evaluator, KSWorld documents headless and in a window, KSWorld's own s
   the class's type, and a send no method answers is an error naming class and selector; a KSWorld object's send sets or reads a
   field or entry it already has, but never makes one, which would hide a missing method. A field read on any other value (`ev.hand`) is a send with no arguments.
   A list (`[1, 2]`, a range, a comprehension) is a Maru array, as Smalltalk's Arrays are, indexed from 0; an empty one is a
-  collection, true as a test, never nil. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
+  collection, true as a test, never nil. A range `[b ... e]` takes in `e`, and `[b .. e]` stops before it, as KSCompiler
+  compiles them (`b to: e`, `b to: e - 1`), so `for i in [0 .. n]`, the loop KSWorld's own methods use, runs `n` times. Truth is Maru's: true is `t`, false and nil are one value, `()`, as test-pepsi.l has
   them (`false := nil`), and `undefined` is neither; a stream saved with no value is undefined. Departures: false prints
   as `nil`, where Squeak printed `false`, and the symbol `t` (a Smalltalk `#t`, a document's Symbol `t`) is true.
 - `ksworld_headless` (`check/ksworld.l`): `./eval ksworld-run.l DOC.pp [TICKS]` loads a KSWorld document (`ksworld-pp.l`), reads

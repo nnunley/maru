@@ -97,6 +97,11 @@ for i in [0...10] by 5 total := total + i
 (let ((a (ks-run "[1, 2, 3]")))
   (expect "a literal is an array" (and (array? a) (array->list a)) '(1 2 3)))
 (expect "a range is an array" (let ((a (ks-run "[1...3]"))) (and (array? a) (array->list a))) '(1 2 3))
+;; [b .. e] stops before e, as KSCompiler compiles it (b to: e - 1 do:): the form KSWorld's own methods loop with
+(expect "[b .. e] stops before e, and is empty when e is b"
+	(list (array->list (ks-run "[0 .. 3]")) (array->list (ks-run "[0..3]")) (ks-run "[2 .. 2].size()"))
+	'((0 1 2) (0 1 2) 0))
+(expect "for over [0 .. n] runs n times" (ks-val (box-of "total := 0\nfor i in [0 .. 4] total := total + 1\n") 'total) 4)
 (expect "a comprehension is an array" (let ((a (ks-run "[x * 2 for x in [1, 2, 3] when x > 1]"))) (and (array? a) (array->list a))) '(4 6))
 (expect "an index counts from 0" (ks-run "[10, 20, 30][1]") 20)
 (expect "an empty array: size 0, isEmpty, and true as a test"

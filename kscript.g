@@ -44,6 +44,7 @@ primary		= "..." _							-> 'ellipsis
 										-> `(detect-comp ,v ,col ,(car w))
 		| "("_ expr:e ")"_						-> e
 		| "["_ expr:a "..."_ expr:b "]"_				-> `(range ,a ,b)
+		| "["_ expr:a ".."_ expr:b "]"_				-> `(range ,a (- ,b 1) 1)	# KSCompiler's rangeE, b to: e - 1
 		| "["_ expr:e "for" wb ident:v "in" wb expr:col ("when" wb expr)?:w "]"_
 										-> `(list-comp ,e ,v ,col ,(car w))
 		| "["_ arglist:a "]"_						-> `(list ,@a)
