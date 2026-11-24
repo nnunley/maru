@@ -15,3 +15,4 @@ erosion -1 asm-arm64.l's shape key in four short callables (arm64-shape-key, arm
 verbosity -1 the same: the key's forms neither flagged nor cloned dilute the verbose share
 verbosity +1 %checked in boot.l and boot2.l alike, a clone between the two boots as their accessor makers already are
 verbosity -1 check.l's native_nile case, cpu-hundredths and nile-inputs (factored out of nile-build): forms neither flagged nor cloned dilute the verbose share
+erosion +1 kscript.l's ks-eval, already over CC 10, takes a range's step
