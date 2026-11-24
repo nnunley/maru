@@ -107,6 +107,21 @@
 
 ;; a collection a document saved with nil and false elements keeps them, each in its place
 (expect "nil and false elements are elements, of a Maru array" (array->list (car (ksworld-load "check/ksworld/nils.pp"))) '(5 () () 7))
+;; a box in the text, written among the spans, is in the contents in its place, the document's own object; laying the
+;; text out passes over it, though it keeps its place in the count
+(let* ((table (cadr (ksworld-load "check/ksworld/embedded.pp")))
+       (items (ks-items (ks-val (array-at table 1) 'contents))))
+  (expect "letters and the box, in the document's order"
+	  (map (lambda (l) (or (ks-slot l 'unicode) (ks-slot l 'name))) items) '(116 111 32 "address" 120))
+  (expect "the box is the document's" (car (cdddr items)) (array-at table 2))
+  (when (ks-font-file 'TimesNewRoman ks-plain)
+    (expect "laid out, the letters keep their places in the count" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(0 1 2 4)))
+  ;; text that starts with a box, one whose unicode is KSBox>>unicode's 0, as a box that isn't a letter answers
+  (let ((items (ks-items (ks-val (array-at table 3) 'contents))))
+    (expect "text starting with a box" (map (lambda (l) (if (ks-letter? l) (ks-slot l 'unicode) (ks-slot l 'name))) items) '("photo" 120))
+    (when (ks-font-file 'TimesNewRoman ks-plain)
+      (expect "a box whose unicode is 0 isn't a letter" (map (lambda (c) (<ks-char>-index c)) (ks-letter-chars items)) '(1))))
+  (expect "text that is only a box, named by :valueId" (ks-items (ks-val (array-at table 5) 'contents)) (list (array-at table 6))))
 (expect "Color's class and its colours answer apart"
 	(list (<ks-color>-r (ks-send (ks-class-named 'Color) 'white () () ())) (try (ks-send (ks-class-named 'Color) 'lighter () () ()) (lambda (c) (ksw-message c))))
 	'(1.0 "Smalltalk: Color class does not understand lighter"))

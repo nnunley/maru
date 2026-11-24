@@ -103,20 +103,26 @@
 (define-structure <ks-glyph> (font glyph scale x y paint))
 
 ;; a text box's letter boxes (its contents, ksworld-pp.l's ks-letter-contents) as characters, each knowing its font,
-;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts
+;; scale, paint, place in the text and letter; letters sharing a font object share its TrueType fonts.  A box in the text
+;; that isn't a letter keeps its place in the count, so a selection's gaps still count the contents, but isn't laid out:
+;; it stays where its own transformation puts it, and the letters after it don't make room for it.
+(define-function ks-letter? (box)	; KSBox>>unicode is 0 for a box that isn't a letter, as for one that keeps none
+  (let ((u (ks-slot box 'unicode))) (and (long? u) (< 0 u))))
 (define-function ks-letter-chars (letters)
   (let ((out ()) (index 0) (font-of ()) (fonts ()) (size 0) (paint ()))
     (list-do l letters
-      (let ((f (ks-slot l 'font)))
-	(unless (= f font-of)
-	  (let ()	; a span's font keeps what the document wrote as entries under its keywords
-	    (set font-of f)
-	    (set fonts (ks-fonts (string->symbol (ks-attr f ':family)) (string->long (ks-attr f ':style))))
-	    (set size (string->double (ks-attr f ':size)))
-	    (set paint (ks-span-paint (ks-attr f ':fill)))))
-	(let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
-	  (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
-	  (set index (+ index 1)))))
+      (if (not (ks-letter? l))
+	  (set index (+ index 1))
+	(let ((f (ks-slot l 'font)))
+	  (unless (= f font-of)
+	    (let ()	; a span's font keeps what the document wrote as entries under its keywords
+	      (set font-of f)
+	      (set fonts (ks-fonts (string->symbol (ks-attr f ':family)) (string->long (ks-attr f ':style))))
+	      (set size (string->double (ks-attr f ':size)))
+	      (set paint (ks-span-paint (ks-attr f ':fill)))))
+	  (let* ((code (ks-slot l 'unicode)) (font (ks-char-font fonts code)) (scale (/ size (<ttf>-upem font))))
+	    (push out (new <ks-char> code font scale paint (* scale (ttf-advance font (ttf-glyph font code))) 0 index l))
+	    (set index (+ index 1))))))
     (list-reverse! out)))
 
 (define-function ks-space? (c) (or (= 32 (<ks-char>-code c)) (= 9 (<ks-char>-code c))))
@@ -136,7 +142,8 @@
     (<ks-char>-advance c)))
 
 ;; characters into lines, each (hard origin chars...) with chars in order and their pen x set: a carriage return ends a
-;; line hard, and a word that runs past width (unless wrapping is off) starts the next one, the space before it ending this
+;; line hard (hard is that character, or 1 for the text's end), and a word that runs past width (unless wrapping is off)
+;; starts the next one, the space before it ending this
 (define-function ks-break-lines (chars width tabs wrap left)
   (let ((lines ()) (line ()) (pen 0) (origin left))
     (let ((finish (lambda (hard) (push lines (cons hard (cons origin (list-reverse! line)))) (set line ()) (set pen 0)))
@@ -146,7 +153,7 @@
 		   (set pen (+ pen (ks-char-width c pen tabs origin)))
 		   (push line c))))
       (list-do c chars
-	(cond ((= 13 (<ks-char>-code c)) (finish 1))
+	(cond ((= 13 (<ks-char>-code c)) (finish c))
 	      (else
 	       (when (and wrap (not (ks-space? c)) (> (+ pen (ks-char-width c pen tabs origin)) width))
 		 (let ((tail ()) (rest line))
@@ -220,9 +227,10 @@
 	      (ks-place-letter (<ks-char>-letter c) g)
 	      (or (ks-space? c) (not (memq c ink)) (push out g)))
 	    (and (= 32 (<ks-char>-code c)) (memq c ink) (set extra (+ extra spread)))))
-	(push lines (list y (+ (+ y ascent) descent) next (list-reverse! cells)))
-	(and chars (set next (+ 1 (<ks-char>-index (car (last-pair chars))))))
-	(and hard (set next (+ next 1)))	; past the carriage return, which no line holds
+	(push lines (list y (+ (+ y ascent) descent) (if chars (<ks-char>-index (car chars)) next) (list-reverse! cells)))
+	(set next (cond ((and hard (not (= 1 hard))) (+ 1 (<ks-char>-index hard)))	; past the carriage return, which no line holds
+			(chars (+ 1 (<ks-char>-index (car (last-pair chars)))))
+			(else next)))
 	(set y (+ (+ y ascent) (+ descent 2)))))
     (cons (list-reverse! out) (list-reverse! lines))))
 (define-function ks-text-glyphs (box) (car (ks-text-layout box)))
